@@ -5105,7 +5105,7 @@ function renderStudentDashboard() {
           const actionLabel = action === 'invoice' ? 'generate monthly fee invoice & send statement' : 'send fee due reminder notice';
           const targetLabel = studentId !== 'all' ? `Student (${studentId})` : `${targetClass.toUpperCase()} batch`;
           
-          if (!confirm(`🚀 Confirm Live Email Dispatch?\n\n• Action: ${actionLabel.toUpperCase()}\n• Target: ${targetLabel}\n• Sender: Pragyan Institute <noreply@pragyaninstitute.com>\n\nProceed with live dispatch?`)) {
+          if (!confirm(`📢 Confirm Live Email Dispatch?\n\n• Action: ${actionLabel.toUpperCase()}\n• Target: ${targetLabel}\n• Sender: Pragyan Institute <noreply@pragyaninstitute.com>\n\nProceed with live dispatch?`)) {
             return;
           }
 
@@ -5114,48 +5114,121 @@ function renderStudentDashboard() {
           if (resultBox) {
             resultBox.style.display = 'block';
             resultBox.style.background = '#EFF6FF';
-            resultBox.style.border = '1px solid #BFDBFE';
+            resultBox.style.border = '1.5px solid #3B82F6';
             resultBox.style.color = '#1E40AF';
-            resultBox.innerHTML = `<div><i class="fa-solid fa-spinner fa-spin"></i> Connecting to live Supabase database & Resend serverless worker...</div>`;
+            resultBox.innerHTML = `<div><i class="fa-solid fa-spinner fa-spin"></i> Initializing verified Resend Cloud API dispatch...</div>`;
           }
 
           try {
-            const token = sessionStorage.getItem('pragyan_portal_token') || (AppState.getAuthToken ? AppState.getAuthToken() : '');
-            const res = await fetch('/api/admin-trigger-billing', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-              },
-              body: JSON.stringify({ targetClass, action, studentId })
+            const allStudents = (typeof AppState !== 'undefined' && AppState.getStudents) ? AppState.getStudents() : [];
+            let targets = allStudents.filter(s => {
+              const sClass = (s.className || '').toLowerCase();
+              if (targetClass === 'all') return true;
+              if (targetClass === '10th' || targetClass === 'class 10th') return sClass.includes('10');
+              if (targetClass === '9th' || targetClass === 'class 9th') return sClass.includes('9');
+              if (targetClass === '8th' || targetClass === 'class 8th') return sClass.includes('8');
+              if (targetClass === 'junio' || targetClass === 'junior') return sClass.includes('jun') || sClass.includes('foundation');
+              return sClass.includes(targetClass.toLowerCase());
             });
 
-            const data = await res.json();
-            if (res.ok && data.success) {
-              if (resultBox) {
-                resultBox.style.background = '#ECFDF5';
-                resultBox.style.border = '1.5px solid #10B981';
-                resultBox.style.color = '#065F46';
-                resultBox.innerHTML = `
-                  <div style="font-weight: bold; font-size: 0.95rem; margin-bottom: 0.4rem;">
-                    ✅ Live Dispatch Succeeded for ${escapeHtml(data.targetClass || targetClass)}!
-                  </div>
-                  <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem;">
-                    <span>👥 Total Target: <strong>${data.totalStudents || 0}</strong></span>
-                    <span>💳 Billed: <strong>${data.billedCount || 0}</strong></span>
-                    <span>📧 Invoices/Reminders Emailed: <strong>${data.emailedCount || 0}</strong></span>
-                  </div>
-                  <div style="font-size: 0.78rem; opacity: 0.85; max-height: 120px; overflow-y: auto; background: rgba(255,255,255,0.7); padding: 0.5rem; border-radius: 4px; border: 1px solid #A7F3D0;">
-                    ${(data.results || []).map(r => `<div>• <strong>${escapeHtml(r.name || r.studentId)}</strong>: ${r.status}${r.email ? ` (${escapeHtml(r.email)})` : ''}${r.error ? ` <span style="color:#DC2626;">[${escapeHtml(r.error)}]</span>` : ''}</div>`).join('')}
-                  </div>
-                `;
-              }
-              showNotification(`✅ Dispatched emails to ${data.emailedCount || 0} recipient(s)!`, 'success');
-              // Refresh state
-              if (typeof pullAll === 'function') await pullAll();
-            } else {
-              throw new Error(data.error || 'Failed to dispatch billing');
+            if (studentId && studentId !== 'all') {
+              targets = targets.filter(s => {
+                const sId = (s.id || s.student_id || '').toLowerCase();
+                const sRoll = (s.rollNo || s.roll_no || '').toLowerCase();
+                const q = studentId.toLowerCase();
+                return sId === q || sRoll === q;
+              });
             }
+
+            if (targets.length === 0) {
+              throw new Error(`No students found matching target criteria (${targetClass} / ${studentId}).`);
+            }
+
+            const currentMonthName = new Date().toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+            let billedCount = 0;
+            let emailedCount = 0;
+            const results = [];
+
+            for (let i = 0; i < targets.length; i++) {
+              const s = targets[i];
+              const sId = s.id || s.student_id || s.rollNo;
+              const sName = s.name || 'Student';
+              const sEmail = (s.email || '').trim();
+              const monthlyFee = Number(s.monthlyFee) || 1000;
+              let pendingFee = Number(s.pendingFee) || 0;
+
+              let studentStatus = 'Processed';
+              let sendError = null;
+
+              if (action === 'invoice') {
+                pendingFee += monthlyFee;
+                s.pendingFee = pendingFee;
+                billedCount++;
+                studentStatus = `Invoiced +₹${monthlyFee} (New Due: ₹${pendingFee})`;
+              } else {
+                studentStatus = `Reminder (Due: ₹${pendingFee})`;
+              }
+
+              if (sEmail && sEmail.includes('@')) {
+                const subject = action === 'invoice' 
+                  ? `📢 ${currentMonthName} Tuition Fee Invoice - ${sName} (Roll #${s.rollNo || sId})`
+                  : `⚠️ Fee Due Reminder Notice - ${sName} (Due: ₹${pendingFee})`;
+                
+                const emailHtml = generateCampaignEmailHtml(
+                  s, 
+                  action === 'invoice' ? 'monthly_invoice' : 'fee_reminder', 
+                  subject, 
+                  action === 'invoice' 
+                    ? `Please find your official tuition fee invoice for ${currentMonthName}. Prompt payment ensures uninterrupted classes and study material access.`
+                    : `This is a gentle reminder regarding your pending fee balance of ₹${pendingFee}. Please settle before the due date to avoid late fine.`,
+                  true, 
+                  true
+                );
+
+                const sendRes = await sendLiveResendEmail(sEmail, subject, emailHtml);
+                if (sendRes && sendRes.success) {
+                  emailedCount++;
+                  studentStatus += ' -> Emailed ✅';
+                } else {
+                  sendError = sendRes?.error || 'Email delivery failed';
+                  studentStatus += ` -> Email Failed ❌ (${sendError})`;
+                }
+              } else {
+                studentStatus += ' -> (No email registered)';
+              }
+
+              results.push({ name: sName, studentId: sId, email: sEmail, status: studentStatus, error: sendError });
+
+              if (resultBox) {
+                resultBox.innerHTML = `<div><i class="fa-solid fa-spinner fa-spin"></i> Processing ${i + 1} of ${targets.length}: <strong>${escapeHtml(sName)}</strong>...</div>`;
+              }
+            }
+
+            if (action === 'invoice') {
+              await AppState.saveStudents(allStudents);
+            }
+
+            if (resultBox) {
+              resultBox.style.background = '#ECFDF5';
+              resultBox.style.border = '1.5px solid #10B981';
+              resultBox.style.color = '#065F46';
+              resultBox.innerHTML = `
+                <div style="font-weight: bold; font-size: 0.95rem; margin-bottom: 0.4rem;">
+                  ✅ Real-Time Dispatch Complete for ${escapeHtml(targetClass.toUpperCase())}!
+                </div>
+                <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem;">
+                  <span>👥 Total Target: <strong>${targets.length}</strong></span>
+                  <span>💳 Invoiced: <strong>${billedCount}</strong></span>
+                  <span>✉️ Emails Delivered: <strong>${emailedCount}</strong></span>
+                </div>
+                <div style="font-size: 0.78rem; opacity: 0.85; max-height: 140px; overflow-y: auto; background: rgba(255,255,255,0.7); padding: 0.5rem; border-radius: 4px; border: 1px solid #A7F3D0;">
+                  ${results.map(r => `<div>• <strong>${escapeHtml(r.name)}</strong>: ${r.status}</div>`).join('')}
+                </div>
+              `;
+            }
+
+            showNotification(`✅ Dispatched emails to ${emailedCount} recipient(s)!`, 'success');
+            renderAdminAnalyticsTab();
           } catch (err) {
             console.error('Trigger billing error:', err);
             if (resultBox) {
