@@ -4,6 +4,33 @@
 
 (function () {
   'use strict';
+  // Universal Floating Notification & Toast Engine
+  function showNotification(message, type = 'success') {
+    if (typeof document === 'undefined') return;
+    let toast = document.getElementById('toastNotification');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'toastNotification';
+      toast.style.cssText = 'position:fixed;bottom:24px;right:24px;padding:12px 24px;border-radius:10px;font-weight:700;font-size:0.92rem;z-index:999999;box-shadow:0 12px 30px rgba(0,0,0,0.25);display:flex;align-items:center;gap:10px;transition:all 0.3s cubic-bezier(0.4,0,0.2,1);transform:translateY(100px);opacity:0;';
+      document.body.appendChild(toast);
+    }
+    const bg = type === 'error' ? '#EF4444' : type === 'warning' ? '#F59E0B' : '#059669';
+    const icon = type === 'error' ? 'fa-circle-xmark' : type === 'warning' ? 'fa-triangle-exclamation' : 'fa-circle-check';
+    toast.style.background = bg;
+    toast.style.color = '#ffffff';
+    const esc = (typeof escapeHtml === 'function') ? escapeHtml(message) : message;
+    toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${esc}</span>`;
+    toast.style.transform = 'translateY(0)';
+    toast.style.opacity = '1';
+    if (toast._timer) clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => {
+      toast.style.transform = 'translateY(100px)';
+      toast.style.opacity = '0';
+    }, 4000);
+  }
+  window.showNotification = showNotification;
+  window.showToast = showNotification;
+
 
   // Core Feature Flags
   const ENABLE_COMMUNITY_CHAT = false;
