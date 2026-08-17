@@ -444,8 +444,8 @@
     // 1. Try serverless endpoint /api/student-id first
     try {
       const res = await fetch(`/api/student-id?className=${encodeURIComponent(className)}`);
-      if (res.ok) {
-        const json = await res.json();
+      if (res.ok && (res.headers.get("content-type") || "").includes("application/json")) {
+        const json = await res.json().catch(() => ({}));
         if (json.success && json.studentId) {
           // Cross check with unpushed local state
           const localStudents = (typeof AppState !== 'undefined' && AppState.getStudents) ? AppState.getStudents() : [];
@@ -5203,8 +5203,8 @@ function renderStudentDashboard() {
       let token = null;
       try {
         const tokenRes = await fetch('/api/stream-token', { headers: { 'Authorization': `Bearer ${sessionStorage.getItem('pragyan_portal_token') || ''}` } });
-        if (tokenRes.ok) {
-          const tokenJson = await tokenRes.json();
+        if (tokenRes.ok && (tokenRes.headers.get("content-type") || "").includes("application/json")) {
+          const tokenJson = await tokenRes.json().catch(() => ({}));
           streamChatClient = StreamChat.getInstance(tokenJson.apiKey);
           userId = tokenJson.userId;
           token = tokenJson.token;
@@ -6948,8 +6948,8 @@ ${emailLogs.join('\n')}`);
         return;
       }
 
-      const targetDispatchRecipients = emailRecipients.slice(0, MAX_DAILY_BROADCAST_LIMIT);
-      const isCapped = emailRecipients.length > MAX_DAILY_BROADCAST_LIMIT;
+      const targetDispatchRecipients = emailRecipients;
+      const isCapped = false;
 
       const subject = pane.querySelector('#adminEmailSubjectInput')?.value.trim() || defaultSubject;
       const rawBody = pane.querySelector('#adminEmailBodyInput')?.value.trim() || defaultBody;
