@@ -1,5 +1,5 @@
-import { getSupabase, requireSession, applyCors } from './auth.js';
-import { sendEmailViaResend, extractResendErrorMessage } from './resend-sender.js';
+import { getSupabase, requireSession, applyCors } from './_lib/auth.js';
+import { sendEmailViaResend, extractResendErrorMessage } from './_lib/resend-sender.js';
 
 const BATCH_MAP = {
   '10th': { key: '10th', label: 'Class 10th (ACHIEVER)', defaultAmount: 1000 },

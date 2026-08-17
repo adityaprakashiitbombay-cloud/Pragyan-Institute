@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { getSupabase, requireSession, applyCors } from './auth.js';
+import { getSupabase, requireSession, applyCors } from './_lib/auth.js';
 
 export default async function handler(req, res) {
   if (applyCors(req, res)) return;

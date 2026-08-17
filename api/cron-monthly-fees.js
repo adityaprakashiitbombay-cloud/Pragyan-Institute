@@ -1,5 +1,5 @@
-import { getSupabase } from './auth.js';
-import { sendEmailViaResend, extractResendErrorMessage } from './resend-sender.js';
+import { getSupabase } from './_lib/auth.js';
+import { sendEmailViaResend, extractResendErrorMessage } from './_lib/resend-sender.js';
 
 const BATCH_SCHEDULE = {
   // Days 1-4: Monthly Tuition Fee Generation & Initial Statements

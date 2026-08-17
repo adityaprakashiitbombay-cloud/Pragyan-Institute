@@ -1,4 +1,4 @@
-import { getSupabase, applyCors } from './auth.js';
+import { getSupabase, applyCors } from './_lib/auth.js';
 
 function getClassCode(className = '') {
   const cStr = String(className || '').toUpperCase();

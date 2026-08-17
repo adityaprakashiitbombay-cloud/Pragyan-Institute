@@ -1,4 +1,4 @@
-import { getSupabase, requireSession, applyCors } from './auth.js';
+import { getSupabase, requireSession, applyCors } from './_lib/auth.js';
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const ALLOWED_FOLDERS = new Set(['admin_avatars', 'notice_attachments', 'profile_pictures', 'payment_proofs']);

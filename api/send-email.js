@@ -1,5 +1,5 @@
-import { getSupabase, requireSession, applyCors } from './auth.js';
-import { sendEmailViaResend, extractResendErrorMessage } from './resend-sender.js';
+import { getSupabase, requireSession, applyCors } from './_lib/auth.js';
+import { sendEmailViaResend, extractResendErrorMessage } from './_lib/resend-sender.js';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DEFAULT_FROM = 'Pragyan Institute <noreply@pragyaninstitute.com>';

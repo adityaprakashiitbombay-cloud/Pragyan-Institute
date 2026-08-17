@@ -1,4 +1,4 @@
-import { applyCors } from './auth.js';
+import { applyCors } from './_lib/auth.js';
 
 export default async function handler(req, res) {
   if (applyCors(req, res)) return;

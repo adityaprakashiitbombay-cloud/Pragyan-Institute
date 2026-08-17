@@ -1,5 +1,5 @@
 import { StreamChat } from 'stream-chat';
-import { requireSession, applyCors } from './auth.js';
+import { requireSession, applyCors } from './_lib/auth.js';
 
 export default async function handler(req, res) {
   if (applyCors(req, res)) return;
