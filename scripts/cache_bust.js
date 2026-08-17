@@ -55,6 +55,7 @@ function updateCacheBusting() {
   let indexHtml = fs.readFileSync(indexPath, 'utf8');
   indexHtml = indexHtml.replace(/(\.(css|js)|logo\.png)\?v=[a-zA-Z0-9_.-]+/g, `$1?v=${buildVersion}`);
   indexHtml = indexHtml.replace(/(id="siteVersionBadge"[^>]*>|letter-spacing:0.5px; color:rgba\(255,255,255,0.5\);">)v[0-9.]+/g, `$1v${baseVer}`);
+  indexHtml = indexHtml.replace(/register\(['"]\.\/sw\.js(\?v=[a-zA-Z0-9_.-]+)?['"]\)/g, `register('./sw.js?v=${buildVersion}')`);
   fs.writeFileSync(indexPath, indexHtml, 'utf8');
   console.log(`[CacheBust] Updated index.html with v=${buildVersion} and footer badge v${baseVer}`);
 
