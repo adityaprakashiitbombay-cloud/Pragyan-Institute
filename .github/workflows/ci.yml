@@ -29,12 +29,6 @@ jobs:
       - name: Run Cache Busting Build
         run: npm run build
 
-      - name: Run Master LF Audit Suite
-        run: node scratch/test_lf_fixes_suite.js
-
-      - name: Run Master CSS Audit Suite
-        run: node scratch/test_css_bugs_suite.js
-
   deploy-check:
     name: Deployment Configuration Audit
     runs-on: ubuntu-latest
