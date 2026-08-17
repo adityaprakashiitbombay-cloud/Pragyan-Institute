@@ -1,0 +1,33 @@
+name: 24/7 Automated Keep-Alive & Anti-Inactivity Ping
+
+on:
+  schedule:
+    # Runs every 2 days at 04:00 UTC (9:30 AM IST) to guarantee 100% active state
+    - cron: '0 4 */2 * *'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  ping-keep-alive:
+    name: Ping Health & Keep Cloud Active
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Pragyan Live Portal & Health Endpoint
+        run: |
+          echo "⏰ Sending keep-alive health check at $(date -u)..."
+          
+          # 1. Ping GitHub Pages Live Portal
+          PAGES_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L "https://adityaprakashiitbombay-cloud.github.io/pragyan-institute-portal/")
+          echo "📡 Live Portal Status: $PAGES_STATUS"
+          if [ "$PAGES_STATUS" -ne 200 ]; then
+            echo "⚠️ Warning: Live portal returned HTTP $PAGES_STATUS"
+          else
+            echo "✅ Live portal is healthy (HTTP 200)"
+          fi
+          
+          # 2. Ping Health Endpoint (if configured)
+          if [ -n "${{ secrets.VERCEL_PROJECT_URL }}" ]; then
+            API_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.VERCEL_PROJECT_URL }}/api/health")
+            echo "📡 API Health Check Status: $API_STATUS"
+          fi
+          
+          echo "✅ Keep-alive signal successfully dispatched! Project is 100% active."

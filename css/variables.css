@@ -1,0 +1,55 @@
+/* CSS Design Tokens - Pragyan Institute Lalganj */
+:root {
+  /* Color Palette - Earthy Minimalist Warm Aesthetics */
+  --primary-terracotta: #B5543A;
+  --primary-terracotta-hover: #9E452D;
+  --primary-terracotta-light: rgba(181, 84, 58, 0.12);
+  
+  --secondary-sage: #6F7F5F;
+  --secondary-sage-hover: #5A694C;
+  --secondary-sage-light: rgba(111, 127, 95, 0.15);
+
+  --primary-emerald: #064E3B;
+  --primary-emerald-hover: #04382B;
+  --primary-emerald-light: rgba(6, 78, 59, 0.12);
+  --primary-emerald-lighter: rgba(6, 78, 59, 0.06);
+
+  --bg-warm-cream: #F0E6D8;
+  --bg-surface-cream: #F8F3EC;
+  --bg-surface-pure: #FFFFFF;
+
+  --text-mahogany: #5A2E25;
+  --text-charcoal: #2E2E2E;
+  --text-muted: #6B6259;
+  --text-on-accent: #FFFFFF;
+
+  --border-sand: #DDD5CD;
+  --border-sand-dark: #C5BBAF;
+
+  /* Shadows & Glows */
+  --shadow-sm: 0 2px 8px rgba(90, 46, 37, 0.06);
+  --shadow-md: 0 8px 24px rgba(90, 46, 37, 0.09);
+  --shadow-lg: 0 16px 40px rgba(90, 46, 37, 0.14);
+  --shadow-terracotta-glow: 0 8px 25px rgba(181, 84, 58, 0.3);
+  --shadow-sage-glow: 0 8px 25px rgba(111, 127, 95, 0.25);
+  --shadow-emerald-glow: 0 8px 25px rgba(6, 78, 59, 0.3);
+
+  /* Typography */
+  --font-heading: 'Outfit', 'Cinzel', serif;
+  --font-body: 'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif;
+
+  /* Border Radii */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.875rem;
+  --radius-lg: 1.25rem;
+  --radius-full: 9999px;
+
+  /* Transitions */
+  --transition-fast: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-normal: 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-slow: 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Layout */
+  --nav-height: 76px;
+  --max-width: 1280px;
+}

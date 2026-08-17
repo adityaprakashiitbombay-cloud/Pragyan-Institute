@@ -1,0 +1,54 @@
+name: CI & Integrity Audit
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Build & Code Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Syntax & Module Checks
+        run: npm run test
+
+      - name: Run Cache Busting Build
+        run: npm run build
+
+      - name: Run Master LF Audit Suite
+        run: node scratch/test_lf_fixes_suite.js
+
+      - name: Run Master CSS Audit Suite
+        run: node scratch/test_css_bugs_suite.js
+
+  deploy-check:
+    name: Deployment Configuration Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Verify vercel.json
+        run: node -e "const v = JSON.parse(require('fs').readFileSync('vercel.json')); if (!v.buildCommand || !v.outputDirectory) process.exit(1);"
+
+      - name: Verify Service Worker Precache Assets
+        run: node -e "const s = require('fs').readFileSync('sw.js', 'utf8'); if (!s.includes('PRECACHE_ASSETS')) process.exit(1);"

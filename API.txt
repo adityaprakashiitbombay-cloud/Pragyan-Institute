@@ -1,0 +1,9 @@
+Production configuration
+========================
+
+All production credentials are configured only in Vercel Project Settings →
+Environment Variables. See `.env.example` for the required variable names.
+
+Do not paste API keys, service-role keys, provider tokens, or passwords into
+this file, client-side JavaScript, SQL files, or source control. Rotate any
+credentials that were previously stored in this repository before deployment.

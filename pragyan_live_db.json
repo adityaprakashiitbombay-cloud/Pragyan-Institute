@@ -1,0 +1,142 @@
+{
+  "students": [
+    {
+      "id": "261001",
+      "name": "Rohan Sharma (Demo)",
+      "mobile": "9800000001",
+      "dob": "2010-05-15",
+      "rollNo": "261001",
+      "className": "Class 10th (ACHIEVER)",
+      "batchName": "Class 10th (ACHIEVER)",
+      "guardianName": "Guardian A",
+      "guardianMobile": "9800000002",
+      "email": "student.demo1@pragyan.example",
+      "address": "Main Road, Lalganj, Vaishali",
+      "bloodGroup": "B+",
+      "admissionDate": "2026-04-10",
+      "joiningMonth": "April 2026",
+      "monthlyFee": 1000,
+      "totalFee": 5000,
+      "paidFee": 3000,
+      "pendingFee": 2000,
+      "photoUrl": "",
+      "feeHistory": [
+        { "receiptNo": "REC-1042", "date": "12 Apr 2026, 04:30 PM", "amount": 1000, "mode": "Cash Collected", "status": "Paid", "by": "CHANDAN KUMAR (Science Mentor)", "note": "April tuition fee paid in cash" },
+        { "receiptNo": "OLD-DUE-01", "date": "01 May 2026, 09:00 AM", "amount": 2000, "mode": "Old Fee Carryover", "status": "Pending Due", "by": "System Auto-Rollover", "note": "May & June tuition fee balance" },
+        { "receiptNo": "REC-1189", "date": "05 Jul 2026, 05:15 PM", "amount": 2000, "mode": "UPI (PhonePe)", "status": "Paid", "by": "RAVI RANJAN (Maths Mentor)", "note": "July fee payment verified" }
+      ]
+    },
+    {
+      "id": "260901",
+      "name": "Ananya Verma (Demo)",
+      "mobile": "9800000003",
+      "dob": "2011-08-20",
+      "rollNo": "260901",
+      "className": "Class 9th (NURTURE)",
+      "batchName": "Class 9th (NURTURE)",
+      "guardianName": "Guardian B",
+      "guardianMobile": "9800000004",
+      "email": "student.demo2@pragyan.example",
+      "address": "Station Road, Lalganj",
+      "bloodGroup": "O+",
+      "admissionDate": "2026-05-01",
+      "joiningMonth": "May 2026",
+      "monthlyFee": 1000,
+      "totalFee": 4000,
+      "paidFee": 4000,
+      "pendingFee": 0,
+      "photoUrl": "",
+      "feeHistory": [
+        { "receiptNo": "REC-0955", "date": "05 May 2026, 03:20 PM", "amount": 2000, "mode": "Cash Collected", "status": "Paid", "by": "RAVI RANJAN (Maths Mentor)", "note": "May & June upfront fee paid" },
+        { "receiptNo": "REC-1201", "date": "10 Jul 2026, 04:00 PM", "amount": 2000, "mode": "UPI (GPay)", "status": "Paid", "by": "CHANDAN KUMAR (Science Mentor)", "note": "July & August tuition fee cleared" }
+      ]
+    },
+    {
+      "id": "260801",
+      "name": "Vikram Singh (Demo)",
+      "mobile": "9800000005",
+      "dob": "2012-03-10",
+      "rollNo": "260801",
+      "className": "Class 8th (ALPHA)",
+      "batchName": "Class 8th (ALPHA)",
+      "guardianName": "Guardian C",
+      "guardianMobile": "9800000006",
+      "email": "student.demo3@pragyan.example",
+      "address": "Gandhi Chowk, Lalganj",
+      "bloodGroup": "A+",
+      "admissionDate": "2026-06-15",
+      "joiningMonth": "June 2026 (Mid-Session)",
+      "monthlyFee": 800,
+      "totalFee": 3200,
+      "paidFee": 1600,
+      "pendingFee": 1600,
+      "photoUrl": "",
+      "feeHistory": [
+        { "receiptNo": "MID-JOIN-01", "date": "15 Jun 2026, 05:00 PM", "amount": 1600, "mode": "Mid-Session Joining Carryover", "status": "Pending Due", "by": "CHANDAN KUMAR (Science Mentor)", "note": "Joined mid-session in June" },
+        { "receiptNo": "REC-1310", "date": "01 Jul 2026, 04:45 PM", "amount": 1600, "mode": "Cash Collected", "status": "Paid", "by": "RAVI RANJAN (Maths Mentor)", "note": "June & July fee received at counter" }
+      ]
+    }
+  ],
+  "notices": [
+    {
+      "id": "NTC-101",
+      "title": "Class 10th ACHIEVER Weekly Mathematics Mock Test",
+      "category": "exam",
+      "date": "2026-08-15",
+      "message": "Weekly Board Special Mock Test for Class 10th ACHIEVER batch Mathematics by Ravi Ranjan Sir will be held on Sunday from 9:00 AM to 12:00 PM. Attendance is compulsory.",
+      "targetBatch": "Class 10th (ACHIEVER)",
+      "unread": true
+    },
+    {
+      "id": "NTC-102",
+      "title": "Independence Day Science Quiz by Chandan Sir",
+      "category": "general",
+      "date": "2026-08-14",
+      "message": "All students are invited to join the 15th August flag hoisting at 8:00 AM, followed by a Science Quiz competition conducted by Chandan Kumar Sir.",
+      "targetBatch": "All Batches",
+      "unread": true
+    }
+  ],
+  "batches": [
+    {
+      "id": "BAT-10",
+      "name": "Class 10th (ACHIEVER)",
+      "class": "Class 10th",
+      "timing": "04:00 PM - 07:00 PM",
+      "room": "Hall 1 (Main Campus)",
+      "teacher": "Prof. Ravi Ranjan & Chandan Kumar",
+      "monthlyFee": 1000,
+      "totalFee": 11000
+    },
+    {
+      "id": "BAT-09",
+      "name": "Class 9th (NURTURE)",
+      "class": "Class 9th",
+      "timing": "03:30 PM - 06:30 PM",
+      "room": "Room 2 (Ground Floor)",
+      "teacher": "Prof. Ravi Ranjan & Chandan Kumar",
+      "monthlyFee": 1000,
+      "totalFee": 10500
+    },
+    {
+      "id": "BAT-08",
+      "name": "Class 8th (ALPHA)",
+      "class": "Class 8th",
+      "timing": "03:00 PM - 06:00 PM",
+      "room": "Room 3 (First Floor)",
+      "teacher": "Chandan Kumar & Er. Rohit S.",
+      "monthlyFee": 800,
+      "totalFee": 8500
+    },
+    {
+      "id": "BAT-07",
+      "name": "Junior Batch (JUNIO)",
+      "class": "Junior Batch",
+      "timing": "02:30 PM - 05:30 PM",
+      "room": "Room 4 (Interactive Lab)",
+      "teacher": "Prof. Ravi Ranjan & Team",
+      "monthlyFee": 700,
+      "totalFee": 7500
+    }
+  ]
+}

@@ -1,0 +1,367 @@
+/* Base Styles & Typography - Pragyan Institute */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--nav-height) + 1.5rem);
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--bg-warm-cream);
+  color: var(--text-charcoal);
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* Performance Optimization: Defer rendering work for off-screen sections */
+.faculty-section,
+.batches-section,
+.gallery-section,
+.contact-section {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 600px;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  color: var(--text-mahogany);
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+}
+
+p {
+  color: var(--text-charcoal);
+  font-size: 1rem;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+button {
+  font-family: var(--font-body);
+  border: none;
+  outline: none;
+  background: none;
+  cursor: pointer;
+}
+
+/* Container */
+.container {
+  width: 100%;
+  max-width: var(--max-width);
+  margin-inline: auto;
+  padding-inline: clamp(1.25rem, 4vw, 2.5rem);
+}
+
+/* Section Header Shared */
+.section-header {
+  text-align: center;
+  max-width: 680px;
+  margin: 0 auto 3.5rem auto;
+}
+
+.section-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 1rem;
+  border-radius: var(--radius-full);
+  background-color: var(--secondary-sage-light);
+  color: var(--secondary-sage);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 0.875rem;
+  border: 1px solid rgba(111, 127, 95, 0.25);
+}
+
+.section-title {
+  font-size: clamp(2rem, 3.8vw, 2.75rem);
+  font-weight: 800;
+  margin-bottom: 1rem;
+  color: var(--text-mahogany);
+}
+
+.section-subtitle {
+  font-size: 1.0625rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 0.85rem 1.85rem;
+  border-radius: var(--radius-full);
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+  transition: all var(--transition-fast);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-terracotta {
+  background-color: var(--primary-terracotta);
+  color: var(--text-on-accent);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-terracotta:hover {
+  background-color: var(--primary-terracotta-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-terracotta-glow);
+}
+
+.btn-sage {
+  background-color: var(--secondary-sage);
+  color: var(--text-on-accent);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-sage:hover {
+  background-color: var(--secondary-sage-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sage-glow);
+}
+
+.btn-outline-terracotta {
+  border: 2px solid var(--primary-terracotta);
+  color: var(--primary-terracotta);
+  background: transparent;
+}
+
+.btn-outline-terracotta:hover {
+  background-color: var(--primary-terracotta);
+  color: var(--text-on-accent);
+  transform: translateY(-2px);
+}
+
+.btn-outline-sage {
+  border: 2px solid var(--secondary-sage);
+  color: var(--secondary-sage);
+  background: transparent;
+}
+
+.btn-outline-sage:hover {
+  background-color: var(--secondary-sage);
+  color: var(--text-on-accent);
+  transform: translateY(-2px);
+}
+
+/* Focus Visible High-Contrast Rules */
+:focus-visible {
+  outline: 3px solid var(--primary-terracotta, #C85A32);
+  outline-offset: 3px;
+}
+
+/* White outline on terracotta, dark & saturated CTA elements */
+.btn-terracotta:focus-visible,
+.bg-terracotta:focus-visible,
+.btn-emerald:focus-visible,
+.btn-primary:focus-visible,
+.portal-primary-btn:focus-visible,
+.open-portal-trigger:focus-visible,
+.hero-slide-nav:focus-visible {
+  outline: 3px solid #FFFFFF !important;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 5px rgba(200, 90, 50, 0.85);
+}
+
+/* Terracotta outline on white / light backgrounds and inputs */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+button:not(.btn-terracotta):not(.btn-emerald):not(.btn-primary):not(.portal-primary-btn):focus-visible,
+a:not(.btn-terracotta):not(.btn-emerald):focus-visible,
+.tab-btn:focus-visible,
+.portal-tab-pill:focus-visible {
+  outline: 3px solid var(--primary-terracotta, #C85A32) !important;
+  outline-offset: 2px;
+}
+
+/* Mobile Responsive Scaling for Clean Information Density */
+@media (max-width: 768px) {
+  html {
+    font-size: 15px;
+  }
+  .container {
+    padding-inline: 1rem;
+  }
+  .section-header {
+    margin-bottom: 2rem;
+  }
+  .section-title {
+    font-size: 1.75rem;
+  }
+  .section-subtitle {
+    font-size: 0.85rem;
+  }
+  .btn {
+    padding: 0.6rem 1.2rem;
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 480px) {
+  html {
+    font-size: 14px;
+  }
+  .container {
+    padding-inline: 0.85rem;
+  }
+  .section-header {
+    margin-bottom: 1.5rem;
+  }
+  .section-title {
+    font-size: 1.5rem;
+  }
+  .btn {
+    padding: 0.55rem 1.15rem;
+    font-size: 0.84rem;
+  }
+}
+
+/* ==========================================================================
+   ENHANCED GRAPHICS & VISUAL DEPTH SUITE (Performance-Optimized)
+   ========================================================================== */
+
+/* 1. Dynamic Ambient Aurora Mesh Backdrop (Optimized to 1 Subtle Orb) */
+.aurora-ambient-container {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.aurora-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(30px);
+  opacity: 0.5;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.aurora-orb-emerald {
+  width: 320px;
+  height: 320px;
+  background: radial-gradient(circle, rgba(181, 84, 58, 0.07) 0%, rgba(181, 84, 58, 0.01) 70%, transparent 100%);
+  top: -10%;
+  left: 15%;
+  animation: auroraDrift1 20s infinite alternate ease-in-out;
+}
+
+/* Extra orbs disabled to maintain high FPS and low power usage */
+.aurora-orb-gold,
+.aurora-orb-cyan {
+  display: none !important;
+}
+
+@keyframes auroraDrift1 {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(60px, 40px, 0) scale(1.08); }
+  100% { transform: translate3d(-30px, 50px, 0) scale(0.96); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora-ambient-container,
+  .aurora-orb,
+  .aurora-orb-emerald,
+  .aurora-orb-gold,
+  .aurora-orb-cyan {
+    animation: none !important;
+    display: none !important;
+  }
+}
+
+/* 2. Gold & Emerald Foil Text Shimmer Sweep */
+.shimmer-text-gold {
+  background: linear-gradient(135deg, #B45309 0%, #F59E0B 25%, #FFFBEB 50%, #F59E0B 75%, #92400E 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: textShimmer 4.5s linear infinite;
+  display: inline-block;
+}
+
+.shimmer-text-emerald {
+  background: linear-gradient(135deg, #064E3B 0%, #059669 25%, #ECFDF5 50%, #059669 75%, #064E3B 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: textShimmer 5s linear infinite;
+  display: inline-block;
+}
+
+@keyframes textShimmer {
+  to { background-position: 200% center; }
+}
+
+/* 3. Living Breathing Neon LED Status Rings */
+.pulse-status-ring {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pulse-status-ring::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 99px;
+  border: 2px solid currentColor;
+  opacity: 0.8;
+  animation: pulseRingGlow 2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+  pointer-events: none;
+}
+
+@keyframes pulseRingGlow {
+  0% { transform: scale(0.95); opacity: 0.85; }
+  70% { transform: scale(1.35); opacity: 0; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+
+/* 4. Staggered Grid Animations */
+.stagger-slide-up {
+  animation: staggerSlideUp 0.45s cubic-bezier(0.34, 1.45, 0.64, 1) both;
+}
+
+@keyframes staggerSlideUp {
+  0% { opacity: 0; transform: translate3d(0, 16px, 0); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+/* 5. Reduced Motion Respect */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
