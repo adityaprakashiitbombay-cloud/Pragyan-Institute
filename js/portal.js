@@ -5157,22 +5157,25 @@ function renderStudentDashboard() {
 
           try {
             const allStudents = (typeof AppState !== 'undefined' && AppState.getStudents) ? AppState.getStudents() : [];
-            let targets = allStudents.filter(s => {
-              const sClass = (s.className || '').toLowerCase();
-              if (targetClass === 'all') return true;
-              if (targetClass === '10th' || targetClass === 'class 10th') return sClass.includes('10');
-              if (targetClass === '9th' || targetClass === 'class 9th') return sClass.includes('9');
-              if (targetClass === '8th' || targetClass === 'class 8th') return sClass.includes('8');
-              if (targetClass === 'junio' || targetClass === 'junior') return sClass.includes('jun') || sClass.includes('foundation');
-              return sClass.includes(targetClass.toLowerCase());
-            });
-
+            let targets = [];
+            
             if (studentId && studentId !== 'all') {
-              targets = targets.filter(s => {
-                const sId = (s.id || s.student_id || '').toLowerCase();
-                const sRoll = (s.rollNo || s.roll_no || '').toLowerCase();
-                const q = studentId.toLowerCase();
-                return sId === q || sRoll === q;
+              const q = String(studentId).trim().toLowerCase();
+              targets = allStudents.filter(s => {
+                const sId = String(s.id ?? s.student_id ?? '').trim().toLowerCase();
+                const sRoll = String(s.rollNo ?? s.roll_no ?? '').trim().toLowerCase();
+                const sName = String(s.name ?? '').trim().toLowerCase();
+                return sId === q || sRoll === q || sName === q;
+              });
+            } else {
+              targets = allStudents.filter(s => {
+                const sClass = (s.className || s.class_name || '').toLowerCase();
+                if (targetClass === 'all') return true;
+                if (targetClass === '10th' || targetClass === 'class 10th') return sClass.includes('10');
+                if (targetClass === '9th' || targetClass === 'class 9th') return sClass.includes('9');
+                if (targetClass === '8th' || targetClass === 'class 8th') return sClass.includes('8');
+                if (targetClass === 'junio' || targetClass === 'junior') return sClass.includes('jun') || sClass.includes('foundation');
+                return sClass.includes(targetClass.toLowerCase());
               });
             }
 
@@ -6782,7 +6785,7 @@ ${emailLogs.join('\n')}`);
       targetStudents = activeStudents.filter(s => (s.pendingFee || 0) > 0);
       audienceLabel = 'Pending Dues Defaulters Only';
     } else if (adminEmailAudience === 'student') {
-      const match = activeStudents.find(s => (s.id || s.student_id) === adminEmailSelectedStudentId || s.rollNo === adminEmailSelectedStudentId);
+      const match = activeStudents.find(s => String(s.id ?? s.student_id ?? '').trim() === String(adminEmailSelectedStudentId).trim() || String(s.rollNo ?? s.roll_no ?? '').trim() === String(adminEmailSelectedStudentId).trim());
       targetStudents = match ? [match] : (activeStudents.length ? [activeStudents[0]] : []);
       if (targetStudents[0]) adminEmailSelectedStudentId = targetStudents[0].id || targetStudents[0].student_id || targetStudents[0].rollNo;
       audienceLabel = targetStudents[0] ? `${targetStudents[0].name} (Roll #${targetStudents[0].rollNo})` : 'Individual Student';
@@ -7061,9 +7064,9 @@ ${emailLogs.join('\n')}`);
       try {
         const res = await sendLiveResendEmail(promptEmail, subject, emailHtml);
         if (res.success) {
-          alert(`✅ Test email successfully delivered to: ${promptEmail}`);
+          showNotification(`✅ Test email successfully delivered to: ${promptEmail}`, 'success');
         } else {
-          alert(`❌ Test email error: ` + (res.error || 'Check Resend credentials'));
+          showNotification(`⚠️ ${res.error || 'Check Resend credentials'}`, 'warning');
         }
       } catch (err) {
         alert(`❌ Failed to send test: ` + err.message);
