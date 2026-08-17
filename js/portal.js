@@ -5303,18 +5303,21 @@ function renderStudentDashboard() {
             if (AppState.saveNotices) await AppState.saveNotices(notices);
 
             
-            // Trigger Live Resend Cloud Email Dispatcher
+            // Trigger Live Resend Cloud Email Dispatcher with real-time UI logging
             const targetStudentCode = (studentId !== 'all' && targets.length > 0) 
-              ? (targets[0].student_id || targets[0].rollNo || studentId) 
+              ? String(targets[0].student_id || targets[0].roll_no || targets[0].rollNo || targets[0].id || studentId) 
               : 'all';
             
-            triggerCloudEmailDispatch({
-              action: action === 'invoice' ? 'invoice' : 'reminder',
-              batch: targetClass,
-              studentId: targetStudentCode
-            }).then(cloudRes => {
+            try {
+              const cloudRes = await triggerCloudEmailDispatch({
+                action: action === 'invoice' ? 'invoice' : 'reminder',
+                batch: (studentId !== 'all') ? 'all' : targetClass,
+                studentId: targetStudentCode
+              });
               console.log('[Resend Cloud Dispatch Result]:', cloudRes);
-            }).catch(console.error);
+            } catch (cloudErr) {
+              console.warn('[Resend Cloud Dispatch Error]:', cloudErr);
+            }
 const author = getActiveTeacherName();
             await AppState.addAuditLog(
               author, 

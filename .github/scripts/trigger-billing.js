@@ -180,13 +180,19 @@ async function run() {
     return;
   }
 
-  // Fetch target students
+  // Fetch target students with flexible multi-field matching
   let query = supabase.from('students').select('*');
-  if (batch !== 'all') {
+  
+  if (studentId && studentId !== 'all') {
+    const cleanId = String(studentId).trim();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanId);
+    if (isUuid) {
+      query = query.eq('id', cleanId);
+    } else {
+      query = query.or(`student_id.eq.${cleanId},roll_no.eq.${cleanId},name.ilike.%${cleanId}%`);
+    }
+  } else if (batch && batch !== 'all') {
     query = query.ilike('class_name', `%${batch}%`);
-  }
-  if (studentId !== 'all') {
-    query = query.eq('student_id', studentId);
   }
 
   const { data: students, error } = await query;
