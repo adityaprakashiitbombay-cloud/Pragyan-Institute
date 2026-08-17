@@ -160,6 +160,7 @@
     },
 
     updateStatus(status) {
+      if (typeof document === 'undefined') return;
       const studentBadge = document.getElementById('studentCloudSyncBadge');
       const adminBadge = document.getElementById('adminCloudSyncBadge');
       const badges = [studentBadge, adminBadge].filter(Boolean);
@@ -1177,7 +1178,7 @@
           if (Array.isArray(admins) && admins.length > 0) {
             const admin = admins[0];
             const hash = admin.password_hash || admin.passwordHash || '';
-            const isMatch = await this._verifyPasswordHash(cleanCred, hash);
+            const isMatch = hash ? (await this._verifyPasswordHash(cleanCred, hash)) : (admin.password === cleanCred);
             if (isMatch) {
               const norm = this.normalizeAdmin(admin);
               const token = `token_adm_${admin.id || admin.admin_id}_${Date.now()}`;
@@ -1206,7 +1207,7 @@
           const idMatch = (a.username?.toLowerCase() === cleanId.toLowerCase() || a.email?.toLowerCase() === cleanId.toLowerCase() || a.mobile === cleanId);
           if (idMatch) {
             const hash = a.password_hash || a.passwordHash || '';
-            const isMatch = await this._verifyPasswordHash(cleanCred, hash);
+            const isMatch = hash ? (await this._verifyPasswordHash(cleanCred, hash)) : (a.password === cleanCred);
             if (isMatch) {
               const cleanUser = this.normalizeAdmin(a) || a;
               const token = `token_adm_${a.id || 'ADM'}_${Date.now()}`;
@@ -1246,7 +1247,8 @@
               if (activeReq && activeReq.new_data) {
                 const newD = typeof activeReq.new_data === 'string' ? JSON.parse(activeReq.new_data) : activeReq.new_data;
                 const hash = newD.password_hash || newD.passwordHash || '';
-                if (hash && (await this._verifyPasswordHash(cleanCred, hash))) {
+                const isPwdMatch = hash ? (await this._verifyPasswordHash(cleanCred, hash)) : (newD.password === cleanCred);
+                if (isPwdMatch) {
                   matched = s;
                   break;
                 }
@@ -1345,6 +1347,7 @@
 
     // ── UI Status Badge ─────────────────────────────────────────────────────
     updateStatus(status) {
+      if (typeof document === 'undefined') return;
       document.querySelectorAll('#adminCloudSyncBadge, #studentCloudSyncBadge').forEach(badge => {
         const icon = badge.querySelector('i');
         const span = badge.querySelector('span');

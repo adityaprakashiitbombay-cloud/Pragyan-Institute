@@ -1905,7 +1905,7 @@
     try {
       if (typeof SupabaseSync !== 'undefined' && SupabaseSync.login) {
         const authResult = await SupabaseSync.login(role, mobile, dob);
-        if (authResult.success) {
+        if (authResult && authResult.success) {
           AppState.currentUser = authResult.user;
           saveSession(role, authResult.user);
           if (role === 'student' && typeof AppState !== 'undefined' && AppState.getStudents) {
@@ -1925,7 +1925,7 @@
           }
           return;
         } else {
-          showLoginError(authResult.error || 'Authentication failed. Please check your credentials.');
+          showLoginError((authResult && authResult.error) || 'Authentication failed. Please check your credentials.');
           if (submitBtn) {
             submitBtn.disabled = false;
             submitBtn.innerHTML = originalBtnContent;
