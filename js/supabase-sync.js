@@ -8,15 +8,10 @@
   'use strict';
 
   // ── Supabase Connection Config ──────────────────────────────────────────────
+  const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqY21tY2FlcnZnc2twa2NmZWttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NDEzMTksImV4cCI6MjEwMjAxNzMxOX0.pTp51JWa-qWbAz-l5NGLKvrS66TED4lruhLInQ6hvmc';
   const _cfg = (typeof window !== 'undefined' && window.PRAGYAN_CONFIG) ? window.PRAGYAN_CONFIG : {};
   const SUPABASE_URL = _cfg.SUPABASE_URL || 'https://ujcmmcaervgskpkcfekm.supabase.co';
-  const SUPABASE_ANON_KEY = _cfg.SUPABASE_ANON_KEY; // No fallback - must be configured
-
-  // Validate critical configuration
-  if (!SUPABASE_ANON_KEY) {
-    console.error('🚨 SUPABASE_ANON_KEY is not configured in window.PRAGYAN_CONFIG');
-    throw new Error('SupabaseSync requires SUPABASE_ANON_KEY to be configured');
-  }
+  const SUPABASE_ANON_KEY = _cfg.SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
 
   const REST_BASE = `${SUPABASE_URL}/rest/v1`;
 
