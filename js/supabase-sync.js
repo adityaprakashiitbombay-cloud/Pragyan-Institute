@@ -212,6 +212,11 @@
           if (!window._pragyanSupabaseClient) {
             console.log('🔌 Creating new Supabase client instance');
             window._pragyanSupabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+              auth: {
+                persistSession: false,
+                autoRefreshToken: false,
+                detectSessionInUrl: false
+              },
               realtime: {
                 params: {
                   eventsPerSecond: 5 // Rate limit realtime events
