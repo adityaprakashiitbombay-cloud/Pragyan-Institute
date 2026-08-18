@@ -4,44 +4,6 @@
 
 (function () {
   'use strict';
-  // GitHub Cloud Worker Real-Time Email Dispatch Engine (100% CORS-Safe & Direct Resend Delivery)
-  async function triggerCloudEmailDispatch({ action, batch, studentId, toEmail }) {
-    try {
-      const _p1 = 'Z2hvXzBRRTA5ZktRTj';
-      const _p2 = 'VvTzlZemtTeEc3cDZHO';
-      const _p3 = 'XZxTEt2WjFlNzQ4Mw==';
-      const token = (typeof atob === 'function') ? atob(_p1 + _p2 + _p3) : '';
-      const repo = 'adityaprakashiitbombay-cloud/pragyan-institute-portal';
-
-      const res = await fetch(`https://api.github.com/repos/${repo}/actions/workflows/trigger-billing.yml/dispatches`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `token ${token}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          ref: 'main',
-          inputs: {
-            action: action || 'invoice',
-            batch: batch || 'all',
-            student_id: studentId || 'all',
-            to_email: toEmail || ''
-          }
-        })
-      });
-
-      if (res.status === 204 || res.ok) {
-        return { success: true };
-      }
-      const errData = await res.json().catch(() => ({}));
-      return { success: false, error: errData.message || `HTTP ${res.status}` };
-    } catch (err) {
-      console.warn('[Cloud Dispatch Engine] Error:', err);
-      return { success: false, error: err.message };
-    }
-  }
-
   // Universal Floating Notification & Toast Engine
   function showNotification(message, type = 'success') {
     if (typeof document === 'undefined') return;
@@ -202,7 +164,7 @@
     }
   }
 
-  // Resilient Email Dispatcher with Serverless & Client Direct Fallback
+  // Server-only email dispatcher. API credentials must never be exposed in browser code.
   async function sendLiveResendEmail(to, subject, html) {
     if (!to) return { success: false, error: 'No recipient email specified' };
     try {
@@ -217,62 +179,24 @@
         return { success: false, error: 'No valid recipient email address found' };
       }
 
-      // 1. Try serverless backend endpoint first if available
-      if (token) {
-        try {
-          const res = await fetch(getApiUrl('/api/send-email'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ to: recipients, subject, html })
-          });
-          const ct = res.headers.get('content-type') || '';
-          if (res.ok && ct.includes('application/json')) {
-            const payload = await res.json().catch(() => null);
-            if (payload && payload.success) return payload;
-          }
-        } catch (_) {}
+      if (!token || token.startsWith('token_')) {
+        return { success: false, error: 'A live session is required. Please sign out and sign in again.' };
       }
 
-      // 2. Direct Resend API attempt
-      const resendApiKey = (typeof PRAGYAN_CONFIG !== 'undefined' && PRAGYAN_CONFIG.RESEND_API_KEY) || 
-                           (typeof atob === 'function' ? atob('cmVfMlRuMlVZQ2tfQWFVVm1MYTREOVBIRTlKb1Jjc21oblBk') : '');
-      const fromEmail = (typeof PRAGYAN_CONFIG !== 'undefined' && PRAGYAN_CONFIG.RESEND_FROM_EMAIL) || 
-                        'Pragyan Institute <noreply@pragyaninstitute.com>';
-
-      try {
-        const r = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${resendApiKey}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            from: fromEmail,
-            to: recipients,
-            subject,
-            html
-          })
-        });
-
-        const json = await r.json().catch(() => ({}));
-        if (r.ok && !json.error) {
-          return { success: true, data: json };
-        }
-        if (json.error?.message) {
-          return { success: false, error: json.error.message };
-        }
-      } catch (corsErr) {
-        console.warn('[Email Engine] Direct browser fetch to Resend bypassed due to CORS policy. Scheduled server worker dispatches are active.');
-      }
-
-      return { 
-        success: true, 
-        isQueued: true, 
-        message: 'Notification recorded and synchronized with database noticeboard & billing schedule.' 
-      };
+      const res = await fetch(getApiUrl('/api/send-email'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ to: recipients, subject, html })
+      });
+      const contentType = res.headers.get('content-type') || '';
+      const payload = contentType.includes('application/json')
+        ? await res.json().catch(() => ({}))
+        : { error: await res.text().catch(() => '') };
+      if (res.ok && payload.success) return payload;
+      return { success: false, status: res.status, error: payload.error || `Email service returned HTTP ${res.status}` };
     } catch (err) {
-      console.warn('sendLiveResendEmail note:', err);
-      return { success: false, error: err.message };
+      console.warn('[Email Engine] Server dispatch failed:', err);
+      return { success: false, error: err.message || 'Unable to reach the email service' };
     }
   }
 
@@ -753,10 +677,15 @@
 
     safeSetItem(key, value) {
       this.invalidateCaches();
+      if (typeof SupabaseSync !== 'undefined' && SupabaseSync.safeStore) {
+        return SupabaseSync.safeStore(key, value);
+      }
       try {
         localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
+        return true;
       } catch (err) {
         console.warn(`⚠️ SafeStorage: Could not write key '${key}' (Quota or Privacy Mode):`, err.message);
+        return false;
       }
     },
 
@@ -1491,10 +1420,13 @@
       return this.saveAuditLogs(logs);
     },
     async updateStudentPassword(newPassword) {
-      if (!newPassword || newPassword.trim().length < 4) {
-        throw new Error('Password must be at least 4 characters long.');
+      if (!newPassword || typeof newPassword !== 'string' || newPassword.trim().length < 8) {
+        throw new Error('Password must be at least 8 characters long.');
       }
       const cleanPassword = newPassword.trim();
+      if (!/\d/.test(cleanPassword) || !/[a-zA-Z]/.test(cleanPassword)) {
+        throw new Error('Password must contain both letters and numbers for security.');
+      }
       const current = this.currentUser;
       if (!current) throw new Error('No active student session.');
 
@@ -1503,26 +1435,24 @@
       const sName = current.name || 'Student';
       const sClass = current.className || current.class_name || 'General';
 
-      // 1. Send to server API if available
-      try {
-        const token = sessionStorage.getItem('pragyan_portal_token') || localStorage.getItem('pragyan_portal_token');
-        if (token) {
-          const apiBase = (typeof window !== 'undefined' && window.PRAGYAN_API_BASE) ? window.PRAGYAN_API_BASE : '';
-          const res = await fetch(`${apiBase}/api/student-password`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ newPassword: cleanPassword })
-          });
-          if (res.ok) {
-            const data = await res.json().catch(() => ({}));
-            console.log('Server student password update success:', data);
-          }
+      // 1. Send to server API with full error propagation
+      const token = sessionStorage.getItem('pragyan_portal_token') || localStorage.getItem('pragyan_portal_token');
+      if (token) {
+        const apiBase = (typeof window !== 'undefined' && window.PRAGYAN_API_BASE) ? window.PRAGYAN_API_BASE : '';
+        const res = await fetch(`${apiBase}/api/student-password`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ newPassword: cleanPassword })
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `Server password update failed (${res.status})`);
         }
-      } catch (err) {
-        console.warn('Server password update note:', err);
+        const data = await res.json().catch(() => ({}));
+        console.log('Server student password update success:', data);
       }
 
       // 2. Direct Supabase / local requests upsert
@@ -1551,8 +1481,8 @@
         request_date: new Date().toISOString().split('T')[0],
         oldData: {},
         old_data: {},
-        newData: { password: cleanPassword, updated_at: new Date().toISOString(), updated_by: 'student' },
-        new_data: { password: cleanPassword, updated_at: new Date().toISOString(), updated_by: 'student' }
+        newData: { password_updated: true, updated_at: new Date().toISOString(), updated_by: 'student' },
+        new_data: { password_updated: true, updated_at: new Date().toISOString(), updated_by: 'student' }
       };
 
       if (existingIdx >= 0) {
@@ -5283,12 +5213,15 @@ function renderStudentDashboard() {
                   true
                 );
 
-                await sendLiveResendEmail(sEmail, subject, emailHtml).catch(() => {});
-                notifiedCount++;
-                studentStatus += ' -> Statement & Notice Synchronized ✅';
+                const emailResult = await sendLiveResendEmail(sEmail, subject, emailHtml);
+                if (emailResult.success) {
+                  notifiedCount++;
+                  studentStatus += ' -> Statement & Notice Synchronized ✅';
+                } else {
+                  studentStatus += ` -> Email failed (${emailResult.error || 'delivery service error'})`;
+                }
               } else {
-                studentStatus += ' -> In-Portal Noticeboard Posted ✅';
-                notifiedCount++;
+                studentStatus += ' -> In-Portal Noticeboard Posted (no email address)';
               }
 
               results.push({ name: sName, studentId: sId, email: sEmail, status: studentStatus });
@@ -5302,23 +5235,7 @@ function renderStudentDashboard() {
             await AppState.saveStudents(allStudents);
             if (AppState.saveNotices) await AppState.saveNotices(notices);
 
-            
-            // Trigger Live Resend Cloud Email Dispatcher with real-time UI logging
-            const targetStudentCode = (studentId !== 'all' && targets.length > 0) 
-              ? String(targets[0].student_id || targets[0].roll_no || targets[0].rollNo || targets[0].id || studentId) 
-              : 'all';
-            
-            try {
-              const cloudRes = await triggerCloudEmailDispatch({
-                action: action === 'invoice' ? 'invoice' : 'reminder',
-                batch: (studentId !== 'all') ? 'all' : targetClass,
-                studentId: targetStudentCode
-              });
-              console.log('[Resend Cloud Dispatch Result]:', cloudRes);
-            } catch (cloudErr) {
-              console.warn('[Resend Cloud Dispatch Error]:', cloudErr);
-            }
-const author = getActiveTeacherName();
+            const author = getActiveTeacherName();
             await AppState.addAuditLog(
               author, 
               action === 'invoice' ? 'FEE_INVOICE_GENERATED' : 'FEE_REMINDER_SENT', 
@@ -7117,11 +7034,11 @@ ${emailLogs.join('\n')}`);
 
       try {
         showNotification(`🚀 Dispatched test email to ${promptEmail}... Connecting to Resend.`, 'success');
-        const res = await triggerCloudEmailDispatch({ action: 'test', toEmail: promptEmail });
+        const res = await sendLiveResendEmail(promptEmail, subject, emailHtml);
         if (res.success) {
           showNotification(`✅ Test email successfully dispatched to ${promptEmail} via Resend!`, 'success');
         } else {
-          showNotification(`⚠️ Cloud dispatch queued. Delivering to ${promptEmail}.`, 'warning');
+          showNotification(`Email failed: ${res.error || 'Unknown delivery error'}`, 'error');
         }
       } catch (err) {
         showNotification(`❌ Failed: ` + err.message, 'error');
@@ -7142,8 +7059,8 @@ ${emailLogs.join('\n')}`);
         return;
       }
 
-      const targetDispatchRecipients = emailRecipients;
-      const isCapped = false;
+      const targetDispatchRecipients = emailRecipients.slice(0, MAX_DAILY_BROADCAST_LIMIT);
+      const isCapped = emailRecipients.length > MAX_DAILY_BROADCAST_LIMIT;
 
       const subject = pane.querySelector('#adminEmailSubjectInput')?.value.trim() || defaultSubject;
       const rawBody = pane.querySelector('#adminEmailBodyInput')?.value.trim() || defaultBody;
@@ -7171,17 +7088,6 @@ ${emailLogs.join('\n')}`);
       const author = getActiveTeacherName();
 
       try {
-        // Trigger Live Resend Cloud Dispatcher for Campaign
-        const selectedAudienceStudent = (adminEmailAudience === 'student' && targetStudents.length > 0)
-          ? (targetStudents[0].student_id || targetStudents[0].rollNo || adminEmailSelectedStudentId)
-          : 'all';
-        
-        triggerCloudEmailDispatch({
-          action: adminEmailCampaignType === 'monthly_invoice' ? 'invoice' : 'reminder',
-          batch: adminEmailAudience === 'student' ? 'all' : adminEmailAudience,
-          studentId: selectedAudienceStudent
-        }).catch(console.error);
-
         // Send individually with personalized tags (capped to max 100)
         for (let i = 0; i < targetDispatchRecipients.length; i++) {
           const student = targetDispatchRecipients[i];

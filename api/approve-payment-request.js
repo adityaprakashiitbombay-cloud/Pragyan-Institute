@@ -29,30 +29,40 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, data: approved });
     }
 
-    // 2. Resilient Direct Execution Fallback
-    const { data: reqRows, error: fetchErr } = await supabase
+    // 2. Resilient Direct Execution Fallback (with atomic update to prevent race condition)
+    // ATOMIC: Update with WHERE condition to acquire exclusive lock
+    const { data: reqRows, error: updateErr } = await supabase
       .from('student_requests')
-      .select('*')
+      .update({
+        status: 'Approved',
+        approved_at: new Date().toISOString(),
+        approved_by: p_verifier,
+        updated_at: new Date().toISOString()
+      })
       .eq('request_id', p_req_id)
       .eq('status', 'Pending')
-      .limit(1);
+      .select('*')
+      .maybeSingle();
 
-    if (fetchErr) throw fetchErr;
-    if (!reqRows || reqRows.length === 0) {
+    if (updateErr || !reqRows) {
+      // Request was already approved by another admin OR doesn't exist
       return res.status(404).json({ error: 'Request not found or already processed' });
     }
 
-    const reqData = reqRows[0];
+    const reqData = reqRows;
     const newData = reqData.new_data || reqData.newData || {};
     newData.verifiedBy = p_verifier;
     newData.verifiedAt = new Date().toISOString();
 
-    const { error: updateReqErr } = await supabase
+    // Update new_data separately (already marked as Approved above)
+    const { error: updateDataErr } = await supabase
       .from('student_requests')
-      .update({ status: 'Approved', new_data: newData })
+      .update({ new_data: newData })
       .eq('request_id', p_req_id);
 
-    if (updateReqErr) throw updateReqErr;
+    if (updateDataErr) {
+      console.warn('Failed to update new_data, but request is already approved:', updateDataErr.message);
+    }
 
     const isPaymentReq = reqData.type === 'payment' || reqData.req_type === 'PAYMENT_VERIFICATION' || reqData.req_type === 'PAYMENT' || !!(newData && (newData.amount || newData.paymentDetails));
     if (isPaymentReq) {
@@ -76,6 +86,24 @@ export default async function handler(req, res) {
         if (stuRows && stuRows.length > 0) {
           const stu = stuRows[0];
           const stuUuid = stu.id || stu.student_id;
+          const receiptNo = `REC-${p_req_id.replace(/^REQ-/, '')}`;
+
+          // IDEMPOTENCY: Check if receipt was already generated for this payment request
+          const { data: existingReceipt } = await supabase
+            .from('fee_receipts')
+            .select('receipt_no')
+            .eq('receipt_no', receiptNo)
+            .maybeSingle();
+
+          if (existingReceipt) {
+            console.log(`[approve-payment] Receipt ${receiptNo} already exists. Skipping duplicate balance adjustment.`);
+            return res.status(200).json({
+              success: true,
+              message: 'Request approved (receipt already issued)',
+              receipt_no: receiptNo
+            });
+          }
+
           const currentTotal = Number(stu.total_fee || 0);
           const currentPaid = Number(stu.paid_fee || 0);
           const previousPending = Number(stu.pending_fee || Math.max(0, currentTotal - currentPaid));
@@ -88,7 +116,6 @@ export default async function handler(req, res) {
 
           await updateStudent;
 
-          const receiptNo = `REC-${p_req_id.replace(/^REQ-/, '')}`;
           await supabase
             .from('fee_receipts')
             .upsert([{

@@ -10,7 +10,13 @@
   // ── Supabase Connection Config ──────────────────────────────────────────────
   const _cfg = (typeof window !== 'undefined' && window.PRAGYAN_CONFIG) ? window.PRAGYAN_CONFIG : {};
   const SUPABASE_URL = _cfg.SUPABASE_URL || 'https://ujcmmcaervgskpkcfekm.supabase.co';
-  const SUPABASE_ANON_KEY = _cfg.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqY21tY2FlcnZnc2twa2NmZWttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NDEzMTksImV4cCI6MjEwMjAxNzMxOX0.pTp51JWa-qWbAz-l5NGLKvrS66TED4lruhLInQ6hvmc';
+  const SUPABASE_ANON_KEY = _cfg.SUPABASE_ANON_KEY; // No fallback - must be configured
+
+  // Validate critical configuration
+  if (!SUPABASE_ANON_KEY) {
+    console.error('🚨 SUPABASE_ANON_KEY is not configured in window.PRAGYAN_CONFIG');
+    throw new Error('SupabaseSync requires SUPABASE_ANON_KEY to be configured');
+  }
 
   const REST_BASE = `${SUPABASE_URL}/rest/v1`;
 
@@ -42,7 +48,11 @@
     isSyncing: false,
     _pullPromise: null,
     _pendingPull: false,
+    _pendingPullResolvers: [],
+    _pullDebounceTimer: null,
     _pullAbort: null,
+    _tabId: (typeof window !== 'undefined' && window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : ('tab_' + Math.random().toString(36).slice(2, 9)),
+    _pollIntervalMs: 60000,
     sessionToken: null,
     sessionRole: null,
     pollTimer: null,
@@ -55,15 +65,28 @@
     // ── Input Sanitization Helper ───────────────────────────────────────────
     _sanitizeForQuery(value) {
       if (value == null) return '';
-      // Remove any characters that could be used for SQL injection
-      // Allow alphanumeric, hyphens, underscores, @, dots (for UUIDs, emails, UPI IDs)
-      return String(value).replace(/[^\w\-@.]/g, '').trim();
+      // STRICT: Only allow alphanumeric and hyphens (safe for UUID and basic IDs)
+      // Dots and @ symbols removed to prevent Supabase filter injection
+      const cleaned = String(value).replace(/[^a-zA-Z0-9\-]/g, '').trim();
+      // Additional validation: reject if contains Supabase operators
+      const forbidden = ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'like', 'ilike', 'in', 'or', 'and'];
+      if (forbidden.some(op => cleaned.toLowerCase().includes(op))) {
+        console.error('🚨 Potential filter injection detected:', value);
+        return ''; // Reject suspicious input
+      }
+      return cleaned;
     },
 
     _encodeFilterValue(value) {
       if (value == null) return '';
-      // Properly encode values for Supabase REST API filter syntax
-      return encodeURIComponent(String(value).trim());
+      // Double-encode to prevent filter syntax injection
+      const cleaned = String(value).trim();
+      // Reject if contains Supabase PostgREST operators
+      if (/\b(eq|neq|gt|gte|lt|lte|like|ilike|in|or|and|not)\b/i.test(cleaned)) {
+        console.error('🚨 Filter injection attempt blocked:', value);
+        return '__INVALID__'; // Return sentinel that won't match any records
+      }
+      return encodeURIComponent(cleaned);
     },
 
     // ── Initialization ──────────────────────────────────────────────────────
@@ -73,6 +96,30 @@
       this.sessionToken = sessionStorage.getItem('pragyan_portal_token') || localStorage.getItem('pragyan_portal_token') || null;
       this.sessionRole = sessionStorage.getItem('pragyan_portal_role') || localStorage.getItem('pragyan_portal_role') || null;
       this._listenForConnectivity();
+
+      // Register cleanup on page unload
+      if (typeof window !== 'undefined') {
+        window.addEventListener('beforeunload', () => {
+          console.log('🔌 Page unloading - cleaning up Supabase connections...');
+          this.destroy();
+        });
+
+        // Also handle visibility change (tab switch)
+        document.addEventListener('visibilitychange', () => {
+          if (document.hidden) {
+            console.log('👁️ Tab hidden - pausing realtime sync');
+            // Don't destroy, just pause polling
+            if (this.pollTimer) {
+              clearInterval(this.pollTimer);
+              this.pollTimer = null;
+            }
+          } else {
+            console.log('👁️ Tab visible - resuming realtime sync');
+            this._listenForConnectivity();
+          }
+        });
+      }
+
       return this.pullAll();
     },
 
@@ -82,15 +129,28 @@
         clearInterval(this.pollTimer);
         this.pollTimer = null;
       }
+      if (this._pullDebounceTimer) {
+        clearTimeout(this._pullDebounceTimer);
+        this._pullDebounceTimer = null;
+      }
       if (this._pullAbort) {
         try { this._pullAbort.abort(); } catch(e) {}
         this._pullAbort = null;
       }
       if (this._realtimeChannel && this._supabaseClient) {
         try {
+          // CORRECT: Unsubscribe first, then remove
+          this._realtimeChannel.unsubscribe();
           this._supabaseClient.removeChannel(this._realtimeChannel);
+          console.log('✅ Realtime channel unsubscribed and removed');
         } catch(e) {
-          console.warn('Realtime channel cleanup error:', e.message);
+          console.error('❌ Realtime channel cleanup failed:', e.message);
+          // Force disconnect as fallback
+          try {
+            this._supabaseClient.removeAllChannels();
+          } catch(forceErr) {
+            console.error('❌ Force channel removal failed:', forceErr.message);
+          }
         }
         this._realtimeChannel = null;
         this._realtimeSubscribed = false;
@@ -104,53 +164,116 @@
       this.isSyncing = false;
       this._pullPromise = null;
       this._pendingPull = false;
+      if (this._pendingPullResolvers && this._pendingPullResolvers.length > 0) {
+        this._pendingPullResolvers.forEach(w => {
+          try { w.resolve({ success: false, error: 'Sync destroyed' }); } catch (_) {}
+        });
+        this._pendingPullResolvers = [];
+      }
       this.sessionToken = null;
       this.sessionRole = null;
     },
 
+    // Debounced pull trigger: coalesces rapid events into a single execution
+    _schedulePull(delay = 150) {
+      if (this._pullDebounceTimer) clearTimeout(this._pullDebounceTimer);
+      this._pullDebounceTimer = setTimeout(() => {
+        this._pullDebounceTimer = null;
+        this.pullAll().catch(e => console.warn('[SupabaseSync] Scheduled pull note:', e.message));
+      }, delay);
+    },
+
+    // Adaptive polling: 60s when Realtime WebSocket is active, 30s when disconnected/polling fallback
+    _resetPollTimer() {
+      if (this.pollTimer) {
+        clearInterval(this.pollTimer);
+        this.pollTimer = null;
+      }
+      if (typeof document !== 'undefined' && document.hidden) return; // Do not poll when tab is backgrounded
+      const interval = this._realtimeSubscribed ? 60000 : 30000;
+      this._pollIntervalMs = interval;
+      this.pollTimer = window.setInterval(() => {
+        if (typeof document !== 'undefined' && !document.hidden) {
+          this._schedulePull(300);
+        }
+      }, interval);
+    },
+
     _listenForConnectivity() {
-      window.addEventListener('online', () => this.pullAll());
-      window.addEventListener('focus', () => this.pullAll());
+      window.addEventListener('online', () => this._schedulePull(100));
+      window.addEventListener('focus', () => this._schedulePull(150));
       document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) this.pullAll();
+        if (!document.hidden) {
+          this._schedulePull(150);
+          this._resetPollTimer();
+        } else if (this.pollTimer) {
+          clearInterval(this.pollTimer);
+          this.pollTimer = null;
+        }
       });
 
       // 1. Instant Realtime WebSocket Subscription via Supabase Client
       if (typeof window !== 'undefined' && window.supabase && !this._realtimeSubscribed) {
         try {
-          if (!this._supabaseClient) {
-            this._supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+          // Reuse global client to prevent connection leaks
+          if (!window._pragyanSupabaseClient) {
+            console.log('🔌 Creating new Supabase client instance');
+            window._pragyanSupabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+              realtime: {
+                params: {
+                  eventsPerSecond: 5 // Rate limit realtime events
+                }
+              },
+              db: {
+                schema: 'public'
+              },
+              global: {
+                headers: {
+                  'X-Client-Info': 'pragyan-portal-web'
+                }
+              }
+            });
           }
+
+          this._supabaseClient = window._pragyanSupabaseClient;
+
           this._realtimeChannel = this._supabaseClient.channel('pragyan_realtime_sync_all')
             .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
               console.log('⚡ [Supabase Realtime] Change received from database:', payload.table, payload.eventType);
-              this.pullAll();
+              this._schedulePull(150);
             })
             .subscribe((status) => {
               console.log('⚡ [Supabase Realtime] Subscription status:', status);
               if (status === 'SUBSCRIBED') {
                 this._realtimeSubscribed = true;
                 this.updateStatus('synced');
+                this._resetPollTimer();
+              }
+              if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+                console.error(`❌ Realtime connection ${status}`);
+                this._realtimeSubscribed = false;
+                this.updateStatus('local');
+                this._resetPollTimer();
               }
             });
         } catch (rtErr) {
-          console.warn('[Supabase Realtime] Setup note:', rtErr.message);
+          console.error('❌ Supabase Realtime setup failed:', rtErr.message);
         }
       }
 
-      // 2. Smart Polling (30 seconds when tab is active, reduces server load)
-      if (!this.pollTimer) {
-        this.pollTimer = window.setInterval(() => {
-          if (!document.hidden) this.pullAll();
-        }, 30000); // Reduced from 4s to 30s to prevent database throttling
-      }
-      // Cross-tab sync via BroadcastChannel
+      // 2. Start adaptive smart polling
+      this._resetPollTimer();
+
+      // Cross-tab sync via BroadcastChannel (with tab echo suppression)
       if (typeof BroadcastChannel !== 'undefined') {
         try {
           this._bc = new BroadcastChannel('pragyan_realtime_hub');
           this._bc.onmessage = (event) => {
+            if (event.data?.sourceTabId && event.data.sourceTabId === this._tabId) {
+              return; // Ignore local tab echo
+            }
             if (event.data?.type === 'DATA_MUTATED') {
-              this.pullAll();
+              this._schedulePull(150);
             }
           };
         } catch(e) {
@@ -227,21 +350,50 @@
 
     // ── Read All Records from a Table ───────────────────────────────────────
     async readAll(table, extraQuery = '', options = {}) {
+      const QUERY_TIMEOUT_MS = options.timeout || 15000; // 15 seconds default
       const orderCol = ORDER_COLUMNS[table] || 'id';
       const dir = (table === 'student_requests' || table === 'notices' || table === 'audit_logs') ? 'desc' : 'asc';
       const pageSize = 1000;
       const maxRows = options.maxRows || 10000;
       let offset = 0;
       let allRows = [];
+      const startTime = Date.now();
 
       while (offset < maxRows) {
+        // Check timeout before each page fetch
+        if (Date.now() - startTime > QUERY_TIMEOUT_MS) {
+          console.warn(`⏱️ Query timeout for table '${table}' after ${QUERY_TIMEOUT_MS}ms`);
+          throw new Error(`Query timeout: ${table} took longer than ${QUERY_TIMEOUT_MS}ms`);
+        }
+
         let params = `select=*&order=${orderCol}.${dir}&limit=${pageSize}&offset=${offset}`;
         if (extraQuery) params += `&${extraQuery}`;
-        const page = await this._rest('GET', table, params, null, {}, options);
-        if (!Array.isArray(page) || page.length === 0) break;
-        allRows.push(...page);
-        if (page.length < pageSize) break;
-        offset += pageSize;
+
+        // Create AbortController for this page fetch
+        const pageAbortController = new AbortController();
+        const pageTimeout = setTimeout(() => {
+          pageAbortController.abort();
+          console.warn(`⏱️ Page fetch timeout for ${table} at offset ${offset}`);
+        }, 5000); // 5 seconds per page
+
+        try {
+          const page = await this._rest('GET', table, params, null, {}, {
+            ...options,
+            signal: pageAbortController.signal
+          });
+          clearTimeout(pageTimeout);
+
+          if (!Array.isArray(page) || page.length === 0) break;
+          allRows.push(...page);
+          if (page.length < pageSize) break;
+          offset += pageSize;
+        } catch (err) {
+          clearTimeout(pageTimeout);
+          if (err.name === 'AbortError') {
+            throw new Error(`Page fetch timeout for ${table} at offset ${offset}`);
+          }
+          throw err;
+        }
       }
       return allRows;
     },
@@ -251,7 +403,10 @@
       // H1: Mutex lock & pending queue
       if (this.isSyncing) {
         this._pendingPull = true;
-        return this._pullPromise || Promise.resolve({ success: true, queued: true });
+        return new Promise((resolve, reject) => {
+          if (!this._pendingPullResolvers) this._pendingPullResolvers = [];
+          this._pendingPullResolvers.push({ resolve, reject });
+        });
       }
       if (this._pullAbort) {
         try { this._pullAbort.abort(); } catch (_) {}
@@ -355,10 +510,22 @@
           return { success: false, error: error.message };
         } finally {
           this.isSyncing = false;
+          this._pullPromise = null;
           // H1: Process queued pull if requested during in-flight fetch
           if (this._pendingPull) {
             this._pendingPull = false;
-            setTimeout(() => this.pullAll(), 50);
+            const waiters = Array.isArray(this._pendingPullResolvers) ? this._pendingPullResolvers.splice(0) : [];
+            this.pullAll()
+              .then(nextRes => {
+                waiters.forEach(w => {
+                  try { w.resolve(nextRes); } catch (_) {}
+                });
+              })
+              .catch(nextErr => {
+                waiters.forEach(w => {
+                  try { w.reject(nextErr); } catch (_) {}
+                });
+              });
           }
         }
       })();
@@ -695,46 +862,97 @@
     },
 
     safeStore(key, value) {
+      const CRITICAL_KEYS = new Set([
+        'pragyan_db_students_master',
+        'pragyan_db_fee_receipts_master',
+        'pragyan_db_requests_master',
+        'pragyan_db_fee_ledger_master',
+        'pragyan_db_batches_master',
+        'pragyan_db_admins_master',
+        'pragyan_portal_token',
+        'pragyan_portal_role',
+        'pragyan_session',
+        'pragyan_portal_open',
+        'pragyan_last_local_mutation'
+      ]);
+
       try {
-        const jsonStr = JSON.stringify(value);
-        // Check if data is too large (localStorage has ~5-10MB limit)
-        const sizeInMB = new Blob([jsonStr]).size / (1024 * 1024);
-
-        if (sizeInMB > 8) {
-          console.warn(`⚠️ Data for ${key} is ${sizeInMB.toFixed(2)}MB - approaching localStorage limit. Consider implementing pagination.`);
-        }
-
+        const jsonStr = typeof value === 'string' ? value : JSON.stringify(value);
         localStorage.setItem(key, jsonStr);
         return true;
       } catch (e) {
-        // Handle QuotaExceededError
-        if (e.name === 'QuotaExceededError' || e.code === 22) {
-          console.error(`❌ localStorage quota exceeded for ${key}. Attempting to clear old data...`);
-          // Try to clear non-critical cached data
+        // Handle QuotaExceededError across browsers (Firefox, WebKit, Blink, Edge)
+        if (e.name === 'QuotaExceededError' || e.code === 22 || e.number === -2147024882) {
+          console.warn(`⚠️ localStorage quota exceeded for '${key}'. Executing tiered cache eviction...`);
+
+          // Stage 1: Evict non-critical disposable keys (temporary caches, logs, drafts)
           try {
-            const keysToPreserve = ['pragyan_db_students_master', 'pragyan_db_fee_receipts_master', 'pragyan_portal_token'];
+            let freedCount = 0;
             Object.keys(localStorage).forEach(k => {
-              if (!keysToPreserve.includes(k)) {
+              if (!CRITICAL_KEYS.has(k) && k !== 'pragyan_db_notices_master' && k !== 'pragyan_db_audit_logs_master') {
                 localStorage.removeItem(k);
+                freedCount++;
               }
             });
-            // Retry storage
-            localStorage.setItem(key, JSON.stringify(value));
-            console.log(`✅ Successfully stored ${key} after clearing cache.`);
+            const jsonStr = typeof value === 'string' ? value : JSON.stringify(value);
+            localStorage.setItem(key, jsonStr);
+            console.log(`✅ [Quota Recovery] Stored '${key}' after freeing ${freedCount} disposable cache keys.`);
             return true;
-          } catch (retryErr) {
-            console.error(`❌ Failed to store ${key} even after cache clear:`, retryErr.message);
-            // Notify user if critical data couldn't be cached
-            if (key.includes('students') || key.includes('receipts')) {
-              if (typeof window !== 'undefined' && !window._storageWarningShown) {
-                window._storageWarningShown = true;
-                alert('⚠️ Storage space is full. Some data may not be cached offline. Please clear browser data or use a different browser.');
-              }
+          } catch (_) {}
+
+          // Stage 2: Trim audit logs to last 25 entries if present
+          try {
+            const auditKey = KEY_MAP.audit_logs || 'pragyan_db_audit_logs_master';
+            if (key === auditKey && Array.isArray(value) && value.length > 25) {
+              const trimmed = value.slice(-25);
+              localStorage.setItem(key, JSON.stringify(trimmed));
+              console.log(`✅ [Quota Recovery] Trimmed audit logs to latest 25 records.`);
+              return true;
+            } else if (localStorage.getItem(auditKey)) {
+              try {
+                const logs = JSON.parse(localStorage.getItem(auditKey) || '[]');
+                if (Array.isArray(logs) && logs.length > 25) {
+                  localStorage.setItem(auditKey, JSON.stringify(logs.slice(-25)));
+                }
+              } catch (_) { localStorage.removeItem(auditKey); }
+              const jsonStr = typeof value === 'string' ? value : JSON.stringify(value);
+              localStorage.setItem(key, jsonStr);
+              return true;
             }
-            return false;
+          } catch (_) {}
+
+          // Stage 3: Trim notices to last 15 if present
+          try {
+            const noticeKey = KEY_MAP.notices || 'pragyan_db_notices_master';
+            if (key === noticeKey && Array.isArray(value) && value.length > 15) {
+              const trimmed = value.slice(-15);
+              localStorage.setItem(key, JSON.stringify(trimmed));
+              return true;
+            } else if (localStorage.getItem(noticeKey)) {
+              try {
+                const notices = JSON.parse(localStorage.getItem(noticeKey) || '[]');
+                if (Array.isArray(notices) && notices.length > 15) {
+                  localStorage.setItem(noticeKey, JSON.stringify(notices.slice(-15)));
+                }
+              } catch (_) { localStorage.removeItem(noticeKey); }
+              const jsonStr = typeof value === 'string' ? value : JSON.stringify(value);
+              localStorage.setItem(key, jsonStr);
+              return true;
+            }
+          } catch (_) {}
+
+          // Stage 4: Safety notification without corrupting critical state
+          console.error(`❌ [Quota Exhaustion] Unable to persist '${key}' without compromising critical database integrity.`);
+          if (typeof window !== 'undefined' && (key.includes('students') || key.includes('receipts') || key.includes('requests'))) {
+            if (!window._storageQuotaWarningShown) {
+              window._storageQuotaWarningShown = true;
+              console.warn('⚠️ Storage quota reached. Active database tables are protected, but local browser cache is constrained.');
+            }
           }
+          return false;
         }
-        console.warn(`Unable to cache ${key}:`, e.message);
+
+        console.warn(`Unable to cache '${key}':`, e.message);
         return false;
       }
     },
@@ -917,6 +1135,7 @@
       const payload = {
         type: 'DATA_MUTATED',
         timestamp: Date.now(),
+        sourceTabId: this._tabId,
         table: details.table || 'all',
         operation: details.operation || 'mutation',
         changedIds: details.changedIds || details.recordIds || (details.id ? [details.id] : []),

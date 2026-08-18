@@ -35,18 +35,18 @@ $$\mathbf{\text{Student ID}} = \mathbf{YY} + \mathbf{CC} + \mathbf{XX}$$
 
 ## 2. Multi-Identifier Matching Helper (`isStudentRequestMatch`)
 
-Because students can be referenced across different tables and sessions by `student_id` (`'261001'`), `id` (`UUID`), `roll_no`, or `mobile`, the portal uses a unified matching helper:
+Because students can be referenced across different tables and sessions by `student_id` (`'261001'`), `id` (`UUID`), `roll_no`, or `mobile`, the portal uses a unified matching helper that bridges PostgreSQL `snake_case` schema columns (`student_id`, `roll_no`, `old_data`, `new_data`) and legacy `camelCase` frontend cached objects:
 
 ```javascript
 function isStudentRequestMatch(req, student) {
   if (!req || !student) return false;
   const sId = (student.id || student.student_id || '').toString().trim().toLowerCase();
   const sRoll = (student.rollNo || student.roll_no || '').toString().trim().toLowerCase();
-  const sMob = (student.mobile || student.guardianMobile || '').toString().trim().slice(-10);
+  const sMob = (student.mobile || student.guardianMobile || student.guardian_mobile || '').toString().trim().slice(-10);
 
   const rTarget = (req.studentId || req.student_id || '').toString().trim().toLowerCase();
   const rRoll = (req.rollNo || req.roll_no || '').toString().trim().toLowerCase();
-  const rMob = (req.oldData?.mobile || req.newData?.mobile || req.old_data?.mobile || req.new_data?.mobile || '').toString().trim().slice(-10);
+  const rMob = (req.old_data?.mobile || req.new_data?.mobile || req.oldData?.mobile || req.newData?.mobile || '').toString().trim().slice(-10);
 
   if (sId && (rTarget === sId || rRoll === sId)) return true;
   if (sRoll && (rTarget === sRoll || rRoll === sRoll)) return true;

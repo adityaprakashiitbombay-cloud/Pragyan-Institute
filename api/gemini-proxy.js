@@ -22,25 +22,28 @@ export default async function handler(req, res) {
   ];
 
   const models = [
-    'gemini-flash-latest',
-    'gemini-flash-lite-latest',
-    'gemini-3.7-flash',
-    'gemini-3.6-flash',
-    'gemini-3.5-flash',
-    'gemini-3-flash-preview',
-    'gemini-1.5-flash-latest'
+    'gemini-1.5-flash',
+    'gemini-1.5-flash-latest',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash-8b'
   ];
 
   let lastError = null;
 
   for (const model of models) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3500);
+
     try {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: payloadContents })
+        body: JSON.stringify({ contents: payloadContents }),
+        signal: controller.signal
       });
+
+      clearTimeout(timer);
 
       const data = await response.json();
       if (response.ok && data.candidates && data.candidates[0]?.content) {
@@ -50,7 +53,12 @@ export default async function handler(req, res) {
         lastError = data.error ? data.error.message : 'API Response error';
       }
     } catch (err) {
-      lastError = err.message;
+      clearTimeout(timer);
+      if (err.name === 'AbortError') {
+        lastError = `Model ${model} request timed out after 3500ms`;
+      } else {
+        lastError = err.message;
+      }
     }
   }
 

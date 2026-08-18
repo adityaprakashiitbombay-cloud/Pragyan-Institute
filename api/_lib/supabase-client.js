@@ -38,9 +38,14 @@ function assertStudentOwnership(table, operation, data, filters, session) {
       }
       return filters?.where || {};
     }
+    if (table === 'student_requests' && operation === 'update') {
+      // Allow students to cancel or update their own pending requests
+      if (!filters?.where?.request_id && !filters?.where?.id) throw new Error('A request identifier is required');
+      return { ...(filters?.where || {}), student_id: session.sub, status: 'Pending' };
+    }
     if (table === 'student_requests' && operation === 'delete') {
-      if (!filters?.where?.request_id) throw new Error('A request identifier is required');
-      return { request_id: filters.where.request_id, student_id: session.sub, status: 'Pending' };
+      if (!filters?.where?.request_id && !filters?.where?.id) throw new Error('A request identifier is required');
+      return { ...(filters?.where || {}), student_id: session.sub, status: 'Pending' };
     }
     throw new Error('Students cannot modify this record directly');
   }

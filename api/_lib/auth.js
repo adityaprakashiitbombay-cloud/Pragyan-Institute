@@ -6,9 +6,30 @@ const SESSION_TTL_SECONDS = 60 * 60 * 8;
 let _ephemeralSecret = null;
 
 export function applyCors(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  // Whitelist trusted origins only (SECURITY FIX: No wildcard CORS)
+  const allowedOrigins = [
+    'https://pragyaninstitute.com',
+    'https://www.pragyaninstitute.com',
+    'http://localhost:8080',
+    'http://localhost:3000',
+    'http://127.0.0.1:8080',
+    'http://127.0.0.1:3000'
+  ];
+
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else if (process.env.NODE_ENV !== 'production' && origin) {
+    // Allow all origins in development with warning
+    console.warn(`⚠️ CORS: Unknown origin ${origin} allowed in development mode`);
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours preflight cache
+
   if (req.method === 'OPTIONS') {
     res.status(204).end();
     return true;
@@ -22,10 +43,16 @@ export function getSupabase(opts = {}) {
 
   if (!serviceKey) {
     if (opts.allowAnon) {
-      const anonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqY21tY2FlcnZnc2twa2NmZWttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NDEzMTksImV4cCI6MjEwMjAxNzMxOX0.pTp51JWa-qWbAz-l5NGLKvrS66TED4lruhLInQ6hvmc';
+      const anonKey = process.env.SUPABASE_ANON_KEY;
+      if (!anonKey) {
+        console.error('🚨 SUPABASE_ANON_KEY environment variable is not set');
+        if (opts.throwOnMissing) throw new Error('SUPABASE_ANON_KEY environment variable is not set');
+        return null;
+      }
       return createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
     }
     console.error('🚨 SUPABASE_SERVICE_ROLE_KEY is required for server API execution. Refusing to fall back to anon credentials.');
+    if (opts.throwOnMissing) throw new Error('SUPABASE_SERVICE_ROLE_KEY is required for server API execution.');
     return null;
   }
 
@@ -39,8 +66,25 @@ export function getSessionSecret() {
   if (process.env.PORTAL_SESSION_SECRET) {
     return process.env.PORTAL_SESSION_SECRET;
   }
-  // Safe robust fallback for all environments
-  return 'pragyan_portal_jwt_secret_token_auth_2026_secure';
+  // Never use a predictable signing key in production. A per-process key keeps
+  // local development usable while forcing deployments to configure a stable
+  // secret (otherwise tokens would be invalidated on every cold start).
+  if (process.env.NODE_ENV === 'production') {
+    console.error('🚨 CRITICAL: PORTAL_SESSION_SECRET is not set in production!');
+    // Graceful degradation: Use derived fallback to prevent total auth collapse
+    // This is NOT secure long-term, but prevents complete service outage
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+    if (serviceKey) {
+      const fallback = crypto.createHash('sha256')
+        .update(serviceKey + 'INSECURE_FALLBACK')
+        .digest('hex');
+      console.warn('⚠️ Using derived fallback secret. SET PORTAL_SESSION_SECRET immediately.');
+      return fallback;
+    }
+    throw new Error('PORTAL_SESSION_SECRET is required in production and no fallback available');
+  }
+  if (!_ephemeralSecret) _ephemeralSecret = crypto.randomBytes(32).toString('hex');
+  return _ephemeralSecret;
 }
 
 export function readBearerToken(req) {
@@ -65,7 +109,14 @@ export function requireSession(req, res, allowedRoles = []) {
   }
 
   // Attempt JWT verification (ONLY VALID AUTH METHOD)
-  const secret = getSessionSecret();
+  let secret;
+  try {
+    secret = getSessionSecret();
+  } catch (configErr) {
+    console.error(configErr.message);
+    res.status(503).json({ error: 'Authentication service is not configured' });
+    return null;
+  }
   try {
     const session = jwt.verify(token, secret, { algorithms: ['HS256'] });
 

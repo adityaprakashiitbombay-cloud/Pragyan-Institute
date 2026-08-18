@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { getSupabase, requireSession, applyCors } from './_lib/auth.js';
 
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -35,7 +36,7 @@ export default async function handler(req, res) {
     const { data } = supabase.storage.from('pragyan-media').getPublicUrl(path);
     return res.status(200).json({ success: true, url: data.publicUrl });
   } catch (error) {
-    console.error('Upload failed:', error.message);
-    return res.status(500).json({ error: 'Upload failed' });
+    console.error('[upload] Upload failed:', error.message);
+    return res.status(500).json({ error: error.message || 'Upload failed' });
   }
 }

@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { getSupabase, applyCors } from './_lib/auth.js';
 
 function getClassCode(className = '') {
@@ -23,13 +24,7 @@ function getClassCode(className = '') {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  if (applyCors(req, res)) return;
 
   try {
     const supabase = getSupabase();
@@ -72,7 +67,7 @@ export default async function handler(req, res) {
     const nextSerial = maxSerial + 1;
     const serialStr = nextSerial.toString().padStart(2, '0');
     const studentId = `${prefix}${serialStr}`;
-    const uuid = crypto.randomUUID();
+    const uuid = typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
 
     return res.status(200).json({
       success: true,

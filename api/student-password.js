@@ -21,11 +21,23 @@ export default async function handler(req, res) {
 
     if (session.role === 'student') {
       // Student updating their own password (no verification needed)
-      if (typeof newPassword !== 'string' || newPassword.trim().length < 4) {
-        return res.status(400).json({ success: false, error: 'Password must be at least 4 characters long' });
+      if (typeof newPassword !== 'string' || newPassword.trim().length < 8) {
+        return res.status(400).json({ success: false, error: 'Password must be at least 8 characters long' });
       }
 
       const cleanPassword = newPassword.trim();
+
+      // Enforce password complexity
+      const hasNumber = /\d/.test(cleanPassword);
+      const hasLetter = /[a-zA-Z]/.test(cleanPassword);
+
+      if (!hasNumber || !hasLetter) {
+        return res.status(400).json({
+          success: false,
+          error: 'Password must contain both letters and numbers for security'
+        });
+      }
+
       const password_hash = await bcrypt.hash(cleanPassword, 10);
       const studentSub = session.sub;
 
@@ -144,16 +156,28 @@ export default async function handler(req, res) {
 
         return res.status(200).json({
           success: true,
-          message: `Password for ${student.name} has been reset to Date of Birth (${student.dob}).`,
-          dob: student.dob
+          message: `Password for ${student.name} has been reset to official Date of Birth.`
         });
       } else if (newPassword) {
         // Admin setting specific password for student
-        if (typeof newPassword !== 'string' || newPassword.trim().length < 4) {
-          return res.status(400).json({ success: false, error: 'Password must be at least 4 characters long' });
+        if (typeof newPassword !== 'string' || newPassword.trim().length < 8) {
+          return res.status(400).json({ success: false, error: 'Password must be at least 8 characters long' });
         }
 
-        const password_hash = await bcrypt.hash(newPassword.trim(), 10);
+        const cleanPassword = newPassword.trim();
+
+        // Enforce password complexity
+        const hasNumber = /\d/.test(cleanPassword);
+        const hasLetter = /[a-zA-Z]/.test(cleanPassword);
+
+        if (!hasNumber || !hasLetter) {
+          return res.status(400).json({
+            success: false,
+            error: 'Password must contain both letters and numbers for security'
+          });
+        }
+
+        const password_hash = await bcrypt.hash(cleanPassword, 10);
         const { data: existingRecords } = await supabase
           .from('student_requests')
           .select('id')

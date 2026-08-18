@@ -1,18 +1,30 @@
 import { getSupabase } from './_lib/auth.js';
-import { sendEmailViaResend, extractResendErrorMessage } from './_lib/resend-sender.js';
+import {
+  sendEmailViaResend,
+  extractResendErrorMessage,
+  isValidResendApiKey,
+  isVerifiedSenderDomain,
+  DEFAULT_FROM
+} from './_lib/resend-sender.js';
+import {
+  feeEmail,
+  reminderEmail,
+  escapeHtml,
+  formatMonthLabel
+} from './_lib/email-templates.js';
 
 const BATCH_SCHEDULE = {
   // Days 1-4: Monthly Tuition Fee Generation & Initial Statements
   1: { key: '10th', label: 'Class 10th (ACHIEVER)', fee: 1000, type: 'billing' },
   2: { key: '9th', label: 'Class 9th (NURTURE)', fee: 1000, type: 'billing' },
   3: { key: '8th', label: 'Class 8th (ALPHA)', fee: 800, type: 'billing' },
-  4: { key: 'junio', label: 'Junior Batch (JUNIO)', fee: 700, type: 'billing' },
+  4: { key: 'junior', label: 'Junior Batch (JUNIO)', fee: 700, type: 'billing' },
 
   // Days 15-19: Mid-Month Pending Due Reminders (Only for students with pending_fee > 0)
   15: { key: '10th', label: 'Class 10th (ACHIEVER)', type: 'reminder' },
   16: { key: '9th', label: 'Class 9th (NURTURE)', type: 'reminder' },
   17: { key: '8th', label: 'Class 8th (ALPHA)', type: 'reminder' },
-  18: { key: 'junio', label: 'Junior Batch (JUNIO)', type: 'reminder' },
+  18: { key: 'junior', label: 'Junior Batch (JUNIO)', type: 'reminder' },
   19: { key: 'all', label: 'All Batches (Pending Dues Reminder)', type: 'reminder' }
 };
 
@@ -23,300 +35,7 @@ function indiaDateParts(date = new Date()) {
   return { day: Number(parts.day), monthKey: `${parts.year}-${parts.month}` };
 }
 
-function monthLabel(monthKey) {
-  return new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', month: 'long', year: 'numeric' })
-    .format(new Date(`${monthKey}-01T12:00:00Z`));
-}
-
-function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
-}
-
-function feeEmail(student, ledger) {
-  const amount = Number(ledger.amount || 0);
-  const updatedDue = Number(ledger.updated_due ?? (Number(ledger.previous_due || 0) + amount));
-  const previousDue = Number(ledger.previous_due !== undefined && ledger.previous_due !== null 
-    ? ledger.previous_due 
-    : Math.max(0, updatedDue - amount));
-
-  return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:620px;margin:0 auto;background:#ffffff;border:2px solid #064E3B;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(6,78,59,0.15)">
-    <!-- Top Header Banner -->
-    <div style="background:linear-gradient(135deg,#064E3B 0%,#022C22 100%);color:#ffffff;padding:28px 24px;text-align:center">
-      <img src="https://pragyaninstitute.com/assets/images/logo.png" alt="Pragyan Institute Logo" width="70" height="70" style="width:70px;height:70px;border-radius:50%;object-fit:contain;background:#ffffff;padding:3px;display:inline-block;margin-bottom:12px;box-shadow:0 4px 14px rgba(0,0,0,0.3);border:2px solid #34D399">
-      <h1 style="margin:0;font-size:24px;font-weight:900;letter-spacing:0.5px;color:#ffffff;line-height:1.2">PRAGYAN INSTITUTE</h1>
-      <div style="font-size:12px;font-weight:700;color:#6EE7B7;text-transform:uppercase;letter-spacing:1.5px;margin-top:4px">Lalganj, Vaishali • Bihar</div>
-      <div style="display:inline-block;margin-top:14px;background:rgba(52,211,153,0.2);border:1px solid #34D399;color:#A7F3D0;font-size:13px;font-weight:700;padding:5px 16px;border-radius:99px">
-        📄 OFFICIAL MONTHLY TUITION INVOICE — ${escapeHtml(monthLabel(ledger.billing_month))}
-      </div>
-    </div>
-
-    <!-- Body Container -->
-    <div style="padding:26px;background:#FAF9F6">
-      <!-- Student Greeting & Meta Card -->
-      <div style="background:#ffffff;border:1.5px solid #E5E7EB;border-radius:12px;padding:18px;margin-bottom:20px;box-shadow:0 2px 6px rgba(0,0,0,0.03)">
-        <table style="width:100%;border-collapse:collapse">
-          <tr>
-            <td style="vertical-align:top;padding-right:10px">
-              <div style="font-size:12px;color:#6B7280;text-transform:uppercase;font-weight:600">Student Name</div>
-              <div style="font-size:18px;font-weight:800;color:#111827;margin-top:2px">${escapeHtml(student.name)}</div>
-            </td>
-            <td style="text-align:right;vertical-align:top">
-              <div style="font-size:12px;color:#6B7280;text-transform:uppercase;font-weight:600">Roll Number</div>
-              <div style="font-size:18px;font-weight:800;color:#065F46;font-family:monospace;margin-top:2px">#${escapeHtml(student.roll_no)}</div>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding-top:12px">
-              <div style="font-size:12px;color:#6B7280;text-transform:uppercase;font-weight:600">Academic Batch</div>
-              <div style="font-size:14px;font-weight:700;color:#374151;margin-top:2px">${escapeHtml(student.class_name)}</div>
-            </td>
-            <td style="text-align:right;padding-top:12px">
-              <div style="font-size:12px;color:#6B7280;text-transform:uppercase;font-weight:600">Billing Cycle</div>
-              <div style="font-size:14px;font-weight:700;color:#374151;margin-top:2px">${escapeHtml(monthLabel(ledger.billing_month))}</div>
-            </td>
-          </tr>
-        </table>
-      </div>
-
-      <!-- ⭐ PROMINENT DUE AMOUNT HIGHLIGHT HERO CARD ⭐ -->
-      <div style="background:linear-gradient(135deg,#ECFDF5 0%,#D1FAE5 100%);border:2.5px solid #10B981;border-radius:14px;padding:22px 20px;text-align:center;margin-bottom:22px;box-shadow:0 6px 18px rgba(16,185,129,0.15)">
-        <div style="font-size:13px;font-weight:800;color:#065F46;text-transform:uppercase;letter-spacing:1px">
-          📢 TOTAL NET AMOUNT PAYABLE / कुल देय राशि
-        </div>
-        <div style="font-size:44px;font-weight:900;color:#064E3B;line-height:1.1;margin:8px 0;text-shadow:0 1px 2px rgba(0,0,0,0.1)">
-          ₹${updatedDue.toLocaleString('en-IN')}
-        </div>
-        <div style="display:inline-block;background:#064E3B;color:#A7F3D0;padding:4px 14px;border-radius:99px;font-size:12px;font-weight:700">
-          ⏳ Please clear within 4 Days
-        </div>
-      </div>
-
-      <!-- Detailed Itemized Breakdown Statement -->
-      <div style="background:#ffffff;border:1.5px solid #E5E7EB;border-radius:14px;overflow:hidden;margin-bottom:22px;box-shadow:0 2px 8px rgba(0,0,0,0.03)">
-        <div style="background:#F8FAFC;padding:12px 18px;font-size:13px;font-weight:800;color:#334155;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #E2E8F0">
-          📊 DETAILED FEE BREAKDOWN / शुल्क विवरण
-        </div>
-        <table style="width:100%;border-collapse:collapse">
-          <tr>
-            <td style="padding:14px 18px;font-size:14px;color:#334155;border-bottom:1px solid #F1F5F9;line-height:1.4">
-              <strong>1. Previous Unpaid Dues / पिछला बकाया शुल्क</strong><br>
-              <span style="font-size:12px;color:#64748B">Fee balance carried forward before current cycle</span>
-            </td>
-            <td style="padding:14px 18px;font-size:15px;color:#475569;text-align:right;border-bottom:1px solid #F1F5F9;font-weight:700;font-family:monospace">
-              ₹${previousDue.toLocaleString('en-IN')}
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:14px 18px;font-size:14px;color:#334155;border-bottom:1px solid #F1F5F9;line-height:1.4">
-              <strong>2. Current Month Tuition Fee / इस माह का शुल्क (${escapeHtml(monthLabel(ledger.billing_month))})</strong><br>
-              <span style="font-size:12px;color:#059669">Academic batch fee for ${escapeHtml(student.class_name)}</span>
-            </td>
-            <td style="padding:14px 18px;font-size:15px;color:#059669;font-weight:800;text-align:right;border-bottom:1px solid #F1F5F9;font-family:monospace">
-              + ₹${amount.toLocaleString('en-IN')}
-            </td>
-          </tr>
-          <tr style="background:#ECFDF5">
-            <td style="padding:16px 18px;font-size:15px;font-weight:900;color:#065F46;border-top:2px solid #10B981;line-height:1.4">
-              TOTAL NET AMOUNT PAYABLE / कुल देय राशि<br>
-              <span style="font-size:12px;font-weight:600;color:#047857">Combined earlier balance + this month's fee</span>
-            </td>
-            <td style="padding:16px 18px;font-size:20px;font-weight:900;color:#065F46;text-align:right;border-top:2px solid #10B981;font-family:monospace">
-              ₹${updatedDue.toLocaleString('en-IN')}
-            </td>
-          </tr>
-        </table>
-      </div>
-
-      <!-- Official PhonePe QR & 1-Tap Auto-UPI Gateway -->
-      <div style="background:#ffffff;border:2px solid #10B981;border-radius:14px;padding:22px;text-align:center;margin-bottom:22px;box-shadow:0 4px 14px rgba(16,185,129,0.1)">
-        <div style="font-weight:800;font-size:14px;color:#065F46;letter-spacing:0.5px;margin-bottom:14px">
-          📱 SCAN TO PAY OR TAP 1-CLICK BUTTON
-        </div>
-        
-        <div style="display:inline-block;background:#FFFFFF;padding:8px;border-radius:12px;border:2px solid #10B981;box-shadow:0 4px 12px rgba(0,0,0,0.08)">
-          <img src="https://pragyaninstitute.com/assets/images/chandan_upi_qr.png" alt="PhonePe QR Code - Chandan Kumar Pragyan Institute" width="150" height="195" style="width:150px;height:195px;object-fit:contain;border-radius:8px;display:block">
-        </div>
-
-        <div style="margin:14px 0 6px">
-          <div style="font-family:monospace;font-size:16px;font-weight:800;background:#ECFDF5;border:1px solid #A7F3D0;color:#065F46;padding:6px 16px;border-radius:8px;display:inline-block">
-            chandankr1501998@ybl
-          </div>
-        </div>
-        <div style="font-size:13px;color:#4B5563">
-          Verified Payee: <strong>Chandan Kumar</strong> (Director, Pragyan Institute)
-        </div>
-
-        <div style="margin-top:18px">
-          <a href="https://pragyaninstitute.com/pay.html?amount=${updatedDue}&roll=${encodeURIComponent(student.roll_no)}&name=${encodeURIComponent(student.name)}&batch=${encodeURIComponent(student.class_name)}&prev=${previousDue}&curr=${amount}" style="display:inline-block;background:linear-gradient(135deg,#059669 0%,#047857 100%);color:#ffffff;font-weight:800;padding:14px 28px;border-radius:10px;text-decoration:none;font-size:15px;box-shadow:0 4px 14px rgba(5,150,105,0.4);letter-spacing:0.2px">
-            ⚡ Click Here to Pay ₹${updatedDue.toLocaleString('en-IN')} Online
-          </a>
-        </div>
-      </div>
-
-      <!-- Verification Instructions -->
-      <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:14px;font-size:13px;color:#1E40AF;line-height:1.5;margin-bottom:12px">
-        💡 <strong>Receipt & Verification:</strong> After transferring fees, enter your 12-digit UTR on <a href="https://pragyaninstitute.com/pay.html?amount=${updatedDue}&roll=${encodeURIComponent(student.roll_no)}" style="color:#1D4ED8;font-weight:800;text-decoration:underline">pragyaninstitute.com/pay</a> for instant computerized receipt generation.
-      </div>
-    </div>
-
-    <!-- Footer -->
-    <div style="background:#F3F4F6;padding:18px 24px;text-align:center;font-size:12px;color:#6B7280;border-top:1px solid #E5E7EB;line-height:1.6">
-      <strong>PRAGYAN INSTITUTE LALGANJ</strong> • Near Gandhi Chowk, Lalganj, Vaishali, Bihar<br>
-      Mentors: <strong>Prof. Ravi Ranjan</strong> (Director) & <strong>Chandan Kumar</strong> (Director)<br>
-      📞 Official Helpline: <strong>+91 91100 24683</strong> • 🌐 Website: <a href="https://pragyaninstitute.com" style="color:#065F46;font-weight:bold;text-decoration:none">pragyaninstitute.com</a>
-    </div>
-  </div>`;
-}
-
-function reminderEmail(student, monthName) {
-  const pendingDue = Number(student.pending_fee || 0);
-  const monthlyRate = Number(student.monthly_fee || 1000);
-  let prevDue = 0;
-  let currDue = 0;
-
-  if (pendingDue <= 0) {
-    prevDue = 0;
-    currDue = 0;
-  } else if (pendingDue > monthlyRate) {
-    prevDue = pendingDue - monthlyRate;
-    currDue = monthlyRate;
-  } else {
-    prevDue = 0;
-    currDue = pendingDue;
-  }
-
-  return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:620px;margin:0 auto;background:#ffffff;border:2px solid #D97706;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(217,119,6,0.15)">
-    <!-- Top Header Banner -->
-    <div style="background:linear-gradient(135deg,#78350F 0%,#451A03 100%);color:#ffffff;padding:28px 24px;text-align:center">
-      <img src="https://pragyaninstitute.com/assets/images/logo.png" alt="Pragyan Institute Logo" width="70" height="70" style="width:70px;height:70px;border-radius:50%;object-fit:contain;background:#ffffff;padding:3px;display:inline-block;margin-bottom:12px;box-shadow:0 4px 14px rgba(0,0,0,0.3);border:2px solid #FBBF24">
-      <h1 style="margin:0;font-size:24px;font-weight:900;letter-spacing:0.5px;color:#ffffff;line-height:1.2">PRAGYAN INSTITUTE</h1>
-      <div style="font-size:12px;font-weight:700;color:#FDE68A;text-transform:uppercase;letter-spacing:1.5px;margin-top:4px">Lalganj, Vaishali • Bihar</div>
-      <div style="display:inline-block;margin-top:14px;background:rgba(245,158,11,0.25);border:1px solid #F59E0B;color:#FEF3C7;font-size:13px;font-weight:700;padding:5px 16px;border-radius:99px">
-        ⚠️ MID-MONTH PENDING FEE REMINDER — ${escapeHtml(monthName)}
-      </div>
-    </div>
-
-    <!-- Body Container -->
-    <div style="padding:26px;background:#FAF9F6">
-      <!-- Student Greeting & Meta Card -->
-      <div style="background:#ffffff;border:1.5px solid #E5E7EB;border-radius:12px;padding:18px;margin-bottom:20px;box-shadow:0 2px 6px rgba(0,0,0,0.03)">
-        <table style="width:100%;border-collapse:collapse">
-          <tr>
-            <td style="vertical-align:top;padding-right:10px">
-              <div style="font-size:12px;color:#6B7280;text-transform:uppercase;font-weight:600">Student Name</div>
-              <div style="font-size:18px;font-weight:800;color:#111827;margin-top:2px">${escapeHtml(student.name)}</div>
-            </td>
-            <td style="text-align:right;vertical-align:top">
-              <div style="font-size:12px;color:#6B7280;text-transform:uppercase;font-weight:600">Roll Number</div>
-              <div style="font-size:18px;font-weight:800;color:#B45309;font-family:monospace;margin-top:2px">#${escapeHtml(student.roll_no)}</div>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding-top:12px">
-              <div style="font-size:12px;color:#6B7280;text-transform:uppercase;font-weight:600">Class / Batch</div>
-              <div style="font-size:14px;font-weight:700;color:#374151;margin-top:2px">${escapeHtml(student.class_name)}</div>
-            </td>
-            <td style="text-align:right;padding-top:12px">
-              <div style="font-size:12px;color:#6B7280;text-transform:uppercase;font-weight:600">Notice Type</div>
-              <div style="font-size:14px;font-weight:700;color:#DC2626;margin-top:2px">Due Clearance</div>
-            </td>
-          </tr>
-        </table>
-      </div>
-
-      <!-- ⭐ PROMINENT DUE AMOUNT HIGHLIGHT HERO CARD ⭐ -->
-      <div style="background:linear-gradient(135deg,#FEF3C7 0%,#FDE68A 100%);border:2.5px solid #D97706;border-radius:14px;padding:22px 20px;text-align:center;margin-bottom:22px;box-shadow:0 6px 18px rgba(217,119,6,0.15)">
-        <div style="font-size:13px;font-weight:800;color:#92400E;text-transform:uppercase;letter-spacing:1px">
-          🚨 TOTAL PENDING BALANCE / कुल बकाया राशि
-        </div>
-        <div style="font-size:44px;font-weight:900;color:#B45309;line-height:1.1;margin:8px 0;text-shadow:0 1px 2px rgba(0,0,0,0.1)">
-          ₹${pendingDue.toLocaleString('en-IN')}
-        </div>
-        <div style="display:inline-block;background:#92400E;color:#FEF3C7;padding:4px 14px;border-radius:99px;font-size:12px;font-weight:700">
-          ⚠️ Clearance Requested
-        </div>
-      </div>
-
-      <!-- Itemized Breakdown Statement for Reminder -->
-      <div style="background:#ffffff;border:1.5px solid #E5E7EB;border-radius:14px;overflow:hidden;margin-bottom:22px;box-shadow:0 2px 8px rgba(0,0,0,0.03)">
-        <div style="background:#F8FAFC;padding:12px 18px;font-size:13px;font-weight:800;color:#334155;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #E2E8F0">
-          📊 DETAILED FEE BREAKDOWN / शुल्क विवरण
-        </div>
-        <table style="width:100%;border-collapse:collapse">
-          <tr>
-            <td style="padding:14px 18px;font-size:14px;color:#334155;border-bottom:1px solid #F1F5F9;line-height:1.4">
-              <strong>1. Previous Unpaid Dues / पिछला बकाया शुल्क</strong><br>
-              <span style="font-size:12px;color:#64748B">Fee balance carried forward till last month</span>
-            </td>
-            <td style="padding:14px 18px;font-size:15px;color:#475569;text-align:right;border-bottom:1px solid #F1F5F9;font-weight:700;font-family:monospace">
-              ₹${prevDue.toLocaleString('en-IN')}
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:14px 18px;font-size:14px;color:#334155;border-bottom:1px solid #F1F5F9;line-height:1.4">
-              <strong>2. Current Month Tuition Fee / इस माह का शुल्क (${escapeHtml(monthName)})</strong><br>
-              <span style="font-size:12px;color:#059669">Academic batch fee for ${escapeHtml(student.class_name)}</span>
-            </td>
-            <td style="padding:14px 18px;font-size:15px;color:#059669;font-weight:800;text-align:right;border-bottom:1px solid #F1F5F9;font-family:monospace">
-              + ₹${currDue.toLocaleString('en-IN')}
-            </td>
-          </tr>
-          <tr style="background:#FEF3C7">
-            <td style="padding:16px 18px;font-size:15px;font-weight:900;color:#92400E;border-top:2px solid #D97706;line-height:1.4">
-              TOTAL NET AMOUNT PAYABLE / कुल देय राशि<br>
-              <span style="font-size:12px;font-weight:600;color:#78350F">Exact total outstanding fee</span>
-            </td>
-            <td style="padding:16px 18px;font-size:20px;font-weight:900;color:#92400E;text-align:right;border-top:2px solid #D97706;font-family:monospace">
-              ₹${pendingDue.toLocaleString('en-IN')}
-            </td>
-          </tr>
-        </table>
-      </div>
-
-      <p style="font-size:14px;color:#4B5563;line-height:1.6;margin-bottom:20px">
-        Dear Parent / Student, this is a mid-month reminder from the accounts desk regarding the outstanding balance of <strong>₹${pendingDue.toLocaleString('en-IN')}</strong> for <strong>${escapeHtml(student.name)}</strong>. Kindly clear the pending dues online or at the institute counter.
-      </p>
-
-      <!-- Official PhonePe QR & 1-Tap Auto-UPI Gateway -->
-      <div style="background:#ffffff;border:2px solid #D97706;border-radius:14px;padding:22px;text-align:center;margin-bottom:22px;box-shadow:0 4px 14px rgba(217,119,6,0.1)">
-        <div style="font-weight:800;font-size:14px;color:#92400E;letter-spacing:0.5px;margin-bottom:14px">
-          📱 SCAN TO PAY OR TAP 1-CLICK BUTTON
-        </div>
-        
-        <div style="display:inline-block;background:#FFFFFF;padding:8px;border-radius:12px;border:2px solid #D97706;box-shadow:0 4px 12px rgba(0,0,0,0.08)">
-          <img src="https://pragyaninstitute.com/assets/images/chandan_upi_qr.png" alt="PhonePe QR Code - Chandan Kumar Pragyan Institute" width="150" height="195" style="width:150px;height:195px;object-fit:contain;border-radius:8px;display:block">
-        </div>
-
-        <div style="margin:14px 0 6px">
-          <div style="font-family:monospace;font-size:16px;font-weight:800;background:#FFFBEB;border:1px solid #FCD34D;color:#92400E;padding:6px 16px;border-radius:8px;display:inline-block">
-            chandankr1501998@ybl
-          </div>
-        </div>
-        <div style="font-size:13px;color:#4B5563">
-          Verified Payee: <strong>Chandan Kumar</strong> (Director, Pragyan Institute)
-        </div>
-
-        <div style="margin-top:18px">
-          <a href="https://pragyaninstitute.com/pay.html?amount=${pendingDue}&roll=${encodeURIComponent(student.roll_no)}&name=${encodeURIComponent(student.name)}&batch=${encodeURIComponent(student.class_name)}&prev=${prevDue}&curr=${currDue}" style="display:inline-block;background:linear-gradient(135deg,#D97706 0%,#B45309 100%);color:#ffffff;font-weight:800;padding:14px 28px;border-radius:10px;text-decoration:none;font-size:15px;box-shadow:0 4px 14px rgba(217,119,6,0.4);letter-spacing:0.2px">
-            ⚡ Click Here to Pay ₹${pendingDue.toLocaleString('en-IN')} Online
-          </a>
-        </div>
-      </div>
-
-      <!-- Verification Instructions -->
-      <div style="background:#FFFBEB;border:1px solid #FCD34D;border-radius:10px;padding:14px;font-size:13px;color:#92400E;line-height:1.5;margin-bottom:12px">
-        💡 <strong>Receipt & Verification:</strong> After transferring fees, enter your 12-digit UTR on <a href="https://pragyaninstitute.com/pay.html?amount=${pendingDue}&roll=${encodeURIComponent(student.roll_no)}&prev=${prevDue}&curr=${currDue}" style="color:#B45309;font-weight:800;text-decoration:underline">pragyaninstitute.com/pay</a> for instant computerized receipt confirmation.
-      </div>
-    </div>
-
-    <!-- Footer -->
-    <div style="background:#F3F4F6;padding:18px 24px;text-align:center;font-size:12px;color:#6B7280;border-top:1px solid #E5E7EB;line-height:1.6">
-      <strong>PRAGYAN INSTITUTE LALGANJ</strong> • Near Gandhi Chowk, Lalganj, Vaishali, Bihar<br>
-      Mentors: <strong>Prof. Ravi Ranjan</strong> (Director) & <strong>Chandan Kumar</strong> (Director)<br>
-      📞 Official Helpline: <strong>+91 91100 24683</strong> • 🌐 Website: <a href="https://pragyaninstitute.com" style="color:#065F46;font-weight:bold;text-decoration:none">pragyaninstitute.com</a>
-    </div>
-  </div>`;
-}
+const monthLabel = formatMonthLabel;
 
 function extractErrorMessage(err) {
   if (!err) return 'Email delivery failed';
@@ -333,41 +52,83 @@ function extractErrorMessage(err) {
 }
 
 async function sendLedgerEmail(supabase, from, ledger, student) {
+  // STEP 1: Acquire exclusive lock by updating email_attempts atomically
+  const lockResult = await supabase
+    .from('fee_billing_ledger')
+    .update({
+      email_attempts: supabase.raw('email_attempts + 1'),
+      last_email_attempt_at: new Date().toISOString()
+    })
+    .eq('id', ledger.id)
+    .is('email_sent_at', null) // Only lock if not already sent
+    .select('id, email_attempts')
+    .maybeSingle();
+
+  if (lockResult.error || !lockResult.data) {
+    // Another process already locked this record or email was sent
+    return { studentId: ledger.student_id, status: 'already_processing_or_sent' };
+  }
+
   const attempt = Number(ledger.email_attempts || 0) + 1;
   const attemptedAt = new Date().toISOString();
+
   if (!student?.email) {
-    await supabase.from('fee_billing_ledger').update({ email_attempts: attempt, last_email_attempt_at: attemptedAt, email_error: 'No registered email address' }).eq('id', ledger.id);
+    await supabase.from('fee_billing_ledger')
+      .update({ email_error: 'No registered email address' })
+      .eq('id', ledger.id);
     return { studentId: ledger.student_id, status: 'billed_no_email' };
   }
 
   try {
+    // STEP 2: Generate idempotency key from ledger ID + billing month
+    const idempotencyKey = `ledger_${ledger.id}_${ledger.billing_month}`;
+
     const result = await sendEmailViaResend({
       from,
       to: student.email,
       subject: `Monthly Fee Statement — ${student.name} (${monthLabel(ledger.billing_month)})`,
-      html: feeEmail(student, ledger)
+      html: feeEmail(student, ledger),
+      headers: {
+        'X-Entity-Ref-ID': idempotencyKey // Resend custom header for tracking
+      }
     });
 
     if (!result.success) {
       const finalError = extractResendErrorMessage(result.error).slice(0, 500);
-      await supabase.from('fee_billing_ledger').update({ email_attempts: attempt, last_email_attempt_at: attemptedAt, email_error: finalError }).eq('id', ledger.id);
+      await supabase.from('fee_billing_ledger')
+        .update({ email_error: finalError })
+        .eq('id', ledger.id);
       return { studentId: ledger.student_id, status: 'email_failed', error: finalError };
     }
 
-    await supabase.from('fee_billing_ledger').update({ email_attempts: attempt, last_email_attempt_at: attemptedAt, email_sent_at: attemptedAt, email_error: null }).eq('id', ledger.id);
+    // STEP 3: Mark as sent with Resend message ID for audit trail
+    await supabase.from('fee_billing_ledger')
+      .update({
+        email_sent_at: attemptedAt,
+        email_error: null,
+        resend_message_id: result.data?.id || null
+      })
+      .eq('id', ledger.id);
+
     return { studentId: ledger.student_id, status: 'emailed', emailId: result.data?.id || null };
   } catch (error) {
     const finalError = extractResendErrorMessage(error).slice(0, 500);
-    await supabase.from('fee_billing_ledger').update({ email_attempts: attempt, last_email_attempt_at: attemptedAt, email_error: finalError }).eq('id', ledger.id);
+    await supabase.from('fee_billing_ledger')
+      .update({ email_error: finalError })
+      .eq('id', ledger.id);
     return { studentId: ledger.student_id, status: 'email_failed', error: finalError };
   }
 }
 
 async function retryUnsentEmails(supabase, from) {
+  const MAX_RETRY_ATTEMPTS = 3;
+  const BASE_DELAY_MS = 2000; // Start with 2 seconds
+
   const { data: pending, error } = await supabase
     .from('fee_billing_ledger')
     .select('id,student_id,billing_month,amount,previous_due,updated_due,email_attempts')
     .is('email_sent_at', null)
+    .lt('email_attempts', MAX_RETRY_ATTEMPTS) // Only retry if under max attempts
     .order('created_at', { ascending: true })
     .limit(100);
   if (error) throw error;
@@ -378,9 +139,34 @@ async function retryUnsentEmails(supabase, from) {
   if (studentsError) throw studentsError;
   const byStudentId = new Map((students || []).map(student => [student.student_id, student]));
   const results = [];
+
   for (const ledger of pending) {
+    // Re-verify that email hasn't been sent in parallel by another process
+    const { data: currentRecord } = await supabase
+      .from('fee_billing_ledger')
+      .select('email_sent_at,email_attempts')
+      .eq('id', ledger.id)
+      .maybeSingle();
+
+    if (currentRecord?.email_sent_at) {
+      console.log(`[Retry] Skipped ledger ${ledger.id} (already sent by another process)`);
+      continue;
+    }
+
+    const attemptNumber = Number(currentRecord?.email_attempts ?? ledger.email_attempts ?? 0);
+    if (attemptNumber >= MAX_RETRY_ATTEMPTS) {
+      continue;
+    }
+
+    // Exponential backoff: 2s, 4s, 8s, 16s, 32s...
+    const delayMs = BASE_DELAY_MS * Math.pow(2, attemptNumber);
+    const jitter = Math.random() * 1000; // Add 0-1s random jitter
+    const totalDelay = Math.min(delayMs + jitter, 60000); // Cap at 60 seconds
+
+    console.log(`[Retry ${attemptNumber + 1}/${MAX_RETRY_ATTEMPTS}] Waiting ${Math.round(totalDelay)}ms before retry for student ${ledger.student_id}...`);
+    await new Promise(resolve => setTimeout(resolve, totalDelay));
+
     results.push(await sendLedgerEmail(supabase, from, ledger, byStudentId.get(ledger.student_id)));
-    await new Promise(resolve => setTimeout(resolve, 100));
   }
   return results;
 }
@@ -394,9 +180,10 @@ export default async function handler(req, res) {
 
   const supabase = getSupabase();
   const resendKey = process.env.RESEND_API_KEY;
-  const from = process.env.RESEND_FROM_EMAIL || 'Pragyan Institute <noreply@pragyaninstitute.com>';
+  const rawFrom = process.env.RESEND_FROM_EMAIL || DEFAULT_FROM;
+  const from = isVerifiedSenderDomain(rawFrom) ? rawFrom : DEFAULT_FROM;
   if (!supabase) return res.status(503).json({ error: 'Billing service is not configured' });
-  const emailConfigured = Boolean(resendKey && from);
+  const emailConfigured = Boolean(isValidResendApiKey(resendKey) && isVerifiedSenderDomain(from));
 
   const { day, monthKey } = indiaDateParts();
   const target = BATCH_SCHEDULE[day];
@@ -409,7 +196,11 @@ export default async function handler(req, res) {
         .from('students')
         .select('student_id,name,roll_no,class_name,monthly_fee,status,pending_fee,email');
       if (target.key && target.key !== 'all') {
-        query = query.ilike('class_name', `%${target.key}%`);
+        if (target.key === 'junior') {
+          query = query.or('class_name.ilike.%junior%,class_name.ilike.%junio%,class_name.ilike.%6%,class_name.ilike.%7%');
+        } else {
+          query = query.ilike('class_name', `%${target.key}%`);
+        }
       }
       const { data: students, error } = await query;
       if (error) throw error;
@@ -465,34 +256,22 @@ export default async function handler(req, res) {
 
           if (!handled) {
             try {
-              const { data: existingLedger } = await supabase
-                .from('fee_billing_ledger')
-                .select('id, billing_month')
+              // Use UPSERT with UNIQUE constraint - database will prevent duplicates
+              const { data: freshStudent } = await supabase
+                .from('students')
+                .select('id,student_id,name,roll_no,class_name,pending_fee,total_fee')
                 .eq('student_id', student.student_id)
-                .in('billing_month', [monthKey, currentMonthName])
-                .maybeSingle();
+                .single();
 
-              if (existingLedger) {
-                results.push({ studentId: student.student_id, status: 'already_billed' });
-              } else {
-                const { data: freshStudent } = await supabase
-                  .from('students')
-                  .select('id,student_id,name,roll_no,class_name,pending_fee,total_fee')
-                  .eq('student_id', student.student_id)
-                  .single();
+              const studentUuid = freshStudent?.id || student.id;
+              const previousDue = Number(freshStudent?.pending_fee || 0);
+              const updatedDue = previousDue + amount;
+              const receiptNo = `REC-BILL-${student.student_id}-${monthKey}`;
 
-                const studentUuid = freshStudent?.id || student.id;
-                const previousDue = Number(freshStudent?.pending_fee || 0);
-                const updatedDue = previousDue + amount;
-                const receiptNo = `REC-BILL-${student.student_id}-${monthKey}`;
-
-                await supabase.from('students').update({
-                  pending_fee: updatedDue,
-                  total_fee: Number(freshStudent?.total_fee || 0) + amount,
-                  updated_at: new Date().toISOString()
-                }).eq('id', studentUuid);
-
-                await supabase.from('fee_billing_ledger').upsert({
+              // ATOMIC: Insert ledger entry with UNIQUE constraint enforcement
+              const { data: ledgerResult, error: ledgerError } = await supabase
+                .from('fee_billing_ledger')
+                .upsert({
                   student_id: student.student_id,
                   billing_month: monthKey,
                   amount: amount,
@@ -500,27 +279,51 @@ export default async function handler(req, res) {
                   updated_due: updatedDue,
                   batch_label: target.label,
                   idempotency_key: `fee_${student.student_id}_${monthKey}`
-                }, { onConflict: 'idempotency_key' });
+                }, {
+                  onConflict: 'student_id,billing_month',
+                  ignoreDuplicates: true
+                })
+                .select();
 
-                if (studentUuid) {
-                  try {
-                    await supabase.from('fee_receipts').upsert({
-                      receipt_no: receiptNo,
-                      student_id: studentUuid,
-                      amount: amount,
-                      payment_mode: 'System Monthly Billing',
-                      payment_date: new Date().toISOString().split('T')[0],
-                      status: 'Billed',
-                      collected_by: 'System Monthly Engine',
-                      note: `Monthly tuition fee for ${currentMonthName}`
-                    }, { onConflict: 'receipt_no', ignoreDuplicates: true });
-                  } catch (receiptErr) {
-                    console.warn('[cron] fee_receipts upsert note:', receiptErr.message);
-                  }
-                }
-
-                results.push({ studentId: student.student_id, status: 'billed', receiptNo });
+              if (ledgerError) {
+                throw ledgerError;
               }
+
+              // Check if this was a duplicate (no rows returned)
+              if (!ledgerResult || ledgerResult.length === 0) {
+                results.push({ studentId: student.student_id, status: 'already_billed' });
+                continue;
+              }
+
+              // Only update student fees if ledger entry was actually created
+              const { error: updateError } = await supabase.from('students').update({
+                pending_fee: updatedDue,
+                total_fee: Number(freshStudent?.total_fee || 0) + amount,
+                updated_at: new Date().toISOString()
+              }).eq('id', studentUuid);
+
+              if (updateError) {
+                throw updateError;
+              }
+
+              if (studentUuid) {
+                try {
+                  await supabase.from('fee_receipts').upsert({
+                    receipt_no: receiptNo,
+                    student_id: studentUuid,
+                    amount: amount,
+                    payment_mode: 'System Monthly Billing',
+                    payment_date: new Date().toISOString().split('T')[0],
+                    status: 'Billed',
+                    collected_by: 'System Monthly Engine',
+                    note: `Monthly tuition fee for ${currentMonthName}`
+                  }, { onConflict: 'receipt_no', ignoreDuplicates: true });
+                } catch (receiptErr) {
+                  console.warn('[cron] fee_receipts upsert note:', receiptErr.message);
+                }
+              }
+
+              results.push({ studentId: student.student_id, status: 'billed', receiptNo });
             } catch (dbErr) {
               results.push({ studentId: student.student_id, status: 'billing_failed', error: dbErr.message });
             }
@@ -529,7 +332,25 @@ export default async function handler(req, res) {
       } else if (target.type === 'reminder') {
         // --- DAYS 15 to 18: MID-MONTH PENDING DUE REMINDERS ---
         const pendingStudents = activeStudents.filter(s => Number(s.pending_fee) > 0 && s.email && s.email.includes('@'));
+
+        console.log(`📧 Sending ${pendingStudents.length} reminder emails...`);
+        let successCount = 0;
+        let failureCount = 0;
+        const CIRCUIT_BREAKER_THRESHOLD = Number(process.env.CIRCUIT_BREAKER_THRESHOLD) || 5;
+        let consecutiveFailures = 0;
+
         for (const student of pendingStudents) {
+          // Circuit breaker: Stop if too many consecutive failures
+          if (consecutiveFailures >= CIRCUIT_BREAKER_THRESHOLD) {
+            console.error(`🚨 Circuit breaker triggered after ${consecutiveFailures} failures. Stopping email batch.`);
+            results.push({
+              status: 'circuit_breaker_open',
+              message: `Stopped after ${consecutiveFailures} consecutive failures`,
+              remainingCount: pendingStudents.length - results.filter(r => r.status && r.status.includes('reminder')).length
+            });
+            break;
+          }
+
           try {
             const result = await sendEmailViaResend({
               from,
@@ -540,14 +361,26 @@ export default async function handler(req, res) {
 
             if (result.success) {
               results.push({ studentId: student.student_id, status: 'reminder_sent', emailId: result.data?.id });
+              successCount++;
+              consecutiveFailures = 0; // Reset on success
             } else {
               results.push({ studentId: student.student_id, status: 'reminder_failed', error: extractResendErrorMessage(result.error) });
+              failureCount++;
+              consecutiveFailures++;
             }
-            await new Promise(resolve => setTimeout(resolve, 100)); // Throttle
           } catch (remErr) {
+            // Catch ALL errors to prevent loop from crashing
+            console.error(`❌ Unexpected error sending reminder to ${student.student_id}:`, remErr);
             results.push({ studentId: student.student_id, status: 'reminder_failed', error: extractResendErrorMessage(remErr) });
+            failureCount++;
+            consecutiveFailures++;
+          } finally {
+            // Always throttle, even on error (100ms base delay)
+            await new Promise(resolve => setTimeout(resolve, 100));
           }
         }
+
+        console.log(`✅ Reminder emails complete: ${successCount} sent, ${failureCount} failed`);
       }
     }
 

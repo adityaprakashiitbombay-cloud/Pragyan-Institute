@@ -1,15 +1,75 @@
 import https from 'https';
 
-const DEFAULT_RESEND_KEY = '';
+export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const DEFAULT_FROM = 'Pragyan Institute <noreply@pragyaninstitute.com>';
+
+// Domains verified with Resend for production delivery.
+export const VERIFIED_PRODUCTION_DOMAINS = new Set([
+  'pragyaninstitute.com'
+]);
+
+// Sandbox domain only usable during local/non-production testing.
+export const SANDBOX_DOMAINS = new Set([
+  'resend.dev'
+]);
+
+// Backward compatibility export
+export const VERIFIED_SENDER_DOMAINS = new Set([
+  'pragyaninstitute.com',
+  'resend.dev'
+]);
+
+/**
+ * Extract bare email domain from format like:
+ * "Display Name <user@domain.tld>" or "user@domain.tld"
+ */
+export function extractSenderDomain(fromStr) {
+  if (!fromStr || typeof fromStr !== 'string') return null;
+  const match = fromStr.match(/<([^>]+)>/) || [null, fromStr];
+  const email = (match[1] || fromStr).trim();
+  if (!EMAIL_PATTERN.test(email)) return null;
+  return email.split('@')[1].toLowerCase();
+}
+
+/**
+ * Validates if a sender address is from an authorized / verified domain
+ */
+export function isVerifiedSenderDomain(fromStr) {
+  const domain = extractSenderDomain(fromStr);
+  if (!domain) return false;
+  // In production, strictly reject sandbox resend.dev to prevent silent email drops to students/parents
+  if (process.env.NODE_ENV === 'production') {
+    return VERIFIED_PRODUCTION_DOMAINS.has(domain);
+  }
+  return VERIFIED_PRODUCTION_DOMAINS.has(domain) || SANDBOX_DOMAINS.has(domain);
+}
+
+/**
+ * Validate that a string matches Resend API key format (starts with 're_', alphanumeric/hyphens, non-placeholder)
+ */
+export function isValidResendApiKey(key) {
+  if (typeof key !== 'string') return false;
+  const trimmed = key.trim();
+  if (!trimmed.startsWith('re_') || trimmed.length < 15) return false;
+  if (trimmed.includes('<') || trimmed.includes('>') || /YOUR_/i.test(trimmed) || /PLACEHOLDER/i.test(trimmed)) {
+    return false;
+  }
+  return /^re_[a-zA-Z0-9_-]+$/.test(trimmed);
+}
 
 export async function sendEmailViaResend({ from, to, subject, html, text, apiKey }) {
-  const key = apiKey || process.env.RESEND_API_KEY;
-  if (!key) throw new Error('RESEND_API_KEY is not configured');
+  const key = (apiKey || process.env.RESEND_API_KEY || '').trim();
+  if (!isValidResendApiKey(key)) {
+    throw new Error('RESEND_API_KEY is not configured or is invalid (must start with "re_")');
+  }
+
+  // Pre-validate sender domain against whitelist
+  const rawFrom = from || process.env.RESEND_FROM_EMAIL || DEFAULT_FROM;
+  const senderFrom = isVerifiedSenderDomain(rawFrom) ? rawFrom : DEFAULT_FROM;
 
   const recipients = Array.isArray(to) ? to : [to];
-  const defaultSender = 'Pragyan Institute <noreply@pragyaninstitute.com>';
   const payload = {
-    from: from || defaultSender,
+    from: senderFrom,
     to: recipients,
     subject,
     html,
@@ -59,20 +119,7 @@ export async function sendEmailViaResend({ from, to, subject, html, text, apiKey
     });
   }
 
-  let result = await doRequest(payload, key);
-  // If domain verification issue or testing note occurs, fallback to onboarding@resend.dev
-  if (!result.success && result.error) {
-    const errMsg = String(result.error.message || '').toLowerCase();
-    if (errMsg.includes('domain') || errMsg.includes('verify') || errMsg.includes('testing emails')) {
-      const fallbackPayload = {
-        ...payload,
-        from: 'Pragyan Institute <onboarding@resend.dev>'
-      };
-      result = await doRequest(fallbackPayload, key);
-    }
-  }
-
-  return result;
+  return doRequest(payload, key);
 }
 
 export function extractResendErrorMessage(err) {

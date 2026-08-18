@@ -1,6 +1,47 @@
 import bcrypt from 'bcryptjs';
 import { getSupabase, createSession, publicAdmin, applyCors } from './_lib/auth.js';
 
+// In-memory rate limiter (use Redis in production for multi-instance deployments)
+const loginAttempts = new Map(); // key: identifier, value: { count, resetTime }
+
+function cleanupExpiredAttempts() {
+  const now = Date.now();
+  if (loginAttempts.size > 50) {
+    for (const [key, value] of loginAttempts.entries()) {
+      if (value.resetTime < now) {
+        loginAttempts.delete(key);
+      }
+    }
+  }
+}
+
+function checkRateLimit(identifier) {
+  cleanupExpiredAttempts();
+  const now = Date.now();
+  const window = 15 * 60 * 1000; // 15 minutes
+  const maxAttempts = 5;
+
+  const attempts = loginAttempts.get(identifier);
+  if (attempts && attempts.resetTime > now) {
+    if (attempts.count >= maxAttempts) {
+      const remainingTime = Math.ceil((attempts.resetTime - now) / 60000);
+      return {
+        allowed: false,
+        message: `Too many login attempts. Please try again in ${remainingTime} minute(s).`
+      };
+    }
+    attempts.count++;
+    return { allowed: true };
+  } else {
+    loginAttempts.set(identifier, { count: 1, resetTime: now + window });
+    return { allowed: true };
+  }
+}
+
+function resetRateLimit(identifier) {
+  loginAttempts.delete(identifier);
+}
+
 export default async function handler(req, res) {
   if (applyCors(req, res)) return;
   if (req.method !== 'POST') {
@@ -17,6 +58,13 @@ export default async function handler(req, res) {
     }
 
     const safeId = String(identifier || '').replace(/[\r\n,()"']/g, '').trim();
+
+    // Check rate limit
+    const rateLimitCheck = checkRateLimit(safeId);
+    if (!rateLimitCheck.allowed) {
+      return res.status(429).json({ success: false, error: rateLimitCheck.message });
+    }
+
     const supabase = getSupabase();
     if (!supabase) {
       return res.status(503).json({ success: false, error: 'Database configuration missing' });
@@ -50,6 +98,9 @@ export default async function handler(req, res) {
       if (!admin) {
         return res.status(401).json({ success: false, error: 'Invalid admin username or password' });
       }
+
+      // Reset rate limit on successful login
+      resetRateLimit(safeId);
 
       const adminId = admin.admin_id || admin.id;
       const token = createSession({ sub: adminId, role: 'admin', name: admin.name });
@@ -156,6 +207,9 @@ export default async function handler(req, res) {
           error: 'Student not found or incorrect Password / Date of Birth (DOB)'
         });
       }
+
+      // Reset rate limit on successful login
+      resetRateLimit(safeId);
 
       const student = matchedStudent;
       const studentId = student.student_id || student.id;

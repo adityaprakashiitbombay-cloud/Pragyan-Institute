@@ -1,27 +1,14 @@
 import { getSupabase, requireSession, applyCors } from './_lib/auth.js';
-import { sendEmailViaResend, extractResendErrorMessage } from './_lib/resend-sender.js';
+import {
+  sendEmailViaResend,
+  extractResendErrorMessage,
+  isValidResendApiKey,
+  isVerifiedSenderDomain,
+  DEFAULT_FROM,
+  EMAIL_PATTERN
+} from './_lib/resend-sender.js';
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const DEFAULT_FROM = 'Pragyan Institute <noreply@pragyaninstitute.com>';
-
-// Domains verified with Resend. Any sender outside this list is rejected
-// pre-flight rather than letting the API return a 400 validation_error.
-const VERIFIED_SENDER_DOMAINS = new Set([
-  'pragyaninstitute.com',
-  'resend.dev', // Resend onboarding sandbox domain
-]);
-
-/**
- * Extract the bare domain from a From address such as
- * "Display Name <user@domain.tld>" or "user@domain.tld".
- * Returns null when the address cannot be parsed.
- */
-function extractSenderDomain(fromStr) {
-  const match = fromStr.match(/<([^>]+)>/) || [null, fromStr];
-  const email = (match[1] || fromStr).trim();
-  if (!EMAIL_PATTERN.test(email)) return null;
-  return email.split('@')[1].toLowerCase();
-}
+const MAX_BODY_LENGTH = 1024 * 1024;
 
 export default async function handler(req, res) {
   if (applyCors(req, res)) return;
@@ -29,22 +16,24 @@ export default async function handler(req, res) {
   const session = requireSession(req, res, ['student', 'admin']);
   if (!session) return;
 
-  const { to, subject, html, text, from: customFrom } = req.body || {};
-  const recipients = (Array.isArray(to) ? to : [to]).filter(value => typeof value === 'string' && EMAIL_PATTERN.test(value));
+  const { to, subject, html, text } = req.body || {};
+  const recipients = [...new Set((Array.isArray(to) ? to : [to])
+    .filter(value => typeof value === 'string')
+    .map(value => value.trim().toLowerCase())
+    .filter(value => EMAIL_PATTERN.test(value)))];
   const maxRecipients = session.role === 'admin' ? 100 : 1;
-  if (!recipients.length || recipients.length > maxRecipients || typeof subject !== 'string' || subject.length > 200 || (!html && !text)) {
+  const cleanSubject = typeof subject === 'string' ? subject.trim() : '';
+  const cleanHtml = typeof html === 'string' ? html : '';
+  const cleanText = typeof text === 'string' ? text : '';
+  if (!recipients.length || recipients.length > maxRecipients || !cleanSubject || cleanSubject.length > 200 || (!cleanHtml && !cleanText) || cleanHtml.length > MAX_BODY_LENGTH || cleanText.length > MAX_BODY_LENGTH) {
     return res.status(400).json({ error: 'Invalid email request' });
   }
 
-  const rawFrom = customFrom || process.env.RESEND_FROM_EMAIL || DEFAULT_FROM;
-
-  // Pre-validate sender domain against the verified whitelist before hitting
-  // the Resend API. An unverified domain would cause a 400 validation_error;
-  // catching it here lets us silently substitute the default sender instead.
-  const senderDomain = extractSenderDomain(rawFrom);
-  const from = senderDomain && VERIFIED_SENDER_DOMAINS.has(senderDomain)
-    ? rawFrom
-    : DEFAULT_FROM;
+  if (!isValidResendApiKey(process.env.RESEND_API_KEY)) {
+    return res.status(503).json({ success: false, error: 'Email service is not properly configured on the server (invalid or missing RESEND_API_KEY)' });
+  }
+  const rawFrom = process.env.RESEND_FROM_EMAIL || DEFAULT_FROM;
+  const from = isVerifiedSenderDomain(rawFrom) ? rawFrom : DEFAULT_FROM;
 
   try {
     if (session.role === 'student') {
@@ -57,7 +46,7 @@ export default async function handler(req, res) {
       }
     }
 
-    const result = await sendEmailViaResend({ from, to: recipients, subject, html, text });
+    const result = await sendEmailViaResend({ from, to: recipients, subject: cleanSubject, html: cleanHtml || undefined, text: cleanText || undefined });
     if (!result.success) {
       const errMsg = extractResendErrorMessage(result.error);
       const isDomainError = errMsg.includes('domain') || errMsg.includes('verify') || errMsg.includes('testing emails');
