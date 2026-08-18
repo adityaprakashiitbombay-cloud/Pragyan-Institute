@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Online Fee Payment — Pragyan Institute Lalganj</title>
   <meta name="description" content="Official online fee payment gateway for Pragyan Institute Lalganj. Scan PhonePe QR or tap 1-click UPI to clear student fees.">
-  <link rel="icon" type="image/png" sizes="32x32" href="assets/images/logo.png?v=90.0.2ae4019c">
-  <link rel="shortcut icon" type="image/png" href="assets/images/logo.png?v=90.0.2ae4019c">
-  <link rel="apple-touch-icon" sizes="180x180" href="assets/images/logo.png?v=90.0.2ae4019c">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/images/logo.png?v=90.0.ee0e3862">
+  <link rel="shortcut icon" type="image/png" href="assets/images/logo.png?v=90.0.ee0e3862">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/images/logo.png?v=90.0.ee0e3862">
   <meta property="og:title" content="Online Fee Payment — Pragyan Institute Lalganj">
   <meta property="og:image" content="https://pragyaninstitute.com/assets/images/logo.png">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -489,6 +489,51 @@
       color: var(--text-muted);
       line-height: 1.5;
       padding: 1rem 0;
+    }
+
+    @media (max-width: 480px) {
+      body {
+        padding: 0.75rem 0.5rem 2.5rem;
+      }
+      .pay-container {
+        border-radius: 12px;
+        box-shadow: 0 4px 18px rgba(0,0,0,0.06);
+      }
+      .header-banner {
+        padding: 1.35rem 1rem;
+      }
+      .inst-title {
+        font-size: 1.2rem;
+      }
+      .content-body {
+        padding: 1rem;
+      }
+      .amount-hero-val {
+        font-size: 2.25rem;
+      }
+      .app-buttons-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.45rem;
+      }
+      .mode-pills-wrap {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+      }
+      .breakdown-row {
+        padding: 0.65rem 0.75rem;
+        font-size: 0.82rem;
+      }
+      .qr-img-frame img {
+        width: 140px;
+        height: 180px;
+      }
+      .upi-pill {
+        font-size: 0.85rem;
+        padding: 0.45rem 0.75rem;
+      }
+      .student-meta-card {
+        padding: 0.85rem 1rem;
+      }
     }
   </style>
 </head>

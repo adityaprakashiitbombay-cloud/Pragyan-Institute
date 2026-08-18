@@ -231,22 +231,43 @@
       <!DOCTYPE html>
       <html>
       <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
         <title>Fee Receipt #${safeRecNo} - ${safeName}</title>
         <style>
-          body { font-family: Arial, sans-serif; padding: 30px; color: #1f2937; background: #fff; }
-          .receipt-card { border: 2px solid #064E3B; border-radius: 12px; padding: 24px; max-width: 650px; margin: 0 auto; }
-          .header { background: #064E3B; color: #fff; padding: 16px; text-align: center; border-radius: 8px 8px 0 0; margin: -24px -24px 20px -24px; }
+          * { box-sizing: border-box; }
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; padding: 20px 15px; color: #1f2937; background: #FAF9F6; margin: 0; }
+          .receipt-card { border: 2px solid #064E3B; border-radius: 12px; padding: 24px; max-width: 650px; margin: 0 auto; background: #ffffff; box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
+          .header { background: linear-gradient(135deg, #064E3B 0%, #022C22 100%); color: #fff; padding: 18px 16px; text-align: center; border-radius: 8px 8px 0 0; margin: -24px -24px 20px -24px; }
           .header h2 { margin: 0; font-size: 20px; letter-spacing: 1px; }
           .header p { margin: 4px 0 0 0; opacity: 0.9; font-size: 13px; }
-          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; font-size: 14px; }
-          .grid div { background: #f9fafb; padding: 10px; border-radius: 6px; border: 1px solid #e5e7eb; }
-          table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }
-          th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e5e7eb; }
-          th { background: #f3f4f6; }
-          .total-row { font-weight: bold; color: #064E3B; font-size: 16px; }
-          .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #6b7280; border-top: 1px solid #e5e7eb; padding-top: 15px; }
-          .signatures { display: flex; justify-content: space-between; margin-top: 40px; padding-top: 20px; }
-          .sig-box { text-align: center; border-top: 1px dashed #9ca3af; width: 180px; font-size: 12px; color: #4b5563; }
+          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; font-size: 13px; }
+          .grid div { background: #f9fafb; padding: 9px 12px; border-radius: 6px; border: 1px solid #e5e7eb; word-break: break-word; }
+          .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 15px; }
+          table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+          th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #e5e7eb; }
+          th { background: #f3f4f6; font-weight: 700; color: #374151; }
+          .total-row { font-weight: bold; color: #064E3B; font-size: 15px; background: #F0FDF4; }
+          .footer { margin-top: 24px; text-align: center; font-size: 12px; color: #6b7280; border-top: 1px solid #e5e7eb; padding-top: 14px; line-height: 1.5; }
+          .signatures { display: flex; justify-content: space-between; margin-top: 35px; padding-top: 15px; flex-wrap: wrap; gap: 15px; }
+          .sig-box { text-align: center; border-top: 1px dashed #9ca3af; width: 180px; font-size: 12px; color: #4b5563; padding-top: 6px; }
+
+          @media screen and (max-width: 600px) {
+            body { padding: 10px 8px; }
+            .receipt-card { padding: 16px 14px; border-radius: 10px; }
+            .header { margin: -16px -14px 15px -14px; padding: 14px 10px; }
+            .header h2 { font-size: 17px; }
+            .grid { grid-template-columns: 1fr; gap: 6px; }
+            .grid div { font-size: 12.5px; padding: 8px 10px; }
+            table { font-size: 12px; }
+            th, td { padding: 8px 8px; }
+            .signatures { flex-direction: column; align-items: center; gap: 20px; }
+            .sig-box { width: 80%; max-width: 220px; }
+          }
+          @media print {
+            body { padding: 0; background: #fff; }
+            .receipt-card { box-shadow: none; border-color: #000; }
+          }
         </style>
       </head>
       <body>
@@ -6718,24 +6739,24 @@ ${emailLogs.join('\n')}`);
   function openEmailPreviewModal(subject, emailHtml) {
     document.getElementById('emailPreviewModal')?.remove();
     const modalHtml = `
-      <div class="inner-modal-backdrop active" id="emailPreviewModal" style="z-index: 10005;">
-        <div class="inner-modal-content" style="max-width: 720px; max-height: 90vh; display: flex; flex-direction: column;">
-          <div class="inner-modal-header" style="background: #064E3B; color: #fff; padding: 1rem 1.25rem;">
-            <h3 style="margin: 0; font-size: 1.1rem; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
+      <div class="inner-modal-backdrop active" id="emailPreviewModal" style="z-index: 10005; padding: 10px;">
+        <div class="inner-modal-content" style="max-width: min(720px, 96vw); width: 96vw; max-height: 92vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; border-radius: 14px;">
+          <div class="inner-modal-header" style="background: linear-gradient(135deg, #064E3B 0%, #022C22 100%); color: #fff; padding: 1rem 1.25rem; margin: 0;">
+            <h3 style="margin: 0; font-size: 1.05rem; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
               <i class="fa-solid fa-envelope-open-text"></i> Live HTML Email Preview
             </h3>
             <button class="btn-close-inner" onclick="document.getElementById('emailPreviewModal').remove()" style="color: #fff;"><i class="fa-solid fa-xmark"></i></button>
           </div>
-          <div style="padding: 0.75rem 1.25rem; background: #F8FAFC; border-bottom: 1px solid #E2E8F0; font-size: 0.85rem;">
+          <div style="padding: 0.65rem 1rem; background: #F8FAFC; border-bottom: 1px solid #E2E8F0; font-size: 0.82rem; word-break: break-word;">
             <strong>Subject:</strong> <span style="color: #1E293B;">${escapeHtml(subject)}</span>
           </div>
-          <div style="flex: 1; overflow-y: auto; padding: 1rem; background: #E2E8F0;">
-            <div style="background: #fff; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden;">
+          <div style="flex: 1; overflow-y: auto; overflow-x: auto; -webkit-overflow-scrolling: touch; padding: 0.85rem; background: #E2E8F0;">
+            <div style="background: #fff; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden; max-width: 100%;">
               ${emailHtml}
             </div>
           </div>
-          <div style="padding: 0.85rem 1.25rem; background: #F8FAFC; border-top: 1px solid #E2E8F0; text-align: right;">
-            <button type="button" class="btn btn-emerald" onclick="document.getElementById('emailPreviewModal').remove()">
+          <div style="padding: 0.75rem 1rem; background: #F8FAFC; border-top: 1px solid #E2E8F0; text-align: right;">
+            <button type="button" class="btn btn-emerald" onclick="document.getElementById('emailPreviewModal').remove()" style="padding: 0.5rem 1.25rem; font-weight: 700;">
               Close Preview
             </button>
           </div>
@@ -6825,7 +6846,7 @@ ${emailLogs.join('\n')}`);
               Send official digital tuition invoices, mid-month fee reminder notices, exam schedules, and circulars directly to parents & students.
             </div>
           </div>
-          <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
             <span class="user-badge-tag" style="background: #064E3B; color: #fff; font-weight: 700; font-size: 0.78rem;">
               <i class="fa-solid fa-clock"></i> IST Active: Day ${ist.day} (${ist.monthKey})
             </span>
@@ -6863,41 +6884,41 @@ ${emailLogs.join('\n')}`);
         `}
 
         <!-- Audience & Live Database Fee Statistics Grid -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.85rem; margin-bottom: 1.25rem;">
+        <div class="admin-email-metrics-grid">
           <div style="background: #F0FDF4; border: 1.5px solid #BBF7D0; border-radius: 10px; padding: 0.85rem 1rem;">
             <div style="font-size: 0.75rem; font-weight: 700; color: #166534; text-transform: uppercase; letter-spacing: 0.5px;">Target Enrolled</div>
-            <div style="font-size: 1.4rem; font-weight: 900; color: #064E3B; margin-top: 0.2rem;">${totalCount} <span style="font-size: 0.8rem; font-weight: 600; color: #15803D;">students</span></div>
+            <div style="font-size: 1.35rem; font-weight: 900; color: #064E3B; margin-top: 0.2rem;">${totalCount} <span style="font-size: 0.8rem; font-weight: 600; color: #15803D;">students</span></div>
             <div style="font-size: 0.72rem; color: #166534; margin-top: 0.2rem;">${audienceLabel}</div>
           </div>
 
           <div style="background: #EFF6FF; border: 1.5px solid #BFDBFE; border-radius: 10px; padding: 0.85rem 1rem;">
             <div style="font-size: 0.75rem; font-weight: 700; color: #1E40AF; text-transform: uppercase; letter-spacing: 0.5px;">Valid Email IDs</div>
-            <div style="font-size: 1.4rem; font-weight: 900; color: #1D4ED8; margin-top: 0.2rem;">${validEmailCount} <span style="font-size: 0.8rem; font-weight: 600; color: #2563EB;">/ ${totalCount}</span></div>
+            <div style="font-size: 1.35rem; font-weight: 900; color: #1D4ED8; margin-top: 0.2rem;">${validEmailCount} <span style="font-size: 0.8rem; font-weight: 600; color: #2563EB;">/ ${totalCount}</span></div>
             <div style="font-size: 0.72rem; color: #1E40AF; margin-top: 0.2rem;">${totalCount - validEmailCount > 0 ? `⚠️ ${totalCount - validEmailCount} missing email` : '✅ 100% email coverage'}</div>
           </div>
 
           <div style="background: #FFFBEB; border: 1.5px solid #FDE68A; border-radius: 10px; padding: 0.85rem 1rem;">
             <div style="font-size: 0.75rem; font-weight: 700; color: #92400E; text-transform: uppercase; letter-spacing: 0.5px;">Outstanding Dues</div>
-            <div style="font-size: 1.4rem; font-weight: 900; color: #B45309; margin-top: 0.2rem;">₹${totalPendingDues.toLocaleString('en-IN')}</div>
+            <div style="font-size: 1.35rem; font-weight: 900; color: #B45309; margin-top: 0.2rem;">₹${totalPendingDues.toLocaleString('en-IN')}</div>
             <div style="font-size: 0.72rem; color: #92400E; margin-top: 0.2rem;">${totalDefaultersInTarget} students with balance</div>
           </div>
 
           <div style="background: #FDF2F8; border: 1.5px solid #FBCFE8; border-radius: 10px; padding: 0.85rem 1rem;">
             <div style="font-size: 0.75rem; font-weight: 700; color: #9D174D; text-transform: uppercase; letter-spacing: 0.5px;">Fee Collected in Target</div>
-            <div style="font-size: 1.4rem; font-weight: 900; color: #BE185D; margin-top: 0.2rem;">₹${totalPaidFee.toLocaleString('en-IN')}</div>
+            <div style="font-size: 1.35rem; font-weight: 900; color: #BE185D; margin-top: 0.2rem;">₹${totalPaidFee.toLocaleString('en-IN')}</div>
             <div style="font-size: 0.72rem; color: #9D174D; margin-top: 0.2rem;">From enrolled records</div>
           </div>
         </div>
 
         <!-- Main Campaign Form -->
         <form id="adminEmailCampaignForm">
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+          <div class="admin-email-form-grid">
             <!-- Target Audience Selector -->
             <div>
               <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.35rem; color: var(--text-mahogany);">
                 <i class="fa-solid fa-users-viewfinder" style="color: var(--primary-emerald);"></i> 1. Select Target Audience *
               </label>
-              <select id="adminEmailAudienceSelect" class="portal-input" style="font-weight: 600;">
+              <select id="adminEmailAudienceSelect" class="portal-input" style="font-weight: 600; width: 100%;">
                 <option value="all" ${adminEmailAudience === 'all' ? 'selected' : ''}>🎯 All Enrolled Students (All Batches)</option>
                 <option value="10th" ${adminEmailAudience === '10th' ? 'selected' : ''}>Class 10th (ACHIEVER Batch)</option>
                 <option value="9th" ${adminEmailAudience === '9th' ? 'selected' : ''}>Class 9th (NURTURE Batch)</option>
@@ -6913,7 +6934,7 @@ ${emailLogs.join('\n')}`);
               <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.35rem; color: var(--text-mahogany);">
                 <i class="fa-solid fa-wand-magic-sparkles" style="color: #D97706;"></i> 2. Email Type / Template Preset *
               </label>
-              <select id="adminEmailTemplateSelect" class="portal-input" style="font-weight: 600;">
+              <select id="adminEmailTemplateSelect" class="portal-input" style="font-weight: 600; width: 100%;">
                 <option value="monthly_invoice" ${adminEmailCampaignType === 'monthly_invoice' ? 'selected' : ''}>📄 Official Monthly Fee Invoice (with UPI QR)</option>
                 <option value="fee_reminder" ${adminEmailCampaignType === 'fee_reminder' ? 'selected' : ''}>⚠️ Outstanding Fee Reminder Alert</option>
                 <option value="exam_circular" ${adminEmailCampaignType === 'exam_circular' ? 'selected' : ''}>📝 Academic & Exam Timetable Circular</option>
@@ -6928,7 +6949,7 @@ ${emailLogs.join('\n')}`);
               <label style="display: block; font-weight: 700; font-size: 0.84rem; color: #1E293B; margin-bottom: 0.35rem;">
                 <i class="fa-solid fa-user-check" style="color: var(--primary-emerald);"></i> Choose Student Recipient:
               </label>
-              <select id="adminEmailIndividualStudentSelect" class="portal-input" style="font-weight: 600;">
+              <select id="adminEmailIndividualStudentSelect" class="portal-input" style="font-weight: 600; width: 100%;">
                 ${activeStudents.map(s => {
                   const sId = s.id || s.student_id || s.rollNo;
                   const isSel = (sId === adminEmailSelectedStudentId || s.rollNo === adminEmailSelectedStudentId);
@@ -6943,29 +6964,29 @@ ${emailLogs.join('\n')}`);
             <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.35rem; color: var(--text-mahogany);">
               Email Subject Line *
             </label>
-            <input type="text" id="adminEmailSubjectInput" class="portal-input" value="${defaultSubject.replace(/"/g, '&quot;')}" required style="font-weight: 600;">
+            <input type="text" id="adminEmailSubjectInput" class="portal-input" value="${defaultSubject.replace(/"/g, '&quot;')}" required style="font-weight: 600; width: 100%;">
           </div>
 
           <!-- Message Body with Smart Placeholders Hint -->
           <div style="margin-bottom: 1rem;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.35rem;">
               <label style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany);">Email Body / Message Text *</label>
-              <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">
-                Smart Tags: <code>{student_name}</code>, <code>{roll_no}</code>, <code>{class_name}</code>, <code>{monthly_fee}</code>, <code>{pending_fee}</code>, <code>{total_payable}</code>
+              <span style="font-size: 0.74rem; color: var(--text-muted); font-weight: 600;">
+                Tags: <code>{student_name}</code>, <code>{roll_no}</code>, <code>{monthly_fee}</code>, <code>{pending_fee}</code>
               </span>
             </div>
             <textarea id="adminEmailBodyInput" class="portal-input" rows="7" required style="resize: vertical; width: 100%; font-family: inherit; font-size: 0.88rem; line-height: 1.5;">${defaultBody.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
           </div>
 
           <!-- Options & Toggles -->
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; margin-bottom: 1.25rem;">
+          <div class="admin-email-toggles-grid">
             <label style="display: flex; align-items: center; gap: 0.6rem; font-size: 0.84rem; font-weight: 700; color: #065F46; background: #ECFDF5; border: 1px solid #A7F3D0; padding: 0.65rem 0.85rem; border-radius: 8px; cursor: pointer; user-select: none;">
-              <input type="checkbox" id="adminEmailIncludePaymentLink" ${(adminEmailCampaignType === 'monthly_invoice' || adminEmailCampaignType === 'fee_reminder') ? 'checked' : ''} style="width: 17px; height: 17px; accent-color: var(--primary-emerald); cursor: pointer;">
+              <input type="checkbox" id="adminEmailIncludePaymentLink" ${(adminEmailCampaignType === 'monthly_invoice' || adminEmailCampaignType === 'fee_reminder') ? 'checked' : ''} style="width: 17px; height: 17px; accent-color: var(--primary-emerald); cursor: pointer; flex-shrink: 0;">
               <span><i class="fa-solid fa-qrcode"></i> Include 1-Click Online Payment Link & UPI Details</span>
             </label>
 
             <label style="display: flex; align-items: center; gap: 0.6rem; font-size: 0.84rem; font-weight: 700; color: #1E40AF; background: #EFF6FF; border: 1px solid #BFDBFE; padding: 0.65rem 0.85rem; border-radius: 8px; cursor: pointer; user-select: none;">
-              <input type="checkbox" id="adminEmailIncludeSeal" checked style="width: 17px; height: 17px; accent-color: #2563EB; cursor: pointer;">
+              <input type="checkbox" id="adminEmailIncludeSeal" checked style="width: 17px; height: 17px; accent-color: #2563EB; cursor: pointer; flex-shrink: 0;">
               <span><i class="fa-solid fa-stamp"></i> Include Official Pragyan Crest Seal & Signatures</span>
             </label>
           </div>
@@ -6975,8 +6996,8 @@ ${emailLogs.join('\n')}`);
           </div>
 
           <!-- Action Buttons Bar -->
-          <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; justify-content: space-between; border-top: 1px solid var(--border-sand); padding-top: 1rem;">
-            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <div class="admin-email-actions-bar">
+            <div class="admin-email-sub-actions" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
               <button type="button" id="btnPreviewEmailCampaign" class="btn" style="background: #F1F5F9; color: #334155; border: 1.5px solid #CBD5E1; font-weight: 700; padding: 0.65rem 1.15rem; border-radius: 8px; cursor: pointer;">
                 <i class="fa-solid fa-eye"></i> Preview HTML Email
               </button>

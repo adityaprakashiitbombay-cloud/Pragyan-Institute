@@ -2981,3 +2981,169 @@ button, a, input, select, textarea {
     touch-action: manipulation;
   }
 }
+
+/* ==========================================================================
+ * COMPREHENSIVE MOBILE & TABLET RESPONSIVE SYSTEM (v90.0)
+ * ========================================================================== */
+
+/* 1. Admin Email Campaign & Invoicing Grid */
+.admin-email-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1.25rem;
+}
+
+.admin-email-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.admin-email-toggles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.admin-email-actions-bar {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--border-sand);
+  padding-top: 1rem;
+}
+
+@media (max-width: 640px) {
+  .admin-email-metrics-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0.6rem !important;
+  }
+
+  .admin-email-form-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  .admin-email-toggles-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.5rem !important;
+  }
+
+  .admin-email-actions-bar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.65rem !important;
+  }
+
+  .admin-email-actions-bar .admin-email-sub-actions {
+    flex-direction: column !important;
+    width: 100% !important;
+  }
+
+  .admin-email-actions-bar button {
+    width: 100% !important;
+    justify-content: center !important;
+    height: 44px !important;
+    font-size: 0.88rem !important;
+  }
+
+  /* 2. Radial Meter on Mobile */
+  .fee-radial-meter-container {
+    flex-direction: column !important;
+    text-align: center !important;
+    padding: 1rem 0.85rem !important;
+    gap: 0.75rem !important;
+  }
+
+  .fee-radial-info h4 {
+    font-size: 1rem !important;
+  }
+
+  .fee-radial-info p {
+    font-size: 0.82rem !important;
+  }
+
+  /* 3. Student Details & Profile Box Grids */
+  .detail-items-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.65rem !important;
+  }
+
+  .detail-box[style*="grid-column"] {
+    grid-column: span 1 !important;
+  }
+
+  .detail-box {
+    padding: 0.8rem 0.95rem !important;
+  }
+
+  /* 4. Student Fee Cards Grid */
+  .fee-summary-cards-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0.6rem !important;
+  }
+
+  .fee-stat-box {
+    padding: 0.75rem 0.85rem !important;
+  }
+
+  .fee-stat-value {
+    font-size: 1.25rem !important;
+  }
+
+  /* 5. Navigation Tabs on Mobile */
+  .dashboard-nav-tabs {
+    display: flex !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    padding-bottom: 0.5rem !important;
+    gap: 0.45rem !important;
+  }
+
+  .dash-tab-btn {
+    flex-shrink: 0 !important;
+    font-size: 0.78rem !important;
+    padding: 0.5rem 0.85rem !important;
+    height: 38px !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .admin-email-metrics-grid,
+  .fee-summary-cards-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .metallic-card-3d {
+    --card-scale: 0.78;
+    min-height: 240px !important;
+  }
+
+  .card-face {
+    padding: 0.75rem 0.85rem !important;
+  }
+
+  .metallic-id-inst-name {
+    font-size: 0.8rem !important;
+  }
+
+  .metallic-id-body h3 {
+    font-size: 0.92rem !important;
+  }
+
+  .dash-card {
+    padding: 1.15rem 0.95rem !important;
+    border-radius: 10px !important;
+  }
+
+  .dash-card-title {
+    font-size: 1rem !important;
+  }
+}
