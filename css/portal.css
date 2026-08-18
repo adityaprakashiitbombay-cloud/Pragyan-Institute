@@ -367,12 +367,12 @@
 }
 
 .form-group-portal {
-  margin-bottom: 1.35rem;
+  margin-bottom: 1.25rem;
 }
 
 .form-group-portal label {
   display: block;
-  font-size: 0.85rem;
+  font-size: 0.86rem;
   font-weight: 600;
   color: var(--text-charcoal);
   margin-bottom: 0.45rem;
@@ -380,19 +380,26 @@
 
 .input-with-icon {
   position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
 }
 
-.input-with-icon i {
+.input-with-icon > i.input-icon-left,
+.input-with-icon > i:first-child {
   position: absolute;
   left: 1rem;
   top: 50%;
   transform: translateY(-50%);
   color: var(--primary-emerald);
   font-size: 1rem;
+  pointer-events: none;
+  z-index: 2;
 }
 
 .portal-input {
   width: 100%;
+  height: 46px;
   padding: 0.75rem 1rem;
   border-radius: var(--radius-md);
   border: 1.5px solid var(--border-sand);
@@ -402,10 +409,12 @@
   color: var(--text-charcoal);
   transition: all var(--transition-fast);
   text-align: left;
+  box-sizing: border-box;
 }
 
 .input-with-icon .portal-input {
   padding-left: 2.75rem;
+  padding-right: 2.75rem;
 }
 
 .portal-input:focus {
@@ -413,6 +422,67 @@
   background-color: #ffffff;
   box-shadow: 0 0 0 4px var(--primary-emerald-light);
   outline: none;
+}
+
+.toggle-password-btn {
+  position: absolute;
+  right: 0.65rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  z-index: 3;
+  border-radius: 6px;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.toggle-password-btn:hover {
+  color: var(--primary-emerald);
+  background-color: rgba(6, 78, 59, 0.06);
+}
+
+.toggle-password-btn i {
+  position: static !important;
+  transform: none !important;
+  font-size: 1rem !important;
+  color: inherit !important;
+}
+
+.credential-hint-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  font-size: 0.78rem;
+  color: #065F46;
+  background: #ECFDF5;
+  border: 1px solid #A7F3D0;
+  border-radius: 6px;
+  padding: 0.45rem 0.65rem;
+  margin-top: 0.45rem;
+  line-height: 1.4;
+}
+
+.credential-hint-box i {
+  color: #059669;
+  font-size: 0.85rem;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.credential-hint-box code {
+  background: #D1FAE5;
+  color: #047857;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-weight: 700;
+  font-family: monospace;
 }
 
 .demo-credentials-container {

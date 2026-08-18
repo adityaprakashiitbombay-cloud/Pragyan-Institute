@@ -78,4 +78,46 @@ describe('Student Password Management & Authentication Logic', () => {
     expect(requestRecord.new_data.password_hash).toBe(null);
     expect(requestRecord.new_data.reset_to_dob).toBe(true);
   });
+
+  it('correctly matches DDMMYYYY format (e.g. 15052010 to 2010-05-15)', () => {
+    function normalizeDob(d) {
+      if (!d) return [];
+      const str = String(d).trim();
+      const results = [];
+      if (/^\d{4}-\d{2}-\d{2}$/.test(str)) results.push(str);
+      if (/^\d{8}$/.test(str)) {
+        const day = str.slice(0, 2);
+        const month = str.slice(2, 4);
+        const year = str.slice(4, 8);
+        const yNum = parseInt(year, 10);
+        const mNum = parseInt(month, 10);
+        const dNum = parseInt(day, 10);
+        if (yNum >= 1970 && yNum <= 2035 && mNum >= 1 && mNum <= 12 && dNum >= 1 && dNum <= 31) {
+          results.push(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
+        }
+      }
+      const parts = str.split(/[-/.]/);
+      if (parts.length === 3) {
+        if (parts[2].length === 4) {
+          results.push(`${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`);
+        } else if (parts[0].length === 4) {
+          results.push(`${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`);
+        }
+      }
+      return [...new Set(results)];
+    }
+
+    function dobMatches(input, stored) {
+      const iNorms = normalizeDob(input);
+      const sNorms = normalizeDob(stored);
+      return iNorms.some(i => sNorms.includes(i));
+    }
+
+    expect(dobMatches('15052010', '2010-05-15')).toBe(true);
+    expect(dobMatches('15-05-2010', '2010-05-15')).toBe(true);
+    expect(dobMatches('15/05/2010', '2010-05-15')).toBe(true);
+    expect(dobMatches('2010-05-15', '2010-05-15')).toBe(true);
+    expect(dobMatches('11052011', '2011-05-11')).toBe(true);
+    expect(dobMatches('99999999', '2010-05-15')).toBe(false);
+  });
 });

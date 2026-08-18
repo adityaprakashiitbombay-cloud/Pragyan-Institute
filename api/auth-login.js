@@ -137,20 +137,63 @@ export default async function handler(req, res) {
 
       function normalizeDob(d) {
         if (!d) return [];
-        const str = d.toString().trim();
+        const str = String(d).trim();
         const results = [];
-        if (/^\d{4}-\d{2}-\d{2}$/.test(str)) results.push(str);
+
+        // 1. ISO format: YYYY-MM-DD
+        if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+          results.push(str);
+        }
+
+        // 2. 8 continuous digits: DDMMYYYY (Primary) or YYYYMMDD
+        if (/^\d{8}$/.test(str)) {
+          // DDMMYYYY
+          const day = str.slice(0, 2);
+          const month = str.slice(2, 4);
+          const year = str.slice(4, 8);
+          const yNum = parseInt(year, 10);
+          const mNum = parseInt(month, 10);
+          const dNum = parseInt(day, 10);
+          if (yNum >= 1970 && yNum <= 2035 && mNum >= 1 && mNum <= 12 && dNum >= 1 && dNum <= 31) {
+            results.push(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
+          }
+
+          // YYYYMMDD
+          const y2 = str.slice(0, 4);
+          const m2 = str.slice(4, 6);
+          const d2 = str.slice(6, 8);
+          const yNum2 = parseInt(y2, 10);
+          const mNum2 = parseInt(m2, 10);
+          const dNum2 = parseInt(d2, 10);
+          if (yNum2 >= 1970 && yNum2 <= 2035 && mNum2 >= 1 && mNum2 <= 12 && dNum2 >= 1 && dNum2 <= 31) {
+            results.push(`${y2}-${m2.padStart(2, '0')}-${d2.padStart(2, '0')}`);
+          }
+        }
+
+        // 3. Separator-based dates: DD-MM-YYYY, DD/MM/YYYY, YYYY-MM-DD, etc.
         const parts = str.split(/[-/.]/);
         if (parts.length === 3) {
           if (parts[2].length === 4) {
-            results.push(`${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`);
-            results.push(`${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`);
+            const y = parts[2];
+            const m = parts[1].padStart(2, '0');
+            const day = parts[0].padStart(2, '0');
+            results.push(`${y}-${m}-${day}`);
           } else if (parts[0].length === 4) {
-            results.push(`${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`);
+            const y = parts[0];
+            const m = parts[1].padStart(2, '0');
+            const day = parts[2].padStart(2, '0');
+            results.push(`${y}-${m}-${day}`);
           }
         }
+
+        // 4. Standard Date parse
         const parsed = new Date(str);
-        if (!isNaN(parsed.getTime())) results.push(parsed.toISOString().split('T')[0]);
+        if (!isNaN(parsed.getTime())) {
+          try {
+            results.push(parsed.toISOString().split('T')[0]);
+          } catch(e) {}
+        }
+
         return [...new Set(results)];
       }
 
@@ -188,11 +231,23 @@ export default async function handler(req, res) {
           }
         }
 
-        // 2. Check Date of Birth (DOB) as default / fallback
+        // 2. Check Date of Birth (DOB) as default / fallback (with DDMMYYYY support)
         const studentNorms = normalizeDob(s.dob);
         const dobMatch = inputNorms.some(i => studentNorms.includes(i));
         const dobDigits = String(s.dob || '').replace(/\D/g, '');
-        const rawDigitsMatch = inputDigits.length >= 6 && (inputDigits === dobDigits || dobDigits.includes(inputDigits));
+        let rawDigitsMatch = inputDigits.length >= 6 && (inputDigits === dobDigits || dobDigits.includes(inputDigits));
+
+        // Check if input DDMMYYYY digits match student's DOB
+        const stuNorm = studentNorms[0];
+        if (!rawDigitsMatch && stuNorm && /^\d{4}-\d{2}-\d{2}$/.test(stuNorm)) {
+          const [y, m, d] = stuNorm.split('-');
+          const stuDDMMYYYY = `${d}${m}${y}`;
+          const stuYYYYMMDD = `${y}${m}${d}`;
+          if (inputDigits === stuDDMMYYYY || inputDigits === stuYYYYMMDD) {
+            rawDigitsMatch = true;
+          }
+        }
+
         const rawStringMatch = inputTrimmed.toLowerCase() === String(s.dob || '').trim().toLowerCase();
 
         if (dobMatch || rawDigitsMatch || rawStringMatch) {

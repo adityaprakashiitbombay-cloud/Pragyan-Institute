@@ -1873,12 +1873,18 @@
     const credentialLabel = document.getElementById('portalCredentialLabel') || document.querySelector('label[for="portalDobInput"]');
     const idIcon = document.getElementById('portalIdIcon');
     const credentialIcon = document.getElementById('portalCredentialIcon');
+    const subtitleEl = document.getElementById('loginHeaderSubtitle');
+    const helperEl = document.getElementById('portalCredentialHelper');
 
     if (role === 'admin') {
       if (idLabel) idLabel.textContent = 'Admin Username / Email';
       if (credentialLabel) credentialLabel.textContent = 'Admin Password';
-      if (idIcon) idIcon.className = 'fa-solid fa-user-shield';
-      if (credentialIcon) credentialIcon.className = 'fa-solid fa-lock';
+      if (idIcon) idIcon.className = 'fa-solid fa-user-shield input-icon-left';
+      if (credentialIcon) credentialIcon.className = 'fa-solid fa-lock input-icon-left';
+      if (subtitleEl) subtitleEl.textContent = 'Enter your administrator username/email and password.';
+      if (helperEl) {
+        helperEl.innerHTML = '<i class="fa-solid fa-shield-halved"></i> <span>Enter your authorized administrator security password.</span>';
+      }
       if (loginMobileInput) {
         loginMobileInput.type = 'text';
         loginMobileInput.maxLength = 80;
@@ -1891,16 +1897,20 @@
     } else {
       if (idLabel) idLabel.textContent = 'Mobile Number / Roll No';
       if (credentialLabel) credentialLabel.textContent = 'Password or Date of Birth (DOB)';
-      if (idIcon) idIcon.className = 'fa-solid fa-mobile-screen-button';
-      if (credentialIcon) credentialIcon.className = 'fa-solid fa-key';
+      if (idIcon) idIcon.className = 'fa-solid fa-mobile-screen-button input-icon-left';
+      if (credentialIcon) credentialIcon.className = 'fa-solid fa-lock input-icon-left';
+      if (subtitleEl) subtitleEl.textContent = 'Enter your mobile number and password or DOB (DDMMYYYY) below.';
+      if (helperEl) {
+        helperEl.innerHTML = '<i class="fa-solid fa-circle-info"></i> <span>Default password is DOB in <strong>DDMMYYYY</strong> format (e.g. <code>15052010</code> for 15-May-2010) or custom password.</span>';
+      }
       if (loginMobileInput) {
         loginMobileInput.type = 'text';
         loginMobileInput.maxLength = 50;
-        loginMobileInput.placeholder = 'Enter registered mobile number or Roll No';
+        loginMobileInput.placeholder = 'Enter registered 10-digit mobile or Roll No';
       }
       if (loginDobInput) {
         loginDobInput.type = 'password';
-        loginDobInput.placeholder = 'Enter custom password or DOB (YYYY-MM-DD)';
+        loginDobInput.placeholder = 'Password or DOB in DDMMYYYY (e.g. 15052010)';
       }
     }
   }
