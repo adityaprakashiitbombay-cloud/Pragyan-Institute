@@ -7,10 +7,10 @@
   <meta name="description" content="Premier coaching institute in Lalganj for Class 8th, 9th & 10th students (Mathematics, Science, English, Social Science). Board exam success guaranteed.">
   
   <!-- Favicon & Brand Icons -->
-  <link rel="icon" type="image/png" sizes="32x32" href="./assets/images/logo.png?v=90.0.f7312126">
-  <link rel="icon" type="image/png" sizes="16x16" href="./assets/images/logo.png?v=90.0.f7312126">
-  <link rel="shortcut icon" type="image/png" href="./assets/images/logo.png?v=90.0.f7312126">
-  <link rel="apple-touch-icon" sizes="180x180" href="./assets/images/logo.png?v=90.0.f7312126">
+  <link rel="icon" type="image/png" sizes="32x32" href="./assets/images/logo.png?v=90.0.de99a061">
+  <link rel="icon" type="image/png" sizes="16x16" href="./assets/images/logo.png?v=90.0.de99a061">
+  <link rel="shortcut icon" type="image/png" href="./assets/images/logo.png?v=90.0.de99a061">
+  <link rel="apple-touch-icon" sizes="180x180" href="./assets/images/logo.png?v=90.0.de99a061">
   <link rel="manifest" href="./manifest.json">
   <meta name="theme-color" content="#064E3B">
 
@@ -35,11 +35,11 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
   <!-- CSS Design System -->
-  <link rel="stylesheet" href="./css/variables.css?v=90.0.f7312126">
-  <link rel="stylesheet" href="./css/main.css?v=90.0.f7312126">
-  <link rel="stylesheet" href="./css/components.css?v=90.0.f7312126">
-  <link rel="stylesheet" href="./css/animations.css?v=90.0.f7312126">
-  <link rel="stylesheet" href="./css/portal.css?v=90.0.f7312126">
+  <link rel="stylesheet" href="./css/variables.css?v=90.0.de99a061">
+  <link rel="stylesheet" href="./css/main.css?v=90.0.de99a061">
+  <link rel="stylesheet" href="./css/components.css?v=90.0.de99a061">
+  <link rel="stylesheet" href="./css/animations.css?v=90.0.de99a061">
+  <link rel="stylesheet" href="./css/portal.css?v=90.0.de99a061">
   <script>
     window.escapeHtml = function(str) {
       if (str == null) return '';
@@ -823,21 +823,23 @@
 
           <form id="portalLoginForm">
             <div class="form-group-portal">
-              <label for="portalMobileInput">Mobile Number</label>
+              <label for="portalMobileInput" id="portalIdLabel">Mobile Number / Roll No</label>
               <div class="input-with-icon">
-                <i class="fa-solid fa-mobile-screen-button"></i>
-                <input type="tel" id="portalMobileInput" class="portal-input" placeholder="Enter 10-digit mobile number" required maxlength="10">
+                <i class="fa-solid fa-mobile-screen-button" id="portalIdIcon"></i>
+                <input type="text" id="portalMobileInput" class="portal-input" placeholder="Enter registered mobile number or Roll No" required maxlength="50">
               </div>
             </div>
 
             <div class="form-group-portal">
-              <label for="portalDobInput">Date of Birth (DOB)</label>
-              <div class="input-with-icon">
-                <i class="fa-solid fa-calendar-day"></i>
-                <input type="date" id="portalDobInput" class="portal-input" required>
+              <label for="portalDobInput" id="portalCredentialLabel">Password or Date of Birth (DOB)</label>
+              <div class="input-with-icon" style="position: relative;">
+                <i class="fa-solid fa-key" id="portalCredentialIcon"></i>
+                <input type="password" id="portalDobInput" class="portal-input" placeholder="Enter custom password or DOB (YYYY-MM-DD)" required style="padding-right: 2.5rem;">
+                <button type="button" id="togglePasswordVisibilityBtn" aria-label="Toggle password visibility" style="background: none; border: none; cursor: pointer; color: var(--text-muted); position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 0.95rem; z-index: 2; padding: 4px;">
+                  <i class="fa-regular fa-eye" id="togglePasswordIcon"></i>
+                </button>
               </div>
             </div>
-
 
             <button type="submit" class="btn btn-emerald login-submit-btn">
               <i class="fa-solid fa-right-to-bracket"></i> Login to Portal
@@ -961,17 +963,17 @@
   <!-- Application Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
-  <script defer src="./js/config.js?v=90.0.f7312126"></script>
-  <script defer src="./js/supabase-sync.js?v=90.0.f7312126"></script>
-  <script defer src="./js/chat.js?v=90.0.f7312126"></script>
-  <script defer src="./js/app.js?v=90.0.f7312126"></script>
-  <script defer src="./js/portal.js?v=90.0.f7312126"></script>
+  <script defer src="./js/config.js?v=90.0.de99a061"></script>
+  <script defer src="./js/supabase-sync.js?v=90.0.de99a061"></script>
+  <script defer src="./js/chat.js?v=90.0.de99a061"></script>
+  <script defer src="./js/app.js?v=90.0.de99a061"></script>
+  <script defer src="./js/portal.js?v=90.0.de99a061"></script>
 
   <!-- PWA Service Worker Registration for Instant Offline Caching -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=90.0.f7312126').then(reg => {
+        navigator.serviceWorker.register('./sw.js?v=90.0.de99a061').then(reg => {
           reg.update().catch(() => {});
         }).catch(err => console.log('SW reg error:', err));
       });

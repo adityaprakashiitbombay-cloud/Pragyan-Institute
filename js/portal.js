@@ -1719,6 +1719,20 @@
         renderStudentNotifications(cat);
       }
     });
+
+    // Toggle Password Visibility
+    const togglePwdBtn = document.getElementById('togglePasswordVisibilityBtn');
+    togglePwdBtn?.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (!loginDobInput) loginDobInput = document.getElementById('portalDobInput');
+      if (!loginDobInput) return;
+      const isPwd = loginDobInput.type === 'password';
+      loginDobInput.type = isPwd ? 'text' : 'password';
+      const icon = document.getElementById('togglePasswordIcon');
+      if (icon) {
+        icon.className = isPwd ? 'fa-regular fa-eye-slash' : 'fa-regular fa-eye';
+      }
+    });
   }
 
   /* --------------------------------------------------------------------------
@@ -1855,31 +1869,38 @@
       loginRoleStudentBtn?.classList.remove('active');
     }
     if (loginErrorMsg) loginErrorMsg.style.display = 'none';
-    const idLabel = document.querySelector('label[for="portalMobileInput"]');
-    const credentialLabel = document.querySelector('label[for="portalDobInput"]');
+    const idLabel = document.getElementById('portalIdLabel') || document.querySelector('label[for="portalMobileInput"]');
+    const credentialLabel = document.getElementById('portalCredentialLabel') || document.querySelector('label[for="portalDobInput"]');
+    const idIcon = document.getElementById('portalIdIcon');
+    const credentialIcon = document.getElementById('portalCredentialIcon');
+
     if (role === 'admin') {
-      if (idLabel) idLabel.textContent = 'Admin Username';
-      if (credentialLabel) credentialLabel.textContent = 'Password';
+      if (idLabel) idLabel.textContent = 'Admin Username / Email';
+      if (credentialLabel) credentialLabel.textContent = 'Admin Password';
+      if (idIcon) idIcon.className = 'fa-solid fa-user-shield';
+      if (credentialIcon) credentialIcon.className = 'fa-solid fa-lock';
       if (loginMobileInput) {
         loginMobileInput.type = 'text';
         loginMobileInput.maxLength = 80;
-        loginMobileInput.placeholder = 'Enter your admin username';
+        loginMobileInput.placeholder = 'Enter admin username or email';
       }
       if (loginDobInput) {
         loginDobInput.type = 'password';
-        loginDobInput.placeholder = 'Enter your password';
+        loginDobInput.placeholder = 'Enter your admin password';
       }
     } else {
-      if (idLabel) idLabel.textContent = 'Mobile Number';
-      if (credentialLabel) credentialLabel.textContent = 'Date of Birth (DOB)';
+      if (idLabel) idLabel.textContent = 'Mobile Number / Roll No';
+      if (credentialLabel) credentialLabel.textContent = 'Password or Date of Birth (DOB)';
+      if (idIcon) idIcon.className = 'fa-solid fa-mobile-screen-button';
+      if (credentialIcon) credentialIcon.className = 'fa-solid fa-key';
       if (loginMobileInput) {
-        loginMobileInput.type = 'tel';
-        loginMobileInput.maxLength = 10;
-        loginMobileInput.placeholder = 'Enter 10-digit mobile number';
+        loginMobileInput.type = 'text';
+        loginMobileInput.maxLength = 50;
+        loginMobileInput.placeholder = 'Enter registered mobile number or Roll No';
       }
       if (loginDobInput) {
-        loginDobInput.type = 'date';
-        loginDobInput.placeholder = '';
+        loginDobInput.type = 'password';
+        loginDobInput.placeholder = 'Enter custom password or DOB (YYYY-MM-DD)';
       }
     }
   }
