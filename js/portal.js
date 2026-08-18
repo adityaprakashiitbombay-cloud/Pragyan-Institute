@@ -6296,7 +6296,7 @@ ${emailLogs.join('\n')}`);
 
           <div style="margin-bottom: 1rem;">
             <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.35rem;">Announcement Details / Message Body *</label>
-            <textarea id="noticeBodyInput" class="portal-input" rows="4" placeholder="Write full details, examination timings, schedule, syllabus or notice description here..." required style="resize: vertical; width: 100%;">${draftBody.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+            <textarea id="noticeBodyInput" class="portal-input" rows="6" placeholder="Write full details, examination timings, schedule, syllabus or notice description here..." required style="resize: vertical; width: 100%; min-height: 180px; font-family: inherit; font-size: 0.92rem; line-height: 1.55; box-sizing: border-box; padding: 0.85rem;">${draftBody.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
           </div>
           <div style="margin-bottom: 1.25rem;">
             <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.35rem;">Attach Photo or PDF Document (Optional)</label>
@@ -6974,7 +6974,7 @@ ${emailLogs.join('\n')}`);
                 Tags: <code>{student_name}</code>, <code>{roll_no}</code>, <code>{monthly_fee}</code>, <code>{pending_fee}</code>
               </span>
             </div>
-            <textarea id="adminEmailBodyInput" class="portal-input" rows="7" required style="resize: vertical; width: 100%; font-family: inherit; font-size: 0.88rem; line-height: 1.5;">${defaultBody.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+            <textarea id="adminEmailBodyInput" class="portal-input admin-email-textarea" rows="12" required style="resize: vertical; width: 100%; min-height: 280px; font-family: inherit; font-size: 0.95rem; line-height: 1.6; box-sizing: border-box; padding: 0.85rem;">${defaultBody.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
           </div>
 
           <!-- Options & Toggles -->
