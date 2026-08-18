@@ -41,10 +41,10 @@
       `🎁 **3 Days FREE Demo Classes:**\n• Experience our digital smartboard classrooms & teaching pedagogy for 3 days with zero cost!\n• For Class 8th, 9th, 10th (CBSE & Bihar Board).\n\n📲 Call/WhatsApp: **+91 73698 91858** to reserve your seat!`,
 
     "Where is Pragyan Institute located in Lalganj, Bihar?":
-      `📍 **Location & Directions:**\n• **Address:** Near Main Chowk, Lalganj, Vaishali, Bihar - 844121\n• 🗺️ **Google Maps:** [Click for exact directions](https://maps.app.goo.gl/jhpW5ynQntfTMa2aA)\n• ⏰ **Timings:** Mon–Sat: 6:30 AM – 8:00 PM | Sun: 9:00 AM – 1:00 PM`
+      `📍 **Location & Directions:**\n• **Address:** At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj\n• 🗺️ **Google Maps:** [Click for exact directions](https://maps.app.goo.gl/jhpW5ynQntfTMa2aA)\n• ⏰ **Timings:** Mon–Sat: 6:30 AM – 8:00 PM | Sun: 9:00 AM – 1:00 PM`
   };
 
-  const SYSTEM_PROMPT = `You are 'Pragyan AI', the official AI assistant for Pragyan Institute, located near Main Chowk, Lalganj, Vaishali, Bihar - 844121.
+  const SYSTEM_PROMPT = `You are 'Pragyan AI', the official AI assistant for Pragyan Institute, located at Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj.
 
 CRITICAL INSTRUCTIONS FOR EVERY RESPONSE:
 1. STRUCTURE & EMOJIS (MANDATORY):
@@ -58,7 +58,7 @@ CRITICAL INSTRUCTIONS FOR EVERY RESPONSE:
    - NEVER output raw LaTeX code like '$', '\\neq', '\\frac', '\\left', or '\\sqrt'.
 
 3. ACCURATE PRAGYAN INSTITUTE FACTS:
-   - Location: Near Main Chowk, Lalganj, Vaishali, Bihar - 844121 (Google Maps: https://maps.app.goo.gl/jhpW5ynQntfTMa2aA)
+   - Location: At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj (Google Maps: https://maps.app.goo.gl/jhpW5ynQntfTMa2aA)
    - Helpline & WhatsApp: +91 73698 91858
    - Timings: Mon-Sat 6:30 AM - 8:00 PM | Sun 9:00 AM - 1:00 PM
    - Interactive Digital Smartboards: High-tech smartboards in all classrooms for 3D physics/chemistry visual animations and step-by-step digital math solving.
@@ -107,12 +107,12 @@ Always be structured, engaging, helpful, and mentor-like.`;
 
     // Admissions & Enrollment
     if (q.includes('admission') || q.includes('join') || q.includes('enroll') || q.includes('register') || q.includes('seat') || q.includes('namankan')) {
-      return `📝 **Admissions & Enrollment Process:**\n• **Direct Walk-in:** Visit Near Main Chowk, Lalganj, Vaishali.\n• **Documents Needed:** Previous report card & student photo.\n• **Online Registration:** Contact [+91 73698 91858](tel:+917369891858) for instant enrollment!`;
+      return `📝 **Admissions & Enrollment Process:**\n• **Direct Walk-in:** Visit At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj.\n• **Documents Needed:** Previous report card & student photo.\n• **Online Registration:** Contact [+91 73698 91858](tel:+917369891858) for instant enrollment!`;
     }
 
     // Location & Maps
     if (q.includes('location') || q.includes('address') || q.includes('where') || q.includes('map') || q.includes('place') || q.includes('kahan') || q.includes('lalganj') || q.includes('chowk')) {
-      return `📍 **Institute Address & Directions:**\n• **Location:** Near Main Chowk, Lalganj, Vaishali, Bihar - 844121\n• 🗺️ **Google Maps:** [Click for Exact Directions](https://maps.app.goo.gl/jhpW5ynQntfTMa2aA)`;
+      return `📍 **Institute Address & Directions:**\n• **Location:** At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj\n• 🗺️ **Google Maps:** [Click for Exact Directions](https://maps.app.goo.gl/jhpW5ynQntfTMa2aA)`;
     }
 
     // Timings
@@ -122,7 +122,7 @@ Always be structured, engaging, helpful, and mentor-like.`;
 
     // Contact & Helpline
     if (q.includes('contact') || q.includes('phone') || q.includes('call') || q.includes('whatsapp') || q.includes('number') || q.includes('mobile') || q.includes('helpline')) {
-      return `📞 **Direct Contact & Helpline:**\n• **Phone / WhatsApp:** [+91 73698 91858](tel:+917369891858)\n• **Office:** Near Main Chowk, Lalganj, Vaishali, Bihar\n• **Response Time:** Instant on WhatsApp!`;
+      return `📞 **Direct Contact & Helpline:**\n• **Phone / WhatsApp:** [+91 73698 91858](tel:+917369891858)\n• **Office:** At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj\n• **Response Time:** Instant on WhatsApp!`;
     }
 
     // Portal Features & ID Card
@@ -904,7 +904,7 @@ Always be structured, engaging, helpful, and mentor-like.`;
     if (smartFallback) {
       appendMessage(smartFallback, 'bot');
     } else {
-      appendMessage(`🤖 **Pragyan AI Mentor:**\n\nI am here to guide you with any question regarding Pragyan Institute!\n• 💵 **Nominal Fees:** Class 8th (₹800), Class 9th & 10th (₹1,000/mo)\n• 🖥️ **Smart Classrooms:** 3D animated concept visualizer & digital boards\n• 👨‍🏫 **Expert Faculty:** Chandan Sir (Science) & Ravi Sir (Maths)\n• 📍 **Location:** Near Main Chowk, Lalganj, Vaishali, Bihar\n• 📞 **Helpline & Admissions:** [+91 73698 91858](tel:+917369891858)\n\n*Click on any topic above or ask specific questions about syllabus, batches, or demo classes!*`, 'bot');
+      appendMessage(`🤖 **Pragyan AI Mentor:**\n\nI am here to guide you with any question regarding Pragyan Institute!\n• 💵 **Nominal Fees:** Class 8th (₹800), Class 9th & 10th (₹1,000/mo)\n• 🖥️ **Smart Classrooms:** 3D animated concept visualizer & digital boards\n• 👨‍🏫 **Expert Faculty:** Chandan Sir (Science) & Ravi Sir (Maths)\n• 📍 **Location:** At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj\n• 📞 **Helpline & Admissions:** [+91 73698 91858](tel:+917369891858)\n\n*Click on any topic above or ask specific questions about syllabus, batches, or demo classes!*`, 'bot');
     }
   }
 })();

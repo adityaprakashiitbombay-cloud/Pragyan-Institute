@@ -308,7 +308,7 @@
             <div class="sig-box">Authorized Mentor Sign<br><small>(Pragyan Institute Lalganj)</small></div>
           </div>
           <div class="footer">
-            Pragyan Institute — Near Main Chowk, Lalganj, Vaishali, Bihar | Helpline: +91 73698 91858
+            Pragyan Institute — At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj | Helpline: +91 73698 91858
           </div>
         </div>
         <script>
@@ -2410,7 +2410,7 @@ function renderStudentDashboard() {
                 <div class="signature-script">Chandan Kumar • Ravi Ranjan</div>
               </div>
               <div class="back-contact-help">
-                <i class="fa-solid fa-location-dot"></i> Near Main Chowk, Lalganj
+                <i class="fa-solid fa-location-dot"></i> At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj
               </div>
             </div>
           </div>
@@ -6725,7 +6725,7 @@ ${emailLogs.join('\n')}`);
           <!-- Footer -->
           <div style="background: #F8FAFC; padding: 16px 22px; text-align: center; font-size: 12px; color: #64748B; border-top: 1px solid #E2E8F0; line-height: 1.6;">
             <strong>PRAGYAN INSTITUTE LALGANJ</strong><br>
-            Near Main Chowk, Lalganj, Vaishali, Bihar — 844121<br>
+            At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj<br>
             Dispatched by: <strong>${escapeHtml(author)}</strong><br>
             📞 Helpline: <strong>+91 73698 91858</strong> • 💬 WhatsApp Support Available
           </div>
