@@ -13,21 +13,17 @@
     'gemini-1.5-flash-latest'
   ];
 
-  const _FALLBACK_GEMINI_KEY = (function() {
-    const a = ['A','Q','.','A','b','8','R','N','6','L','y','P','d','I','S','w','1','U','E','-'];
-    const b = ['K','i','y','C','F','Z','7','B','8','I','0','J','J','u','Z','5','7','O','X','k','_','Q','2','1','_','c','h','a','H','6','p','I','A'];
-    return a.concat(b).join('');
-  })();
-
   function getActiveApiKey() {
     return (typeof window !== 'undefined' && window.PRAGYAN_CONFIG && window.PRAGYAN_CONFIG.GEMINI_API_KEY) ||
       (typeof window !== 'undefined' && window.ENV_GEMINI_API_KEY) ||
-      localStorage.getItem('pragyan_gemini_key') ||
-      _FALLBACK_GEMINI_KEY;
+      (typeof localStorage !== 'undefined' && localStorage.getItem('pragyan_gemini_key')) ||
+      '';
   }
 
   function setActiveApiKey(key) {
-    localStorage.setItem('pragyan_gemini_key', key.trim());
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('pragyan_gemini_key', key.trim());
+    }
   }
 
   // Preloaded Answers for Quick Suggestion Chips
@@ -142,6 +138,21 @@ Always be structured, engaging, helpful, and mentor-like.`;
     // Batches
     if (q.includes('batch') || q.includes('class 10') || q.includes('class 9') || q.includes('class 8') || q.includes('class 7') || q.includes('class 6') || q.includes('10th') || q.includes('9th') || q.includes('8th')) {
       return `🎯 **Current Academic Batches:**\n• **Class 10th (ACHIEVER):** Board Mastery & Weekly Mock Tests\n• **Class 9th (NURTURE):** Strong Foundation & Conceptual Science\n• **Class 8th (ALPHA):** School Curriculum & Advanced Aptitude\n• **Junior (JUNIO):** Class 6th & 7th Basics`;
+    }
+
+    // Physics Concepts
+    if (q.includes('newton') || q.includes('gravity') || q.includes('motion') || q.includes('ohm') || q.includes('electricity') || q.includes('force') || q.includes('energy') || q.includes('light') || q.includes('reflection') || q.includes('refraction')) {
+      return `💡 **Physics Conceptual Highlights (Chandan Sir's Module):**\n• **Visual Concept:** Interactive 3D animations break down complex derivations step-by-step.\n• **Key Formulas:** Standard formulas like F = ma, V = IR, and KE = ½ mv² are derived with practical demonstrations.\n• **Board Focus:** Targeted numericals and previous year question solving sessions!`;
+    }
+
+    // Maths Concepts
+    if (q.includes('trigonometry') || q.includes('quadratic') || q.includes('pythagoras') || q.includes('triangle') || q.includes('formula') || q.includes('theorem') || q.includes('algebra') || q.includes('geometry')) {
+      return `📐 **Mathematics Mastery (Ravi Sir's Module):**\n• **Step-by-Step Logic:** Clear geometric proofs and algebraic identities without rote memorization.\n• **Daily Practice Problems (DPP):** High-yield board exam question patterns with shortcut techniques.\n• **Doubt Clearance:** Dedicated Sunday sessions to solve every doubt!`;
+    }
+
+    // General Science
+    if (q.includes('photosynthesis') || q.includes('cell') || q.includes('reaction') || q.includes('acid') || q.includes('base') || q.includes('periodic') || q.includes('respiration')) {
+      return `🔬 **Science & Chemistry Modules:**\n• **Visual Smartboard Demonstrations:** Chemical reactions and biological diagrams shown in full color.\n• **NCERT & Board Aligned:** Complete coverage of all textbook activities and experiments.\n• **Printed Summaries:** Concise formula sheets and concept mind maps provided to all students.`;
     }
 
     return null;
@@ -887,13 +898,13 @@ Always be structured, engaging, helpful, and mentor-like.`;
       }
     }
 
-    // If Gemini API fails or runs out of quota, fallback cleanly to local smart knowledge base
+    // If Gemini API is offline/unreachable, fallback seamlessly to local smart knowledge base
     removeTypingIndicator();
     const smartFallback = getLocalSmartAnswer(userPrompt);
     if (smartFallback) {
       appendMessage(smartFallback, 'bot');
     } else {
-      appendMessage(`🤖 **Pragyan AI Assistant:**\n\nI can assist you with all institute information!\n• 💵 **Fee Structures** (Class 8th, 9th, 10th)\n• 🎁 **3 Days Free Demo Classes**\n• 👨‍🏫 **Faculty:** Chandan Sir (Science) & Ravi Sir (Maths)\n• 📍 **Location:** Near Main Chowk, Lalganj, Vaishali\n• 📞 **Helpline:** [+91 73698 91858](tel:+917369891858)\n\n*💡 Tip: To chat about any general science/math question with live Google Gemini AI, click the ⚙️ Settings gear icon in the chat header and enter your free Gemini API Key!*`, 'bot');
+      appendMessage(`🤖 **Pragyan AI Mentor:**\n\nI am here to guide you with any question regarding Pragyan Institute!\n• 💵 **Nominal Fees:** Class 8th (₹800), Class 9th & 10th (₹1,000/mo)\n• 🖥️ **Smart Classrooms:** 3D animated concept visualizer & digital boards\n• 👨‍🏫 **Expert Faculty:** Chandan Sir (Science) & Ravi Sir (Maths)\n• 📍 **Location:** Near Main Chowk, Lalganj, Vaishali, Bihar\n• 📞 **Helpline & Admissions:** [+91 73698 91858](tel:+917369891858)\n\n*Click on any topic above or ask specific questions about syllabus, batches, or demo classes!*`, 'bot');
     }
   }
 })();
