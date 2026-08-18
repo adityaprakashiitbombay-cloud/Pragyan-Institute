@@ -1939,13 +1939,19 @@
       }
     } catch (err) {
       console.warn('Direct database login error:', err);
+      showLoginError((err && err.message) || 'Authentication failed. Please check your network connection or credentials.');
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtnContent;
+      }
+      return;
     }
 
     if (submitBtn) {
       submitBtn.disabled = false;
       submitBtn.innerHTML = originalBtnContent;
     }
-    showLoginError('Server unavailable. Please check your internet connection or try again.');
+    showLoginError('Authentication service temporarily unreachable. Please check your credentials or try again.');
   }
 
   function showLoginError(msg) {
