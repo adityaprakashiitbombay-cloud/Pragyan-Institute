@@ -65,29 +65,27 @@
     // ── Input Sanitization Helper ───────────────────────────────────────────
     _sanitizeForQuery(value) {
       if (value == null) return '';
-      // STRICT: Only allow alphanumeric and hyphens (safe for UUID and basic IDs)
-      // Dots and @ symbols removed to prevent Supabase filter injection
-      const cleaned = String(value).replace(/[^a-zA-Z0-9\-]/g, '').trim();
-      // Additional validation: reject if contains Supabase operators
-      const forbidden = ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'like', 'ilike', 'in', 'or', 'and'];
-      if (forbidden.some(op => cleaned.toLowerCase().includes(op))) {
+      // Allow alphanumeric, spaces, hyphens, underscores, dots, and @ (safe for usernames, emails, roll numbers, mobiles)
+      // Strips query-breaking delimiters: commas, parentheses, quotes, backslashes, semicolons, brackets
+      const cleaned = String(value).replace(/[\r\n,()"';\\{}[\]]/g, '').trim();
+      // Block operator injection attempts that try to inject sub-queries
+      if (/\.(eq|neq|gt|gte|lt|lte|like|ilike|in|is|not)\./i.test(cleaned) || /^(or|and)\(/i.test(cleaned)) {
         console.error('🚨 Potential filter injection detected:', value);
-        return ''; // Reject suspicious input
+        return '';
       }
       return cleaned;
     },
 
     _encodeFilterValue(value) {
       if (value == null) return '';
-      // Double-encode to prevent filter syntax injection
-      const cleaned = String(value).trim();
-      // Reject if contains Supabase PostgREST operators
-      if (/\b(eq|neq|gt|gte|lt|lte|like|ilike|in|or|and|not)\b/i.test(cleaned)) {
+      const cleaned = String(value).replace(/[\r\n,()"';\\{}[\]]/g, '').trim();
+      if (/\.(eq|neq|gt|gte|lt|lte|like|ilike|in|is|not)\./i.test(cleaned) || /^(or|and)\(/i.test(cleaned)) {
         console.error('🚨 Filter injection attempt blocked:', value);
-        return '__INVALID__'; // Return sentinel that won't match any records
+        return '__INVALID__';
       }
       return encodeURIComponent(cleaned);
     },
+
 
     // ── Initialization ──────────────────────────────────────────────────────
     async init() {

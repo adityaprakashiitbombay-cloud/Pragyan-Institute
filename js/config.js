@@ -11,19 +11,15 @@ const getEnv = () => {
 
 const env = getEnv();
 
+// Public Supabase Anon Key (Designed for public client-side browser consumption)
+const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqY21tY2FlcnZnc2twa2NmZWttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NDEzMTksImV4cCI6MjEwMjAxNzMxOX0.pTp51JWa-qWbAz-l5NGLKvrS66TED4lruhLInQ6hvmc';
+
 export const CONFIG = {
   SUPABASE_URL: env.VITE_SUPABASE_URL || 'https://ujcmmcaervgskpkcfekm.supabase.co',
-  SUPABASE_ANON_KEY: env.VITE_SUPABASE_ANON_KEY, // No fallback - fail loudly if missing
+  SUPABASE_ANON_KEY: env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY,
   GEMINI_API_KEY: env.VITE_GEMINI_API_KEY || '',
   API_BASE: env.VITE_API_BASE || ''
 };
-
-// Validation: Fail fast if critical config is missing
-if (typeof window !== 'undefined' && !CONFIG.SUPABASE_ANON_KEY) {
-  console.error('🚨 SUPABASE_ANON_KEY is not configured. Application cannot initialize.');
-  console.error('📋 Set VITE_SUPABASE_ANON_KEY in your .env file or deployment environment');
-  throw new Error('Configuration error: SUPABASE_ANON_KEY is required');
-}
 
 // Validation & Global Binding
 if (typeof window !== 'undefined') {
@@ -36,3 +32,4 @@ if (typeof window !== 'undefined') {
     });
   };
 }
+
