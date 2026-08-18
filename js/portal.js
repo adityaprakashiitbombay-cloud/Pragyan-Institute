@@ -3655,35 +3655,34 @@ function renderStudentDashboard() {
 
       pane.innerHTML = `
         <div class="dash-card">
-          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border-sand); padding-bottom: 1rem;">
+          <div class="admin-profile-header-wrap" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border-sand); padding-bottom: 1rem;">
             <div>
               <h3 style="font-size: 1.2rem; font-weight: 800; color: var(--text-mahogany); margin: 0;">
                 <i class="fa-solid fa-gears" style="color: var(--primary-emerald);"></i> Admin Profile, Security & Account Settings
               </h3>
               <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 0.2rem;">Manage your profile, password, payment details, and photo.</div>
             </div>
-            <span style="background: var(--primary-emerald-light); color: var(--primary-emerald); padding: 0.35rem 0.85rem; border-radius: 99px; font-size: 0.8rem; font-weight: 700;">
+            <span class="admin-profile-secure-badge" style="background: var(--primary-emerald-light); color: var(--primary-emerald); padding: 0.35rem 0.85rem; border-radius: 99px; font-size: 0.8rem; font-weight: 700;">
               <i class="fa-solid fa-shield-halved"></i> Secure Profile Settings
             </span>
           </div>
 
-
           <form id="adminSettingsForm">
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; margin-bottom: 1.5rem;">
+            <div class="admin-profile-cards-grid">
               
               <!-- CARD 1: PROFILE & AVATAR -->
-              <div style="background: #FAF9F6; border: 1px solid var(--border-sand); border-radius: 10px; padding: 1.15rem;">
+              <div class="admin-profile-card">
                 <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text-mahogany); margin-bottom: 0.85rem; display: flex; align-items: center; gap: 0.4rem;">
                   <i class="fa-solid fa-id-card" style="color: var(--primary-emerald);"></i> 1. Profile Photo & Director Info
                 </h4>
 
                 <!-- Avatar Preview -->
-                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; background: #ffffff; padding: 0.85rem; border-radius: 8px; border: 1px solid #E5E7EB;">
-                  <div id="adminAvatarPreview" style="width: 64px; height: 64px; border-radius: 50%; background: var(--primary-emerald); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; font-weight: 800; flex-shrink: 0; overflow: hidden; border: 2px solid var(--primary-emerald);">
+                <div class="admin-avatar-card-inner">
+                  <div id="adminAvatarPreview" class="admin-avatar-preview-box" style="width: 64px; height: 64px; border-radius: 50%; background: var(--primary-emerald); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; font-weight: 800; flex-shrink: 0; overflow: hidden; border: 2px solid var(--primary-emerald);">
                     ${admin.photoUrl ? `<img src="${admin.photoUrl}" style="width:100%; height:100%; object-fit:cover;">` : (admin.name ? admin.name.charAt(0) : 'A')}
                   </div>
-                  <div>
-                    <label style="display: inline-block; background: var(--primary-emerald); color: #fff; padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.78rem; font-weight: 700; cursor: pointer; margin-bottom: 0.35rem;">
+                  <div class="admin-avatar-ctrls">
+                    <label class="btn-change-photo" style="display: inline-block; background: var(--primary-emerald); color: #fff; padding: 0.45rem 0.85rem; border-radius: 6px; font-size: 0.82rem; font-weight: 700; cursor: pointer; margin-bottom: 0.35rem; text-align: center;">
                       <i class="fa-solid fa-camera"></i> Change Photo
                       <input type="file" id="adminPhotoFileInput" accept="image/*" capture="environment" style="display: none;">
                     </label>
@@ -3717,7 +3716,7 @@ function renderStudentDashboard() {
               </div>
 
               <!-- CARD 2: LOGIN CREDENTIALS & SECURITY -->
-              <div style="background: #FAF9F6; border: 1px solid var(--border-sand); border-radius: 10px; padding: 1.15rem;">
+              <div class="admin-profile-card">
                 <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text-mahogany); margin-bottom: 0.85rem; display: flex; align-items: center; gap: 0.4rem;">
                   <i class="fa-solid fa-key" style="color: #D97706;"></i> 2. Admin ID & Password Security
                 </h4>
@@ -3749,7 +3748,7 @@ function renderStudentDashboard() {
               </div>
 
               <!-- CARD 3: INSTITUTE PAYMENT & BILLING SETTINGS -->
-              <div style="background: #FAF9F6; border: 1px solid var(--border-sand); border-radius: 10px; padding: 1.15rem;">
+              <div class="admin-profile-card">
                 <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text-mahogany); margin-bottom: 0.85rem; display: flex; align-items: center; gap: 0.4rem;">
                   <i class="fa-solid fa-building-columns" style="color: #0284C7;"></i> 3. Official Billing & UPI Settings
                 </h4>
@@ -3757,8 +3756,8 @@ function renderStudentDashboard() {
                 <!-- Official UPI ID -->
                 <div style="margin-bottom: 0.85rem;">
                   <label style="font-size: 0.82rem; font-weight: 700; color: var(--text-mahogany);">Institute Official UPI ID</label>
-                  <input type="text" id="adminSettingUpi" class="portal-input" value="${admin.upiId || 'pragyanlalganj@upi'}" placeholder="e.g. pragyanlalganj@upi">
-                  <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.2rem;">Printed on generated fee receipts</div>
+                  <input type="text" id="adminSettingUpi" class="portal-input" value="${admin.upiId || 'chandankr1501998@ybl'}" placeholder="e.g. chandankr1501998@ybl">
+                  <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.2rem;">Printed on generated fee receipts & UPI gateway</div>
                 </div>
 
                 <!-- Hidden Base64 Photo Storage -->
@@ -3767,8 +3766,8 @@ function renderStudentDashboard() {
 
             </div>
 
-            <div style="margin-top: 1rem;">
-              <button type="submit" class="btn btn-emerald btn-admin-settings-submit" style="padding: 0.75rem 1.5rem; font-size: 0.88rem; font-weight: 700; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; width: 100%; max-width: 340px; box-sizing: border-box;">
+            <div class="admin-profile-submit-wrap" style="margin-top: 1.25rem;">
+              <button type="submit" class="btn btn-emerald btn-admin-settings-submit" style="padding: 0.8rem 1.75rem; font-size: 0.92rem; font-weight: 700; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;">
                 <i class="fa-solid fa-floppy-disk"></i> Save & Sync Profile Changes
               </button>
             </div>
@@ -3954,7 +3953,7 @@ function renderStudentDashboard() {
         </div>
 
         <!-- Filter & Sorting Bar (Class Wise, Fee Status, Fee Max-Min) -->
-        <div style="display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; justify-content: space-between; background: #FAF9F6; border: 1px solid var(--border-sand); padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1.25rem;">
+        <div class="admin-filter-bar" style="display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; justify-content: space-between; background: #FAF9F6; border: 1px solid var(--border-sand); padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1.25rem;">
           <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
             <!-- FILTER 1: CLASS WISE -->
             <select id="filterClassWise" class="portal-input" style="width: auto; font-size: 0.83rem; padding: 0.45rem 0.75rem;">
@@ -4193,7 +4192,7 @@ function renderStudentDashboard() {
           </div>
 
           <!-- Section Switcher Sub-Pills -->
-          <div style="display: flex; gap: 0.5rem; margin-bottom: 1.25rem; border-bottom: 2px solid var(--border-sand); padding-bottom: 0.6rem; flex-wrap: wrap;">
+          <div class="stu-mgmt-sub-pills-bar">
             <button class="req-sub-pill ${initialSection === 'pay' ? 'active' : ''}" data-sec="pay">
               <i class="fa-solid fa-indian-rupee-sign"></i> Record Payment
             </button>
@@ -4862,7 +4861,7 @@ function renderStudentDashboard() {
               </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
+            <div class="admin-billing-form-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
               <div>
                 <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #374151; margin-bottom: 0.35rem;">
                   🎯 1. Select Batch / Class:
@@ -5051,7 +5050,7 @@ function renderStudentDashboard() {
                 </span>
               </h5>
 
-              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+              <div class="admin-teacher-summary-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
                 
                 <!-- Chandan Sir Summary -->
                 <div style="background: #ffffff; border: 1.5px solid #059669; border-radius: 10px; padding: 1.1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.03);">

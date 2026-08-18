@@ -3113,12 +3113,112 @@ button, a, input, select, textarea {
     padding: 0.5rem 0.85rem !important;
     height: 38px !important;
   }
+
+  /* 6. Admin Profile & Account Settings Grid on Mobile */
+  .admin-profile-cards-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+  }
+
+  .admin-profile-card {
+    padding: 1rem 0.85rem !important;
+  }
+
+  .admin-avatar-card-inner {
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 0.85rem !important;
+    padding: 0.75rem !important;
+  }
+
+  .admin-avatar-preview-box {
+    width: 54px !important;
+    height: 54px !important;
+    font-size: 1.4rem !important;
+  }
+
+  .admin-profile-submit-wrap {
+    width: 100% !important;
+  }
+
+  .btn-admin-settings-submit {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 46px !important;
+    font-size: 0.92rem !important;
+  }
+
+  /* 7. Admin Analytics & Teacher Summary on Mobile */
+  .admin-teacher-summary-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  .admin-billing-form-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.65rem !important;
+  }
+
+  #adminTriggerBillingBtn {
+    width: 100% !important;
+    justify-content: center !important;
+    height: 44px !important;
+  }
+
+  /* 8. Make Changes Control Modal & Sub-pills on Mobile */
+  .stu-mgmt-sub-pills-bar {
+    display: flex !important;
+    gap: 0.4rem !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    scrollbar-width: none !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding-bottom: 0.5rem !important;
+    margin-bottom: 1rem !important;
+  }
+
+  .stu-mgmt-sub-pills-bar::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .stu-mgmt-sub-pills-bar .req-sub-pill {
+    flex-shrink: 0 !important;
+    width: auto !important;
+    font-size: 0.76rem !important;
+    padding: 0.45rem 0.75rem !important;
+    height: 36px !important;
+  }
+
+  .btn-mgmt-quick-pay {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    text-align: center !important;
+    height: 38px !important;
+  }
+
+  /* 9. Noticeboard Form & Batch Chks on Mobile */
+  #noticeBatchOptionsGrid {
+    grid-template-columns: 1fr !important;
+    gap: 0.45rem !important;
+  }
 }
 
 @media (max-width: 420px) {
   .admin-email-metrics-grid,
-  .fee-summary-cards-grid {
+  .fee-summary-cards-grid,
+  #adminOverviewStats {
     grid-template-columns: 1fr !important;
+  }
+
+  .admin-avatar-card-inner {
+    flex-direction: column !important;
+    text-align: center !important;
+    gap: 0.65rem !important;
+  }
+
+  .admin-avatar-ctrls label {
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
 
   .metallic-card-3d {
@@ -3145,5 +3245,12 @@ button, a, input, select, textarea {
 
   .dash-card-title {
     font-size: 1rem !important;
+  }
+
+  .portal-input,
+  .search-input-field,
+  select.portal-input {
+    font-size: 16px !important;
+    height: 42px !important;
   }
 }
