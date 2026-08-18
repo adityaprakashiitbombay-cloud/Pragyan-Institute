@@ -40,15 +40,10 @@ export function applyCors(req, res) {
 export function getSupabase(opts = {}) {
   const url = process.env.SUPABASE_URL || 'https://ujcmmcaervgskpkcfekm.supabase.co';
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+  const anonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqY21tY2FlcnZnc2twa2NmZWttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NDEzMTksImV4cCI6MjEwMjAxNzMxOX0.pTp51JWa-qWbAz-l5NGLKvrS66TED4lruhLInQ6hvmc';
 
   if (!serviceKey) {
-    if (opts.allowAnon) {
-      const anonKey = process.env.SUPABASE_ANON_KEY;
-      if (!anonKey) {
-        console.error('🚨 SUPABASE_ANON_KEY environment variable is not set');
-        if (opts.throwOnMissing) throw new Error('SUPABASE_ANON_KEY environment variable is not set');
-        return null;
-      }
+    if (opts.allowAnon || !opts.requireServiceRole) {
       return createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
     }
     console.error('🚨 SUPABASE_SERVICE_ROLE_KEY is required for server API execution. Refusing to fall back to anon credentials.');

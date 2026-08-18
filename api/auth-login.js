@@ -65,7 +65,7 @@ export default async function handler(req, res) {
       return res.status(429).json({ success: false, error: rateLimitCheck.message });
     }
 
-    const supabase = getSupabase();
+    const supabase = getSupabase({ allowAnon: true });
     if (!supabase) {
       return res.status(503).json({ success: false, error: 'Database configuration missing' });
     }
@@ -79,7 +79,7 @@ export default async function handler(req, res) {
       const { data: admins, error } = await supabase
         .from('admins')
         .select('*')
-        .or(`username.eq.${safeAdminId},email.eq.${safeAdminId},admin_id.eq.${safeAdminId}`);
+        .or(`username.ilike.${safeAdminId},email.ilike.${safeAdminId},admin_id.ilike.${safeAdminId},mobile.eq.${safeAdminId}`);
 
       if (error) throw error;
 

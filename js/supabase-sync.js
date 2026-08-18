@@ -1345,6 +1345,36 @@
       return inputNorms.some(i => studentNorms.includes(i));
     },
 
+    async _verifyPasswordHash(password, storedHash) {
+      if (!password || !storedHash) return false;
+      if (String(password).trim() === String(storedHash).trim()) return true;
+
+      // 1. Check bcrypt hash if bcryptjs is loaded
+      if (storedHash.startsWith('$2')) {
+        try {
+          if (typeof dcodeIO !== 'undefined' && dcodeIO.bcrypt) {
+            return dcodeIO.bcrypt.compareSync(String(password), storedHash);
+          }
+          if (typeof window !== 'undefined' && window.bcrypt && window.bcrypt.compareSync) {
+            return window.bcrypt.compareSync(String(password), storedHash);
+          }
+        } catch (_) {}
+      }
+
+      // 2. Check SHA-256 hex hash (64 characters) via Web Crypto API
+      if (/^[a-f0-9]{64}$/i.test(storedHash)) {
+        try {
+          const msgBuffer = new TextEncoder().encode(String(password));
+          const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+          const hashArray = Array.from(new Uint8Array(hashBuffer));
+          const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+          return hashHex.toLowerCase() === storedHash.toLowerCase();
+        } catch (_) {}
+      }
+
+      return false;
+    },
+
     async login(role, identifier, credential) {
       // SECURITY: Sanitize all inputs before processing
       const cleanId = this._sanitizeForQuery(String(identifier || '').trim());
@@ -1354,80 +1384,98 @@
         return { success: false, error: 'Please enter all credentials.' };
       }
 
-      // ── PRIMARY AUTH PATH: Secure BCrypt Verification via Serverless Endpoint ──
+      // ── PRIMARY AUTH PATH: Secure Verification via Serverless Endpoint ──
       try {
         const authRes = await fetch('/api/auth-login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ role, identifier: cleanId, credential: cleanCred })
         });
-        if (authRes.ok) {
-          const authData = await authRes.json().catch(() => ({}));
-          if (authData.success && authData.token) {
-            this.isOfflineFallback = false;
-            if (typeof sessionStorage !== 'undefined') {
-              sessionStorage.removeItem('pragyan_offline_fallback');
-              sessionStorage.setItem('pragyan_portal_token', authData.token);
-            }
-            if (typeof localStorage !== 'undefined') {
-              localStorage.setItem('pragyan_portal_token', authData.token);
-            }
-            await this.setSession(authData.token, role);
-            await this.pullAll().catch(() => {});
-            let finalUser = authData.user;
-            if (role === 'student' && typeof AppState !== 'undefined' && AppState.getStudents) {
-              const fresh = AppState.getStudents().find(s => s.id === finalUser.id || s.student_id === finalUser.id || s.rollNo === finalUser.rollNo);
-              if (fresh) finalUser = fresh;
-            }
-            return { success: true, user: finalUser, token: authData.token };
+        const authData = await authRes.json().catch(() => ({}));
+        if (authRes.ok && authData.success && authData.token) {
+          this.isOfflineFallback = false;
+          if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.removeItem('pragyan_offline_fallback');
+            sessionStorage.setItem('pragyan_portal_token', authData.token);
           }
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('pragyan_portal_token', authData.token);
+          }
+          await this.setSession(authData.token, role);
+          await this.pullAll().catch(() => {});
+          let finalUser = authData.user;
+          if (role === 'student' && typeof AppState !== 'undefined' && AppState.getStudents) {
+            const fresh = AppState.getStudents().find(s => s.id === finalUser.id || s.student_id === finalUser.id || s.rollNo === finalUser.rollNo);
+            if (fresh) finalUser = fresh;
+          }
+          return { success: true, user: finalUser, token: authData.token };
+        } else if (authRes.status === 401 || authRes.status === 400 || authRes.status === 429) {
+          return { success: false, error: authData.error || 'Authentication failed. Please check your credentials.' };
         }
       } catch (apiErr) {
-        console.warn('API /api/auth-login unreachable, evaluating secure offline fallback:', apiErr.message);
+        console.warn('API /api/auth-login unreachable, evaluating direct database auth fallback:', apiErr.message);
       }
 
-      // ── FALLBACK AUTH PATH: Offline / Direct Query Authentication ──
+      // ── FALLBACK AUTH PATH: Direct Database Query Authentication ──
       if (role === 'admin') {
         try {
           const sanitizedId = this._sanitizeForQuery(cleanId);
-          const filter = `or=(username.ilike.${this._encodeFilterValue(sanitizedId)},email.ilike.${this._encodeFilterValue(sanitizedId)},mobile.eq.${this._encodeFilterValue(sanitizedId)})&select=*&limit=1`;
+          const encoded = this._encodeFilterValue(sanitizedId);
+          const filter = `or=(username.ilike.${encoded},email.ilike.${encoded},mobile.eq.${encoded},admin_id.ilike.${encoded})&select=*&limit=5`;
           const admins = await this._rest('GET', 'admins', filter);
           if (Array.isArray(admins) && admins.length > 0) {
-            const admin = admins[0];
-            const hash = admin.password_hash || admin.passwordHash || '';
-            const isMatch = hash ? (await this._verifyPasswordHash(cleanCred, hash)) : (admin.password === cleanCred);
-            if (isMatch) {
-              const norm = this.normalizeAdmin(admin);
-              const token = `token_adm_${admin.id || admin.admin_id}_${Date.now()}`;
-              this.isOfflineFallback = true;
-              if (typeof sessionStorage !== 'undefined') {
-                sessionStorage.setItem('pragyan_offline_fallback', 'true');
+            for (const admin of admins) {
+              const hash = admin.password_hash || admin.passwordHash || '';
+              let isMatch = false;
+              if (hash) {
+                isMatch = await this._verifyPasswordHash(cleanCred, hash);
               }
-              await this.setSession(token, 'admin');
-              await this.pullAll().catch(() => {});
-              return {
-                success: true,
-                user: norm,
-                token,
-                isFallback: true,
-                warning: 'Offline session: Server-dependent operations require an active internet connection.'
-              };
+              if (!isMatch && admin.password) {
+                isMatch = (String(admin.password).trim() === cleanCred);
+              }
+              if (isMatch) {
+                const norm = this.normalizeAdmin(admin);
+                const token = `token_adm_${admin.id || admin.admin_id}_${Date.now()}`;
+                this.isOfflineFallback = true;
+                if (typeof sessionStorage !== 'undefined') {
+                  sessionStorage.setItem('pragyan_offline_fallback', 'true');
+                }
+                await this.setSession(token, 'admin');
+                await this.pullAll().catch(() => {});
+                return {
+                  success: true,
+                  user: norm,
+                  token,
+                  isFallback: true
+                };
+              }
             }
           }
         } catch (e) {
-          console.warn('Live admin auth query failed, checking local state:', e.message);
+          console.warn('Live admin auth query note:', e.message);
         }
 
-        // Local Admin Check using password_hash only
+        // Local Admin Check using password_hash and password fallback
         const localAdmins = (typeof AppState !== 'undefined' && AppState.getAdmins) ? AppState.getAdmins() : [];
         for (const a of localAdmins) {
-          const idMatch = (a.username?.toLowerCase() === cleanId.toLowerCase() || a.email?.toLowerCase() === cleanId.toLowerCase() || a.mobile === cleanId);
+          const idMatch = (
+            a.username?.toLowerCase() === cleanId.toLowerCase() || 
+            a.email?.toLowerCase() === cleanId.toLowerCase() || 
+            a.mobile === cleanId ||
+            (a.id || a.admin_id)?.toLowerCase() === cleanId.toLowerCase()
+          );
           if (idMatch) {
             const hash = a.password_hash || a.passwordHash || '';
-            const isMatch = hash ? (await this._verifyPasswordHash(cleanCred, hash)) : (a.password === cleanCred);
+            let isMatch = false;
+            if (hash) {
+              isMatch = await this._verifyPasswordHash(cleanCred, hash);
+            }
+            if (!isMatch && a.password) {
+              isMatch = (String(a.password).trim() === cleanCred);
+            }
             if (isMatch) {
               const cleanUser = this.normalizeAdmin(a) || a;
-              const token = `token_adm_${a.id || 'ADM'}_${Date.now()}`;
+              const token = `token_adm_${a.id || a.admin_id || 'ADM'}_${Date.now()}`;
               this.isOfflineFallback = true;
               if (typeof sessionStorage !== 'undefined') {
                 sessionStorage.setItem('pragyan_offline_fallback', 'true');
@@ -1438,8 +1486,7 @@
                 success: true,
                 user: cleanUser,
                 token,
-                isFallback: true,
-                warning: 'Offline session: Server-dependent operations require an active internet connection.'
+                isFallback: true
               };
             }
           }
