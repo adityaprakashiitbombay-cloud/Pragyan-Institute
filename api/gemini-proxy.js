@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   if (applyCors(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { prompt, contents } = req.body || {};
+  const { prompt, contents, systemInstruction } = req.body || {};
   if (!prompt && (!contents || !contents.length)) {
     return res.status(400).json({ error: 'Prompt or contents are required' });
   }
@@ -21,25 +21,33 @@ export default async function handler(req, res) {
     }
   ];
 
+  const requestBody = { contents: payloadContents };
+  if (systemInstruction) {
+    requestBody.system_instruction = {
+      parts: [{ text: typeof systemInstruction === 'string' ? systemInstruction : JSON.stringify(systemInstruction) }]
+    };
+  }
+
   const models = [
-    'gemini-1.5-flash',
-    'gemini-1.5-flash-latest',
-    'gemini-2.0-flash',
-    'gemini-1.5-flash-8b'
+    'gemini-3.6-flash',
+    'gemini-3.5-flash-lite',
+    'gemini-3.7-flash',
+    'gemini-3-flash-preview',
+    'gemini-flash-latest'
   ];
 
   let lastError = null;
 
   for (const model of models) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 3500);
+    const timer = setTimeout(() => controller.abort(), 7500);
 
     try {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: payloadContents }),
+        body: JSON.stringify(requestBody),
         signal: controller.signal
       });
 
@@ -55,7 +63,7 @@ export default async function handler(req, res) {
     } catch (err) {
       clearTimeout(timer);
       if (err.name === 'AbortError') {
-        lastError = `Model ${model} request timed out after 3500ms`;
+        lastError = `Model ${model} request timed out after 7500ms`;
       } else {
         lastError = err.message;
       }

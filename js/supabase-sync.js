@@ -714,6 +714,7 @@
             delete rowObj.attachmentUrl;
             delete rowObj.notice_id;
             delete rowObj.date;
+            delete rowObj.unread;
             // If notice id is not a standard UUID, strip it so Postgres auto-generates a valid UUID
             if (rowObj.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rowObj.id)) {
               delete rowObj.id;

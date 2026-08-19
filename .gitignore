@@ -2,9 +2,11 @@ node_modules/
 .env
 .env.*
 !.env.example
+CREDENTIALS.md
 *.local
 scratch/
 scratch_*
 *.zip
 *.pdf
 resend.com*.txt
+

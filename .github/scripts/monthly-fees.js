@@ -63,14 +63,15 @@ function sendEmailViaResend({ from, to, subject, html, text }) {
 // Billing: 1st=10th, 2nd=9th, 3rd=8th, 4th=Junior
 // Reminders: 15th=10th, 16th=9th, 17th=8th, 18th=Junior
 const scheduleMap = {
-  1:  { type: 'billing',  name: '10th', label: 'Class 10th (ACHIEVER)' },
-  2:  { type: 'billing',  name: '9th',  label: 'Class 9th (NURTURE)'   },
-  3:  { type: 'billing',  name: '8th',  label: 'Class 8th (ALPHA)'     },
-  4:  { type: 'billing',  name: 'junio',label: 'Junior Batch (JUNIO)'  },
+  1:  { type: 'billing',  name: 'all',  label: 'All Batches (1st-of-Month Unified Fee Accrual)' },
+  2:  { type: 'billing',  name: 'all',  label: 'All Batches (Day 2 Idempotent Billing Catch-Up)' },
+  3:  { type: 'billing',  name: 'all',  label: 'All Batches (Day 3 Idempotent Billing Catch-Up)' },
+  4:  { type: 'billing',  name: 'all',  label: 'All Batches (Day 4 Idempotent Billing Catch-Up)' },
   15: { type: 'reminder', name: '10th', label: 'Class 10th (ACHIEVER)' },
   16: { type: 'reminder', name: '9th',  label: 'Class 9th (NURTURE)'   },
   17: { type: 'reminder', name: '8th',  label: 'Class 8th (ALPHA)'     },
-  18: { type: 'reminder', name: 'junio',label: 'Junior Batch (JUNIO)'  }
+  18: { type: 'reminder', name: 'junio',label: 'Junior Batch (JUNIO)'  },
+  19: { type: 'reminder', name: 'all',  label: 'All Batches (Pending Dues Reminder)' }
 };
 
 const today = new Date();
@@ -89,10 +90,12 @@ if (!target) {
 console.log(`🎯 Target: ${target.label} (Operation: ${target.type.toUpperCase()})`);
 
 try {
-  const { data: students, error } = await supabase
-    .from('students')
-    .select('*')
-    .ilike('class_name', `%${target.name}%`);
+  let query = supabase.from('students').select('*');
+  if (target.name && target.name !== 'all') {
+    query = query.ilike('class_name', `%${target.name}%`);
+  }
+
+  const { data: students, error } = await query;
 
   if (error) throw error;
   if (!students?.length) {

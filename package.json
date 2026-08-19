@@ -20,6 +20,6 @@
     "stream-chat": "^8.52.0"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": "20.x"
   }
 }

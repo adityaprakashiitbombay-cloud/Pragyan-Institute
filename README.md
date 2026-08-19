@@ -1,6 +1,6 @@
 # 🎓 PRAGYAN INSTITUTE LALGANJ (Vaishali, Bihar)
 > **Official Web Application & Digital Portal** — Empowering Future Achievers (Class 8th, 9th & 10th)  
-> Near Main Chowk, Lalganj, Vaishali, Bihar - 844121  
+> At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj  
 > **Live Website:** [https://pragyaninstitute.com/](https://pragyaninstitute.com/) | **WhatsApp / Phone:** +91 73698 91858
 
 ---

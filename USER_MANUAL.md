@@ -8,7 +8,7 @@
   ╔══════════════════════════════════════════════════════════════════════════╗
   ║               PRAGYAN INSTITUTE WEB APP & DIGITAL PORTAL                 ║
   ║                   Empowering Future Achievers Since 2020                 ║
-  ║               Near Main Chowk, Lalganj, Vaishali, Bihar (844121)         ║
+  ║     At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj ║
   ║                   Official Website: https://pragyaninstitute.com         ║
   ╚══════════════════════════════════════════════════════════════════════════╝
 ```
@@ -94,7 +94,7 @@ Accessible 24/7 on mobile, tablet, and desktop at **[pragyaninstitute.com](https
 ### 3. Smart AI Assistant (Gemini AI Chatbot)
 - Located at the **bottom-left** of the screen with a friendly floating robot icon.
 - Answers questions instantly in **English & Hindi (Hinglish)** about:
-  - Institute address and landmark near Main Chowk, Lalganj.
+  - Institute address at Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj.
   - Batch timings and subject teachers.
   - How to log into the student portal.
   - Fee policies and online payment methods.
@@ -457,7 +457,7 @@ For technical help, admissions, or administrative questions:
 
 ```
 📍 Pragyan Institute Lalganj
-   Near Main Chowk, Lalganj, Vaishali, Bihar - 844121
+   At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj
 📱 Phone / WhatsApp: +91 73698 91858
 📧 Official Email:   noreply@pragyaninstitute.com
 🌐 Live Portal:      https://pragyaninstitute.com/

@@ -821,12 +821,16 @@
    3D Metallic VIP Student ID Card (Royal Obsidian & 24K Gold Glassmorphic Sheen)
    ========================================================================== */
 .metallic-card-3d-container {
-  perspective: calc(1000px * var(--card-scale, 1));
+  perspective: 1000px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: 2rem;
+  justify-content: center;
+  margin: 0.5rem auto 2.25rem auto;
   width: 100%;
+  max-width: 430px;
+  position: relative;
+  overflow: visible;
 }
 
 .card-flip-hint {
@@ -860,20 +864,13 @@
   z-index: 1;
   width: 100%;
   max-width: 420px;
-  height: auto;
-  aspect-ratio: 1.4;
-  min-height: 280px;
-  --card-scale: 1;
+  height: 285px;
+  min-height: 285px;
   transform-style: preserve-3d;
   transition: transform var(--transition-slow);
   cursor: pointer;
   border-radius: 18px;
-}
-
-@media (max-width: 480px) {
-  .metallic-card-3d {
-    --card-scale: 0.85;
-  }
+  box-sizing: border-box;
 }
 
 .metallic-card-3d.is-flipped {
@@ -886,7 +883,7 @@
   width: 100%;
   height: 100%;
   border-radius: 18px;
-  padding: 1.15rem 1.35rem 1.5rem 1.35rem;
+  padding: 0.95rem 1.25rem 1.15rem 1.25rem;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
   background: #022C22;
@@ -897,8 +894,8 @@
     #011B14 100%
   );
   box-shadow:
-    0 24px 50px -10px rgba(0, 0, 0, 0.65),
-    0 0 20px rgba(6, 78, 59, 0.35),
+    0 16px 36px -8px rgba(0, 0, 0, 0.55),
+    0 0 16px rgba(6, 78, 59, 0.25),
     inset 0 1px 2px rgba(255, 255, 255, 0.25),
     inset 0 -1px 2px rgba(0, 0, 0, 0.5);
   border: 1.5px solid rgba(245, 158, 11, 0.55);
@@ -2027,6 +2024,282 @@
 }
 
 /* ==========================================================================
+ * Admin Profile & Account Settings Master Styles (Desktop / Laptop / Base)
+ * ========================================================================== */
+.admin-profile-header-wrap {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1.5px solid var(--border-sand);
+  padding-bottom: 1.15rem;
+}
+
+.admin-profile-header-wrap h3 {
+  font-size: 1.28rem;
+  font-weight: 800;
+  color: var(--text-mahogany);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.admin-profile-secure-badge {
+  background: #ECFDF5;
+  color: #065F46;
+  border: 1px solid #A7F3D0;
+  padding: 0.4rem 0.95rem;
+  border-radius: 99px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+/* Top Hero Identity Banner */
+.admin-hero-profile-banner {
+  background: linear-gradient(135deg, #064E3B 0%, #032d22 100%);
+  color: #ffffff;
+  border-radius: 14px;
+  padding: 1.35rem 1.65rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  box-shadow: 0 4px 18px rgba(6, 78, 59, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.admin-hero-left {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.admin-hero-avatar-wrap {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: #ffffff;
+  color: var(--primary-emerald);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.85rem;
+  font-weight: 800;
+  flex-shrink: 0;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  border: 3px solid #34D399;
+  overflow: hidden;
+}
+
+.admin-hero-avatar-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.admin-hero-meta h4 {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0 0 0.35rem 0;
+}
+
+.admin-hero-role-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(255, 255, 255, 0.15);
+  color: #A7F3D0;
+  padding: 0.25rem 0.75rem;
+  border-radius: 99px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  backdrop-filter: blur(4px);
+}
+
+.admin-hero-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+
+.btn-change-photo-hero {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #34D399;
+  color: #064E3B;
+  padding: 0.6rem 1.25rem;
+  border-radius: 8px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  user-select: none;
+}
+
+.btn-change-photo-hero:hover {
+  background: #6EE7B7;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(52, 211, 153, 0.3);
+}
+
+/* Master 2-Column Grid on Desktop / Laptop */
+.admin-profile-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.admin-profile-card {
+  background: #ffffff;
+  border: 1.5px solid var(--border-sand);
+  border-radius: 12px;
+  padding: 1.35rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-profile-card:hover {
+  border-color: #CBD5E1;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+.admin-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding-bottom: 0.85rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.admin-card-head-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  flex-shrink: 0;
+}
+
+.admin-card-head-title {
+  font-size: 0.98rem;
+  font-weight: 800;
+  color: var(--text-mahogany);
+}
+
+.admin-form-row-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem;
+  margin-bottom: 0.85rem;
+}
+
+.admin-form-group {
+  margin-bottom: 0.85rem;
+}
+
+.admin-form-group:last-child {
+  margin-bottom: 0;
+}
+
+.admin-form-group label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-mahogany);
+  margin-bottom: 0.35rem;
+}
+
+.admin-form-group .input-icon-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.admin-form-group .input-icon-wrap i.input-left-icon {
+  position: absolute;
+  left: 0.9rem;
+  color: #94A3B8;
+  font-size: 0.92rem;
+  pointer-events: none;
+  transition: color 0.15s ease;
+  z-index: 2;
+}
+
+.admin-form-group .input-icon-wrap input:focus ~ i.input-left-icon {
+  color: var(--primary-emerald);
+}
+
+.admin-form-group .input-icon-wrap input.portal-input {
+  padding-left: 2.5rem !important;
+}
+
+.admin-security-alert-box {
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: 8px;
+  padding: 0.65rem 0.85rem;
+  margin-top: 0.5rem;
+  font-size: 0.76rem;
+  color: #991B1B;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  line-height: 1.4;
+}
+
+.admin-profile-submit-wrap {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+.btn-admin-settings-submit {
+  background: linear-gradient(135deg, #064E3B 0%, #04382B 100%);
+  color: #ffffff;
+  padding: 0.85rem 2.25rem;
+  font-size: 0.96rem;
+  font-weight: 800;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  box-shadow: 0 4px 14px rgba(6, 78, 59, 0.25);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-admin-settings-submit:hover {
+  background: linear-gradient(135deg, #047857 0%, #064E3B 100%);
+  box-shadow: 0 6px 20px rgba(6, 78, 59, 0.35);
+  transform: translateY(-1px);
+}
+
+.btn-admin-settings-submit:active {
+  transform: scale(0.98);
+}
+
+/* ==========================================================================
  * MASTER MOBILE & ANDROID RESPONSIVENESS SUITE (320px - 768px)
  * ========================================================================== */
 
@@ -2223,9 +2496,19 @@
   }
 
   /* 3. Sleek Scrollable Tab Navigation (Admin & Student) */
+  .portal-close-btn {
+    top: 0.55rem !important;
+    right: 0.55rem !important;
+    width: 38px !important;
+    min-width: 38px !important;
+    height: 38px !important;
+    font-size: 1.1rem !important;
+    z-index: 1050 !important;
+  }
+
   .dashboard-nav-tabs,
   .portal-nav-bar {
-    padding: 0.35rem 0.5rem !important;
+    padding: 0.35rem 3.8rem 0.35rem 0.5rem !important;
     gap: 0.35rem !important;
     display: flex !important;
     overflow-x: auto !important;
@@ -2276,12 +2559,15 @@
     padding: 0.95rem 0.85rem !important;
     margin-bottom: 0.85rem !important;
     border-radius: 10px !important;
+    position: relative;
+    z-index: 1;
+    clear: both;
   }
 
   .dash-card-header {
     display: flex !important;
     flex-direction: column !important;
-    align-items: flex-start !important;
+    align-items: stretch !important;
     gap: 0.65rem !important;
     margin-bottom: 0.75rem !important;
     padding-bottom: 0.65rem !important;
@@ -2296,6 +2582,21 @@
     font-size: 0.95rem !important;
     gap: 0.45rem !important;
     width: 100% !important;
+  }
+
+  .student-header-actions-row {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0.5rem !important;
+    width: 100% !important;
+  }
+
+  .student-header-actions-row .btn {
+    width: 100% !important;
+    padding: 0.55rem 0.45rem !important;
+    font-size: 0.78rem !important;
+    height: 38px !important;
+    box-sizing: border-box !important;
   }
 
   /* 5. Student Details Tab & Grid Layout */
@@ -2328,27 +2629,36 @@
   .metallic-card-3d-container {
     perspective: 1000px !important;
     width: 100% !important;
-    max-width: min(380px, 90vw) !important;
-    margin: 0.5rem auto 1.25rem auto !important;
+    max-width: 400px !important;
+    margin: 0.4rem auto 2.25rem auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    position: relative !important;
+    overflow: visible !important;
   }
 
   .metallic-card-3d {
     width: 100% !important;
-    max-width: min(380px, 90vw) !important;
-    height: auto !important;
+    max-width: 100% !important;
+    height: 285px !important;
     min-height: 285px !important;
-    aspect-ratio: 1.35 !important;
+    aspect-ratio: auto !important;
     border-radius: 16px !important;
+    box-sizing: border-box !important;
+    margin: 0 auto !important;
   }
 
   .card-face {
-    padding: 0.95rem 1.15rem 1.15rem 1.15rem !important;
+    padding: 0.85rem 1rem !important;
     border-radius: 16px !important;
     display: flex !important;
     flex-direction: column !important;
     justify-content: space-between !important;
-    min-height: 285px !important;
+    height: 100% !important;
+    min-height: 100% !important;
     box-sizing: border-box !important;
+    overflow: hidden !important;
   }
 
   .metallic-id-header {

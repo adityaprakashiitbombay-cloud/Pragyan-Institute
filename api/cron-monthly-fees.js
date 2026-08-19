@@ -14,11 +14,11 @@ import {
 } from './_lib/email-templates.js';
 
 const BATCH_SCHEDULE = {
-  // Days 1-4: Monthly Tuition Fee Generation & Initial Statements
-  1: { key: '10th', label: 'Class 10th (ACHIEVER)', fee: 1000, type: 'billing' },
-  2: { key: '9th', label: 'Class 9th (NURTURE)', fee: 1000, type: 'billing' },
-  3: { key: '8th', label: 'Class 8th (ALPHA)', fee: 800, type: 'billing' },
-  4: { key: 'junior', label: 'Junior Batch (JUNIO)', fee: 700, type: 'billing' },
+  // Days 1-4: Monthly Tuition Fee Generation & Statements (Day 1 covers ALL active batches; Days 2-4 provide redundant idempotent catch-up)
+  1: { key: 'all', label: 'All Batches (1st-of-Month Unified Fee Accrual)', type: 'billing' },
+  2: { key: 'all', label: 'All Batches (Day 2 Idempotent Billing Catch-Up)', type: 'billing' },
+  3: { key: 'all', label: 'All Batches (Day 3 Idempotent Billing Catch-Up)', type: 'billing' },
+  4: { key: 'all', label: 'All Batches (Day 4 Idempotent Billing Catch-Up)', type: 'billing' },
 
   // Days 15-19: Mid-Month Pending Due Reminders (Only for students with pending_fee > 0)
   15: { key: '10th', label: 'Class 10th (ACHIEVER)', type: 'reminder' },
@@ -27,6 +27,15 @@ const BATCH_SCHEDULE = {
   18: { key: 'junior', label: 'Junior Batch (JUNIO)', type: 'reminder' },
   19: { key: 'all', label: 'All Batches (Pending Dues Reminder)', type: 'reminder' }
 };
+
+function getStudentDefaultMonthlyFee(className) {
+  const str = String(className || '').toLowerCase();
+  if (str.includes('10')) return 1000;
+  if (str.includes('9')) return 1000;
+  if (str.includes('8')) return 800;
+  if (str.includes('junior') || str.includes('junio') || str.includes('6') || str.includes('7')) return 700;
+  return 1000;
+}
 
 function indiaDateParts(date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' })
@@ -209,7 +218,7 @@ export default async function handler(req, res) {
       if (target.type === 'billing') {
         // --- DAYS 1 to 4: MONTHLY FEE ADDITION & STATEMENT GENERATION ---
         for (const student of activeStudents) {
-          const amount = Number(student.monthly_fee) > 0 ? Number(student.monthly_fee) : target.fee;
+          const amount = Number(student.monthly_fee) > 0 ? Number(student.monthly_fee) : getStudentDefaultMonthlyFee(student.class_name);
           let handled = false;
 
           try {

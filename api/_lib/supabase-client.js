@@ -21,7 +21,7 @@ function addWhere(query, where = {}) {
 function readColumns(table, requested) {
   if (table !== 'admins') return requested || '*';
   // Password hashes never leave the server, including for administrators.
-  return 'admin_id,username,name,role,mobile,email,upi_id,is_head,photo_url,created_at,updated_at';
+  return 'admin_id,username,name,role,mobile,email,upi_id,is_head,photo_url,updated_at';
 }
 
 function assertStudentOwnership(table, operation, data, filters, session) {

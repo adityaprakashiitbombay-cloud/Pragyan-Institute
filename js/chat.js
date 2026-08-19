@@ -1,20 +1,20 @@
-/* Pragyan AI Assistant - Preloaded Chips + Real Gemini AI Engine */
+/* Pragyan AI Assistant - Multi-Turn Session Memory + Active Gemini 3.6/3.5/3.7 Engine */
 
 (function () {
   'use strict';
 
+  // Active Google Gemini Models in order of latency and performance
   const GEMINI_MODELS = [
-    'gemini-flash-latest',
-    'gemini-flash-lite-latest',
-    'gemini-3.7-flash',
     'gemini-3.6-flash',
-    'gemini-3.5-flash',
+    'gemini-3.5-flash-lite',
+    'gemini-3.7-flash',
     'gemini-3-flash-preview',
-    'gemini-1.5-flash-latest'
+    'gemini-flash-latest'
   ];
 
   function getActiveApiKey() {
-    return (typeof window !== 'undefined' && window.PRAGYAN_CONFIG && window.PRAGYAN_CONFIG.GEMINI_API_KEY) ||
+    return (typeof localStorage !== 'undefined' && localStorage.getItem('pragyan_gemini_key')) ||
+      (typeof window !== 'undefined' && window.PRAGYAN_CONFIG && window.PRAGYAN_CONFIG.GEMINI_API_KEY) ||
       (typeof window !== 'undefined' && window.ENV_GEMINI_API_KEY) ||
       (typeof localStorage !== 'undefined' && localStorage.getItem('pragyan_gemini_key')) ||
       '';
@@ -26,19 +26,23 @@
     }
   }
 
+  // Multi-Turn Sliding Window Conversation Memory
+  let chatSessionHistory = [];
+  const MAX_HISTORY_MESSAGES = 20;
+
   // Preloaded Answers for Quick Suggestion Chips
   const PRELOADED_CHIP_ANSWERS = {
     "What are the fee structures for Class 8, 9, and 10?":
-      `💵 **Nominal Monthly Fee Structure (No Admission Charges):**\n• **Class 10th (ACHIEVER):** ₹1,000 / month\n• **Class 9th (NURTURE):** ₹1,000 / month\n• **Class 8th (ALPHA):** ₹800 / month\n• **Junior Batch (JUNIO):** ₹700 / month\n\n✨ *Includes printed study modules, weekly board test series & student portal.*`,
+      `💵 **Nominal Monthly Fee Structure (Zero Hidden Charges):**\n• **Class 10th (ACHIEVER / Matric Mastery):** ₹1,000 / month\n• **Class 9th (NURTURE / Foundation):** ₹1,000 / month\n• **Class 8th (ALPHA / Middle Foundation):** ₹800 / month\n• **Class 11th & 12th (ASCEND / I.Sc.):** ₹1,200 – ₹1,500 / month\n• **Annual Advance Scholarship:** 5% scholarship discount on full-year lump sum payment\n\n✨ *Includes printed study modules, Sunday board mock test series & 3D digital VIP pass access.*`,
 
     "How do Digital Smartboards enhance learning?":
-      `🖥️ **Interactive Digital Smartboards:**\n• **3D Visual Science:** Physics & Chemistry concepts with vivid animations & molecular models.\n• **Digital Maths:** Step-by-step graphical problem solving.\n• **Recorded Sessions:** Quick concept recap & visual diagrams for high retention.`,
+      `🖥️ **Interactive Digital Smartboards & Visual Tech:**\n• **3D Animated Science:** Complex Physics & Chemistry concepts visualized with 3D molecular and mechanical models.\n• **Digital Maths Derivations:** Step-by-step graphical plotting and interactive geometry derivations.\n• **High Retention & Engagement:** Visual explanations make abstract board topics easy to understand.\n• **Recorded Concept Recaps:** Rapid revision before weekly mock tests.`,
 
     "Who are the teachers at Pragyan Institute?":
-      `👨‍🏫 **Expert Mentors & Faculty:**\n• **CHANDAN KUMAR** — Science Mentor (M.Sc Physics, B.Ed, D.El.Ed, CTET Qualified, 8+ Yrs Exp)\n• **RAVI RANJAN** — Maths Mentor (M.Sc Maths, B.Ed, CTET Qualified, 10+ Yrs Exp)\n\n🏆 *Proven track record of 100% board pass results in Lalganj!*`,
+      `👨‍🏫 **Expert Mentors & Leadership Faculty:**\n• **CHANDAN KUMAR** — Science Mentor & Director (M.Sc Physics, B.Ed, D.El.Ed, CTET Qualified, 8+ Yrs Exp, **10,000+ Students Mentored**)\n• **PROf. RAVI RANJAN** — Mathematics Mentor & Director (M.Sc Maths, B.Ed, CTET Qualified, 10+ Yrs Exp, **12,000+ Students Mentored**)\n\n🏆 *Proven track record of 100% board exam pass rates and top ranks across Lalganj & Vaishali!*`,
 
     "Tell me about the 3 days free demo classes":
-      `🎁 **3 Days FREE Demo Classes:**\n• Experience our digital smartboard classrooms & teaching pedagogy for 3 days with zero cost!\n• For Class 8th, 9th, 10th (CBSE & Bihar Board).\n\n📲 Call/WhatsApp: **+91 73698 91858** to reserve your seat!`,
+      `🎁 **3 Days FREE Demo Classes:**\n• Experience our digital smartboards, concept-first pedagogy, and teaching excellence for 3 days with **zero cost and zero admission fee**!\n• Available for Class 8th, 9th, 10th, 11th & 12th (CBSE & BSEB).\n\n📲 Call / WhatsApp: **[+91 73698 91858](tel:+917369891858)** to reserve your demo seat today!`,
 
     "Where is Pragyan Institute located in Lalganj, Bihar?":
       `📍 **Location & Directions:**\n• **Address:** At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj\n• 🗺️ **Google Maps:** [Click for exact directions](https://maps.app.goo.gl/jhpW5ynQntfTMa2aA)\n• ⏰ **Timings:** Mon–Sat: 6:30 AM – 8:00 PM | Sun: 9:00 AM – 1:00 PM`
@@ -46,16 +50,21 @@
 
   const SYSTEM_PROMPT = `You are 'Pragyan AI', the official AI assistant for Pragyan Institute, located at Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj.
 
-CRITICAL INSTRUCTIONS FOR EVERY RESPONSE:
-1. STRUCTURE & EMOJIS (MANDATORY):
-   - ALWAYS organize answers into clean, structured sections with bold headers and appropriate, vibrant emojis (e.g. 📐, 📊, 🎯, 💡, 👨‍🏫, 💵, 📍, 🎁, 🏆, ✨).
-   - NEVER output raw markdown '#' or '###' symbols. Use clean bold headers with emojis (e.g., 📐 **Heading Title**).
-   - Use clean bullet points ('•') for each key point. NEVER use raw asterisks ('*') or messy wall-of-text blocks.
-   - Keep answers crisp, concise, informative, and visually engaging (3 to 6 bullet points).
+CORE IDENTITY & TONE:
+- You are polite, encouraging, highly structured, authoritative, and helpful.
+- You represent the vision of Pragyan Institute: "Where Concept Meets Success".
+- STRICT PRIVACY MANDATE: NEVER mention individual developer names (such as Aditya Prakash). You represent Pragyan Institute and its founding educators: Chandan Kumar & Prof. Ravi Ranjan.
+
+MANDATORY ANSWER FORMATTING RULES:
+1. BULLETED & STRUCTURED PRESENTATION:
+   - ALWAYS format answers using crisp, clean bullet points ('•') or numbered steps ('1.', '2.', '3.').
+   - Use vibrant bold section headings with relevant emojis (e.g., 🎯 **Key Highlights**, 💵 **Fee Structure**, 👨‍🏫 **Faculty**, 📍 **Location & Timings**, 📚 **Syllabus**).
+   - NEVER output raw markdown '#' or '###' headers. Use bold emoji headers.
+   - Keep answers clear, structured, and easy to read on mobile and desktop screens. Avoid dense walls of unformatted text.
 
 2. MATHEMATICS & SCIENCE FORMATTING:
-   - Always write math formulas cleanly with standard Unicode powers and symbols (e.g., ax² + bx + c = 0, KE = ½ mv², a ≠ 0, √x, ±, ×, ÷).
-   - NEVER output raw LaTeX code like '$', '\\neq', '\\frac', '\\left', or '\\sqrt'.
+   - Format math and science with clean Unicode characters (e.g., ax² + bx + c = 0, KE = ½ mv², F = ma, v = u + at, H₂SO₄, sin²θ + cos²θ = 1, a ≠ 0, √x, ±, ×, ÷).
+   - NEVER output raw LaTeX formatting like '$', '\\frac', '\\neq', or '\\sqrt'.
 
 3. ACCURATE PRAGYAN INSTITUTE FACTS:
    - Location: At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj (Google Maps: https://maps.app.goo.gl/jhpW5ynQntfTMa2aA)
@@ -74,35 +83,35 @@ CRITICAL INSTRUCTIONS FOR EVERY RESPONSE:
    - Student & Admin ERP Portal: 3D Metallic VIP ID card with live fees & barcode, online fee payments, instant PDF receipts, attendance tracker, and profile update requests.
    - Boards: CBSE and Bihar Board (BSEB).
 
-Always be structured, engaging, helpful, and mentor-like.`;
+Always be structured, engaging, helpful, and polite.`;
 
-  // Local intelligent matcher for immediate and reliable short answers
+  // Local intelligent knowledge matcher for instant, zero-latency answers
   function getLocalSmartAnswer(query) {
     const q = query.toLowerCase().trim();
 
     // Greetings
-    if (q.match(/\b(hi|hello|hey|namaste|pranam|good morning|good evening|kaisa|kaise|sup)\b/)) {
-      return `👋 **Namaste & Welcome to Pragyan Institute!**\n\nI am your **AI Assistant**. How can I help you today?\n• 💵 **Fee Structure & Batches**\n• 🎁 **3 Days Free Demo Classes**\n• 👨‍🏫 **Faculty (Ravi Sir & Chandan Sir)**\n• 📍 **Location & Timings in Lalganj**\n\n*Type your question below or click any suggestion chip!*`;
+    if (q.match(/\b(hi|hello|hey|namaste|pranam|good morning|good afternoon|good evening|kaisa|kaise|sup)\b/)) {
+      return `👋 **Namaste & Welcome to Pragyan Institute!**\n\nI am your **Pragyan AI Academic Assistant**. How can I help you today?\n• 💵 **Fee Structure & Batches (Class 8th–12th)**\n• 🎁 **3 Days Free Demo Classes**\n• 👨‍🏫 **Faculty (Chandan Sir & Ravi Sir)**\n• 🖥️ **Smart Classrooms & 3D Visual Learning**\n• 📍 **Location, Directions & Timings in Lalganj**\n\n*Type your question below or click any quick suggestion chip!*`;
     }
 
     // Smartboards & Visual Tech
     if (q.includes('digital') || q.includes('smart board') || q.includes('smartboard') || q.includes('screen') || q.includes('board') || q.includes('tech') || q.includes('smart')) {
-      return `🖥️ **Interactive Digital Smartboards:**\n• **3D Visual Science:** Physics & Chemistry concepts taught with vivid 3D animations & models.\n• **Step-by-Step Maths:** Digital geometry derivations & graph plotting.\n• **High Retention:** Visual learning makes difficult topics simple and engaging.`;
+      return `🖥️ **Interactive Digital Smartboards & Visual Learning:**\n• **3D Visual Science:** Physics & Chemistry concepts visualized with vivid 3D animations and atomic/molecular models.\n• **Step-by-Step Maths:** Digital geometry derivations, coordinate graphing & algebraic proofs.\n• **High Retention:** Visual demonstrations significantly improve memory recall for board exams.\n• **Recorded Revision:** Quick concept recap sessions before weekly mock tests.`;
     }
 
     // Faculty & Mentors
     if (q.includes('teacher') || q.includes('faculty') || q.includes('sir') || q.includes('chandan') || q.includes('ravi') || q.includes('mentor') || q.includes('founder') || q.includes('who teaches')) {
-      return `👨‍🏫 **Expert Mentors & Faculty:**\n• **CHANDAN KUMAR** — Science Lead (M.Sc Physics, B.Ed, D.El.Ed, CTET, 8+ Yrs Exp)\n• **RAVI RANJAN** — Maths Lead (M.Sc Maths, B.Ed, CTET, 10+ Yrs Exp)\n\n🏆 *Dedicated mentorship with a 100% board exam pass rate in Lalganj!*`;
+      return `👨‍🏫 **Expert Mentors & Faculty Leadership:**\n• **CHANDAN KUMAR** — Science Mentor (M.Sc Physics, B.Ed, D.El.Ed, CTET Qualified, 8+ Yrs Exp, **10,000+ Students Mentored**)\n• **PROF. RAVI RANJAN** — Maths Mentor (M.Sc Maths, B.Ed, CTET Qualified, 10+ Yrs Exp, **12,000+ Students Mentored**)\n\n🏆 *Dedicated mentorship with a proven 100% board exam pass rate across Lalganj & Vaishali!*`;
     }
 
-    // Fees & Pricing
-    if (q.includes('fee') || q.includes('fees') || q.includes('cost') || q.includes('price') || q.includes('nominal') || q.includes('charge') || q.includes('payment') || q.includes('money') || q.includes('paisa') || q.includes('kitna')) {
-      return `💵 **Nominal Monthly Fee Structure (Zero Hidden Charges):**\n• **Class 10th (ACHIEVER):** ₹1,000 / month\n• **Class 9th (NURTURE):** ₹1,000 / month\n• **Class 8th (ALPHA):** ₹800 / month\n• **Junior (JUNIO):** ₹700 / month\n\n✨ *No admission fee. Includes printed study modules, weekly board test series & portal access.*`;
+    // Fees, Pricing & Scholarships
+    if (q.includes('fee') || q.includes('fees') || q.includes('cost') || q.includes('price') || q.includes('nominal') || q.includes('charge') || q.includes('payment') || q.includes('money') || q.includes('scholarship') || q.includes('paisa') || q.includes('kitna')) {
+      return `💵 **Nominal Monthly Fee Structure (Zero Hidden Charges):**\n• **Class 10th (ACHIEVER / Matric Board):** ₹1,000 / month\n• **Class 9th (NURTURE / Foundation):** ₹1,000 / month\n• **Class 8th (ALPHA / Middle School):** ₹800 / month\n• **Class 11th & 12th (ASCEND / I.Sc.):** ₹1,200 – ₹1,500 / month\n• **5% Annual Scholarship:** 5% discount on full annual lump-sum advance payment\n\n✨ *No admission fee. Includes printed study modules, weekly board test series & 3D VIP portal access.*`;
     }
 
     // Demo Classes
     if (q.includes('demo') || q.includes('trial') || q.includes('free') || q.includes('free class')) {
-      return `🎁 **3 Days FREE Demo Classes:**\n• Experience our digital smartboards and classroom pedagogy for 3 days with zero cost!\n• For Class 8th, 9th, and 10th (CBSE & BSEB).\n\n📲 Call/WhatsApp: **+91 73698 91858** to reserve your demo seat!`;
+      return `🎁 **3 Days FREE Demo Classes:**\n• Experience our digital smartboards and conceptual teaching pedagogy for 3 days with **zero cost and zero admission fee**!\n• Open for Class 8th, 9th, 10th, 11th & 12th (CBSE & BSEB).\n\n📲 Call / WhatsApp: **[+91 73698 91858](tel:+917369891858)** to reserve your demo seat!`;
     }
 
     // Admissions & Enrollment
@@ -115,9 +124,9 @@ Always be structured, engaging, helpful, and mentor-like.`;
       return `📍 **Institute Address & Directions:**\n• **Location:** At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj\n• 🗺️ **Google Maps:** [Click for Exact Directions](https://maps.app.goo.gl/jhpW5ynQntfTMa2aA)`;
     }
 
-    // Timings
+    // Operational Timings
     if (q.includes('timing') || q.includes('time') || q.includes('hours') || q.includes('open') || q.includes('schedule') || q.includes('kab') || q.includes('samay')) {
-      return `⏰ **Institute Operational Hours:**\n• **Monday – Saturday:** 6:30 AM – 8:00 PM (Regular Batch Sessions)\n• **Sunday:** 9:00 AM – 1:00 PM (Weekly Mock Tests & Doubt Clearing)`;
+      return `⏰ **Institute Operational Hours:**\n• **Monday – Saturday:** 6:30 AM – 8:00 PM (Regular Batch Sessions & Practical Problem Solving)\n• **Sunday:** 9:00 AM – 1:00 PM (Weekly Sunday Board Mock Tests & Special Doubt Clearing)`;
     }
 
     // Contact & Helpline
@@ -125,19 +134,29 @@ Always be structured, engaging, helpful, and mentor-like.`;
       return `📞 **Direct Contact & Helpline:**\n• **Phone / WhatsApp:** [+91 73698 91858](tel:+917369891858)\n• **Office:** At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj\n• **Response Time:** Instant on WhatsApp!`;
     }
 
-    // Portal Features & ID Card
+    // Portal Features & 3D VIP ID Card
     if (q.includes('portal') || q.includes('id card') || q.includes('vip') || q.includes('receipt') || q.includes('barcode') || q.includes('login') || q.includes('card') || q.includes('pass')) {
-      return `🪪 **Student & Admin ERP Portal Features:**\n• **3D Metallic VIP ID Card:** Realistic 3D flip, live fee clearance status & QR barcode.\n• **Online Payment & PDF Receipts:** Pay monthly fees and download instant GST-compliant receipts.\n• **Attendance & Profile Updates:** Real-time request tracking.`;
+      return `🪪 **Digital Student ERP Portal Features:**\n• **3D Metallic VIP ID Pass:** Gyroscopic physics, 3D flip animation, live fee clearance status & QR barcode.\n• **Online UPI Payment & PDF Receipts:** Pay monthly fees securely via UPI/PhonePe/GPay and download instant computerized receipts.\n• **Attendance & Notices:** Real-time class notices and community forum discussions.`;
     }
 
     // Subjects & Boards
     if (q.includes('subject') || q.includes('syllabus') || q.includes('board') || q.includes('cbse') || q.includes('bseb') || q.includes('math') || q.includes('science') || q.includes('physics') || q.includes('chemistry') || q.includes('biology')) {
-      return `📚 **Curriculum & Academic Coverage:**\n• **Subjects:** Mathematics, Science (Physics, Chemistry, Biology), English & Social Science.\n• **Boards Covered:** CBSE & Bihar School Examination Board (BSEB) English & Hindi Medium.\n• **Target:** 100% Board Exam & NTSE / Olympiad Preparation.`;
+      return `📚 **Curriculum & Academic Coverage:**\n• **Subjects Offered:** Mathematics, Science (Physics, Chemistry, Biology), English & Social Studies.\n• **Boards Supported:** Central Board of Secondary Education (CBSE) & Bihar School Examination Board (BSEB) English & Hindi Medium.\n• **Target:** 100% Board Exam Success + Olympiad / NTSE Foundation.`;
     }
 
     // Batches
-    if (q.includes('batch') || q.includes('class 10') || q.includes('class 9') || q.includes('class 8') || q.includes('class 7') || q.includes('class 6') || q.includes('10th') || q.includes('9th') || q.includes('8th')) {
-      return `🎯 **Current Academic Batches:**\n• **Class 10th (ACHIEVER):** Board Mastery & Weekly Mock Tests\n• **Class 9th (NURTURE):** Strong Foundation & Conceptual Science\n• **Class 8th (ALPHA):** School Curriculum & Advanced Aptitude\n• **Junior (JUNIO):** Class 6th & 7th Basics`;
+    if (q.includes('batch') || q.includes('class 10') || q.includes('class 9') || q.includes('class 8') || q.includes('class 11') || q.includes('class 12') || q.includes('10th') || q.includes('9th') || q.includes('8th')) {
+      return `🎯 **Current Academic Batches:**\n• **Class 10th (ACHIEVER):** Board Mastery & Weekly Mock Tests (₹1,000/mo)\n• **Class 9th (NURTURE):** Deep Foundation & Conceptual Science (₹1,000/mo)\n• **Class 8th (ALPHA):** School Curriculum & Advanced Aptitude (₹800/mo)\n• **Class 11th & 12th (ASCEND):** I.Sc. Intermediate & Competitive Prep (₹1,200–₹1,500/mo)`;
+    }
+
+    // Physics Concepts
+    if (q.includes('newton') || q.includes('gravity') || q.includes('motion') || q.includes('ohm') || q.includes('electricity') || q.includes('force') || q.includes('energy') || q.includes('light') || q.includes('reflection') || q.includes('refraction')) {
+      return `💡 **Physics Conceptual Mastery (Chandan Sir's Module):**\n• **3D Visual Derivation:** Key laws like F = ma, V = IR, and KE = ½ mv² are demonstrated with interactive smartboard simulations.\n• **Step-by-Step Numericals:** High-yield board numericals solved with standard formulas and units.\n• **Board Focus:** Previous 10 years board question bank mastery!`;
+    }
+
+    // Maths Concepts
+    if (q.includes('trigonometry') || q.includes('quadratic') || q.includes('pythagoras') || q.includes('triangle') || q.includes('formula') || q.includes('theorem') || q.includes('algebra') || q.includes('geometry')) {
+      return `📐 **Mathematics Mastery (Ravi Sir's Module):**\n• **Logical Derivations:** Algebraic identities and geometric theorems proven with step-by-step logic.\n• **Daily Practice Problems (DPP):** High-yield board patterns with shortcut techniques for rapid problem solving.\n• **Dedicated Doubt Sessions:** Sunday 1-on-1 doubt clearing for every student!`;
     }
 
     // Physics Concepts
@@ -179,10 +198,11 @@ Always be structured, engaging, helpful, and mentor-like.`;
               <div class="chat-avatar"><i class="fa-solid fa-robot"></i></div>
               <div>
                 <div class="chat-title">Pragyan AI Assistant</div>
-                <div class="chat-status"><span class="status-dot"></span> Powered by Gemini AI</div>
+                <div class="chat-status"><span class="status-dot"></span> Active • Gemini 3.6 Flash</div>
               </div>
             </div>
             <div class="chat-header-actions">
+              <button id="chatResetBtn" class="chat-icon-btn" title="Start Fresh Chat / Reset Memory"><i class="fa-solid fa-rotate-left"></i></button>
               <button id="chatKeySettingsBtn" class="chat-icon-btn" title="Gemini API Key Settings"><i class="fa-solid fa-gear"></i></button>
               <button id="chatCloseBtn" class="chat-close-btn" aria-label="Close Chat">&times;</button>
             </div>
@@ -190,23 +210,23 @@ Always be structured, engaging, helpful, and mentor-like.`;
 
           <!-- API Key Settings Panel -->
           <div id="keySettingsPanel" class="key-settings-panel" style="display: none;">
-            <div class="key-panel-title">🔑 Gemini API Key Settings</div>
+            <div class="key-panel-title">🔑 Custom Gemini API Key Settings</div>
             <div class="key-input-row">
-              <input type="password" id="customApiKeyInput" placeholder="Paste AIzaSy... API key" />
+              <input type="password" id="customApiKeyInput" placeholder="Paste custom API key" />
               <button id="saveKeyBtn" class="key-save-btn">Save</button>
             </div>
-            <div class="key-panel-hint">Get your key from <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a></div>
+            <div class="key-panel-hint">Pre-configured with official Pragyan Institute key. Optional custom key from <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>.</div>
           </div>
 
           <div id="chatMessages" class="chat-messages">
             <div class="chat-msg bot-msg">
               <div class="msg-content">
-                🙏 Namaste! I am <strong>Pragyan AI</strong>. Ask me anything about our digital classrooms, experienced teachers, nominal fees, batches, or demo classes!
+                🙏 Namaste! I am <strong>Pragyan AI</strong>, your official academic assistant. Ask me anything about our digital classrooms, experienced teachers, nominal fee structure, batches, or 3-day demo classes!
               </div>
             </div>
 
             <!-- Quick Suggestion Chips -->
-            <div class="chat-suggestions">
+            <div class="chat-suggestions" id="chatChipsContainer">
               <button class="chip-btn" data-query="What are the fee structures for Class 8, 9, and 10?">💰 Nominal Fee</button>
               <button class="chip-btn" data-query="How do Digital Smartboards enhance learning?">🖥️ Digital Boards</button>
               <button class="chip-btn" data-query="Who are the teachers at Pragyan Institute?">👨‍🏫 Expert Mentors</button>
@@ -216,7 +236,7 @@ Always be structured, engaging, helpful, and mentor-like.`;
           </div>
 
           <div class="chat-input-area">
-            <input type="text" id="chatInput" placeholder="Ask about fees, digital boards, faculty..." autocomplete="off" />
+            <input type="text" id="chatInput" placeholder="Ask about fees, faculty, smartboards, demo..." autocomplete="off" />
             <button id="chatSendBtn" class="chat-send-btn" aria-label="Send message">
               <i class="fa-solid fa-paper-plane"></i>
             </button>
@@ -269,9 +289,9 @@ Always be structured, engaging, helpful, and mentor-like.`;
         bottom: 4.5rem;
         left: 0;
         right: auto;
-        width: 375px;
+        width: 385px;
         max-width: calc(100vw - 2rem);
-        height: 520px;
+        height: 530px;
         max-height: calc(100vh - 7rem);
         max-height: calc(100dvh - 7rem);
         background-color: #FFFFFF;
@@ -296,7 +316,7 @@ Always be structured, engaging, helpful, and mentor-like.`;
       .chat-header {
         background: linear-gradient(135deg, #5A2E25, #3D1C16);
         color: #F0E6D8;
-        padding: 1rem 1.25rem;
+        padding: 0.9rem 1.15rem;
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -311,19 +331,22 @@ Always be structured, engaging, helpful, and mentor-like.`;
       .chat-header-actions {
         display: flex;
         align-items: center;
-        gap: 0.5rem;
+        gap: 0.55rem;
       }
 
       .chat-icon-btn {
         background: none;
         border: none;
         color: #F0E6D8;
-        font-size: 1.05rem;
+        font-size: 0.95rem;
         cursor: pointer;
-        opacity: 0.8;
+        opacity: 0.85;
+        padding: 0.3rem;
+        border-radius: 4px;
+        transition: opacity 0.2s;
       }
 
-      .chat-icon-btn:hover { opacity: 1; }
+      .chat-icon-btn:hover { opacity: 1; background: rgba(255,255,255,0.1); }
 
       .chat-avatar {
         width: 38px;
@@ -341,13 +364,13 @@ Always be structured, engaging, helpful, and mentor-like.`;
       .chat-title {
         font-family: var(--font-heading, 'Outfit', serif);
         font-weight: 800;
-        font-size: 1.05rem;
+        font-size: 1.02rem;
         color: #F0E6D8;
         line-height: 1.1;
       }
 
       .chat-status {
-        font-size: 0.75rem;
+        font-size: 0.73rem;
         color: rgba(240, 230, 216, 0.8);
         display: flex;
         align-items: center;
@@ -370,7 +393,8 @@ Always be structured, engaging, helpful, and mentor-like.`;
         font-size: 1.5rem;
         cursor: pointer;
         line-height: 1;
-        padding: 0;
+        padding: 0 0.2rem;
+        opacity: 0.85;
       }
 
       .chat-close-btn:hover { opacity: 1; }
@@ -436,7 +460,7 @@ Always be structured, engaging, helpful, and mentor-like.`;
 
       .chat-msg {
         display: flex;
-        max-width: 86%;
+        max-width: 88%;
         line-height: 1.45;
         font-size: 0.88rem;
       }
@@ -476,7 +500,7 @@ Always be structured, engaging, helpful, and mentor-like.`;
 
       .chat-heading {
         font-weight: 800;
-        font-size: 0.96rem;
+        font-size: 0.95rem;
         color: #5A2E25;
         margin: 0.6rem 0 0.25rem 0;
         display: block;
@@ -494,7 +518,7 @@ Always be structured, engaging, helpful, and mentor-like.`;
 
       .chat-link {
         color: #B5543A;
-        font-weight: 600;
+        font-weight: 700;
         text-decoration: underline;
       }
 
@@ -575,20 +599,6 @@ Always be structured, engaging, helpful, and mentor-like.`;
         flex-shrink: 0;
       }
 
-      .chat-close-btn {
-        width: 44px;
-        height: 44px;
-        background: none;
-        border: none;
-        color: #F0E6D8;
-        font-size: 1.6rem;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
-      }
-
       @media (max-width: 480px) {
         .pragyan-chat-widget {
           left: 0.5rem;
@@ -639,6 +649,7 @@ Always be structured, engaging, helpful, and mentor-like.`;
     const closeBtn = document.getElementById('chatCloseBtn');
     const sendBtn = document.getElementById('chatSendBtn');
     const inputEl = document.getElementById('chatInput');
+    const resetBtn = document.getElementById('chatResetBtn');
     const settingsBtn = document.getElementById('chatKeySettingsBtn');
     const settingsPanel = document.getElementById('keySettingsPanel');
     const saveKeyBtn = document.getElementById('saveKeyBtn');
@@ -656,6 +667,29 @@ Always be structured, engaging, helpful, and mentor-like.`;
     if (closeBtn && windowEl) {
       closeBtn.addEventListener('click', () => {
         windowEl.classList.remove('open');
+      });
+    }
+
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => {
+        chatSessionHistory = [];
+        const messagesEl = document.getElementById('chatMessages');
+        if (messagesEl) {
+          messagesEl.innerHTML = `
+            <div class="chat-msg bot-msg">
+              <div class="msg-content">
+                🔄 **Conversation memory cleared.** How can I assist you with Pragyan Institute today?
+              </div>
+            </div>
+            <div class="chat-suggestions" id="chatChipsContainer">
+              <button class="chip-btn" data-query="What are the fee structures for Class 8, 9, and 10?">💰 Nominal Fee</button>
+              <button class="chip-btn" data-query="How do Digital Smartboards enhance learning?">🖥️ Digital Boards</button>
+              <button class="chip-btn" data-query="Who are the teachers at Pragyan Institute?">👨‍🏫 Expert Mentors</button>
+              <button class="chip-btn" data-query="Tell me about the 3 days free demo classes">🎁 3 Days Demo</button>
+              <button class="chip-btn" data-query="Where is Pragyan Institute located in Lalganj, Bihar?">📍 Location & Map</button>
+            </div>
+          `;
+        }
       });
     }
 
@@ -677,7 +711,7 @@ Always be structured, engaging, helpful, and mentor-like.`;
           settingsPanel.style.display = 'none';
         } else {
           localStorage.removeItem('pragyan_gemini_key');
-          alert('Reset to default Gemini API Key.');
+          alert('Reset to official Pragyan Institute default Gemini Key.');
           settingsPanel.style.display = 'none';
         }
       });
@@ -716,7 +750,9 @@ Always be structured, engaging, helpful, and mentor-like.`;
       setTimeout(() => {
         removeTypingIndicator();
         appendMessage(preloadedAnswer, 'bot');
-      }, 300);
+        chatSessionHistory.push({ role: 'user', parts: [{ text: queryText }] });
+        chatSessionHistory.push({ role: 'model', parts: [{ text: preloadedAnswer }] });
+      }, 250);
     } else {
       callGeminiAPIReal(queryText);
     }
@@ -738,7 +774,7 @@ Always be structured, engaging, helpful, and mentor-like.`;
     appendMessage(query, 'user');
     showTypingIndicator();
 
-    // Call real Gemini API, with smart local matcher as fallback
+    // Call real Gemini API with multi-turn memory & local fallback
     callGeminiAPIReal(query);
   }
 
@@ -777,7 +813,7 @@ Always be structured, engaging, helpful, and mentor-like.`;
       .replace(/'/g, '&#039;');
 
     // 3. Links
-    clean = clean.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="chat-link">$1</a>');
+    clean = clean.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+|tel:[^\s)]+|mailto:[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="chat-link">$1</a>');
 
     // 4. Bold and italics
     clean = clean
@@ -798,6 +834,12 @@ Always be structured, engaging, helpful, and mentor-like.`;
       if (/^[\*\-\•]\s+/.test(trimmed)) {
         const itemContent = trimmed.replace(/^[\*\-\•]\s+/, '');
         return `<div class="chat-bullet"><span class="chat-bullet-dot">•</span><span class="chat-bullet-text">${itemContent}</span></div>`;
+      }
+      if (/^(\d+)\.\s+/.test(trimmed)) {
+        const match = trimmed.match(/^(\d+)\.\s+(.*)$/);
+        if (match) {
+          return `<div class="chat-bullet"><span class="chat-bullet-dot" style="font-size: 0.85rem;">${match[1]}.</span><span class="chat-bullet-text">${match[2]}</span></div>`;
+        }
       }
       return line;
     });
@@ -838,39 +880,58 @@ Always be structured, engaging, helpful, and mentor-like.`;
   }
 
   async function callGeminiAPIReal(userPrompt) {
-    const contents = [
-      {
-        role: 'user',
-        parts: [{ text: `${SYSTEM_PROMPT}\n\nUser Question: ${userPrompt}\n\nIMPORTANT: Respond in short bullet points with key facts.` }]
+    // 1. Push user turn to conversation history
+    chatSessionHistory.push({
+      role: 'user',
+      parts: [{ text: userPrompt }]
+    });
+
+    // Prune history if it exceeds sliding window limit
+    if (chatSessionHistory.length > MAX_HISTORY_MESSAGES) {
+      chatSessionHistory = chatSessionHistory.slice(-MAX_HISTORY_MESSAGES);
+    }
+
+    // Build payload contents with conversation memory
+    const contents = chatSessionHistory.map((item, idx) => {
+      // Prepend system prompt to the first user turn for models without direct systemInstruction support
+      if (idx === 0 && item.role === 'user') {
+        return {
+          role: 'user',
+          parts: [{ text: `${SYSTEM_PROMPT}\n\nUser Question: ${item.parts[0].text}` }]
+        };
       }
-    ];
+      return item;
+    });
 
     const isStaticHost = typeof window !== 'undefined' && (window.location.hostname.includes('github.io') || window.location.protocol === 'file:');
+
+    // Attempt Serverless Proxy First
     if (!isStaticHost) {
       try {
         const proxyRes = await fetch('./api/gemini-proxy', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents }),
-          signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(4500) : undefined
+          body: JSON.stringify({ contents, systemInstruction: SYSTEM_PROMPT }),
+          signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(7500) : undefined
         });
 
         if (proxyRes.ok) {
           const proxyData = await proxyRes.json();
           if (proxyData.success && proxyData.text) {
             removeTypingIndicator();
-            appendMessage(proxyData.text, 'bot');
+            const botReply = proxyData.text;
+            appendMessage(botReply, 'bot');
+            chatSessionHistory.push({ role: 'model', parts: [{ text: botReply }] });
             return;
           }
         }
       } catch (e) {
-        console.warn('Gemini proxy error:', e);
+        console.warn('Gemini serverless proxy fallback:', e.message);
       }
     }
 
+    // Direct Browser Client-Side Gemini Call with Key Fallback
     const apiKey = getActiveApiKey();
-    let lastError = null;
-
     if (apiKey) {
       for (const model of GEMINI_MODELS) {
         try {
@@ -878,8 +939,11 @@ Always be structured, engaging, helpful, and mentor-like.`;
           const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents }),
-            signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(4500) : undefined
+            body: JSON.stringify({
+              contents,
+              system_instruction: { parts: [{ text: SYSTEM_PROMPT }] }
+            }),
+            signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(7500) : undefined
           });
 
           const data = await response.json();
@@ -888,12 +952,11 @@ Always be structured, engaging, helpful, and mentor-like.`;
             removeTypingIndicator();
             const botReply = data.candidates[0].content.parts[0].text;
             appendMessage(botReply, 'bot');
+            chatSessionHistory.push({ role: 'model', parts: [{ text: botReply }] });
             return;
-          } else {
-            lastError = data.error ? data.error.message : 'API Response format error';
           }
         } catch (err) {
-          lastError = err.message;
+          console.warn(`Direct model ${model} attempt note:`, err.message);
         }
       }
     }
@@ -903,6 +966,7 @@ Always be structured, engaging, helpful, and mentor-like.`;
     const smartFallback = getLocalSmartAnswer(userPrompt);
     if (smartFallback) {
       appendMessage(smartFallback, 'bot');
+      chatSessionHistory.push({ role: 'model', parts: [{ text: smartFallback }] });
     } else {
       appendMessage(`🤖 **Pragyan AI Mentor:**\n\nI am here to guide you with any question regarding Pragyan Institute!\n• 💵 **Nominal Fees:** Class 8th (₹800), Class 9th & 10th (₹1,000/mo)\n• 🖥️ **Smart Classrooms:** 3D animated concept visualizer & digital boards\n• 👨‍🏫 **Expert Faculty:** Chandan Sir (Science) & Ravi Sir (Maths)\n• 📍 **Location:** At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj\n• 📞 **Helpline & Admissions:** [+91 73698 91858](tel:+917369891858)\n\n*Click on any topic above or ask specific questions about syllabus, batches, or demo classes!*`, 'bot');
     }
