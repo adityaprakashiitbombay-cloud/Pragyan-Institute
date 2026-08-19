@@ -31,9 +31,8 @@ export default async function handler(req, res) {
   const models = [
     'gemini-3.6-flash',
     'gemini-3.5-flash-lite',
-    'gemini-3.7-flash',
     'gemini-3-flash-preview',
-    'gemini-flash-latest'
+    'gemini-3.7-flash'
   ];
 
   let lastError = null;

@@ -4143,28 +4143,33 @@ function renderStudentDashboard() {
             </span>
           </div>
 
-          <form id="adminSettingsForm">
+          <form id="adminSettingsForm" class="admin-settings-form">
             <div class="admin-profile-cards-grid">
               
-              <!-- CARD 1: PROFILE & AVATAR -->
+              <!-- CARD 1: DIRECTOR IDENTITY & CONTACT INFO -->
               <div class="admin-profile-card">
-                <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text-mahogany); margin-bottom: 0.85rem; display: flex; align-items: center; gap: 0.4rem;">
-                  <i class="fa-solid fa-id-card" style="color: var(--primary-emerald);"></i> 1. Profile Photo & Director Info
-                </h4>
+                <div class="admin-card-head">
+                  <div class="admin-card-head-icon" style="background: rgba(6, 78, 59, 0.1); color: var(--primary-emerald);">
+                    <i class="fa-solid fa-user-tie"></i>
+                  </div>
+                  <div>
+                    <div class="admin-card-head-title">1. Director Identity & Profile</div>
+                    <div style="font-size: 0.76rem; color: var(--text-muted);">Personal details and official contact channels</div>
+                  </div>
+                </div>
 
-                <!-- Avatar Preview -->
+                <!-- Avatar Preview & Upload -->
                 <div class="admin-avatar-card-inner">
-                  <div id="adminAvatarPreview" class="admin-avatar-preview-box" style="width: 64px; height: 64px; border-radius: 50%; background: var(--primary-emerald); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; font-weight: 800; flex-shrink: 0; overflow: hidden; border: 2px solid var(--primary-emerald);">
+                  <div id="adminAvatarPreview" class="admin-avatar-preview-box">
                     ${admin.photoUrl ? `<img src="${admin.photoUrl}" style="width:100%; height:100%; object-fit:cover;">` : (admin.name ? admin.name.charAt(0) : 'A')}
                   </div>
                   <div class="admin-avatar-ctrls">
-                    <label class="btn-change-photo" style="display: inline-block; background: var(--primary-emerald); color: #fff; padding: 0.45rem 0.85rem; border-radius: 6px; font-size: 0.82rem; font-weight: 700; cursor: pointer; margin-bottom: 0.35rem; text-align: center;">
+                    <label class="btn-change-photo">
                       <i class="fa-solid fa-camera"></i> Change Photo
                       <input type="file" id="adminPhotoFileInput" accept="image/*" capture="environment" style="display: none;">
                     </label>
-                    <div style="font-size: 0.72rem; color: var(--text-muted);">Supports JPG, PNG (Auto-compressed)</div>
+                    <div style="font-size: 0.74rem; color: var(--text-muted); line-height: 1.35;">Supports JPG, PNG (Auto-compressed & Cloud Live)</div>
                   </div>
-                  <div class="admin-card-head-title">1. Director Identity & Contact Info</div>
                 </div>
 
                 <!-- Full Name -->
@@ -4185,7 +4190,7 @@ function renderStudentDashboard() {
                   </div>
                 </div>
 
-                <!-- 2-Col: Mobile & Email -->
+                <!-- 2-Col on Desktop, 1-Col on Mobile: Mobile & Email -->
                 <div class="admin-form-row-2col">
                   <div class="admin-form-group">
                     <label for="adminSettingMobile">Mobile / WhatsApp *</label>
@@ -4203,86 +4208,147 @@ function renderStudentDashboard() {
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <!-- CARD 2: LOGIN CREDENTIALS & SECURITY -->
-              <div class="admin-profile-card">
-                <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text-mahogany); margin-bottom: 0.85rem; display: flex; align-items: center; gap: 0.4rem;">
-                  <i class="fa-solid fa-key" style="color: #D97706;"></i> 2. Admin ID & Password Security
-                </h4>
-
-                <!-- Username / ID -->
-                <div class="admin-form-group">
-                  <label for="adminSettingUsername">Permanent Admin Username / ID</label>
+                <!-- Official Institute UPI ID -->
+                <div class="admin-form-group" style="margin-top: 0.25rem;">
+                  <label for="adminSettingUpi">Institute Official UPI ID (VPA) *</label>
                   <div class="input-icon-wrap">
-                    <input type="text" id="adminSettingUsername" class="portal-input" value="${(admin.username || '').replace(/"/g, '&quot;')}" readonly disabled style="background: #F3F4F6; cursor: not-allowed; opacity: 0.85; border-color: #E5E7EB;" title="Admin username is fixed and cannot be changed">
-                    <i class="fa-solid fa-lock input-left-icon"></i>
-                  </div>
-                </div>
-
-                <!-- 2-Col: New Password & Confirm Password -->
-                <div class="admin-form-row-2col">
-                  <div class="admin-form-group">
-                    <label for="adminSettingNewPass">New Password</label>
-                    <div class="input-icon-wrap">
-                      <input type="password" id="adminSettingNewPass" class="portal-input" placeholder="Leave blank to keep current">
-                      <i class="fa-solid fa-key input-left-icon"></i>
-                    </div>
-                  </div>
-
-                  <div class="admin-form-group">
-                    <label for="adminSettingConfirmPass">Confirm New Password</label>
-                    <div class="input-icon-wrap">
-                      <input type="password" id="adminSettingConfirmPass" class="portal-input" placeholder="Re-enter new password">
-                      <i class="fa-solid fa-check-double input-left-icon"></i>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Official UPI ID -->
-                <div class="admin-form-group">
-                  <label for="adminSettingUpi">Institute Official UPI ID (VPA)</label>
-                  <div class="input-icon-wrap">
-                    <input type="text" id="adminSettingUpi" class="portal-input" value="${(admin.upiId || 'chandankr1501998@ybl').replace(/"/g, '&quot;')}" placeholder="e.g. chandankr1501998@ybl">
+                    <input type="text" id="adminSettingUpi" class="portal-input" value="${(admin.upiId || 'chandankr1501998@ybl').replace(/"/g, '&quot;')}" required placeholder="e.g. chandankr1501998@ybl">
                     <i class="fa-solid fa-building-columns input-left-icon"></i>
                   </div>
-                  <div style="font-size: 0.74rem; color: var(--text-muted); margin-top: 0.25rem;">Printed on computerized fee receipts & payment QR codes</div>
-                </div>
-
-                <!-- Current Password Verification -->
-                <div>
-                  <label style="font-size: 0.82rem; font-weight: 700; color: #DC2626;">Current Security Password *</label>
-                  <input type="password" id="adminSettingCurrentPass" class="portal-input" placeholder="Enter current admin password" style="border-color: #F87171;">
-                </div>
-              </div>
-
-              <!-- CARD 3: INSTITUTE PAYMENT & BILLING SETTINGS -->
-              <div class="admin-profile-card">
-                <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text-mahogany); margin-bottom: 0.85rem; display: flex; align-items: center; gap: 0.4rem;">
-                  <i class="fa-solid fa-building-columns" style="color: #0284C7;"></i> 3. Official Billing & UPI Settings
-                </h4>
-
-                <!-- Official UPI ID -->
-                <div style="margin-bottom: 0.85rem;">
-                  <label style="font-size: 0.82rem; font-weight: 700; color: var(--text-mahogany);">Institute Official UPI ID</label>
-                  <input type="text" id="adminSettingUpi" class="portal-input" value="${admin.upiId || 'chandankr1501998@ybl'}" placeholder="e.g. chandankr1501998@ybl">
-                  <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.2rem;">Printed on generated fee receipts & UPI gateway</div>
+                  <div style="font-size: 0.74rem; color: var(--text-muted); margin-top: 0.25rem;">Printed on fee receipts, student payment vouchers & QR codes</div>
                 </div>
 
                 <!-- Hidden Base64 / URL Photo Storage -->
                 <input type="hidden" id="adminSettingPhotoBase64" value="${admin.photoUrl || ''}">
               </div>
 
+              <!-- CARD 2: LOGIN CREDENTIALS & SECURITY -->
+              <div class="admin-profile-card">
+                <div class="admin-card-head">
+                  <div class="admin-card-head-icon" style="background: rgba(217, 119, 6, 0.1); color: #D97706;">
+                    <i class="fa-solid fa-shield-halved"></i>
+                  </div>
+                  <div>
+                    <div class="admin-card-head-title">2. Admin ID & Password Security</div>
+                    <div style="font-size: 0.76rem; color: var(--text-muted);">Access control, password updates & security verification</div>
+                  </div>
+                </div>
+
+                <!-- Username / ID -->
+                <div class="admin-form-group">
+                  <label for="adminSettingUsername">Permanent Admin Username / ID</label>
+                  <div class="input-icon-wrap">
+                    <input type="text" id="adminSettingUsername" class="portal-input" value="${(admin.username || '').replace(/"/g, '&quot;')}" readonly disabled style="background: #F1F5F9; cursor: not-allowed; opacity: 0.9; border-color: #E2E8F0;" title="Admin username is fixed and cannot be changed">
+                    <i class="fa-solid fa-lock input-left-icon"></i>
+                  </div>
+                  <div style="font-size: 0.74rem; color: var(--text-muted); margin-top: 0.25rem;">Permanent institutional admin identifier (read-only)</div>
+                </div>
+
+                <!-- 2-Col on Desktop, 1-Col on Mobile: New Password & Confirm Password -->
+                <div class="admin-form-row-2col" style="margin-top: 0.5rem;">
+                  <div class="admin-form-group">
+                    <label for="adminSettingNewPass">New Password (Optional)</label>
+                    <div class="input-icon-wrap">
+                      <input type="password" id="adminSettingNewPass" class="portal-input" placeholder="Leave blank to keep current" autocomplete="new-password">
+                      <i class="fa-solid fa-key input-left-icon"></i>
+                      <button type="button" class="btn-toggle-admin-pw" data-target="adminSettingNewPass" aria-label="Toggle password visibility">
+                        <i class="fa-regular fa-eye"></i>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="admin-form-group">
+                    <label for="adminSettingConfirmPass">Confirm New Password</label>
+                    <div class="input-icon-wrap">
+                      <input type="password" id="adminSettingConfirmPass" class="portal-input" placeholder="Re-enter new password" autocomplete="new-password">
+                      <i class="fa-solid fa-check-double input-left-icon"></i>
+                      <button type="button" class="btn-toggle-admin-pw" data-target="adminSettingConfirmPass" aria-label="Toggle password visibility">
+                        <i class="fa-regular fa-eye"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div class="security-hint" id="adminPasswordMatchHint" style="margin-top: -0.35rem; margin-bottom: 0.85rem; font-size: 0.76rem; color: var(--text-muted);">
+                  Leave blank to keep current password. Minimum 12 characters if updating.
+                </div>
+
+                <!-- Current Password Verification Box -->
+                <div class="admin-security-alert-box" style="margin-top: auto;">
+                  <div style="font-size: 1.1rem; color: #DC2626; flex-shrink: 0; margin-top: 2px;"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                  <div style="width: 100%;">
+                    <label for="adminSettingCurrentPass" style="display: block; font-size: 0.82rem; font-weight: 700; color: #991B1B; margin-bottom: 0.35rem;">
+                      Current Admin Password (Required to Authorize Changes) *
+                    </label>
+                    <div class="input-icon-wrap">
+                      <input type="password" id="adminSettingCurrentPass" class="portal-input" required placeholder="Enter current password to verify identity" style="border-color: #FCA5A5; background: #fff;">
+                      <i class="fa-solid fa-shield-cat input-left-icon" style="color: #EF4444;"></i>
+                      <button type="button" class="btn-toggle-admin-pw" data-target="adminSettingCurrentPass" aria-label="Toggle password visibility">
+                        <i class="fa-regular fa-eye"></i>
+                      </button>
+                    </div>
+                    <div style="font-size: 0.72rem; color: #B91C1C; margin-top: 0.25rem;">Mandatory security verification step for all profile and credential updates.</div>
+                  </div>
+                </div>
+              </div>
+
             </div>
 
             <div class="admin-profile-submit-wrap" style="margin-top: 1.25rem;">
-              <button type="submit" class="btn btn-emerald btn-admin-settings-submit" style="padding: 0.8rem 1.75rem; font-size: 0.92rem; font-weight: 700; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;">
+              <button type="submit" class="btn btn-emerald btn-admin-settings-submit">
                 <i class="fa-solid fa-floppy-disk"></i> Save & Sync Profile Changes
               </button>
             </div>
           </form>
         </div>
       `;
+
+      // Password Eye Toggles for Admin Form
+      pane.querySelectorAll('.btn-toggle-admin-pw').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const targetId = btn.getAttribute('data-target');
+          const input = pane.querySelector('#' + targetId);
+          if (input) {
+            const isPassword = input.type === 'password';
+            input.type = isPassword ? 'text' : 'password';
+            const icon = btn.querySelector('i');
+            if (icon) {
+              icon.classList.toggle('fa-eye', !isPassword);
+              icon.classList.toggle('fa-eye-slash', isPassword);
+            }
+          }
+        });
+      });
+
+      // Real-time password matching check for admin
+      const adminNewPIn = pane.querySelector('#adminSettingNewPass');
+      const adminConfPIn = pane.querySelector('#adminSettingConfirmPass');
+      const adminMatchHint = pane.querySelector('#adminPasswordMatchHint');
+      function checkAdminPassMatch() {
+        if (!adminNewPIn || !adminConfPIn || !adminMatchHint) return;
+        const v1 = adminNewPIn.value;
+        const v2 = adminConfPIn.value;
+        if (!v1 && !v2) {
+          adminMatchHint.innerHTML = 'Leave blank to keep current password. Minimum 12 characters if updating.';
+          adminMatchHint.style.color = 'var(--text-muted)';
+          adminConfPIn.style.borderColor = '#CBD5E1';
+        } else if (v1 && v1.length < 12) {
+          adminMatchHint.innerHTML = '<i class="fa-solid fa-circle-exclamation" style="color: #D97706;"></i> New password must be at least 12 characters long.';
+          adminMatchHint.style.color = '#B45309';
+          adminConfPIn.style.borderColor = '#F59E0B';
+        } else if (v1 === v2 && v1.length >= 12) {
+          adminMatchHint.innerHTML = '<i class="fa-solid fa-circle-check" style="color: #10B981;"></i> New passwords match perfectly!';
+          adminMatchHint.style.color = '#059669';
+          adminConfPIn.style.borderColor = '#10B981';
+        } else {
+          adminMatchHint.innerHTML = '<i class="fa-solid fa-circle-xmark" style="color: #EF4444;"></i> Passwords do not match.';
+          adminMatchHint.style.color = '#DC2626';
+          adminConfPIn.style.borderColor = '#EF4444';
+        }
+      }
+      adminNewPIn?.addEventListener('input', checkAdminPassMatch);
+      adminConfPIn?.addEventListener('input', checkAdminPassMatch);
 
       // Handle Photo Upload (NH8)
       pane.querySelector('#adminPhotoFileInput')?.addEventListener('change', async (e) => {
@@ -4832,19 +4898,19 @@ function renderStudentDashboard() {
 
           <!-- Section Switcher Sub-Pills -->
           <div class="stu-mgmt-sub-pills-bar">
-            <button class="req-sub-pill ${initialSection === 'pay' ? 'active' : ''}" data-sec="pay">
+            <button class="mgmt-sub-pill req-sub-pill ${initialSection === 'pay' ? 'active' : ''}" data-sec="pay">
               <i class="fa-solid fa-hand-holding-dollar"></i> Partial Payment
             </button>
-            <button class="req-sub-pill ${initialSection === 'regulate' ? 'active' : ''}" data-sec="regulate">
+            <button class="mgmt-sub-pill req-sub-pill ${initialSection === 'regulate' ? 'active' : ''}" data-sec="regulate">
               <i class="fa-solid fa-scale-balanced"></i> Fee Adjustment & Correction
             </button>
-            <button class="req-sub-pill ${initialSection === 'due' ? 'active' : ''}" data-sec="due">
+            <button class="mgmt-sub-pill req-sub-pill ${initialSection === 'due' ? 'active' : ''}" data-sec="due">
               <i class="fa-solid fa-clock-rotate-left"></i> Add Old Due
             </button>
-            <button class="req-sub-pill ${initialSection === 'profile' ? 'active' : ''}" data-sec="profile">
+            <button class="mgmt-sub-pill req-sub-pill ${initialSection === 'profile' ? 'active' : ''}" data-sec="profile">
               <i class="fa-solid fa-user-pen"></i> Edit Profile Details
             </button>
-            <button class="req-sub-pill ${initialSection === 'security' ? 'active' : ''}" data-sec="security">
+            <button class="mgmt-sub-pill req-sub-pill ${initialSection === 'security' ? 'active' : ''}" data-sec="security">
               <i class="fa-solid fa-shield-halved"></i> Login & Security
             </button>
           </div>
@@ -4858,18 +4924,18 @@ function renderStudentDashboard() {
               </div>
 
               <!-- Quick Presets for Partial Payment -->
-              <div style="display: flex; gap: 0.4rem; margin-bottom: 0.75rem; flex-wrap: wrap;">
-                <button type="button" class="btn-mgmt-quick-pay btn-quick-partial" data-amt="500" style="padding: 0.35rem 0.75rem; border-radius: 6px; border: 1px solid #CBD5E1; background: #fff; color: #334155; font-weight: 700; font-size: 0.78rem; cursor: pointer; font-family: inherit;">
+              <div class="mgmt-quick-presets-grid">
+                <button type="button" class="btn-mgmt-quick-pay btn-quick-partial" data-amt="500">
                   + ₹500
                 </button>
-                <button type="button" class="btn-mgmt-quick-pay btn-quick-partial" data-amt="1000" style="padding: 0.35rem 0.75rem; border-radius: 6px; border: 1px solid #CBD5E1; background: #fff; color: #334155; font-weight: 700; font-size: 0.78rem; cursor: pointer; font-family: inherit;">
+                <button type="button" class="btn-mgmt-quick-pay btn-quick-partial" data-amt="1000">
                   + ₹1,000
                 </button>
-                <button type="button" class="btn-mgmt-quick-pay btn-quick-partial" data-amt="${target.monthlyFee || 1000}" style="padding: 0.35rem 0.75rem; border-radius: 6px; border: 1px solid #CBD5E1; background: #fff; color: #334155; font-weight: 700; font-size: 0.78rem; cursor: pointer; font-family: inherit;">
+                <button type="button" class="btn-mgmt-quick-pay btn-quick-partial" data-amt="${target.monthlyFee || 1000}">
                   1-Month: ₹${(target.monthlyFee || 1000).toLocaleString()}
                 </button>
-                <button type="button" class="btn-mgmt-quick-pay btn-quick-partial-clear" style="padding: 0.35rem 0.75rem; border-radius: 6px; border: 1px solid #E2E8F0; background: #F8FAFC; color: #64748B; font-weight: 700; font-size: 0.78rem; cursor: pointer; font-family: inherit;">
-                  Clear
+                <button type="button" class="btn-mgmt-quick-pay btn-quick-partial-clear">
+                  <i class="fa-solid fa-rotate-left"></i> Clear
                 </button>
               </div>
 
@@ -4879,10 +4945,19 @@ function renderStudentDashboard() {
               </div>
 
               <!-- Live Balance Calculator Card -->
-              <div id="mgmtPayCalcPreview" style="background: #F8FAFC; border: 1.5px dashed #CBD5E1; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 0.9rem; font-size: 0.82rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
-                <div>Current Dues: <strong>₹${(target.pendingFee || 0).toLocaleString()}</strong></div>
-                <div>Paying: <strong id="mgmtPayNowDisplay" style="color: #059669;">₹0</strong></div>
-                <div>Remaining Dues: <strong id="mgmtPayRemainingDisplay" style="color: ${target.pendingFee > 0 ? '#DC2626' : '#059669'};">₹${(target.pendingFee || 0).toLocaleString()}</strong></div>
+              <div id="mgmtPayCalcPreview" class="mgmt-calc-summary-grid">
+                <div class="mgmt-calc-stat-box">
+                  <span class="calc-stat-lbl">Current Dues</span>
+                  <span class="calc-stat-val" style="color: #334155;">₹${(target.pendingFee || 0).toLocaleString()}</span>
+                </div>
+                <div class="mgmt-calc-stat-box">
+                  <span class="calc-stat-lbl">Paying Now</span>
+                  <span class="calc-stat-val" id="mgmtPayNowDisplay" style="color: #059669;">₹0</span>
+                </div>
+                <div class="mgmt-calc-stat-box">
+                  <span class="calc-stat-lbl">Remaining Dues</span>
+                  <span class="calc-stat-val" id="mgmtPayRemainingDisplay" style="color: ${target.pendingFee > 0 ? '#DC2626' : '#059669'};">₹${(target.pendingFee || 0).toLocaleString()}</span>
+                </div>
               </div>
 
               <div style="margin-bottom: 0.9rem;">
@@ -4946,10 +5021,19 @@ function renderStudentDashboard() {
               </div>
 
               <!-- Live Adjustment Preview -->
-              <div id="mgmtAdjPreview" style="background: #F8FAFC; border: 1.5px dashed #CBD5E1; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 0.9rem; font-size: 0.82rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
-                <div>Current Dues: <strong>₹${(target.pendingFee || 0).toLocaleString()}</strong></div>
-                <div>New Dues After Correction: <strong id="mgmtAdjResultDues" style="color: #0284C7;">₹${(target.pendingFee || 0).toLocaleString()}</strong></div>
-                <div style="font-size: 0.74rem; color: #64748B;">(Paid Collected remains: ₹${(target.paidFee || 0).toLocaleString()})</div>
+              <div id="mgmtAdjPreview" class="mgmt-calc-summary-grid">
+                <div class="mgmt-calc-stat-box">
+                  <span class="calc-stat-lbl">Current Dues</span>
+                  <span class="calc-stat-val" style="color: #334155;">₹${(target.pendingFee || 0).toLocaleString()}</span>
+                </div>
+                <div class="mgmt-calc-stat-box">
+                  <span class="calc-stat-lbl">After Correction</span>
+                  <span class="calc-stat-val" id="mgmtAdjResultDues" style="color: #0284C7;">₹${(target.pendingFee || 0).toLocaleString()}</span>
+                </div>
+                <div class="mgmt-calc-stat-box">
+                  <span class="calc-stat-lbl">Paid Revenue</span>
+                  <span class="calc-stat-val" style="color: #059669;">₹${(target.paidFee || 0).toLocaleString()}</span>
+                </div>
               </div>
 
               <div style="margin-bottom: 1.25rem;">
@@ -4966,7 +5050,7 @@ function renderStudentDashboard() {
           <!-- SECTION 4: EDIT PROFILE -->
           <div class="stu-mgmt-sec" id="stuMgmtSec-profile" style="display: ${initialSection === 'profile' ? 'block' : 'none'};">
             <form id="mgmtEditProfileForm">
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; margin-bottom: 1rem;">
+              <div class="mgmt-profile-grid">
                 <div>
                   <label style="font-size: 0.85rem; font-weight: 600;">Student Full Name *</label>
                   <input type="text" id="mgmtStuName" class="portal-input" value="${target.name}" required>
@@ -5021,7 +5105,7 @@ function renderStudentDashboard() {
                   <label style="font-size: 0.85rem; font-weight: 600;">Joining Session / Month</label>
                   <input type="text" id="mgmtStuJoiningMonth" class="portal-input" value="${target.joiningMonth || 'April 2026'}">
                 </div>
-                <div style="grid-column: span 2;">
+                <div class="col-span-2">
                   <label style="font-size: 0.85rem; font-weight: 600;"><i class="fa-solid fa-camera" style="color: var(--primary-emerald);"></i> Profile Photo (Upload to Cloud Storage)</label>
                   <div style="display: flex; gap: 0.75rem; align-items: center; margin-top: 0.35rem;">
                     <div id="mgmtPhotoPreviewContainer" style="width: 50px; height: 50px; border-radius: 8px; overflow: hidden; border: 2px solid var(--primary-emerald); flex-shrink: 0; background: #f3f4f6;">
@@ -5034,7 +5118,7 @@ function renderStudentDashboard() {
                     </div>
                   </div>
                 </div>
-                <div style="grid-column: span 2;">
+                <div class="col-span-2">
                   <label style="font-size: 0.85rem; font-weight: 600;">Residential Address</label>
                   <input type="text" id="mgmtStuAddress" class="portal-input" value="${target.address}">
                 </div>
@@ -5145,10 +5229,10 @@ function renderStudentDashboard() {
     });
 
     // Section Switcher Listeners
-    modalEl.querySelectorAll('.req-sub-pill').forEach(pill => {
+    modalEl.querySelectorAll('.req-sub-pill, .mgmt-sub-pill').forEach(pill => {
       pill.onclick = () => {
         const sec = pill.dataset.sec;
-        modalEl.querySelectorAll('.req-sub-pill').forEach(p => p.classList.remove('active'));
+        modalEl.querySelectorAll('.req-sub-pill, .mgmt-sub-pill').forEach(p => p.classList.remove('active'));
         pill.classList.add('active');
 
         modalEl.querySelectorAll('.stu-mgmt-sec').forEach(sEl => sEl.style.display = 'none');
