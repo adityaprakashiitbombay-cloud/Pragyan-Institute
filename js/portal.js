@@ -785,7 +785,7 @@
       try {
         if (Array.isArray(students) && students.length > 0) {
           // H1: Determine dirty / changed records for Delta Sync
-          let studentsToSync = students;
+          let studentsToSync = [];
           const dirtySet = new Set(this._dirtyStudentIds);
           if (Array.isArray(changedIds) && changedIds.length > 0) {
             changedIds.forEach(id => dirtySet.add(id.toString().toLowerCase()));
@@ -800,7 +800,7 @@
             studentsToSync = students.filter(s => {
               const id = s.id || s.student_id || s.rollNo;
               const prev = this._lastSavedStudentsMap.get(id);
-              if (!prev) return true; // New student
+              if (!prev) return false; // Prevent ghost resurrecting deleted students
               const prevPhoto = prev.photo || prev.photoUrl || prev.photo_url || '';
               const currPhoto = s.photo || s.photoUrl || s.photo_url || '';
               return (
@@ -1373,8 +1373,7 @@
             target_batch: n.targetBatch || n.target_batch || 'All Batches',
             attachment_url: n.attachmentUrl || n.attachment_url || '',
             created_at: n.date ? new Date(n.date).toISOString() : new Date().toISOString(),
-            idempotency_key: n.id,
-            _local_id: n._local_id
+            idempotency_key: n.id
           }));
 
           const r = await SupabaseSync.mutate('notices', 'upsert', supaPayload, { conflict: 'id' });

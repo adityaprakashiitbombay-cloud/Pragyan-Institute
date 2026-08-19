@@ -1,3 +1,14 @@
+// Polyfill WebSocket stub for serverless environments (Node.js < 22) where Realtime WebSockets are not used
+if (typeof globalThis.WebSocket === 'undefined') {
+  globalThis.WebSocket = class StubWebSocket {
+    constructor() {}
+    addEventListener() {}
+    removeEventListener() {}
+    send() {}
+    close() {}
+  };
+}
+
 import jwt from 'jsonwebtoken';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';

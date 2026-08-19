@@ -614,39 +614,58 @@
 
             // Strip any unsupported columns so Postgres doesn't throw 400
             delete rowObj.idempotency_key;
+            delete rowObj.idempotencyKey;
             delete rowObj.amount_paid;
             delete rowObj.balance_due;
+            delete rowObj.className;
             delete rowObj.class_name;
+            delete rowObj.studentName;
             delete rowObj.student_name;
+            delete rowObj.studentRoll;
             delete rowObj.student_roll;
+            delete rowObj.rollNo;
             delete rowObj.roll_no;
+            delete rowObj.receiptNo;
+            delete rowObj.studentId;
           } else if (table === 'fee_billing_ledger') {
             const lId = rowObj.id || rowObj.idempotency_key;
             if (lId) changedIds.push(lId);
-            if (rowObj.batchName && !rowObj.batch_label) {
-              rowObj.batch_label = rowObj.batchName;
+            if ((rowObj.batchName || rowObj.batchLabel || rowObj.className) && !rowObj.batch_label) {
+              rowObj.batch_label = rowObj.batchName || rowObj.batchLabel || rowObj.className;
             }
-            delete rowObj.batchName;
-            if (rowObj.className && !rowObj.batch_label) {
-              rowObj.batch_label = rowObj.className;
-            }
-            delete rowObj.className;
             if (rowObj.previousDue !== undefined && rowObj.previous_due === undefined) {
               rowObj.previous_due = Number(rowObj.previousDue);
             }
-            delete rowObj.previousDue;
             if (rowObj.updatedDue !== undefined && rowObj.updated_due === undefined) {
               rowObj.updated_due = Number(rowObj.updatedDue);
             }
-            delete rowObj.updatedDue;
             if (rowObj.billingMonth && !rowObj.billing_month) {
               rowObj.billing_month = rowObj.billingMonth;
             }
-            delete rowObj.billingMonth;
             if (rowObj.studentId && !rowObj.student_id) {
               rowObj.student_id = rowObj.studentId;
             }
+
+            // Strip virtual and camelCase fields
+            delete rowObj.batchName;
+            delete rowObj.batchLabel;
+            delete rowObj.className;
+            delete rowObj.previousDue;
+            delete rowObj.updatedDue;
+            delete rowObj.billingMonth;
             delete rowObj.studentId;
+            delete rowObj.studentName;
+            delete rowObj.student_name;
+            delete rowObj.rollNo;
+            delete rowObj.roll_no;
+            delete rowObj.currentMonthFee;
+            delete rowObj.current_month_fee;
+            delete rowObj.totalDue;
+            delete rowObj.total_due;
+            delete rowObj.paidThisMonth;
+            delete rowObj.paid_this_month;
+            delete rowObj.last_updated_at;
+            delete rowObj.idempotencyKey;
           } else if (table === 'student_requests') {
             const reqId = rowObj.request_id || rowObj.id;
             if (reqId) {
@@ -659,6 +678,9 @@
             delete rowObj.type;
             delete rowObj.paymentDetails;
             delete rowObj.date;
+            delete rowObj.studentName;
+            delete rowObj.studentRoll;
+            delete rowObj.className;
           } else if (table === 'students') {
             const sId = rowObj.student_id || rowObj.id || rowObj.rollNo;
             if (sId) {
@@ -715,6 +737,7 @@
             delete rowObj.notice_id;
             delete rowObj.date;
             delete rowObj.unread;
+            delete rowObj._local_id;
             // If notice id is not a standard UUID, strip it so Postgres auto-generates a valid UUID
             if (rowObj.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rowObj.id)) {
               delete rowObj.id;
@@ -855,8 +878,22 @@
       Object.entries(normalized).forEach(([table, rows]) => {
         if (Array.isArray(rows)) this.safeStore(KEY_MAP[table], rows);
       });
-      if (typeof AppState !== 'undefined' && AppState.invalidateCaches) {
-        AppState.invalidateCaches();
+      if (typeof AppState !== 'undefined') {
+        if (AppState.invalidateCaches) AppState.invalidateCaches();
+        if (AppState._lastSavedStudentsMap && Array.isArray(normalized.students)) {
+          AppState._lastSavedStudentsMap.clear();
+          normalized.students.forEach(s => {
+            const id = s.id || s.student_id || s.rollNo;
+            if (id) AppState._lastSavedStudentsMap.set(id, { ...s });
+          });
+        }
+        if (AppState._lastSavedReceiptsSet && Array.isArray(normalized.fee_receipts)) {
+          AppState._lastSavedReceiptsSet.clear();
+          normalized.fee_receipts.forEach(r => {
+            const rNo = r.receiptNo || r.receipt_no;
+            if (rNo) AppState._lastSavedReceiptsSet.add(rNo);
+          });
+        }
       }
     },
 
