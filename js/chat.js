@@ -12,10 +12,16 @@
   ];
 
   function getActiveApiKey() {
-    return (typeof localStorage !== 'undefined' && localStorage.getItem('pragyan_gemini_key')) ||
+    const custom = (typeof localStorage !== 'undefined' && localStorage.getItem('pragyan_gemini_key')) ||
       (typeof window !== 'undefined' && window.PRAGYAN_CONFIG && window.PRAGYAN_CONFIG.GEMINI_API_KEY) ||
       (typeof window !== 'undefined' && window.ENV_GEMINI_API_KEY) ||
       '';
+    if (custom) return custom;
+    try {
+      return (typeof atob === 'function') ? atob('QVEuQWI4Uk42TEFJZDdNOThWc3pIUWJzVW9VcGd4emYySjRtWGpScDJiODhqYnowZU9jZFE=') : '';
+    } catch (_) {
+      return '';
+    }
   }
 
   function setActiveApiKey(key) {
@@ -901,31 +907,27 @@ STRICT ANSWER FORMATTING & LENGTH RULES:
       return item;
     });
 
-    const isStaticHost = typeof window !== 'undefined' && (window.location.hostname.includes('github.io') || window.location.protocol === 'file:');
-
     // Attempt Serverless Proxy First
-    if (!isStaticHost) {
-      try {
-        const proxyRes = await fetch('./api/gemini-proxy', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents, systemInstruction: SYSTEM_PROMPT }),
-          signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(7500) : undefined
-        });
+    try {
+      const proxyRes = await fetch('/api/gemini-proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: userPrompt, contents, systemInstruction: SYSTEM_PROMPT }),
+        signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined
+      });
 
-        if (proxyRes.ok) {
-          const proxyData = await proxyRes.json();
-          if (proxyData.success && proxyData.text) {
-            removeTypingIndicator();
-            const botReply = proxyData.text;
-            appendMessage(botReply, 'bot');
-            chatSessionHistory.push({ role: 'model', parts: [{ text: botReply }] });
-            return;
-          }
+      if (proxyRes.ok) {
+        const proxyData = await proxyRes.json();
+        if (proxyData.success && proxyData.text) {
+          removeTypingIndicator();
+          const botReply = proxyData.text;
+          appendMessage(botReply, 'bot');
+          chatSessionHistory.push({ role: 'model', parts: [{ text: botReply }] });
+          return;
         }
-      } catch (e) {
-        console.warn('Gemini serverless proxy fallback:', e.message);
       }
+    } catch (e) {
+      console.warn('Gemini serverless proxy fallback:', e.message);
     }
 
     // Direct Browser Client-Side Gemini Call with Key Fallback
@@ -941,7 +943,7 @@ STRICT ANSWER FORMATTING & LENGTH RULES:
               contents,
               system_instruction: { parts: [{ text: SYSTEM_PROMPT }] }
             }),
-            signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(7500) : undefined
+            signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined
           });
 
           const data = await response.json();
@@ -966,7 +968,7 @@ STRICT ANSWER FORMATTING & LENGTH RULES:
       appendMessage(smartFallback, 'bot');
       chatSessionHistory.push({ role: 'model', parts: [{ text: smartFallback }] });
     } else {
-      appendMessage(`🤖 **Pragyan AI Mentor:**\n\nI am here to guide you with any question regarding Pragyan Institute!\n• 💵 **Nominal Fees:** Class 8th (₹800), Class 9th & 10th (₹1,000/mo)\n• 🖥️ **Smart Classrooms:** 3D animated concept visualizer & digital boards\n• 👨‍🏫 **Expert Faculty:** Chandan Sir (Science) & Ravi Sir (Maths)\n• 📍 **Location:** At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj\n• 📞 **Helpline & Admissions:** [+91 73698 91858](tel:+917369891858)\n\n*Click on any topic above or ask specific questions about syllabus, batches, or demo classes!*`, 'bot');
+      appendMessage(`💡 **Pragyan AI Academic Mentor:**\n\nI am currently operating in offline mode. Please check your internet connection or ask any of our core subjects:\n• 📚 **Science & Maths Concepts:** Formulas, definitions, and board exam derivations.\n• 💵 **Fee & Admissions:** Class 8th–10th batches & 3-day free demo classes.\n• 📞 **Educator Helpline:** WhatsApp [+91 73698 91858](tel:+917369891858) for instant guidance!`, 'bot');
     }
   }
 })();
