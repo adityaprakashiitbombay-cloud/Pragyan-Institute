@@ -53,7 +53,7 @@ function updateCacheBusting() {
   // 1. Update index.html
   const indexPath = path.join(ROOT, 'index.html');
   let indexHtml = fs.readFileSync(indexPath, 'utf8');
-  indexHtml = indexHtml.replace(/(\.(css|js)|logo\.png)\?v=[a-zA-Z0-9_.-]+/g, `$1?v=${buildVersion}`);
+  indexHtml = indexHtml.replace(/(\.(css|js))\?v=[a-zA-Z0-9_.-]+/g, `$1?v=${buildVersion}`);
   indexHtml = indexHtml.replace(/(id="siteVersionBadge"[^>]*>|letter-spacing:0.5px; color:rgba\(255,255,255,0.5\);">)v[0-9.]+/g, `$1v${baseVer}`);
   indexHtml = indexHtml.replace(/register\(['"]\.\/sw\.js(\?v=[a-zA-Z0-9_.-]+)?['"]\)/g, `register('./sw.js?v=${buildVersion}')`);
   fs.writeFileSync(indexPath, indexHtml, 'utf8');
@@ -63,7 +63,7 @@ function updateCacheBusting() {
   const payPath = path.join(ROOT, 'pay.html');
   if (fs.existsSync(payPath)) {
     let payHtml = fs.readFileSync(payPath, 'utf8');
-    payHtml = payHtml.replace(/(\.(css|js)|logo\.png)\?v=[a-zA-Z0-9_.-]+/g, `$1?v=${buildVersion}`);
+    payHtml = payHtml.replace(/(\.(css|js))\?v=[a-zA-Z0-9_.-]+/g, `$1?v=${buildVersion}`);
     fs.writeFileSync(payPath, payHtml, 'utf8');
     console.log(`[CacheBust] Updated pay.html with v=${buildVersion}`);
   }
