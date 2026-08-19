@@ -1,0 +1,557 @@
+/* ================================================================
+   PRAGYAN INSTITUTE — VERSION 2.0 SMART CLASSROOM & MEDIA CDN
+   Theme: Earthy Minimalist Warm Luxury & Modern Cinema Dark Stage
+   Features: Zero-Sync YouTube ULL, Dynamic Watermark & Realtime Doubts
+   ================================================================ */
+
+:root {
+  --cinema-bg: #0B0F19;
+  --cinema-surface: #111827;
+  --cinema-card: #1F2937;
+  --cinema-border: rgba(255, 255, 255, 0.08);
+  --cinema-accent-emerald: #10B981;
+  --cinema-accent-glow: rgba(16, 185, 129, 0.35);
+  --cinema-accent-red: #EF4444;
+  --cinema-accent-gold: #F59E0B;
+}
+
+.classroom-container {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 24px;
+  margin-top: 18px;
+  align-items: start;
+}
+
+@media (max-width: 1040px) {
+  .classroom-container {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+/* ================================================================
+   1. CINEMA VIDEO STAGE
+   ================================================================ */
+.video-stage-card {
+  background: var(--cinema-bg);
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--cinema-border);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35), 0 0 30px rgba(16, 185, 129, 0.08);
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.video-frame-container {
+  position: relative;
+  width: 100%;
+  padding-top: 56.25%; /* 16:9 Aspect Ratio */
+  background: #000000;
+  overflow: hidden;
+}
+
+.video-frame-container iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* Dynamic Anti-Piracy Floating Watermark */
+.floating-watermark {
+  position: absolute;
+  pointer-events: none;
+  z-index: 20;
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.28);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 10px rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(4px);
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  user-select: none;
+  transition: top 4.5s cubic-bezier(0.4, 0, 0.2, 1), left 4.5s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Header Bar */
+.classroom-header-bar {
+  padding: 16px 20px;
+  background: linear-gradient(180deg, #161F30 0%, #111827 100%);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--cinema-border);
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.classroom-title-wrap h3 {
+  color: #F8FAFC;
+  font-size: 16px;
+  font-weight: 800;
+  margin: 0;
+  letter-spacing: -0.2px;
+}
+
+.classroom-title-wrap .sub-info {
+  font-size: 12.5px;
+  color: #94A3B8;
+  margin-top: 3px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Live Beacon Badge */
+.live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: linear-gradient(135deg, #DC2626 0%, #991B1B 100%);
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 12px;
+  border-radius: 99px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  box-shadow: 0 0 16px rgba(220, 38, 38, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.live-badge.off {
+  background: #334155;
+  box-shadow: none;
+  border-color: transparent;
+  color: #CBD5E1;
+}
+
+.live-beacon {
+  width: 8px;
+  height: 8px;
+  background: #FFFFFF;
+  border-radius: 50%;
+  animation: pulse-live-radar 1.5s infinite;
+}
+
+@keyframes pulse-live-radar {
+  0% { transform: scale(0.8); opacity: 1; box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
+  70% { transform: scale(1.2); opacity: 0.9; box-shadow: 0 0 0 8px rgba(255, 255, 255, 0); }
+  100% { transform: scale(0.8); opacity: 1; box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+}
+
+/* Controls Toolbar */
+.player-controls-toolbar {
+  padding: 12px 20px;
+  background: #0B0F19;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border-top: 1px solid var(--cinema-border);
+}
+
+.speed-control-group {
+  display: inline-flex;
+  background: #1F2937;
+  border-radius: 10px;
+  padding: 3px;
+  gap: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.speed-control-label {
+  font-size: 10.5px;
+  color: #64748B;
+  font-weight: 800;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+}
+
+.speed-btn {
+  background: transparent;
+  border: none;
+  color: #94A3B8;
+  padding: 5px 10px;
+  font-size: 11.5px;
+  font-weight: 800;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.speed-btn:hover {
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.speed-btn.active {
+  background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  color: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+}
+
+.notes-download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: #FFFFFF !important;
+  text-decoration: none;
+  font-size: 12.5px;
+  font-weight: 800;
+  padding: 8px 18px;
+  border-radius: 10px;
+  border: 1px solid #34D399;
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.35);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.notes-download-btn:hover {
+  background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5);
+}
+
+/* ================================================================
+   2. REALTIME IN-CLASS DOUBT CHAT STREAM
+   ================================================================ */
+.doubt-stream-card {
+  background: #FFFFFF;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  height: 560px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.doubt-stream-header {
+  padding: 14px 18px;
+  background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%);
+  border-bottom: 1.5px solid #E2E8F0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.doubt-stream-header h4 {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #0F172A;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+}
+
+.doubt-counter-badge {
+  font-size: 11px;
+  font-weight: 800;
+  background: #ECFDF5;
+  color: #065F46;
+  border: 1px solid #A7F3D0;
+  padding: 3px 9px;
+  border-radius: 99px;
+}
+
+.doubt-messages-list {
+  flex: 1;
+  padding: 14px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #F8FAFC;
+}
+
+.doubt-bubble {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  position: relative;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.doubt-bubble.pinned {
+  background: #FFFBEB;
+  border: 1.5px solid #F59E0B;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.15);
+}
+
+.doubt-pinned-banner {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #B45309;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  letter-spacing: 0.4px;
+}
+
+.doubt-sender-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #64748B;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.doubt-sender-name {
+  color: #065F46;
+  font-weight: 800;
+}
+
+.doubt-text {
+  color: #1E293B;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.doubt-answer-badge {
+  margin-top: 8px;
+  background: #F0FDF4;
+  border: 1px solid #86EFAC;
+  border-left: 3px solid #059669;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  color: #166534;
+  line-height: 1.35;
+}
+
+.doubt-answer-badge strong {
+  color: #065F46;
+  font-weight: 800;
+}
+
+.doubt-input-form {
+  padding: 12px 14px;
+  background: #FFFFFF;
+  border-top: 1.5px solid #E2E8F0;
+  display: flex;
+  gap: 8px;
+}
+
+.doubt-input {
+  flex: 1;
+  border: 1.5px solid #CBD5E1;
+  border-radius: 10px;
+  padding: 9px 14px;
+  font-size: 12.5px;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.doubt-input:focus {
+  border-color: #059669;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15);
+}
+
+.doubt-send-btn {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 10px;
+  padding: 0 16px;
+  font-weight: 800;
+  font-size: 12.5px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.3);
+  transition: all 0.2s ease;
+}
+
+.doubt-send-btn:hover {
+  background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  transform: scale(1.02);
+}
+
+/* ================================================================
+   3. CURRICULUM EXPLORER & LECTURE LIBRARY
+   ================================================================ */
+.lecture-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 18px;
+  margin-top: 16px;
+}
+
+.lecture-card {
+  background: #FFFFFF;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 14px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+.lecture-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
+  border-color: #10B981;
+}
+
+.lecture-card.active {
+  border: 2px solid #059669;
+  box-shadow: 0 0 0 4px rgba(5, 150, 105, 0.15);
+}
+
+.lecture-thumb-wrap {
+  position: relative;
+  width: 100%;
+  padding-top: 56.25%;
+  background: #111827;
+  overflow: hidden;
+}
+
+.lecture-thumb-wrap img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s ease;
+}
+
+.lecture-card:hover .lecture-thumb-wrap img {
+  transform: scale(1.05);
+}
+
+.lecture-play-hover-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.lecture-card:hover .lecture-play-hover-overlay {
+  opacity: 1;
+}
+
+.lecture-play-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #10B981;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.lecture-duration-tag {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(4px);
+  color: #FFFFFF;
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.lecture-live-badge-card {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: #DC2626;
+  color: #FFFFFF;
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 99px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  letter-spacing: 0.4px;
+}
+
+.lecture-info-body {
+  padding: 12px 14px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.lecture-subject-badge {
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #059669;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 3px;
+}
+
+.lecture-card-title {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #0F172A;
+  margin-bottom: 6px;
+  line-height: 1.35;
+}
+
+.lecture-card-meta {
+  font-size: 11.5px;
+  color: #64748B;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.filter-pill {
+  background: #F1F5F9;
+  border: 1.5px solid #CBD5E1;
+  color: #475569;
+  padding: 5px 12px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-pill:hover {
+  background: #E2E8F0;
+  color: #0F172A;
+}
+
+.filter-pill.active {
+  background: #059669;
+  color: #FFFFFF;
+  border-color: #059669;
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
+}

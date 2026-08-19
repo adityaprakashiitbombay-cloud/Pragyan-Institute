@@ -38,11 +38,12 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
   <!-- CSS Design System -->
-  <link rel="stylesheet" href="./css/variables.css?v=90.0.c5f8b3a2">
-  <link rel="stylesheet" href="./css/main.css?v=90.0.c5f8b3a2">
-  <link rel="stylesheet" href="./css/components.css?v=90.0.c5f8b3a2">
-  <link rel="stylesheet" href="./css/animations.css?v=90.0.c5f8b3a2">
-  <link rel="stylesheet" href="./css/portal.css?v=90.0.c5f8b3a2">
+  <link rel="stylesheet" href="./css/variables.css?v=90.0.ae49c8e0">
+  <link rel="stylesheet" href="./css/main.css?v=90.0.ae49c8e0">
+  <link rel="stylesheet" href="./css/components.css?v=90.0.ae49c8e0">
+  <link rel="stylesheet" href="./css/animations.css?v=90.0.ae49c8e0">
+  <link rel="stylesheet" href="./css/portal.css?v=90.0.ae49c8e0">
+  <link rel="stylesheet" href="./css/classroom.css?v=90.0.ae49c8e0">
   <!-- Schema.org JSON-LD Structured Data for Google Top Ranking & Knowledge Graph -->
   <script type="application/ld+json">
   {
@@ -934,6 +935,9 @@
           <button class="dash-tab-btn student-tab-btn active" data-tab="details">
             <i class="fa-solid fa-user"></i> Profile
           </button>
+          <button class="dash-tab-btn student-tab-btn" data-tab="live" style="background: linear-gradient(135deg, rgba(220, 38, 38, 0.1), rgba(239, 68, 68, 0.05)); border: 1.5px solid #FCA5A5; color: #DC2626;">
+            <i class="fa-solid fa-tower-broadcast" style="animation: pulse-beacon 1.5s infinite;"></i> 🔴 Live Class & Lectures
+          </button>
           <button class="dash-tab-btn student-tab-btn" data-tab="batch">
             <i class="fa-solid fa-layer-group"></i> Batch Detail
           </button>
@@ -948,6 +952,7 @@
         <!-- Student Content Panes -->
         <div class="dashboard-content-body">
           <div class="tab-pane student-tab-pane active" id="studentTabPane-details"></div>
+          <div class="tab-pane student-tab-pane" id="studentTabPane-live"></div>
           <div class="tab-pane student-tab-pane" id="studentTabPane-batch"></div>
           <div class="tab-pane student-tab-pane" id="studentTabPane-notifications"></div>
           <div class="tab-pane student-tab-pane" id="studentTabPane-fees"></div>
@@ -982,6 +987,9 @@
           <button class="dash-tab-btn admin-tab-btn active" data-tab="students">
             <i class="fa-solid fa-users"></i> Student Directory & Fee Register
           </button>
+          <button class="dash-tab-btn admin-tab-btn" data-tab="live-manager" style="background: linear-gradient(135deg, rgba(220, 38, 38, 0.1), rgba(239, 68, 68, 0.05)); border: 1.5px solid #FCA5A5; color: #DC2626;">
+            <i class="fa-solid fa-video"></i> 🔴 Live Class & Media Manager
+          </button>
           <button class="dash-tab-btn admin-tab-btn" data-tab="analytics">
             <i class="fa-solid fa-chart-pie"></i> Fee Analytics & Reports
           </button>
@@ -1006,6 +1014,7 @@
         <div class="dashboard-content-body">
           <div class="admin-stats-grid" id="adminOverviewStats"></div>
           <div class="tab-pane admin-tab-pane active" id="adminTabPane-students"></div>
+          <div class="tab-pane admin-tab-pane" id="adminTabPane-live-manager"></div>
           <div class="tab-pane admin-tab-pane" id="adminTabPane-analytics"></div>
           <div class="tab-pane admin-tab-pane" id="adminTabPane-email"></div>
           <div class="tab-pane admin-tab-pane" id="adminTabPane-requests"></div>
@@ -1020,17 +1029,18 @@
   <!-- Application Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
-  <script defer src="./js/config.js?v=90.0.c5f8b3a2"></script>
-  <script defer src="./js/supabase-sync.js?v=90.0.c5f8b3a2"></script>
-  <script defer src="./js/chat.js?v=90.0.c5f8b3a2"></script>
-  <script defer src="./js/app.js?v=90.0.c5f8b3a2"></script>
-  <script defer src="./js/portal.js?v=90.0.c5f8b3a2"></script>
+  <script defer src="./js/config.js?v=90.0.ae49c8e0"></script>
+  <script defer src="./js/supabase-sync.js?v=90.0.ae49c8e0"></script>
+  <script defer src="./js/classroom.js?v=90.0.ae49c8e0"></script>
+  <script defer src="./js/chat.js?v=90.0.ae49c8e0"></script>
+  <script defer src="./js/app.js?v=90.0.ae49c8e0"></script>
+  <script defer src="./js/portal.js?v=90.0.ae49c8e0"></script>
 
   <!-- PWA Service Worker Registration for Instant Offline Caching -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=90.0.c5f8b3a2').then(reg => {
+        navigator.serviceWorker.register('./sw.js?v=90.0.ae49c8e0').then(reg => {
           reg.update().catch(() => {});
         }).catch(err => console.log('SW reg error:', err));
       });

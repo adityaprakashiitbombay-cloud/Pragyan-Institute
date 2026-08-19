@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "supabase": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://postgres.crxolbapbfqthoxehhic:Aditya@2006@aws-0-ap-south-1.pooler.supabase.com:6543/postgres"
+      ],
+      "env": {
+        "PGSSLMODE": "require"
+      }
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "E:\\GEMINI\\PragyanInstitute"
+      ]
+    }
+  }
+}

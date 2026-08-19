@@ -7,13 +7,13 @@
 (function () {
   'use strict';
 
-  // ── Supabase Connection Config ──────────────────────────────────────────────
-  const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqY21tY2FlcnZnc2twa2NmZWttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NDEzMTksImV4cCI6MjEwMjAxNzMxOX0.pTp51JWa-qWbAz-l5NGLKvrS66TED4lruhLInQ6hvmc';
+  // ── Connection Config (Local Sandbox Experiment Mode) ──────────────────────
   const _cfg = (typeof window !== 'undefined' && window.PRAGYAN_CONFIG) ? window.PRAGYAN_CONFIG : {};
-  const SUPABASE_URL = _cfg.SUPABASE_URL || 'https://ujcmmcaervgskpkcfekm.supabase.co';
-  const SUPABASE_ANON_KEY = _cfg.SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
+  const SUPABASE_URL = _cfg.SUPABASE_URL || '';
+  const SUPABASE_ANON_KEY = _cfg.SUPABASE_ANON_KEY || '';
+  const IS_STANDALONE_LOCAL = !_cfg.USE_LIVE_SUPABASE || !SUPABASE_URL || !SUPABASE_ANON_KEY;
 
-  const REST_BASE = `${SUPABASE_URL}/rest/v1`;
+  const REST_BASE = SUPABASE_URL ? `${SUPABASE_URL}/rest/v1` : '';
 
   // ── localStorage key map ────────────────────────────────────────────────────
   const KEY_MAP = {
@@ -24,13 +24,17 @@
     student_requests:   'pragyan_db_requests_master',
     batches:            'pragyan_db_batches_master',
     admins:             'pragyan_db_admins_master',
-    audit_logs:         'pragyan_db_audit_logs_master'
+    audit_logs:         'pragyan_db_audit_logs_master',
+    video_lectures:     'pragyan_db_video_lectures_master',
+    study_materials:    'pragyan_db_study_materials_master',
+    live_class_doubts:  'pragyan_db_live_doubts_master'
   };
 
   const ORDER_COLUMNS = {
     students: 'student_id', notices: 'id', fee_receipts: 'receipt_no',
     fee_billing_ledger: 'created_at', student_requests: 'created_at',
-    batches: 'batch_id', admins: 'admin_id', audit_logs: 'log_id'
+    batches: 'batch_id', admins: 'admin_id', audit_logs: 'log_id',
+    video_lectures: 'chapter_no', study_materials: 'created_at', live_class_doubts: 'created_at'
   };
 
   const ALL_TABLES = Object.keys(KEY_MAP);
@@ -88,6 +92,15 @@
       this.isInitialized = true;
       this.sessionToken = sessionStorage.getItem('pragyan_portal_token') || localStorage.getItem('pragyan_portal_token') || null;
       this.sessionRole = sessionStorage.getItem('pragyan_portal_role') || localStorage.getItem('pragyan_portal_role') || null;
+
+      if (IS_STANDALONE_LOCAL) {
+        console.log('🧪 Pragyan Institute: Running in 100% Isolated Local Sandbox Trial Mode (0 API Keys, 0 Cloud Interchanges)');
+        this._connected = false;
+        this.updateStatus('local');
+        this._initBroadcastChannel();
+        return Promise.resolve({ success: true, localOnly: true });
+      }
+
       this._listenForConnectivity();
 
       // Register cleanup on page unload
@@ -398,6 +411,11 @@
 
     // ── H1 & S2: Pull All Tables (Download from Supabase ➔ localStorage) ────
     async pullAll() {
+      if (IS_STANDALONE_LOCAL) {
+        this.updateStatus('local');
+        return Promise.resolve({ success: true, localOnly: true });
+      }
+
       // H1: Mutex lock & pending queue
       if (this.isSyncing) {
         this._pendingPull = true;
@@ -430,9 +448,9 @@
                 const sanitizedId = this._sanitizeForQuery(currentStudentId);
                 const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sanitizedId);
                 const sRoll = this._sanitizeForQuery(String(currentStudent.rollNo || currentStudent.roll_no || ''));
-                const sStuId = this._sanitizeForQuery(String(currentStudent.student_id || currentStudent.id || ''));
 
                 if (table === 'students') {
+                  const sStuId = this._sanitizeForQuery(String(currentStudent.student_id || currentStudent.id || ''));
                   if (isUuid) {
                     filter = `or=(student_id.eq.${this._encodeFilterValue(sStuId || sanitizedId)},id.eq.${this._encodeFilterValue(sanitizedId)})`;
                   } else {
@@ -444,54 +462,54 @@
                   const dbUuid = this._sanitizeForQuery(currentStudent.db_uuid || (isUuid ? sanitizedId : ''));
                   if (dbUuid) {
                     filter = `student_id.eq.${this._encodeFilterValue(dbUuid)}`;
+                  } else {
+                    const dbId = this._sanitizeForQuery(currentStudent.id || currentStudent.student_id || '');
+                    filter = `student_id.eq.${this._encodeFilterValue(dbId)}`;
                   }
-                } else if (table === 'fee_billing_ledger') {
-                  const sStuId = this._sanitizeForQuery(String(currentStudent.student_id || currentStudent.id || sanitizedId));
-                  filter = `student_id.eq.${this._encodeFilterValue(sStuId)}`;
-                } else if (table === 'student_requests') {
-                  const clauses = [`student_id.eq.${this._encodeFilterValue(sanitizedId)}`];
-                  if (sRoll && sRoll !== sanitizedId) clauses.push(`roll_no.eq.${this._encodeFilterValue(sRoll)}`);
-                  filter = clauses.length > 1 ? `or=(${clauses.join(',')})` : clauses[0];
+                } else if (table === 'fee_billing_ledger' || table === 'student_requests') {
+                  const dbUuid = this._sanitizeForQuery(currentStudent.db_uuid || (isUuid ? sanitizedId : ''));
+                  const sRollVal = this._sanitizeForQuery(currentStudent.rollNo || currentStudent.roll_no || '');
+                  const sIdVal = this._sanitizeForQuery(currentStudent.student_id || currentStudent.id || '');
+                  const clauses = [];
+                  if (dbUuid) clauses.push(`student_id.eq.${this._encodeFilterValue(dbUuid)}`);
+                  if (sIdVal && sIdVal !== dbUuid) clauses.push(`student_id.eq.${this._encodeFilterValue(sIdVal)}`);
+                  if (sRollVal && sRollVal !== sIdVal) clauses.push(`student_id.eq.${this._encodeFilterValue(sRollVal)}`);
+                  filter = clauses.length > 1 ? `or=(${clauses.join(',')})` : (clauses[0] || '');
                 }
               }
-              const rows = await this.readAll(table, filter);
-              return { table, rows };
+
+              // Retry logic for table read
+              let attempts = 0;
+              const maxAttempts = 2;
+              while (attempts < maxAttempts) {
+                try {
+                  const rows = await this.readAll(table, filter);
+                  return { table, rows, success: true };
+                } catch (readErr) {
+                  attempts++;
+                  if (attempts >= maxAttempts) {
+                    throw new Error(`Failed to read table ${table} after ${maxAttempts} attempts: ${readErr.message}`);
+                  }
+                  await new Promise(r => setTimeout(r, 500 * attempts));
+                }
+              }
             })
           );
 
-          // S2: Transactional validation
+          // Atomic validation: Process fetch results
           const data = {};
           const failedTables = [];
 
-          fetchResults.forEach((res, idx) => {
-            const table = tables[idx];
-            if (res.status === 'fulfilled' && Array.isArray(res.value?.rows)) {
+          fetchResults.forEach((res, i) => {
+            const table = tables[i];
+            if (res.status === 'fulfilled' && res.value?.success) {
               data[table] = res.value.rows;
             } else {
               failedTables.push(table);
-              console.warn(`⚠️ Failed to sync table: ${table}`, res.reason?.message || 'Unknown error');
+              const existing = this.getLocalTable(table);
+              data[table] = existing;
             }
           });
-
-          // If critical tables failed, rollback and preserve local cache
-          const isCriticalFailure = failedTables.includes('students') && failedTables.includes('fee_receipts');
-          if (failedTables.length === tables.length || isCriticalFailure) {
-            console.error(`❌ Sync failed for critical tables: ${failedTables.join(', ')}. Preserving local state.`);
-            this._connected = false;
-            this.updateStatus('local');
-            // Show user-friendly error message if online but sync failed
-            if (navigator.onLine && typeof window !== 'undefined' && !window._syncErrorShown) {
-              window._syncErrorShown = true;
-              setTimeout(() => { window._syncErrorShown = false; }, 60000); // Reset after 1 minute
-              console.error('⚠️ Unable to sync with database. You are viewing cached data. Please check your internet connection or contact support if the issue persists.');
-            }
-            return { success: false, error: 'Sync failed for critical tables', failedTables };
-          }
-
-          // Log warnings for non-critical table failures
-          if (failedTables.length > 0) {
-            console.warn(`⚠️ Partial sync: ${failedTables.length} table(s) failed to sync: ${failedTables.join(', ')}`);
-          }
 
           // Atomic write of validated tables
           this.updateLocalState(data);
@@ -540,6 +558,43 @@
      */
     async mutate(table, operation, data, filters = {}) {
       if (operation !== 'delete' && !data) return { success: false, error: 'No data provided' };
+      
+      if (IS_STANDALONE_LOCAL) {
+        try {
+          const rows = Array.isArray(data) ? [...data] : (data ? [{ ...data }] : []);
+          const key = KEY_MAP[table];
+          if (key && typeof localStorage !== 'undefined') {
+            let current = [];
+            try {
+              const stored = localStorage.getItem(key);
+              if (stored) current = JSON.parse(stored);
+            } catch (_) {}
+
+            if (operation === 'insert' || operation === 'upsert') {
+              rows.forEach(r => {
+                const idCol = ORDER_COLUMNS[table] || 'id';
+                const idx = current.findIndex(item => (r[idCol] && item[idCol] === r[idCol]) || (r.id && item.id === r.id));
+                if (idx >= 0) current[idx] = { ...current[idx], ...r };
+                else current.push(r);
+              });
+            } else if (operation === 'delete') {
+              const idCol = ORDER_COLUMNS[table] || 'id';
+              const targetId = filters.id || filters[idCol];
+              if (targetId) {
+                current = current.filter(item => item[idCol] !== targetId && item.id !== targetId);
+              }
+            }
+            localStorage.setItem(key, JSON.stringify(current));
+          }
+          if (this._bc) {
+            try { this._bc.postMessage({ type: 'mutation', table, operation, data }); } catch (_) {}
+          }
+          return { success: true, localOnly: true };
+        } catch (e) {
+          return { success: false, error: e.message };
+        }
+      }
+
       try {
         let rows = Array.isArray(data) ? [...data] : (data ? [{ ...data }] : []);
         let result;
@@ -614,39 +669,58 @@
 
             // Strip any unsupported columns so Postgres doesn't throw 400
             delete rowObj.idempotency_key;
+            delete rowObj.idempotencyKey;
             delete rowObj.amount_paid;
             delete rowObj.balance_due;
+            delete rowObj.className;
             delete rowObj.class_name;
+            delete rowObj.studentName;
             delete rowObj.student_name;
+            delete rowObj.studentRoll;
             delete rowObj.student_roll;
+            delete rowObj.rollNo;
             delete rowObj.roll_no;
+            delete rowObj.receiptNo;
+            delete rowObj.studentId;
           } else if (table === 'fee_billing_ledger') {
             const lId = rowObj.id || rowObj.idempotency_key;
             if (lId) changedIds.push(lId);
-            if (rowObj.batchName && !rowObj.batch_label) {
-              rowObj.batch_label = rowObj.batchName;
+            if ((rowObj.batchName || rowObj.batchLabel || rowObj.className) && !rowObj.batch_label) {
+              rowObj.batch_label = rowObj.batchName || rowObj.batchLabel || rowObj.className;
             }
-            delete rowObj.batchName;
-            if (rowObj.className && !rowObj.batch_label) {
-              rowObj.batch_label = rowObj.className;
-            }
-            delete rowObj.className;
             if (rowObj.previousDue !== undefined && rowObj.previous_due === undefined) {
               rowObj.previous_due = Number(rowObj.previousDue);
             }
-            delete rowObj.previousDue;
             if (rowObj.updatedDue !== undefined && rowObj.updated_due === undefined) {
               rowObj.updated_due = Number(rowObj.updatedDue);
             }
-            delete rowObj.updatedDue;
             if (rowObj.billingMonth && !rowObj.billing_month) {
               rowObj.billing_month = rowObj.billingMonth;
             }
-            delete rowObj.billingMonth;
             if (rowObj.studentId && !rowObj.student_id) {
               rowObj.student_id = rowObj.studentId;
             }
+
+            // Strip virtual and camelCase fields
+            delete rowObj.batchName;
+            delete rowObj.batchLabel;
+            delete rowObj.className;
+            delete rowObj.previousDue;
+            delete rowObj.updatedDue;
+            delete rowObj.billingMonth;
             delete rowObj.studentId;
+            delete rowObj.studentName;
+            delete rowObj.student_name;
+            delete rowObj.rollNo;
+            delete rowObj.roll_no;
+            delete rowObj.currentMonthFee;
+            delete rowObj.current_month_fee;
+            delete rowObj.totalDue;
+            delete rowObj.total_due;
+            delete rowObj.paidThisMonth;
+            delete rowObj.paid_this_month;
+            delete rowObj.last_updated_at;
+            delete rowObj.idempotencyKey;
           } else if (table === 'student_requests') {
             const reqId = rowObj.request_id || rowObj.id;
             if (reqId) {
@@ -659,6 +733,9 @@
             delete rowObj.type;
             delete rowObj.paymentDetails;
             delete rowObj.date;
+            delete rowObj.studentName;
+            delete rowObj.studentRoll;
+            delete rowObj.className;
           } else if (table === 'students') {
             const sId = rowObj.student_id || rowObj.id || rowObj.rollNo;
             if (sId) {
@@ -715,6 +792,7 @@
             delete rowObj.notice_id;
             delete rowObj.date;
             delete rowObj.unread;
+            delete rowObj._local_id;
             // If notice id is not a standard UUID, strip it so Postgres auto-generates a valid UUID
             if (rowObj.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rowObj.id)) {
               delete rowObj.id;
@@ -855,8 +933,22 @@
       Object.entries(normalized).forEach(([table, rows]) => {
         if (Array.isArray(rows)) this.safeStore(KEY_MAP[table], rows);
       });
-      if (typeof AppState !== 'undefined' && AppState.invalidateCaches) {
-        AppState.invalidateCaches();
+      if (typeof AppState !== 'undefined') {
+        if (AppState.invalidateCaches) AppState.invalidateCaches();
+        if (AppState._lastSavedStudentsMap && Array.isArray(normalized.students)) {
+          AppState._lastSavedStudentsMap.clear();
+          normalized.students.forEach(s => {
+            const id = s.id || s.student_id || s.rollNo;
+            if (id) AppState._lastSavedStudentsMap.set(id, { ...s });
+          });
+        }
+        if (AppState._lastSavedReceiptsSet && Array.isArray(normalized.fee_receipts)) {
+          AppState._lastSavedReceiptsSet.clear();
+          normalized.fee_receipts.forEach(r => {
+            const rNo = r.receiptNo || r.receipt_no;
+            if (rNo) AppState._lastSavedReceiptsSet.add(rNo);
+          });
+        }
       }
     },
 

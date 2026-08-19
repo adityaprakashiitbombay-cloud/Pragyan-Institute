@@ -1,3 +1,14 @@
+// Polyfill WebSocket stub for serverless environments (Node.js < 22) where Realtime WebSockets are not used
+if (typeof globalThis.WebSocket === 'undefined') {
+  globalThis.WebSocket = class StubWebSocket {
+    constructor() {}
+    addEventListener() {}
+    removeEventListener() {}
+    send() {}
+    close() {}
+  };
+}
+
 import jwt from 'jsonwebtoken';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
@@ -38,16 +49,15 @@ export function applyCors(req, res) {
 }
 
 export function getSupabase(opts = {}) {
-  const url = process.env.SUPABASE_URL || 'https://ujcmmcaervgskpkcfekm.supabase.co';
+  const url = process.env.SUPABASE_URL || '';
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-  const anonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqY21tY2FlcnZnc2twa2NmZWttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NDEzMTksImV4cCI6MjEwMjAxNzMxOX0.pTp51JWa-qWbAz-l5NGLKvrS66TED4lruhLInQ6hvmc';
+  const anonKey = process.env.SUPABASE_ANON_KEY || '';
 
-  if (!serviceKey) {
-    if (opts.allowAnon || !opts.requireServiceRole) {
+  if (!url || !serviceKey) {
+    if (opts.allowAnon && anonKey && url) {
       return createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
     }
-    console.error('🚨 SUPABASE_SERVICE_ROLE_KEY is required for server API execution. Refusing to fall back to anon credentials.');
-    if (opts.throwOnMissing) throw new Error('SUPABASE_SERVICE_ROLE_KEY is required for server API execution.');
+    if (opts.throwOnMissing) throw new Error('SUPABASE_SERVICE_ROLE_KEY & SUPABASE_URL are required for server API execution.');
     return null;
   }
 

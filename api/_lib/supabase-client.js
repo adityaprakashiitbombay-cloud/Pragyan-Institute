@@ -1,13 +1,21 @@
 // Authenticated database gateway. Browser code must never hold a service-role key.
 import { getSupabase, publicAdmin, requireSession, applyCors } from './auth.js';
 
-const TABLES = new Set(['students', 'notices', 'fee_receipts', 'fee_billing_ledger', 'student_requests', 'batches', 'admins', 'audit_logs']);
-const PUBLIC_TABLES = new Set(['notices', 'batches']);
-const STUDENT_TABLES = new Set(['students', 'notices', 'fee_receipts', 'fee_billing_ledger', 'student_requests', 'batches']);
+const TABLES = new Set([
+  'students', 'notices', 'fee_receipts', 'fee_billing_ledger',
+  'student_requests', 'batches', 'admins', 'audit_logs',
+  'video_lectures', 'study_materials', 'live_class_doubts'
+]);
+const PUBLIC_TABLES = new Set(['notices', 'batches', 'video_lectures', 'study_materials', 'live_class_doubts']);
+const STUDENT_TABLES = new Set([
+  'students', 'notices', 'fee_receipts', 'fee_billing_ledger',
+  'student_requests', 'batches', 'video_lectures', 'study_materials', 'live_class_doubts'
+]);
 const ORDER_COLUMNS = {
   students: 'student_id', notices: 'id', fee_receipts: 'receipt_no',
   fee_billing_ledger: 'created_at', student_requests: 'request_id',
-  batches: 'batch_id', admins: 'admin_id', audit_logs: 'log_id'
+  batches: 'batch_id', admins: 'admin_id', audit_logs: 'log_id',
+  video_lectures: 'chapter_no', study_materials: 'created_at', live_class_doubts: 'created_at'
 };
 
 function rows(value) {
@@ -27,6 +35,17 @@ function readColumns(table, requested) {
 function assertStudentOwnership(table, operation, data, filters, session) {
   if (!STUDENT_TABLES.has(table)) throw new Error('This account cannot access that data');
   if (PUBLIC_TABLES.has(table) && operation === 'select') return filters?.where || {};
+
+  // Doubts submission by students
+  if (table === 'live_class_doubts') {
+    if (operation === 'select') return filters?.where || {};
+    if (['insert', 'upsert'].includes(operation)) {
+      for (const row of rows(data)) {
+        if (!row.doubt_text) throw new Error('Doubt text cannot be empty');
+      }
+      return filters?.where || {};
+    }
+  }
 
   if (table === 'students' || table === 'fee_receipts' || table === 'fee_billing_ledger' || table === 'student_requests') {
     if (operation === 'select') return { ...(filters?.where || {}), student_id: session.sub };

@@ -785,7 +785,7 @@
       try {
         if (Array.isArray(students) && students.length > 0) {
           // H1: Determine dirty / changed records for Delta Sync
-          let studentsToSync = students;
+          let studentsToSync = [];
           const dirtySet = new Set(this._dirtyStudentIds);
           if (Array.isArray(changedIds) && changedIds.length > 0) {
             changedIds.forEach(id => dirtySet.add(id.toString().toLowerCase()));
@@ -800,7 +800,7 @@
             studentsToSync = students.filter(s => {
               const id = s.id || s.student_id || s.rollNo;
               const prev = this._lastSavedStudentsMap.get(id);
-              if (!prev) return true; // New student
+              if (!prev) return false; // Prevent ghost resurrecting deleted students
               const prevPhoto = prev.photo || prev.photoUrl || prev.photo_url || '';
               const currPhoto = s.photo || s.photoUrl || s.photo_url || '';
               return (
@@ -1373,8 +1373,7 @@
             target_batch: n.targetBatch || n.target_batch || 'All Batches',
             attachment_url: n.attachmentUrl || n.attachment_url || '',
             created_at: n.date ? new Date(n.date).toISOString() : new Date().toISOString(),
-            idempotency_key: n.id,
-            _local_id: n._local_id
+            idempotency_key: n.id
           }));
 
           const r = await SupabaseSync.mutate('notices', 'upsert', supaPayload, { conflict: 'id' });
@@ -1558,6 +1557,76 @@
       });
       // BUG-M fix: return the promise so callers that await it get proper chaining
       return this.saveAuditLogs(logs);
+    },
+    getVideoLectures() {
+      if (this._videoLecturesCache) return this._videoLecturesCache;
+      try {
+        const stored = localStorage.getItem('pragyan_db_video_lectures_master');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            this._videoLecturesCache = parsed;
+            return parsed;
+          }
+        }
+      } catch (e) {}
+      const fallback = (typeof PragyanClassroom !== 'undefined' && PragyanClassroom.getLectures) ? PragyanClassroom.getLectures() : [];
+      this._videoLecturesCache = fallback;
+      return fallback;
+    },
+    async saveVideoLectures(lectures) {
+      this._videoLecturesCache = lectures;
+      localStorage.setItem('pragyan_db_video_lectures_master', JSON.stringify(lectures));
+      this.markMutation();
+
+      try {
+        if (Array.isArray(lectures) && lectures.length > 0 && typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
+          const payload = lectures.map(l => ({
+            lecture_id: l.id || l.lecture_id,
+            class_batch: l.class_batch || l.className || '10th',
+            subject: l.subject || 'Science',
+            chapter_no: Number(l.chapter_no) || 1,
+            chapter_title: l.chapter_title || '',
+            lecture_title: l.lecture_title || l.title || '',
+            video_source_id: l.video_source_id || '',
+            duration_minutes: Number(l.duration_minutes) || 45,
+            pdf_notes_url: l.pdf_notes_url || null,
+            thumbnail_url: l.thumbnail_url || '',
+            is_live: Boolean(l.is_live),
+            live_scheduled_at: l.live_scheduled_at || null,
+            created_by: l.created_by || 'Chandan Kumar'
+          }));
+          await SupabaseSync.mutate('video_lectures', 'upsert', payload, { conflict: 'lecture_id' });
+        }
+      } catch(e) { console.warn('saveVideoLectures error:', e); }
+    },
+    getStudyMaterials() {
+      try {
+        return JSON.parse(localStorage.getItem('pragyan_db_study_materials_master') || '[]');
+      } catch(e) { return []; }
+    },
+    async saveStudyMaterials(materials) {
+      localStorage.setItem('pragyan_db_study_materials_master', JSON.stringify(materials));
+      this.markMutation();
+      try {
+        if (Array.isArray(materials) && materials.length > 0 && typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
+          await SupabaseSync.mutate('study_materials', 'upsert', materials, { conflict: 'id' });
+        }
+      } catch(e) { console.warn('saveStudyMaterials error:', e); }
+    },
+    getLiveClassDoubts() {
+      try {
+        return JSON.parse(localStorage.getItem('pragyan_db_live_class_doubts_master') || '[]');
+      } catch(e) { return []; }
+    },
+    async saveLiveClassDoubts(doubts) {
+      localStorage.setItem('pragyan_db_live_class_doubts_master', JSON.stringify(doubts));
+      this.markMutation();
+      try {
+        if (Array.isArray(doubts) && doubts.length > 0 && typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
+          await SupabaseSync.mutate('live_class_doubts', 'upsert', doubts, { conflict: 'id' });
+        }
+      } catch(e) { console.warn('saveLiveClassDoubts error:', e); }
     },
     async updateStudentPassword(newPassword) {
       if (!newPassword || typeof newPassword !== 'string' || newPassword.trim().length < 4) {
@@ -2437,6 +2506,7 @@ function renderStudentDashboard() {
 
     // Render Student Tabs
     renderStudentDetailsTab();
+    renderStudentLiveTab();
     renderStudentBatchTab();
     renderStudentNotifications();
     renderStudentFeeTab();
@@ -2444,6 +2514,27 @@ function renderStudentDashboard() {
     // Preserve active student tab
     const targetTab = AppState.activeStudentTab || 'details';
     switchStudentTab(targetTab);
+  }
+
+  function renderStudentLiveTab() {
+    const pane = document.getElementById('studentTabPane-live');
+    if (!pane) return;
+    const s = AppState.currentUser || {};
+    const classroom = (typeof PragyanClassroom !== 'undefined' && PragyanClassroom) || (typeof window !== 'undefined' && window.PragyanClassroom);
+    if (classroom && typeof classroom.init === 'function') {
+      classroom.init(pane, {
+        studentName: s.name || 'Student',
+        studentRoll: s.rollNo || s.student_id || '261001'
+      });
+    } else {
+      pane.innerHTML = `
+        <div style="padding: 2.5rem; text-align: center; color: #64748B;">
+          <div style="font-size: 2rem; margin-bottom: 0.5rem;">📡</div>
+          <h3 style="color: #0F172A; margin: 0 0 0.5rem 0;">Smart Classroom Initializing...</h3>
+          <p style="margin: 0;">Connecting to YouTube Zero-Sync Live Stream & CDN notes.</p>
+        </div>
+      `;
+    }
   }
 
   function switchStudentTab(tabName) {
@@ -2474,6 +2565,8 @@ function renderStudentDashboard() {
     // Dynamically re-render active student tab
     if (tabName === 'details') {
       renderStudentDetailsTab();
+    } else if (tabName === 'live') {
+      renderStudentLiveTab();
     } else if (tabName === 'batch') {
       renderStudentBatchTab();
     } else if (tabName === 'notifications') {
@@ -3867,6 +3960,7 @@ function renderStudentDashboard() {
     }
 
     renderAdminStudentList();
+    renderAdminLiveManagerTab();
     renderAdminAnalyticsTab();
     renderAdminEmailTab();
     renderCommunityChatTab();
@@ -4095,6 +4189,8 @@ function renderStudentDashboard() {
     // Dynamically re-render active admin tab
     if (tabName === 'students') {
       renderAdminStudentList();
+    } else if (tabName === 'live-manager') {
+      renderAdminLiveManagerTab();
     } else if (tabName === 'analytics') {
       renderAdminAnalyticsTab();
     } else if (tabName === 'email') {
@@ -5635,6 +5731,487 @@ function renderStudentDashboard() {
   function openAddOldDueModal(studentId) { openStudentManagementModal(studentId, 'due'); }
   function openAdjustBillModal(studentId) { openStudentManagementModal(studentId, 'regulate'); }
   function openEditStudentProfileModal(studentId) { openStudentManagementModal(studentId, 'profile'); }
+
+  /* ==========================================================================
+   * 🔴 LIVE CLASSROOM & MEDIA CDN MANAGER TAB (ADMIN / TEACHERS)
+   * ========================================================================== */
+  let liveFilterBatch = 'All';
+  let liveFilterSubject = 'All';
+
+  function renderAdminLiveManagerTab() {
+    const pane = document.getElementById('adminTabPane-live-manager');
+    if (!pane) return;
+
+    try {
+      const lectures = AppState.getVideoLectures() || [];
+      const doubts = AppState.getLiveClassDoubts() || [];
+      const liveCount = lectures.filter(l => l.is_live).length;
+      const pdfCount = lectures.filter(l => l.pdf_notes_url && l.pdf_notes_url.trim().length > 0).length;
+      const pendingDoubts = doubts.filter(d => !d.is_resolved);
+
+      // Filtered lectures
+      const filteredLectures = lectures.filter(l => {
+        const matchBatch = (liveFilterBatch === 'All') || (l.class_batch && (l.class_batch.includes(liveFilterBatch) || liveFilterBatch.includes(l.class_batch)));
+        const matchSub = (liveFilterSubject === 'All') || (l.subject && l.subject.toLowerCase() === liveFilterSubject.toLowerCase());
+        return matchBatch && matchSub;
+      });
+
+      pane.innerHTML = `
+        <div class="dash-card">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.25rem;">
+            <div>
+              <h3 style="font-size: 1.15rem; font-weight: 800; color: var(--text-mahogany); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fa-solid fa-tower-broadcast" style="color: #DC2626; animation: pulse-beacon 1.5s infinite;"></i>
+                Live Classroom & Media CDN Manager
+              </h3>
+              <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">
+                Zero-sync YouTube ULL streaming, dynamic student watermarking, Cloudflare R2 PDF study notes & Realtime doubt moderation.
+              </div>
+            </div>
+            
+            <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+              <span class="status-badge" style="background: #FEE2E2; color: #DC2626; border: 1.5px solid #FCA5A5; font-weight: 800; font-size: 0.8rem; padding: 0.3rem 0.75rem; border-radius: 99px;">
+                <span class="live-beacon" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#DC2626; margin-right:4px; box-shadow:0 0 8px #DC2626;"></span>
+                ${liveCount} Live Broadcast${liveCount === 1 ? '' : 's'}
+              </span>
+              <span class="status-badge" style="background: #ECFDF5; color: #065F46; border: 1.5px solid #6EE7B7; font-weight: 800; font-size: 0.8rem; padding: 0.3rem 0.75rem; border-radius: 99px;">
+                📚 ${lectures.length} Total Lectures
+              </span>
+              <span class="status-badge" style="background: #EFF6FF; color: #1E40AF; border: 1.5px solid #93C5FD; font-weight: 800; font-size: 0.8rem; padding: 0.3rem 0.75rem; border-radius: 99px;">
+                📄 ${pdfCount} R2 PDFs
+              </span>
+            </div>
+          </div>
+
+          <!-- 1. SCHEDULE / GO LIVE MASTER CONTROL FORM -->
+          <div style="background: #FAF9F6; border: 1.5px solid var(--border-sand); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem;">
+            <div style="font-weight: 800; font-size: 0.95rem; color: var(--text-mahogany); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.4rem;">
+              <i class="fa-solid fa-circle-plus" style="color: var(--primary-emerald);"></i> Schedule / Broadcast New Lecture
+            </div>
+
+            <form id="adminGoLiveForm">
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.85rem; margin-bottom: 0.85rem;">
+                <div>
+                  <label style="font-size: 0.82rem; font-weight: 700; color: #374151; display: block; margin-bottom: 0.25rem;">Class Batch *</label>
+                  <select id="liveFormClass" class="portal-input" style="font-weight: 600;" required>
+                    <option value="10th">Class 10th (ACHIEVER)</option>
+                    <option value="9th">Class 9th (NURTURE)</option>
+                    <option value="8th">Class 8th (ALPHA)</option>
+                    <option value="Junior">Junior Foundation Batch</option>
+                    <option value="All">All Batches (Common Session)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style="font-size: 0.82rem; font-weight: 700; color: #374151; display: block; margin-bottom: 0.25rem;">Subject *</label>
+                  <select id="liveFormSubject" class="portal-input" style="font-weight: 600;" required>
+                    <option value="Science">Science (Physics / Chem / Bio)</option>
+                    <option value="Mathematics">Mathematics</option>
+                    <option value="English">English Grammar & Lit</option>
+                    <option value="Social Science">Social Science</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style="font-size: 0.82rem; font-weight: 700; color: #374151; display: block; margin-bottom: 0.25rem;">Chapter No. & Title *</label>
+                  <div style="display: flex; gap: 0.35rem;">
+                    <input type="number" id="liveFormChapterNo" class="portal-input" placeholder="Ch #" style="width: 70px; font-weight: 700;" value="1" min="1" required>
+                    <input type="text" id="liveFormChapterTitle" class="portal-input" placeholder="e.g. Chemical Reactions" style="flex: 1; font-weight: 600;" required>
+                  </div>
+                </div>
+
+                <div>
+                  <label style="font-size: 0.82rem; font-weight: 700; color: #374151; display: block; margin-bottom: 0.25rem;">Lecture / Episode Title *</label>
+                  <input type="text" id="liveFormLectureTitle" class="portal-input" placeholder="e.g. Balancing Equations Masterclass • Part 1" required style="font-weight: 600;">
+                </div>
+
+                <div>
+                  <label style="font-size: 0.82rem; font-weight: 700; color: #374151; display: block; margin-bottom: 0.25rem;">
+                    YouTube Stream ID / Video URL *
+                  </label>
+                  <input type="text" id="liveFormVideoUrl" class="portal-input" placeholder="e.g. d41r9k2f1W0 or https://youtu.be/..." required style="font-weight: 600;">
+                  <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 2px;">Accepts YouTube live links, unlisted videos, or 11-char video ID.</div>
+                </div>
+
+                <div>
+                  <label style="font-size: 0.82rem; font-weight: 700; color: #374151; display: block; margin-bottom: 0.25rem;">Educator / Faculty *</label>
+                  <select id="liveFormEducator" class="portal-input" style="font-weight: 600;">
+                    <option value="Chandan Kumar" selected>Chandan Kumar (Science Lead)</option>
+                    <option value="Prof. Ravi Ranjan">Prof. Ravi Ranjan (Director & Maths Lead)</option>
+                    <option value="Faculty Team">Faculty Team</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- PDF Notes & Live Broadcast Toggle -->
+              <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 0.85rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap;">
+                <div>
+                  <label style="font-size: 0.82rem; font-weight: 700; color: #374151; display: block; margin-bottom: 0.25rem;">
+                    Cloudflare R2 / PDF Study Material URL (Optional)
+                  </label>
+                  <div style="display: flex; gap: 0.35rem;">
+                    <input type="url" id="liveFormPdfUrl" class="portal-input" placeholder="https://pub-r2.pragyaninstitute.com/notes/... or upload below" style="flex: 1; font-size: 0.82rem;">
+                    <label class="btn" style="background: #059669; color: #fff; padding: 0.45rem 0.85rem; font-size: 0.8rem; font-weight: 700; border-radius: 6px; cursor: pointer; margin: 0; display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap;">
+                      <i class="fa-solid fa-cloud-arrow-up"></i> Upload PDF
+                      <input type="file" id="liveFormPdfFileInput" accept=".pdf" style="display: none;">
+                    </label>
+                  </div>
+                </div>
+
+                <div style="background: #FEF2F2; border: 1.5px dashed #FCA5A5; border-radius: 8px; padding: 0.65rem 0.85rem; display: flex; align-items: center; gap: 0.6rem; margin-top: 18px;">
+                  <input type="checkbox" id="liveFormIsLiveNow" style="width: 18px; height: 18px; accent-color: #DC2626; cursor: pointer;">
+                  <label for="liveFormIsLiveNow" style="font-size: 0.82rem; font-weight: 800; color: #DC2626; cursor: pointer; margin: 0;">
+                    🔴 Broadcast LIVE Right Now
+                  </label>
+                </div>
+              </div>
+
+              <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
+                <button type="submit" id="btnSubmitLiveLecture" class="btn btn-emerald" style="padding: 0.65rem 1.4rem; font-weight: 800; font-size: 0.88rem; display: inline-flex; align-items: center; gap: 0.4rem;">
+                  <i class="fa-solid fa-satellite-dish"></i> Publish / Schedule Lecture
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- 2. FILTER & LECTURE DIRECTORY -->
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.85rem;">
+            <div style="font-weight: 800; font-size: 0.95rem; color: var(--text-mahogany);">
+              📚 Active Lectures & Video Library (${filteredLectures.length})
+            </div>
+            <div style="display: flex; gap: 0.45rem; flex-wrap: wrap;">
+              <select id="adminLiveBatchFilter" class="portal-input" style="font-size: 0.82rem; padding: 0.3rem 0.6rem; height: 34px;">
+                <option value="All" ${liveFilterBatch === 'All' ? 'selected' : ''}>All Batches</option>
+                <option value="10th" ${liveFilterBatch === '10th' ? 'selected' : ''}>Class 10th</option>
+                <option value="9th" ${liveFilterBatch === '9th' ? 'selected' : ''}>Class 9th</option>
+                <option value="8th" ${liveFilterBatch === '8th' ? 'selected' : ''}>Class 8th</option>
+                <option value="Junior" ${liveFilterBatch === 'Junior' ? 'selected' : ''}>Junior</option>
+              </select>
+              <select id="adminLiveSubjectFilter" class="portal-input" style="font-size: 0.82rem; padding: 0.3rem 0.6rem; height: 34px;">
+                <option value="All" ${liveFilterSubject === 'All' ? 'selected' : ''}>All Subjects</option>
+                <option value="Science" ${liveFilterSubject === 'Science' ? 'selected' : ''}>Science</option>
+                <option value="Mathematics" ${liveFilterSubject === 'Mathematics' ? 'selected' : ''}>Mathematics</option>
+                <option value="English" ${liveFilterSubject === 'English' ? 'selected' : ''}>English</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Table of Lectures -->
+          <div style="max-height: 420px; overflow-y: auto; border: 1px solid var(--border-sand); border-radius: 8px; margin-bottom: 1.5rem;">
+            <table class="portal-table" style="font-size: 0.82rem; margin: 0;">
+              <thead>
+                <tr style="background: #F3F4F6;">
+                  <th>Class & Subject</th>
+                  <th>Chapter & Title</th>
+                  <th>Educator</th>
+                  <th>Status</th>
+                  <th>PDF Notes</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${filteredLectures.length === 0 ? `
+                  <tr>
+                    <td colspan="6" style="text-align: center; padding: 2rem 1rem; color: var(--text-muted);">
+                      No lectures found matching the filter criteria.
+                    </td>
+                  </tr>
+                ` : filteredLectures.map(l => {
+                  const isLive = Boolean(l.is_live);
+                  return `
+                    <tr style="${isLive ? 'background: #FEF2F2;' : ''}">
+                      <td>
+                        <div style="font-weight: 800; color: #1E293B;">Class ${l.class_batch || '10th'}</div>
+                        <div style="font-size: 0.75rem; color: var(--primary-emerald); font-weight: 700;">${l.subject}</div>
+                      </td>
+                      <td>
+                        <div style="font-weight: 700; color: var(--text-mahogany);">Ch ${l.chapter_no}: ${l.chapter_title}</div>
+                        <div style="font-size: 0.78rem; color: var(--text-charcoal); margin-top: 2px;">${l.lecture_title}</div>
+                        <div style="font-size: 0.72rem; color: var(--text-muted); font-family: monospace;">Video ID: ${l.video_source_id}</div>
+                      </td>
+                      <td>
+                        <span style="font-weight: 600; color: #374151;">👨‍🏫 ${l.created_by || 'Faculty'}</span>
+                      </td>
+                      <td>
+                        ${l.pdf_notes_url ? `
+                          <a href="${l.pdf_notes_url}" target="_blank" style="color: #059669; font-weight: 700; text-decoration: underline; display: inline-flex; align-items: center; gap: 0.25rem;">
+                            <i class="fa-solid fa-file-pdf"></i> View PDF
+                          </a>
+                        ` : `
+                          <span style="color: #94A3B8; font-size: 0.75rem;">None</span>
+                        `}
+                      </td>
+                      <td>
+                        <div style="display: flex; gap: 0.35rem; align-items: center;">
+                          <button class="btn btn-toggle-live-status" data-id="${l.id}" style="background: ${isLive ? '#374151' : '#DC2626'}; color: #fff; border: none; padding: 0.25rem 0.55rem; font-size: 0.72rem; font-weight: 700; border-radius: 4px; cursor: pointer;">
+                            ${isLive ? '⏹️ End Live' : '🔴 Go Live'}
+                          </button>
+                          <button class="btn btn-attach-pdf-modal" data-id="${l.id}" style="background: #059669; color: #fff; border: none; padding: 0.25rem 0.55rem; font-size: 0.72rem; font-weight: 700; border-radius: 4px; cursor: pointer;" title="Attach PDF Notes">
+                            <i class="fa-solid fa-paperclip"></i> PDF
+                          </button>
+                          <button class="btn btn-delete-lecture" data-id="${l.id}" style="background: #EF4444; color: #fff; border: none; padding: 0.25rem 0.55rem; font-size: 0.72rem; font-weight: 700; border-radius: 4px; cursor: pointer;" title="Delete Lecture">
+                            <i class="fa-solid fa-trash-can"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 3. REALTIME STUDENT DOUBT MODERATION BOARD -->
+          <div style="background: #F8FAFC; border: 1.5px solid #E2E8F0; border-radius: 12px; padding: 1.25rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.85rem;">
+              <div style="font-weight: 800; font-size: 0.95rem; color: var(--text-mahogany); display: flex; align-items: center; gap: 0.4rem;">
+                <i class="fa-solid fa-comments" style="color: #2563EB;"></i> Realtime Student Doubts Stream
+                <span class="badge" style="background: #2563EB; color: #fff; padding: 1px 7px; border-radius: 99px; font-size: 0.75rem;">
+                  ${pendingDoubts.length} Unresolved
+                </span>
+              </div>
+              <button class="btn" id="btnClearResolvedDoubts" style="background: #E2E8F0; color: #475569; font-size: 0.75rem; font-weight: 700; padding: 0.25rem 0.65rem; border-radius: 6px;">
+                Clear Resolved
+              </button>
+            </div>
+
+            <div style="max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem;">
+              ${doubts.length === 0 ? `
+                <div style="text-align: center; color: var(--text-muted); font-size: 0.82rem; padding: 1.5rem 0;">
+                  No live student doubts submitted yet.
+                </div>
+              ` : doubts.map(d => `
+                <div style="background: #ffffff; border: 1px solid ${d.is_pinned ? '#F59E0B' : '#E2E8F0'}; border-left: 4px solid ${d.is_pinned ? '#F59E0B' : (d.is_resolved ? '#10B981' : '#3B82F6')}; border-radius: 6px; padding: 0.6rem 0.85rem; display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem;">
+                  <div style="flex: 1;">
+                    <div style="display: flex; gap: 0.4rem; align-items: center; margin-bottom: 0.2rem; font-size: 0.78rem;">
+                      <strong style="color: #1E293B;">🎓 ${d.student_name}</strong>
+                      <span style="color: var(--text-muted);">(Roll #${d.student_roll})</span>
+                      ${d.is_pinned ? '<span style="background: #FEF3C7; color: #B45309; padding: 0 4px; border-radius: 3px; font-size: 0.68rem; font-weight: 800;">📌 PINNED</span>' : ''}
+                      ${d.is_resolved ? '<span style="background: #D1FAE5; color: #065F46; padding: 0 4px; border-radius: 3px; font-size: 0.68rem; font-weight: 700;">✓ ANSWERED</span>' : ''}
+                      <span style="color: #94A3B8; font-size: 0.7rem; margin-left: auto;">${d.created_at ? new Date(d.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                    </div>
+                    <div style="font-size: 0.84rem; color: #334155; line-height: 1.4;">${d.doubt_text}</div>
+                    ${d.educator_answer ? `
+                      <div style="margin-top: 0.3rem; background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 4px; padding: 0.3rem 0.55rem; font-size: 0.78rem; color: #166534;">
+                        <strong>👨‍🏫 Answer:</strong> ${d.educator_answer}
+                      </div>
+                    ` : ''}
+                  </div>
+                  
+                  <div style="display: flex; gap: 0.3rem; align-items: center; flex-shrink: 0;">
+                    <button class="btn btn-pin-doubt" data-id="${d.id}" style="background: ${d.is_pinned ? '#F59E0B' : '#F1F5F9'}; color: ${d.is_pinned ? '#fff' : '#475569'}; border: 1px solid #CBD5E1; padding: 0.2rem 0.45rem; border-radius: 4px; font-size: 0.72rem; cursor: pointer;" title="Pin Doubt to Stream">
+                      📌
+                    </button>
+                    <button class="btn btn-answer-doubt" data-id="${d.id}" style="background: #059669; color: #fff; border: none; padding: 0.2rem 0.55rem; border-radius: 4px; font-size: 0.72rem; font-weight: 700; cursor: pointer;">
+                      ✓ Answer
+                    </button>
+                    <button class="btn btn-delete-doubt" data-id="${d.id}" style="background: none; border: none; color: #EF4444; padding: 0.2rem; cursor: pointer;" title="Dismiss">
+                      <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+
+      bindAdminLiveManagerEvents(pane);
+    } catch (err) {
+      console.error('Error rendering Admin Live Manager tab:', err);
+    }
+  }
+
+  function bindAdminLiveManagerEvents(pane) {
+    if (!pane) return;
+
+    function extractYouTubeVideoId(input) {
+      if (!input) return '';
+      const trimmed = input.trim();
+      if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) return trimmed;
+      const urlMatch = trimmed.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|live\/|watch\?.+&v=))([\w-]{11})/i);
+      return urlMatch ? urlMatch[1] : trimmed;
+    }
+
+    pane.querySelector('#adminLiveBatchFilter')?.addEventListener('change', (e) => {
+      liveFilterBatch = e.target.value;
+      renderAdminLiveManagerTab();
+    });
+
+    pane.querySelector('#adminLiveSubjectFilter')?.addEventListener('change', (e) => {
+      liveFilterSubject = e.target.value;
+      renderAdminLiveManagerTab();
+    });
+
+    pane.querySelector('#liveFormPdfFileInput')?.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        const uploadUrl = await SupabaseSync.uploadFile(file, 'lecture_notes');
+        if (uploadUrl) {
+          const pdfInput = pane.querySelector('#liveFormPdfUrl');
+          if (pdfInput) pdfInput.value = uploadUrl;
+          alert('✅ PDF Notes uploaded to Cloudflare R2 / Media CDN!');
+        }
+      } catch (err) {
+        alert('⚠️ PDF Upload failed: ' + err.message);
+      }
+    });
+
+    pane.querySelector('#adminGoLiveForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const classBatch = pane.querySelector('#liveFormClass').value;
+      const subject = pane.querySelector('#liveFormSubject').value;
+      const chapterNo = parseInt(pane.querySelector('#liveFormChapterNo').value, 10) || 1;
+      const chapterTitle = pane.querySelector('#liveFormChapterTitle').value.trim();
+      const lectureTitle = pane.querySelector('#liveFormLectureTitle').value.trim();
+      const rawVideo = pane.querySelector('#liveFormVideoUrl').value.trim();
+      const videoId = extractYouTubeVideoId(rawVideo);
+      const educator = pane.querySelector('#liveFormEducator').value;
+      const pdfUrl = pane.querySelector('#liveFormPdfUrl').value.trim();
+      const isLiveNow = pane.querySelector('#liveFormIsLiveNow').checked;
+
+      if (!videoId) {
+        alert('⚠️ Please enter a valid YouTube Video ID or Stream URL.');
+        return;
+      }
+
+      const lectures = AppState.getVideoLectures();
+      if (isLiveNow) {
+        lectures.forEach(l => {
+          if (l.class_batch === classBatch) l.is_live = false;
+        });
+      }
+
+      const newLecture = {
+        id: `lec-${classBatch.toLowerCase()}-${subject.slice(0, 3).toLowerCase()}-${Date.now().toString(36)}`,
+        class_batch: classBatch,
+        subject: subject,
+        chapter_no: chapterNo,
+        chapter_title: chapterTitle,
+        lecture_title: lectureTitle,
+        video_source_id: videoId,
+        duration_minutes: 50,
+        pdf_notes_url: pdfUrl || '',
+        thumbnail_url: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=600&q=80',
+        is_live: isLiveNow,
+        live_scheduled_at: isLiveNow ? new Date().toISOString() : null,
+        created_by: educator
+      };
+
+      lectures.unshift(newLecture);
+      await AppState.saveVideoLectures(lectures);
+      await AppState.addAuditLog(educator, 'LECTURE_PUBLISHED', 'All Students', `Class ${classBatch}`, `${isLiveNow ? '🔴 Started Live Stream' : 'Published Lecture'}: "${lectureTitle}" (${subject})`);
+
+      alert(`🎉 Lecture "${lectureTitle}" published successfully! ${isLiveNow ? '🔴 Broadcast is LIVE NOW on all student portals.' : ''}`);
+      renderAdminLiveManagerTab();
+    });
+
+    pane.querySelectorAll('.btn-toggle-live-status').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        const lectures = AppState.getVideoLectures();
+        const target = lectures.find(l => l.id === id);
+        if (!target) return;
+
+        const nextStatus = !target.is_live;
+        if (nextStatus) {
+          lectures.forEach(l => {
+            if (l.class_batch === target.class_batch) l.is_live = false;
+          });
+        }
+        target.is_live = nextStatus;
+        if (nextStatus) target.live_scheduled_at = new Date().toISOString();
+
+        await AppState.saveVideoLectures(lectures);
+        await AppState.addAuditLog(getActiveTeacherName(), nextStatus ? 'LIVE_STREAM_STARTED' : 'LIVE_STREAM_ENDED', 'All Students', `Class ${target.class_batch}`, `${nextStatus ? '🔴 Started Live Stream' : '⏹️ Ended Live Stream'}: "${target.lecture_title}"`);
+        renderAdminLiveManagerTab();
+      });
+    });
+
+    pane.querySelectorAll('.btn-attach-pdf-modal').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        const lectures = AppState.getVideoLectures();
+        const target = lectures.find(l => l.id === id);
+        if (!target) return;
+
+        const currentPdf = target.pdf_notes_url || '';
+        const newPdf = prompt(`Enter Cloudflare R2 / PDF Study Material URL for "${target.lecture_title}":`, currentPdf);
+        if (newPdf !== null) {
+          target.pdf_notes_url = newPdf.trim();
+          await AppState.saveVideoLectures(lectures);
+          alert('✅ PDF Notes attached successfully!');
+          renderAdminLiveManagerTab();
+        }
+      });
+    });
+
+    pane.querySelectorAll('.btn-delete-lecture').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        const lectures = AppState.getVideoLectures();
+        const target = lectures.find(l => l.id === id);
+        if (!target) return;
+
+        if (confirm(`🗑️ Permanently delete lecture "${target.lecture_title}"?`)) {
+          const updated = lectures.filter(l => l.id !== id);
+          if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
+            await SupabaseSync.mutate('video_lectures', 'delete', null, { where: { lecture_id: id } });
+          }
+          await AppState.saveVideoLectures(updated);
+          alert('Lecture deleted.');
+          renderAdminLiveManagerTab();
+        }
+      });
+    });
+
+    pane.querySelectorAll('.btn-pin-doubt').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        const doubts = AppState.getLiveClassDoubts();
+        const target = doubts.find(d => d.id === id);
+        if (!target) return;
+        target.is_pinned = !target.is_pinned;
+        await AppState.saveLiveClassDoubts(doubts);
+        renderAdminLiveManagerTab();
+      });
+    });
+
+    pane.querySelectorAll('.btn-answer-doubt').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        const doubts = AppState.getLiveClassDoubts();
+        const target = doubts.find(d => d.id === id);
+        if (!target) return;
+
+        const ans = prompt(`Enter educator answer for student ${target.student_name} (${target.doubt_text}):`, target.educator_answer || '');
+        if (ans !== null) {
+          target.educator_answer = ans.trim();
+          target.is_resolved = true;
+          await AppState.saveLiveClassDoubts(doubts);
+          renderAdminLiveManagerTab();
+        }
+      });
+    });
+
+    pane.querySelectorAll('.btn-delete-doubt').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        const doubts = AppState.getLiveClassDoubts();
+        const updated = doubts.filter(d => d.id !== id);
+        await AppState.saveLiveClassDoubts(updated);
+        renderAdminLiveManagerTab();
+      });
+    });
+
+    pane.querySelector('#btnClearResolvedDoubts')?.addEventListener('click', async () => {
+      const doubts = AppState.getLiveClassDoubts();
+      const remaining = doubts.filter(d => !d.is_resolved);
+      await AppState.saveLiveClassDoubts(remaining);
+      renderAdminLiveManagerTab();
+    });
+  }
 
   /* ==========================================================================
    * FINANCIAL ANALYTICS & REPORTS TAB (ADMIN / TEACHERS)

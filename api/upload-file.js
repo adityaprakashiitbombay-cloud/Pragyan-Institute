@@ -1,8 +1,11 @@
 import crypto from 'crypto';
 import { getSupabase, requireSession, applyCors } from './_lib/auth.js';
 
-const MAX_BYTES = 5 * 1024 * 1024;
-const ALLOWED_FOLDERS = new Set(['admin_avatars', 'notice_attachments', 'profile_pictures', 'payment_proofs']);
+const MAX_BYTES = 15 * 1024 * 1024; // 15 MB for rich PDFs & study material
+const ALLOWED_FOLDERS = new Set([
+  'admin_avatars', 'notice_attachments', 'profile_pictures', 
+  'payment_proofs', 'study_materials', 'lecture_notes'
+]);
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
 
 export default async function handler(req, res) {
@@ -20,9 +23,9 @@ export default async function handler(req, res) {
   }
 
   const raw = base64.includes(',') ? base64.split(',').pop() : base64;
-  if (raw.length > 7 * 1024 * 1024) return res.status(413).json({ error: 'Uploads must be smaller than 5 MB' });
+  if (raw.length > 20 * 1024 * 1024) return res.status(413).json({ error: 'Uploads must be smaller than 15 MB' });
   const bytes = Buffer.from(raw, 'base64');
-  if (!bytes.length || bytes.length > MAX_BYTES) return res.status(413).json({ error: 'Uploads must be smaller than 5 MB' });
+  if (!bytes.length || bytes.length > MAX_BYTES) return res.status(413).json({ error: 'Uploads must be smaller than 15 MB' });
 
   const extension = (fileName || '').split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
   const safeFolder = session.role === 'student' ? `${folder}/${session.sub}` : folder;

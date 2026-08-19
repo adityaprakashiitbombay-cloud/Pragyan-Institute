@@ -3,9 +3,10 @@ import path from 'path';
 import { _normalizeDob, normalizeDob, _dobMatches, generateStudentId } from '../tests/auth.test.js';
 import { calculateEstimate } from '../js/fee-calculator.js';
 import { generateConcurrentStudentId } from '../tests/concurrency.test.js';
+import { runV2ClassroomTests } from '../tests/v2_live_lectures.test.js';
 
 console.log('================================================================');
-console.log('   PRAGYAN INSTITUTE — T1 TO T6 MASTER TEST RUNNER & AUDIT      ');
+console.log('   PRAGYAN INSTITUTE — T1 TO T13 MASTER TEST RUNNER & AUDIT     ');
 console.log('================================================================\n');
 
 let pass = 0;
@@ -446,6 +447,15 @@ assert(summaryResult.chandanTotal + summaryResult.raviTotal === totalMasterPaid,
 assert(summaryResult.chandanCash + summaryResult.chandanUpi === summaryResult.chandanTotal, 'T12.3: Chandan Kumar Cash + UPI breakdown matches total');
 assert(summaryResult.raviCash + summaryResult.raviUpi === summaryResult.raviTotal, 'T12.4: Prof. Ravi Ranjan Cash + UPI breakdown matches total');
 assert(summaryResult.allTx.length === 5, 'T12.5: Successfully synthesizes missing admission transactions to reflect 100% of real payments');
+
+// -----------------------------------------------------------------------------
+// T13: Version 2.0 Live Streaming, CDN & Doubts Tests
+// -----------------------------------------------------------------------------
+console.log('\n--- [T13] Version 2.0 Live Classroom, Watermarking & Realtime Doubts Suite ---');
+const v2Results = runV2ClassroomTests();
+v2Results.forEach(r => {
+  assert(r.pass, r.name);
+});
 
 console.log('\n================================================================');
 console.log(`MASTER TEST RESULTS: ${pass} Passed, ${fail} Failed`);
