@@ -4130,16 +4130,21 @@ function renderStudentDashboard() {
       const safeAdmins = [admin];
 
       pane.innerHTML = `
-        <div class="dash-card">
-          <div class="admin-profile-header-wrap" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border-sand); padding-bottom: 1rem;">
-            <div>
-              <h3 style="font-size: 1.25rem; font-weight: 800; color: var(--text-mahogany); margin: 0;">
-                <i class="fa-solid fa-gears" style="color: var(--primary-emerald);"></i> Admin Profile, Security & Account Settings
-              </h3>
-              <div style="font-size: 0.84rem; color: var(--text-muted); margin-top: 0.25rem;">Manage your official profile details, security credentials, and institute billing configuration.</div>
+        <div class="dash-card admin-settings-dash-card">
+          <div class="admin-profile-header-wrap">
+            <div class="admin-profile-header-left">
+              <div class="admin-profile-icon-badge">
+                <i class="fa-solid fa-user-shield"></i>
+              </div>
+              <div>
+                <h3 class="admin-profile-title">
+                  Admin Profile & Security Settings
+                </h3>
+                <div class="admin-profile-subtitle">Manage official director identity, contact channels, UPI billing & security credentials</div>
+              </div>
             </div>
-            <span class="admin-profile-secure-badge" style="background: var(--primary-emerald-light); color: var(--primary-emerald); padding: 0.35rem 0.85rem; border-radius: 99px; font-size: 0.8rem; font-weight: 700;">
-              <i class="fa-solid fa-shield-halved"></i> Secure Profile Settings
+            <span class="admin-profile-secure-badge">
+              <i class="fa-solid fa-shield-halved"></i> Cloud Synced & Encrypted
             </span>
           </div>
 
@@ -4154,27 +4159,27 @@ function renderStudentDashboard() {
                   </div>
                   <div>
                     <div class="admin-card-head-title">1. Director Identity & Profile</div>
-                    <div style="font-size: 0.76rem; color: var(--text-muted);">Personal details and official contact channels</div>
+                    <div class="admin-card-head-desc">Personal details and official contact channels</div>
                   </div>
                 </div>
 
                 <!-- Avatar Preview & Upload -->
                 <div class="admin-avatar-card-inner">
                   <div id="adminAvatarPreview" class="admin-avatar-preview-box">
-                    ${admin.photoUrl ? `<img src="${admin.photoUrl}" style="width:100%; height:100%; object-fit:cover;">` : (admin.name ? admin.name.charAt(0) : 'A')}
+                    ${admin.photoUrl ? `<img src="${admin.photoUrl}" alt="${(admin.name || 'Admin')}">` : (admin.name ? admin.name.charAt(0).toUpperCase() : 'A')}
                   </div>
                   <div class="admin-avatar-ctrls">
-                    <label class="btn-change-photo">
+                    <label class="btn-change-photo" for="adminPhotoFileInput">
                       <i class="fa-solid fa-camera"></i> Change Photo
                       <input type="file" id="adminPhotoFileInput" accept="image/*" capture="environment" style="display: none;">
                     </label>
-                    <div style="font-size: 0.74rem; color: var(--text-muted); line-height: 1.35;">Supports JPG, PNG (Auto-compressed & Cloud Live)</div>
+                    <div class="admin-avatar-hint">JPG or PNG (Auto-compressed & Cloud Live)</div>
                   </div>
                 </div>
 
                 <!-- Full Name -->
                 <div class="admin-form-group">
-                  <label for="adminSettingName">Director / Educator Full Name *</label>
+                  <label for="adminSettingName">Director / Educator Full Name <span class="req-star">*</span></label>
                   <div class="input-icon-wrap">
                     <input type="text" id="adminSettingName" class="portal-input" value="${(admin.name || '').replace(/"/g, '&quot;')}" required placeholder="e.g. CHANDAN KUMAR / Prof. Ravi Ranjan">
                     <i class="fa-solid fa-user-tie input-left-icon"></i>
@@ -4183,40 +4188,39 @@ function renderStudentDashboard() {
 
                 <!-- Designation Role -->
                 <div class="admin-form-group">
-                  <label for="adminSettingRole">Designation / Role Title *</label>
+                  <label for="adminSettingRole">Designation / Role Title <span class="req-star">*</span></label>
                   <div class="input-icon-wrap">
                     <input type="text" id="adminSettingRole" class="portal-input" value="${(admin.role || '').replace(/"/g, '&quot;')}" required placeholder="e.g. Managing Director & Science Lead">
                     <i class="fa-solid fa-award input-left-icon"></i>
                   </div>
                 </div>
 
-                <!-- 2-Col on Desktop, 1-Col on Mobile: Mobile & Email -->
-                <div class="admin-form-row-2col">
-                  <div class="admin-form-group">
-                    <label for="adminSettingMobile">Mobile / WhatsApp *</label>
-                    <div class="input-icon-wrap">
-                      <input type="tel" id="adminSettingMobile" class="portal-input" value="${(admin.mobile || '').replace(/"/g, '&quot;')}" required placeholder="e.g. 7369891858">
-                      <i class="fa-solid fa-phone input-left-icon"></i>
-                    </div>
+                <!-- Mobile / WhatsApp -->
+                <div class="admin-form-group">
+                  <label for="adminSettingMobile">Mobile / WhatsApp <span class="req-star">*</span></label>
+                  <div class="input-icon-wrap">
+                    <input type="tel" id="adminSettingMobile" class="portal-input" value="${(admin.mobile || '').replace(/"/g, '&quot;')}" required placeholder="e.g. 7369891858">
+                    <i class="fa-solid fa-phone input-left-icon"></i>
                   </div>
+                </div>
 
-                  <div class="admin-form-group">
-                    <label for="adminSettingEmail">Official Email *</label>
-                    <div class="input-icon-wrap">
-                      <input type="email" id="adminSettingEmail" class="portal-input" value="${(admin.email || '').replace(/"/g, '&quot;')}" required placeholder="e.g. chandan@pragyanlalganj.in">
-                      <i class="fa-solid fa-envelope input-left-icon"></i>
-                    </div>
+                <!-- Official Email -->
+                <div class="admin-form-group">
+                  <label for="adminSettingEmail">Official Email Address <span class="req-star">*</span></label>
+                  <div class="input-icon-wrap">
+                    <input type="email" id="adminSettingEmail" class="portal-input" value="${(admin.email || '').replace(/"/g, '&quot;')}" required placeholder="e.g. chandan@pragyaninstitute.com">
+                    <i class="fa-solid fa-envelope input-left-icon"></i>
                   </div>
                 </div>
 
                 <!-- Official Institute UPI ID -->
-                <div class="admin-form-group" style="margin-top: 0.25rem;">
-                  <label for="adminSettingUpi">Institute Official UPI ID (VPA) *</label>
+                <div class="admin-form-group">
+                  <label for="adminSettingUpi">Institute Official UPI ID (VPA) <span class="req-star">*</span></label>
                   <div class="input-icon-wrap">
                     <input type="text" id="adminSettingUpi" class="portal-input" value="${(admin.upiId || 'chandankr1501998@ybl').replace(/"/g, '&quot;')}" required placeholder="e.g. chandankr1501998@ybl">
                     <i class="fa-solid fa-building-columns input-left-icon"></i>
                   </div>
-                  <div style="font-size: 0.74rem; color: var(--text-muted); margin-top: 0.25rem;">Printed on fee receipts, student payment vouchers & QR codes</div>
+                  <div class="admin-field-hint">Printed on fee receipts, student payment vouchers & QR codes</div>
                 </div>
 
                 <!-- Hidden Base64 / URL Photo Storage -->
@@ -4231,7 +4235,7 @@ function renderStudentDashboard() {
                   </div>
                   <div>
                     <div class="admin-card-head-title">2. Admin ID & Password Security</div>
-                    <div style="font-size: 0.76rem; color: var(--text-muted);">Access control, password updates & security verification</div>
+                    <div class="admin-card-head-desc">Access control, password updates & security verification</div>
                   </div>
                 </div>
 
@@ -4239,62 +4243,63 @@ function renderStudentDashboard() {
                 <div class="admin-form-group">
                   <label for="adminSettingUsername">Permanent Admin Username / ID</label>
                   <div class="input-icon-wrap">
-                    <input type="text" id="adminSettingUsername" class="portal-input" value="${(admin.username || '').replace(/"/g, '&quot;')}" readonly disabled style="background: #F1F5F9; cursor: not-allowed; opacity: 0.9; border-color: #E2E8F0;" title="Admin username is fixed and cannot be changed">
+                    <input type="text" id="adminSettingUsername" class="portal-input input-readonly" value="${(admin.username || '').replace(/"/g, '&quot;')}" readonly disabled title="Admin username is fixed and cannot be changed">
                     <i class="fa-solid fa-lock input-left-icon"></i>
                   </div>
-                  <div style="font-size: 0.74rem; color: var(--text-muted); margin-top: 0.25rem;">Permanent institutional admin identifier (read-only)</div>
+                  <div class="admin-field-hint">Permanent institutional admin identifier (read-only)</div>
                 </div>
 
-                <!-- 2-Col on Desktop, 1-Col on Mobile: New Password & Confirm Password -->
-                <div class="admin-form-row-2col" style="margin-top: 0.5rem;">
-                  <div class="admin-form-group">
-                    <label for="adminSettingNewPass">New Password (Optional)</label>
-                    <div class="input-icon-wrap">
-                      <input type="password" id="adminSettingNewPass" class="portal-input" placeholder="Leave blank to keep current" autocomplete="new-password">
-                      <i class="fa-solid fa-key input-left-icon"></i>
-                      <button type="button" class="btn-toggle-admin-pw" data-target="adminSettingNewPass" aria-label="Toggle password visibility">
-                        <i class="fa-regular fa-eye"></i>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div class="admin-form-group">
-                    <label for="adminSettingConfirmPass">Confirm New Password</label>
-                    <div class="input-icon-wrap">
-                      <input type="password" id="adminSettingConfirmPass" class="portal-input" placeholder="Re-enter new password" autocomplete="new-password">
-                      <i class="fa-solid fa-check-double input-left-icon"></i>
-                      <button type="button" class="btn-toggle-admin-pw" data-target="adminSettingConfirmPass" aria-label="Toggle password visibility">
-                        <i class="fa-regular fa-eye"></i>
-                      </button>
-                    </div>
+                <!-- New Password (Optional) - Full Width -->
+                <div class="admin-form-group">
+                  <label for="adminSettingNewPass">New Password (Optional)</label>
+                  <div class="input-icon-wrap">
+                    <input type="password" id="adminSettingNewPass" class="portal-input" placeholder="Leave blank to keep current password" autocomplete="new-password">
+                    <i class="fa-solid fa-key input-left-icon"></i>
+                    <button type="button" class="btn-toggle-admin-pw" data-target="adminSettingNewPass" aria-label="Toggle password visibility">
+                      <i class="fa-regular fa-eye"></i>
+                    </button>
                   </div>
                 </div>
-                <div class="security-hint" id="adminPasswordMatchHint" style="margin-top: -0.35rem; margin-bottom: 0.85rem; font-size: 0.76rem; color: var(--text-muted);">
-                  Leave blank to keep current password. Minimum 12 characters if updating.
+
+                <!-- Confirm New Password - Full Width -->
+                <div class="admin-form-group">
+                  <label for="adminSettingConfirmPass">Confirm New Password</label>
+                  <div class="input-icon-wrap">
+                    <input type="password" id="adminSettingConfirmPass" class="portal-input" placeholder="Re-enter new password to confirm" autocomplete="new-password">
+                    <i class="fa-solid fa-check-double input-left-icon"></i>
+                    <button type="button" class="btn-toggle-admin-pw" data-target="adminSettingConfirmPass" aria-label="Toggle password visibility">
+                      <i class="fa-regular fa-eye"></i>
+                    </button>
+                  </div>
+                  <div class="security-hint" id="adminPasswordMatchHint">
+                    Leave blank to keep current password. Minimum 12 characters if updating.
+                  </div>
                 </div>
 
-                <!-- Current Password Verification Box -->
-                <div class="admin-security-alert-box" style="margin-top: auto;">
-                  <div style="font-size: 1.1rem; color: #DC2626; flex-shrink: 0; margin-top: 2px;"><i class="fa-solid fa-triangle-exclamation"></i></div>
-                  <div style="width: 100%;">
-                    <label for="adminSettingCurrentPass" style="display: block; font-size: 0.82rem; font-weight: 700; color: #991B1B; margin-bottom: 0.35rem;">
-                      Current Admin Password (Required to Authorize Changes) *
+                <!-- Current Password Verification Alert Box -->
+                <div class="admin-security-alert-box">
+                  <div class="security-alert-icon">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                  </div>
+                  <div class="security-alert-body">
+                    <label for="adminSettingCurrentPass" class="security-alert-label">
+                      Current Admin Password (Required to Authorize Changes) <span class="req-star">*</span>
                     </label>
                     <div class="input-icon-wrap">
-                      <input type="password" id="adminSettingCurrentPass" class="portal-input" required placeholder="Enter current password to verify identity" style="border-color: #FCA5A5; background: #fff;">
-                      <i class="fa-solid fa-shield-cat input-left-icon" style="color: #EF4444;"></i>
+                      <input type="password" id="adminSettingCurrentPass" class="portal-input security-auth-input" required placeholder="Enter current password to verify identity">
+                      <i class="fa-solid fa-shield-halved input-left-icon" style="color: #DC2626 !important;"></i>
                       <button type="button" class="btn-toggle-admin-pw" data-target="adminSettingCurrentPass" aria-label="Toggle password visibility">
                         <i class="fa-regular fa-eye"></i>
                       </button>
                     </div>
-                    <div style="font-size: 0.72rem; color: #B91C1C; margin-top: 0.25rem;">Mandatory security verification step for all profile and credential updates.</div>
+                    <div class="security-alert-hint">Mandatory security verification step for all profile and credential updates.</div>
                   </div>
                 </div>
               </div>
 
             </div>
 
-            <div class="admin-profile-submit-wrap" style="margin-top: 1.25rem;">
+            <div class="admin-profile-submit-wrap">
               <button type="submit" class="btn btn-emerald btn-admin-settings-submit">
                 <i class="fa-solid fa-floppy-disk"></i> Save & Sync Profile Changes
               </button>
