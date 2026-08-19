@@ -2531,7 +2531,7 @@ function renderStudentDashboard() {
     `;
   }
 
-  // 1. Student Tab: Their Details
+  // 1. Student Tab: Profile (Details, 3D ID Card, Security)
   function renderStudentDetailsTab() {
     const s = AppState.currentUser;
     const pane = document.getElementById('studentTabPane-details');
