@@ -645,6 +645,58 @@ assert(raviTotal === 1600, 'T15.6: Prof. Ravi Ranjan total is ₹1,600');
 const comboTx = filterFeeTransactions(sampleTxList, { month: '2026-08', batch: '10th', admin: 'chandan', mode: 'upi' });
 assert(comboTx.length === 1 && comboTx[0].receiptNo === 'REC-01', 'T15.7: Multi-dimensional intersection filter accurately isolates targeted transaction');
 
+// -----------------------------------------------------------------------------
+// T16: Outstanding Fee Dues Modal Multi-Dimensional Filter Suite
+// -----------------------------------------------------------------------------
+console.log('\n--- [T16] Outstanding Fee Dues Modal Multi-Dimensional Filter Suite ---');
+const sampleDuesStudents = [
+  { id: 's-1', name: 'Aman Verma', className: 'Class 10th (ACHIEVER)', pendingFee: 2500, guardianName: 'Mr. Verma', guardianMobile: '9876543210' },
+  { id: 's-2', name: 'Rohan Sharma', className: 'Class 10th (ACHIEVER)', pendingFee: 1000, guardianName: 'Mr. Sharma', guardianMobile: '9876543211' },
+  { id: 's-3', name: 'Sneha Patel', className: 'Class 8th (ALPHA)', pendingFee: 800, guardianName: 'Mrs. Patel', guardianMobile: '9876543212' },
+  { id: 's-4', name: 'Kavita Roy', className: 'Class 9th (NURTURE)', pendingFee: 3000, guardianName: 'Mr. Roy', guardianMobile: '9876543213' },
+  { id: 's-5', name: 'Zero Due Student', className: 'Class 10th (ACHIEVER)', pendingFee: 0, guardianName: 'Guardian', guardianMobile: '9876543214' }
+];
+
+function filterDuesStudents(list, { batch = 'all', admin = 'all', range = 'all', query = '' }) {
+  return list.filter(s => {
+    if ((s.pendingFee || 0) <= 0) return false;
+    const bKey = s.className.includes('10th') ? '10th' : s.className.includes('9th') ? '9th' : s.className.includes('8th') ? '8th' : 'junior';
+    
+    if (batch !== 'all' && bKey !== batch) return false;
+    if (admin !== 'all') {
+      const isChandanLead = (bKey === '10th' || bKey === '9th');
+      if (admin === 'chandan' && !isChandanLead) return false;
+      if (admin === 'ravi' && isChandanLead) return false;
+    }
+    if (range === 'high' && s.pendingFee <= 2000) return false;
+    if (range === 'mid' && (s.pendingFee < 1000 || s.pendingFee > 2000)) return false;
+    if (range === 'low' && s.pendingFee >= 1000) return false;
+
+    if (query) {
+      const q = query.toLowerCase();
+      if (!s.name.toLowerCase().includes(q) && !s.className.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+// 1. All pending students (excluding zero dues)
+const allPending = filterDuesStudents(sampleDuesStudents, {});
+assert(allPending.length === 4, 'T16.1: Dues filter isolates all students with pending balances (excludes zero dues)');
+assert(allPending.reduce((sum, s) => sum + s.pendingFee, 0) === 7300, 'T16.2: Total outstanding dues sum is ₹7,300');
+
+// 2. High Dues Filter (> ₹2,000)
+const highDues = filterDuesStudents(sampleDuesStudents, { range: 'high' });
+assert(highDues.length === 2 && highDues.every(s => s.pendingFee > 2000), 'T16.3: High dues filter accurately isolates balances > ₹2,000');
+
+// 3. Class 10th Dues Filter
+const class10Dues = filterDuesStudents(sampleDuesStudents, { batch: '10th' });
+assert(class10Dues.length === 2 && class10Dues.reduce((sum, s) => sum + s.pendingFee, 0) === 3500, 'T16.4: Class 10th dues filter isolates 2 students with ₹3,500 pending');
+
+// 4. Faculty Lead: Prof. Ravi Ranjan (Class 8th / Junior)
+const raviDues = filterDuesStudents(sampleDuesStudents, { admin: 'ravi' });
+assert(raviDues.length === 1 && raviDues[0].id === 's-3', 'T16.5: Faculty lead filter accurately isolates Prof. Ravi Ranjan batch dues');
+
 console.log('\n================================================================');
 console.log(`MASTER TEST RESULTS: ${pass} Passed, ${fail} Failed`);
 console.log('================================================================');

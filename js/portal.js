@@ -4458,89 +4458,361 @@ function renderStudentDashboard() {
     updateFeeModalContent();
   }
 
+  /* ==========================================================================
+   * INTERACTIVE OUTSTANDING FEE DUES & REMINDER MANAGER MODAL WITH MULTI-DIMENSIONAL FILTERS
+   * ========================================================================== */
+  let pendingModalClassFilter = 'all';
+  let pendingModalAdminFilter = 'all';
+  let pendingModalDueRangeFilter = 'all';
+  let pendingModalSearchFilter = '';
+
   function openPendingFeesDefaultersModal() {
     document.getElementById('pendingFeesModal')?.remove();
-    const students = AppState.getStudents();
-    const pendingStudents = students.filter(s => (s.pendingFee || 0) > 0);
-    const totalPending = pendingStudents.reduce((acc, curr) => acc + (curr.pendingFee || 0), 0);
 
     const modalHtml = `
-      <div class="inner-modal-backdrop active" id="pendingFeesModal">
-        <div class="inner-modal-content" style="max-width: 720px;">
-          <div class="inner-modal-header">
-            <h3><i class="fa-solid fa-clock-rotate-left" style="color: #DC2626;"></i> Outstanding Fee Dues & Reminder Manager</h3>
-            <button class="btn-close-inner" onclick="document.getElementById('pendingFeesModal').remove()"><i class="fa-solid fa-xmark"></i></button>
-          </div>
+      <div class="inner-modal-backdrop active" id="pendingFeesModal" style="display: flex; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 9999; align-items: center; justify-content: center; padding: 0.75rem; backdrop-filter: blur(4px);">
+        <div class="inner-modal-content" style="max-width: 860px; width: 100%; max-height: 90vh; background: #FAF9F6; border-radius: 12px; border: 1.5px solid var(--border-sand); box-shadow: 0 10px 30px rgba(0,0,0,0.2); overflow: hidden; display: flex; flex-direction: column;">
           
-          <div style="background: #FEF2F2; border: 1px solid #FECACA; color: #991B1B; padding: 1rem 1.25rem; border-radius: 10px; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+          <!-- Header -->
+          <div class="inner-modal-header" style="background: #991B1B; color: #fff; padding: 1rem 1.25rem; display: flex; justify-content: space-between; align-items: center;">
             <div>
-              <div style="font-size: 0.85rem; font-weight: 600;">Total Outstanding Tuition Dues</div>
-              <div style="font-size: 1.6rem; font-weight: 800; color: #DC2626;">₹${totalPending.toLocaleString()} <span style="font-size: 0.9rem; font-weight: 600;">(${pendingStudents.length} Students Pending)</span></div>
+              <h3 style="margin: 0; font-size: 1.15rem; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fa-solid fa-clock-rotate-left" style="color: #FCA5A5;"></i> Outstanding Fee Dues & Reminder Manager
+              </h3>
+              <div style="font-size: 0.75rem; color: #FECACA; margin-top: 0.15rem;">Filter student dues by batch, educator lead, amount range, and dispatch instant reminders</div>
             </div>
-            <div style="font-size: 0.8rem; color: #7F1D1D;">
-              <i class="fa-solid fa-bell"></i> Send 1-click WhatsApp reminders to parents below
-            </div>
+            <button class="btn-close-inner" onclick="document.getElementById('pendingFeesModal').remove()" style="background: none; border: none; color: #fff; font-size: 1.2rem; cursor: pointer;">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
           </div>
 
-          <div style="max-height: 350px; overflow-y: auto; border: 1px solid var(--border-sand); border-radius: 8px;">
-            <table class="portal-table" style="font-size: 0.85rem; margin: 0;">
-              <thead>
-                <tr style="background: #F3F4F6;">
-                  <th>Student & Roll</th>
-                  <th>Class</th>
-                  <th>Pending Due</th>
-                  <th>Guardian</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${pendingStudents.length === 0 ? '<tr><td colspan="5" style="text-align:center; padding: 2rem; color: #059669; font-weight:700;">🎉 All student fees are 100% cleared! No pending dues.</td></tr>' :
-                  pendingStudents.map(s => {
-                    const guardianPhone = s.guardianMobile || s.mobile || '';
-                    const cleanPhone = String(guardianPhone).replace(/\D/g, '');
-                    const waPhone = cleanPhone.startsWith('91') && cleanPhone.length > 10 ? cleanPhone : (cleanPhone ? '91' + cleanPhone : '');
-                    const waMsg = encodeURIComponent(`Namaste ${s.guardianName || s.name},\nThis is a friendly reminder from Pragyan Institute Lalganj regarding the outstanding monthly tuition fee of ₹${s.pendingFee.toLocaleString()} for ${s.name} (${s.className}, Roll #${s.rollNo}). Kindly deposit the balance at the counter or via online UPI to keep records up to date. Thank you!`);
-                    return `
-                      <tr>
-                        <td>
-                          <strong>${s.name}</strong>
-                          <div style="font-size: 0.76rem; color: var(--text-muted);">Roll #${s.rollNo} • ID: ${s.id}</div>
-                        </td>
-                        <td>${s.className}</td>
-                        <td style="color: #DC2626; font-weight: 800; font-size: 0.95rem;">₹${s.pendingFee.toLocaleString()}</td>
-                        <td>
-                          <div>${s.guardianName || 'Guardian'}</div>
-                          <div style="font-size: 0.78rem; color: var(--text-muted);">${guardianPhone}</div>
-                        </td>
-                        <td>
-                          <div style="display: flex; gap: 0.35rem;">
-                            <a href="https://wa.me/${waPhone}?text=${waMsg}" target="_blank" class="btn" style="background-color: #25D366; color: #fff; padding: 0.3rem 0.6rem; font-size: 0.75rem; font-weight: 700; border-radius: 4px; text-decoration: none; display: inline-flex; align-items: center; gap: 0.3rem;" title="Send WhatsApp Reminder">
-                              <i class="fa-brands fa-whatsapp"></i> Remind
-                            </a>
-                            <button class="btn btn-pay-now-modal" data-id="${s.id}" style="background-color: #059669; color: #fff; padding: 0.3rem 0.6rem; font-size: 0.75rem; font-weight: 700; border: none; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;" title="Record Partial Fee Payment">
-                              <i class="fa-solid fa-hand-holding-dollar"></i> Partial Pay
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    `;
-                  }).join('')
-                }
-              </tbody>
-            </table>
+          <!-- Modal Body with Scroll -->
+          <div style="padding: 1.15rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem;">
+            
+            <!-- Dynamic KPI Banner -->
+            <div style="background: linear-gradient(135deg, #7F1D1D 0%, #450A0A 100%); color: #fff; padding: 1.15rem 1.35rem; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; box-shadow: 0 4px 12px rgba(127,29,29,0.25);">
+              <div>
+                <div style="font-size: 0.82rem; color: #FECACA; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;" id="pendingModalKpiLabel">
+                  Total Outstanding Tuition Dues
+                </div>
+                <div style="font-size: 1.85rem; font-weight: 800; color: #FCA5A5; display: flex; align-items: baseline; gap: 0.5rem;" id="pendingModalKpiAmount">
+                  ₹0
+                </div>
+                <div style="font-size: 0.76rem; color: #FEE2E2; margin-top: 0.2rem;" id="pendingModalKpiSubtext">
+                  Across all enrolled students with pending balance
+                </div>
+              </div>
+              <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <button type="button" class="btn" onclick="document.getElementById('pendingFeesModal').remove(); switchAdminTab('email');" style="background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.35); font-size: 0.82rem; font-weight: 700; padding: 0.45rem 0.85rem; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;">
+                  <i class="fa-solid fa-paper-plane"></i> Email Fee Reminders →
+                </button>
+              </div>
+            </div>
+
+            <!-- Multi-Filter Toolbar -->
+            <div style="background: #ffffff; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 0.85rem; display: flex; flex-direction: column; gap: 0.65rem;">
+              <div style="font-weight: 700; font-size: 0.82rem; color: var(--text-mahogany); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+                <span><i class="fa-solid fa-filter" style="color: #DC2626;"></i> Filter Outstanding Dues:</span>
+                <button type="button" id="btnResetPendingModalFilters" style="background: none; border: none; font-size: 0.76rem; color: #DC2626; font-weight: 700; cursor: pointer; text-decoration: underline;">
+                  Reset All Filters
+                </button>
+              </div>
+
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.6rem;">
+                <!-- 1. Class / Batch Filter -->
+                <div>
+                  <label style="display: block; font-size: 0.74rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">🎯 Class / Batch</label>
+                  <select id="pendingModalClassSelect" class="portal-input" style="width: 100%; font-size: 0.8rem; height: 36px; padding: 0.35rem 0.6rem;">
+                    <option value="all">All Batches</option>
+                    <option value="10th">🎯 Class 10th (ACHIEVER)</option>
+                    <option value="9th">🌱 Class 9th (NURTURE)</option>
+                    <option value="8th">⚡ Class 8th (ALPHA)</option>
+                    <option value="junio">🚀 Junior Batch (JUNIO)</option>
+                  </select>
+                </div>
+
+                <!-- 2. Faculty / Admin Lead Filter -->
+                <div>
+                  <label style="display: block; font-size: 0.74rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">👨‍🏫 Faculty Lead</label>
+                  <select id="pendingModalAdminSelect" class="portal-input" style="width: 100%; font-size: 0.8rem; height: 36px; padding: 0.35rem 0.6rem;">
+                    <option value="all">All Faculty Leads</option>
+                    <option value="chandan">👨‍🏫 Chandan Kumar (Class 10th & 9th)</option>
+                    <option value="ravi">👨‍🏫 Prof. Ravi Ranjan (Class 8th & Junior)</option>
+                  </select>
+                </div>
+
+                <!-- 3. Due Amount Range Filter -->
+                <div>
+                  <label style="display: block; font-size: 0.74rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">💰 Due Amount</label>
+                  <select id="pendingModalDueRangeSelect" class="portal-input" style="width: 100%; font-size: 0.8rem; height: 36px; padding: 0.35rem 0.6rem;">
+                    <option value="all">All Pending Amounts (> ₹0)</option>
+                    <option value="high">🚨 High Dues (> ₹2,000)</option>
+                    <option value="mid">⚠️ Medium Dues (₹1,000 – ₹2,000)</option>
+                    <option value="low">📌 Minor Dues (< ₹1,000)</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Search Input inside modal -->
+              <div style="position: relative; margin-top: 0.2rem;">
+                <input type="text" id="pendingModalSearchInput" class="portal-input" placeholder="🔍 Search by student name, roll number, guardian, mobile..." style="width: 100%; font-size: 0.8rem; height: 36px; padding-left: 2.2rem;">
+                <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 0.8rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.8rem;"></i>
+              </div>
+            </div>
+
+            <!-- Dynamic Batch Dues Summary Grid -->
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <h4 style="font-size: 0.95rem; font-weight: 800; color: var(--text-mahogany); margin: 0; display: flex; align-items: center; gap: 0.4rem;">
+                  <i class="fa-solid fa-layer-group" style="color: #DC2626;"></i> Batch-Wise Outstanding Dues
+                </h4>
+                <span style="font-size: 0.75rem; color: var(--text-muted);" id="pendingModalBatchLabel">4 Institutional Batches</span>
+              </div>
+              <div id="pendingModalBatchGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem;">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
+
+            <!-- Dynamic Defaulters Student Table -->
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <h4 style="font-size: 0.95rem; font-weight: 800; color: var(--text-mahogany); margin: 0; display: flex; align-items: center; gap: 0.4rem;">
+                  <i class="fa-solid fa-users" style="color: #DC2626;"></i> Students with Pending Balance
+                </h4>
+                <span id="pendingModalStudentCountBadge" style="background: #FEE2E2; color: #991B1B; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 700; font-size: 0.76rem;">
+                  0 Students
+                </span>
+              </div>
+
+              <div style="max-height: 280px; overflow-y: auto; -webkit-overflow-scrolling: touch; border: 1.5px solid #E2E8F0; border-radius: 8px; background: #fff;">
+                <table class="portal-table" style="font-size: 0.82rem; margin: 0; width: 100%;">
+                  <thead>
+                    <tr style="background: #FEF2F2;">
+                      <th>Student & Roll #</th>
+                      <th>Class Batch</th>
+                      <th>Pending Due</th>
+                      <th>Guardian & Contact</th>
+                      <th style="text-align: right;">1-Click Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="pendingModalTbody">
+                    <!-- Populated dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
     `;
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 
-    // Bind pay now buttons in modal
-    document.querySelectorAll('.btn-pay-now-modal').forEach(btn => {
-      btn.onclick = () => {
-        document.getElementById('pendingFeesModal')?.remove();
-        openPayModal(btn.dataset.id);
-      };
+    const students = AppState.getStudents() || [];
+
+    // Reactive Renderer for Pending Fees Modal
+    function updatePendingModalContent() {
+      const selectedClass = document.getElementById('pendingModalClassSelect')?.value || 'all';
+      const selectedAdmin = document.getElementById('pendingModalAdminSelect')?.value || 'all';
+      const selectedRange = document.getElementById('pendingModalDueRangeSelect')?.value || 'all';
+      const query = (document.getElementById('pendingModalSearchInput')?.value || '').toLowerCase().trim();
+
+      // Filter Students
+      const filteredStudents = students.filter(s => {
+        const pending = Number(s.pendingFee ?? s.pending_fee ?? 0);
+        if (pending <= 0) return false;
+
+        const bKey = getBatchCategoryKey(s.className || s.class_name || '');
+
+        // 1. Class / Batch Filter
+        if (selectedClass !== 'all' && bKey !== selectedClass) return false;
+
+        // 2. Admin / Faculty Lead Filter
+        if (selectedAdmin !== 'all') {
+          const isChandanLead = (bKey === '10th' || bKey === '9th');
+          if (selectedAdmin === 'chandan' && !isChandanLead) return false;
+          if (selectedAdmin === 'ravi' && isChandanLead) return false;
+        }
+
+        // 3. Due Range Filter
+        if (selectedRange === 'high' && pending <= 2000) return false;
+        if (selectedRange === 'mid' && (pending < 1000 || pending > 2000)) return false;
+        if (selectedRange === 'low' && pending >= 1000) return false;
+
+        // 4. Search Filter
+        if (query) {
+          const sName = String(s.name || '').toLowerCase();
+          const sRoll = String(s.rollNo || s.roll_no || s.student_id || '').toLowerCase();
+          const sId = String(s.id || '').toLowerCase();
+          const sGName = String(s.guardianName || '').toLowerCase();
+          const sPhone = String(s.guardianMobile || s.mobile || '').toLowerCase();
+          const sClass = String(s.className || s.class_name || '').toLowerCase();
+          if (!sName.includes(query) && !sRoll.includes(query) && !sId.includes(query) && !sGName.includes(query) && !sPhone.includes(query) && !sClass.includes(query)) {
+            return false;
+          }
+        }
+
+        return true;
+      });
+
+      // 1. Update KPI Header
+      const totalFilteredPending = filteredStudents.reduce((sum, s) => sum + (Number(s.pendingFee ?? s.pending_fee ?? 0)), 0);
+      const kpiAmountEl = document.getElementById('pendingModalKpiAmount');
+      if (kpiAmountEl) {
+        kpiAmountEl.innerHTML = `₹${totalFilteredPending.toLocaleString()} <span style="font-size: 0.95rem; font-weight: 700; color: #FECACA;">(${filteredStudents.length} Students Pending)</span>`;
+      }
+
+      const kpiSubtextEl = document.getElementById('pendingModalKpiSubtext');
+      if (kpiSubtextEl) {
+        const parts = [];
+        if (selectedClass !== 'all') parts.push(selectedClass === '10th' ? 'Class 10th' : selectedClass === '9th' ? 'Class 9th' : selectedClass === '8th' ? 'Class 8th' : 'Junior Batch');
+        if (selectedAdmin !== 'all') parts.push(selectedAdmin === 'chandan' ? 'Chandan Kumar Leads' : 'Prof. Ravi Ranjan Leads');
+        if (selectedRange !== 'all') parts.push(selectedRange === 'high' ? 'High Dues (> ₹2,000)' : selectedRange === 'mid' ? 'Medium Dues' : 'Minor Dues');
+        
+        kpiSubtextEl.textContent = parts.length > 0
+          ? `Filtered by: ${parts.join(' • ')}`
+          : 'Showing all students with outstanding balances across all batches';
+      }
+
+      // 2. Update Batch Cards Summary
+      const canonicalBatches = [
+        { key: '10th', name: 'Class 10th (ACHIEVER)', icon: '🎯', rate: 1000 },
+        { key: '9th', name: 'Class 9th (NURTURE)', icon: '🌱', rate: 1000 },
+        { key: '8th', name: 'Class 8th (ALPHA)', icon: '⚡', rate: 800 },
+        { key: 'junio', name: 'Junior Batch (JUNIO)', icon: '🚀', rate: 700 }
+      ];
+
+      const visibleBatches = selectedClass === 'all'
+        ? canonicalBatches
+        : canonicalBatches.filter(b => b.key === selectedClass);
+
+      const batchGridEl = document.getElementById('pendingModalBatchGrid');
+      if (batchGridEl) {
+        batchGridEl.innerHTML = visibleBatches.map(b => {
+          const batchDefaulters = filteredStudents.filter(s => getBatchCategoryKey(s.className || s.class_name || '') === b.key);
+          const bPendingSum = batchDefaulters.reduce((sum, s) => sum + (Number(s.pendingFee ?? s.pending_fee ?? 0)), 0);
+
+          return `
+            <div style="background: #ffffff; border: 1.5px solid #FCA5A5; border-radius: 10px; padding: 0.9rem; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                <span style="font-weight: 800; font-size: 0.88rem; color: var(--text-mahogany);">${b.icon} ${b.name}</span>
+                <span style="font-size: 0.72rem; background: #FEF2F2; color: #991B1B; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 700;">₹${b.rate}/mo</span>
+              </div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+                ${batchDefaulters.length} Students Pending Balance
+              </div>
+              <div style="font-size: 1.25rem; font-weight: 800; color: #DC2626;">
+                ₹${bPendingSum.toLocaleString()}
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // 3. Update Defaulters Table
+      const tbody = document.getElementById('pendingModalTbody');
+      const badgeEl = document.getElementById('pendingModalStudentCountBadge');
+      if (badgeEl) badgeEl.textContent = `${filteredStudents.length} Students`;
+
+      if (tbody) {
+        if (filteredStudents.length === 0) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="5" style="text-align: center; padding: 2.5rem 1rem; color: #059669;">
+                <i class="fa-solid fa-circle-check" style="font-size: 2rem; color: #10B981; margin-bottom: 0.5rem; display: block;"></i>
+                <div style="font-weight: 700; font-size: 0.95rem;">🎉 Zero Pending Dues in Selected Filter!</div>
+                <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem;">All students matching this criteria have cleared their tuition fees 100%.</div>
+              </td>
+            </tr>
+          `;
+        } else {
+          tbody.innerHTML = filteredStudents.map(s => {
+            const dueAmt = Number(s.pendingFee ?? s.pending_fee ?? 0);
+            const guardianPhone = s.guardianMobile || s.mobile || '';
+            const cleanPhone = String(guardianPhone).replace(/\D/g, '');
+            const waPhone = cleanPhone.startsWith('91') && cleanPhone.length > 10 ? cleanPhone : (cleanPhone ? '91' + cleanPhone : '');
+            const waMsg = encodeURIComponent(`Namaste ${s.guardianName || s.name},\nThis is a friendly reminder from Pragyan Institute Lalganj regarding the outstanding monthly tuition fee of ₹${dueAmt.toLocaleString()} for ${s.name} (${s.className || s.class_name}, Roll #${s.rollNo || s.roll_no || s.student_id}). Kindly deposit the balance at the counter or via online UPI to keep records up to date. Thank you!`);
+
+            return `
+              <tr>
+                <td>
+                  <strong>${s.name}</strong>
+                  <div style="font-size: 0.74rem; color: var(--text-muted);">
+                    Roll #${s.rollNo || s.roll_no || s.student_id || ''} • ID: ${s.id || ''}
+                  </div>
+                </td>
+                <td>
+                  <span style="background: #F8FAFC; border: 1px solid #E2E8F0; padding: 0.15rem 0.45rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                    ${s.className || s.class_name || 'General'}
+                  </span>
+                </td>
+                <td style="color: #DC2626; font-weight: 800; font-size: 0.95rem;">
+                  ₹${dueAmt.toLocaleString()}
+                </td>
+                <td>
+                  <div style="font-weight: 600; font-size: 0.8rem;">${s.guardianName || 'Guardian'}</div>
+                  <div style="font-size: 0.75rem; color: var(--text-muted);">${guardianPhone || 'N/A'}</div>
+                </td>
+                <td style="text-align: right;">
+                  <div style="display: inline-flex; gap: 0.35rem; align-items: center; justify-content: flex-end;">
+                    ${waPhone ? `
+                      <a href="https://wa.me/${waPhone}?text=${waMsg}" target="_blank" class="btn" style="background-color: #25D366; color: #fff; padding: 0.3rem 0.6rem; font-size: 0.75rem; font-weight: 700; border-radius: 6px; text-decoration: none; display: inline-flex; align-items: center; gap: 0.3rem;" title="Send WhatsApp Reminder">
+                        <i class="fa-brands fa-whatsapp"></i> Remind
+                      </a>
+                    ` : ''}
+                    <button class="btn btn-pending-pay-modal" data-id="${s.id}" style="background-color: #059669; color: #fff; padding: 0.3rem 0.65rem; font-size: 0.75rem; font-weight: 700; border: none; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;" title="Record Fee Payment">
+                      <i class="fa-solid fa-hand-holding-dollar"></i> Collect Fee
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            `;
+          }).join('');
+
+          // Bind collect fee button listeners
+          tbody.querySelectorAll('.btn-pending-pay-modal').forEach(btn => {
+            btn.onclick = () => {
+              document.getElementById('pendingFeesModal')?.remove();
+              openPayModal(btn.dataset.id);
+            };
+          });
+        }
+      }
+    }
+
+    // Bind Filter Event Listeners inside modal
+    document.getElementById('pendingModalClassSelect')?.addEventListener('change', (e) => {
+      pendingModalClassFilter = e.target.value;
+      updatePendingModalContent();
     });
+
+    document.getElementById('pendingModalAdminSelect')?.addEventListener('change', (e) => {
+      pendingModalAdminFilter = e.target.value;
+      updatePendingModalContent();
+    });
+
+    document.getElementById('pendingModalDueRangeSelect')?.addEventListener('change', (e) => {
+      pendingModalDueRangeFilter = e.target.value;
+      updatePendingModalContent();
+    });
+
+    document.getElementById('pendingModalSearchInput')?.addEventListener('input', () => {
+      updatePendingModalContent();
+    });
+
+    document.getElementById('btnResetPendingModalFilters')?.addEventListener('click', () => {
+      pendingModalClassFilter = 'all';
+      pendingModalAdminFilter = 'all';
+      pendingModalDueRangeFilter = 'all';
+      if (document.getElementById('pendingModalClassSelect')) document.getElementById('pendingModalClassSelect').value = 'all';
+      if (document.getElementById('pendingModalAdminSelect')) document.getElementById('pendingModalAdminSelect').value = 'all';
+      if (document.getElementById('pendingModalDueRangeSelect')) document.getElementById('pendingModalDueRangeSelect').value = 'all';
+      if (document.getElementById('pendingModalSearchInput')) document.getElementById('pendingModalSearchInput').value = '';
+      updatePendingModalContent();
+    });
+
+    // Initial render
+    updatePendingModalContent();
   }
 
   function switchAdminTab(tabName) {
