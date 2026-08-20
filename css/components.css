@@ -497,6 +497,70 @@
   animation: float-y 4s ease-in-out infinite;
 }
 
+/* Corner Logo on Images (Top-Left) */
+.hero-corner-logo {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 7;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1.5px solid var(--primary-emerald);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  pointer-events: none;
+  animation: float-y 4s ease-in-out infinite;
+  animation-delay: 1.5s;
+}
+
+.hero-corner-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 50%;
+  display: block;
+}
+
+.gallery-corner-logo {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 6;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1.5px solid var(--primary-emerald);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5px;
+  pointer-events: none;
+  transition: transform var(--transition-normal);
+}
+
+.gallery-corner-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 50%;
+  display: block;
+}
+
+.gallery-card:hover .gallery-corner-logo {
+  transform: scale(1.1) rotate(5deg);
+}
+
 .badge-icon {
   width: 26px;
   height: 26px;
@@ -1538,7 +1602,21 @@
   .stat-label {
     font-size: 0.72rem;
   }
-  /* M4: Show single brand badge cleanly inside top-right corner of photo on mobile */
+  /* M4: Show single brand badge and corner logos cleanly inside corners on mobile */
+  .hero-corner-logo {
+    top: 8px !important;
+    left: 8px !important;
+    width: 26px !important;
+    height: 26px !important;
+    padding: 2px !important;
+  }
+  .gallery-corner-logo {
+    top: 8px !important;
+    left: 8px !important;
+    width: 26px !important;
+    height: 26px !important;
+    padding: 2px !important;
+  }
   .floating-badge.badge-top-right {
     display: flex !important;
     top: 8px !important;

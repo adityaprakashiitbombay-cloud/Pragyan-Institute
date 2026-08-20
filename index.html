@@ -38,11 +38,11 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
   <!-- CSS Design System -->
-  <link rel="stylesheet" href="./css/variables.css?v=90.0.420da5ed">
-  <link rel="stylesheet" href="./css/main.css?v=90.0.420da5ed">
-  <link rel="stylesheet" href="./css/components.css?v=90.0.420da5ed">
-  <link rel="stylesheet" href="./css/animations.css?v=90.0.420da5ed">
-  <link rel="stylesheet" href="./css/portal.css?v=90.0.420da5ed">
+  <link rel="stylesheet" href="./css/variables.css?v=90.0.14ae8b48">
+  <link rel="stylesheet" href="./css/main.css?v=90.0.14ae8b48">
+  <link rel="stylesheet" href="./css/components.css?v=90.0.14ae8b48">
+  <link rel="stylesheet" href="./css/animations.css?v=90.0.14ae8b48">
+  <link rel="stylesheet" href="./css/portal.css?v=90.0.14ae8b48">
   <!-- Schema.org JSON-LD Structured Data for Google Top Ranking & Knowledge Graph -->
   <script type="application/ld+json">
   {
@@ -231,6 +231,11 @@
             <!-- Slide Navigation Controls -->
             <button class="slide-nav-btn prev" id="heroPrevBtn" aria-label="Previous slide"><i class="fa-solid fa-chevron-left"></i></button>
             <button class="slide-nav-btn next" id="heroNextBtn" aria-label="Next slide"><i class="fa-solid fa-chevron-right"></i></button>
+
+            <!-- Small Site Logo (Left Top Side of Photo) -->
+            <div class="hero-corner-logo" aria-label="Pragyan Institute Logo">
+              <img src="assets/images/logo.png" alt="Pragyan Institute Logo" width="38" height="38">
+            </div>
 
             <!-- Floating Brand Badge (Cleanly Inset in Top-Right Corner of Photo) -->
             <div class="floating-badge badge-top-right">
@@ -498,6 +503,9 @@
         <div class="gallery-track" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem;">
           <!-- Gallery Card 1 -->
           <div class="gallery-card">
+            <div class="gallery-corner-logo" aria-label="Pragyan Institute Logo">
+              <img src="assets/images/logo.png" alt="Pragyan Institute Logo" width="30" height="30">
+            </div>
             <img src="assets/images/hero_slide_1.jpg" alt="Smartboard Digital Learning at Pragyan Institute Lalganj" width="899" height="1599" loading="lazy" decoding="async">
             <div class="gallery-card-overlay">
               <div class="gallery-caption-title">Smartboard Digital Learning</div>
@@ -507,6 +515,9 @@
 
           <!-- Gallery Card 2 -->
           <div class="gallery-card">
+            <div class="gallery-corner-logo" aria-label="Pragyan Institute Logo">
+              <img src="assets/images/logo.png" alt="Pragyan Institute Logo" width="30" height="30">
+            </div>
             <img src="assets/images/hero_slide_2.jpg" alt="Focused Classroom Sessions at Pragyan Institute Lalganj" width="1200" height="1600" loading="lazy" decoding="async">
             <div class="gallery-card-overlay">
               <div class="gallery-caption-title">Focused Classroom Sessions</div>
@@ -516,6 +527,9 @@
 
           <!-- Gallery Card 3 -->
           <div class="gallery-card">
+            <div class="gallery-corner-logo" aria-label="Pragyan Institute Logo">
+              <img src="assets/images/logo.png" alt="Pragyan Institute Logo" width="30" height="30">
+            </div>
             <img src="assets/images/hero_slide_3.jpg" alt="Board Exam Prep & Presentations at Pragyan Institute Lalganj" width="1200" height="1600" loading="lazy" decoding="async">
             <div class="gallery-card-overlay">
               <div class="gallery-caption-title">Board Exam Prep & Test Series</div>
@@ -997,17 +1011,17 @@
   <!-- Application Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
-  <script defer src="./js/config.js?v=90.0.420da5ed"></script>
-  <script defer src="./js/supabase-sync.js?v=90.0.420da5ed"></script>
-  <script defer src="./js/chat.js?v=90.0.420da5ed"></script>
-  <script defer src="./js/app.js?v=90.0.420da5ed"></script>
-  <script defer src="./js/portal.js?v=90.0.420da5ed"></script>
+  <script defer src="./js/config.js?v=90.0.14ae8b48"></script>
+  <script defer src="./js/supabase-sync.js?v=90.0.14ae8b48"></script>
+  <script defer src="./js/chat.js?v=90.0.14ae8b48"></script>
+  <script defer src="./js/app.js?v=90.0.14ae8b48"></script>
+  <script defer src="./js/portal.js?v=90.0.14ae8b48"></script>
 
   <!-- PWA Service Worker Registration for Instant Offline Caching -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=90.0.420da5ed').then(reg => {
+        navigator.serviceWorker.register('./sw.js?v=90.0.14ae8b48').then(reg => {
           reg.update().catch(() => {});
         }).catch(err => console.log('SW reg error:', err));
       });
