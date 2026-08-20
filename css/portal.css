@@ -4145,3 +4145,121 @@ button, a, input, select, textarea {
   }
 }
 
+/* ==========================================================================
+ * MOBILE RESPONSIVE ENHANCEMENTS: NOTICEBOARD, BATCHES & TEACHER ANALYTICS
+ * ========================================================================== */
+
+@media (max-width: 768px) {
+  /* 1. Noticeboard Admin Top Header & Search Bar */
+  #adminTabPane-post-notice .dash-card-header,
+  #adminTabPane-post-notice .dash-card > div:first-child {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.75rem !important;
+  }
+
+  #adminTabPane-post-notice #adminNoticeSearchInput,
+  #adminNoticeSearchInput {
+    width: 100% !important;
+    min-width: 100% !important;
+  }
+
+  /* 2. Notice Filter Chips Scroll Container */
+  .notifications-filter-bar,
+  #adminTabPane-post-notice div:has(> .notice-admin-filter-chip) {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding-bottom: 0.4rem !important;
+    gap: 0.4rem !important;
+    scrollbar-width: none !important;
+  }
+
+  .notifications-filter-bar::-webkit-scrollbar,
+  #adminTabPane-post-notice div:has(> .notice-admin-filter-chip)::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .notice-admin-filter-chip,
+  .notice-filter-chip {
+    flex-shrink: 0 !important;
+    font-size: 0.76rem !important;
+    padding: 0.35rem 0.65rem !important;
+    white-space: nowrap !important;
+  }
+
+  /* 3. Notice Card Top Row & Action Buttons */
+  .notice-item-card,
+  #adminTabPane-post-notice .dash-card div[style*="border: 1.5px solid"] {
+    padding: 0.95rem !important;
+  }
+
+  #adminTabPane-post-notice .btn-edit-notice,
+  #adminTabPane-post-notice .btn-delete-notice {
+    padding: 0.35rem 0.65rem !important;
+    font-size: 0.75rem !important;
+    height: 32px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  /* 4. Edit Notice Modal Mobile View */
+  #editNoticeModal .inner-modal-content {
+    max-width: 96% !important;
+    margin: 0.5rem auto !important;
+    border-radius: 12px !important;
+  }
+
+  #editNoticeModal form {
+    padding: 1rem !important;
+    gap: 0.85rem !important;
+  }
+
+  #editNoticeModal div[style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  #editNoticeModal button[type="submit"] {
+    width: 100% !important;
+    height: 44px !important;
+  }
+
+  /* 5. Batch-Wise Breakdown Mobile Optimization */
+  .admin-billing-form-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  .admin-teacher-summary-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.85rem !important;
+  }
+
+  #adminTabPane-analytics .dash-card {
+    padding: 1rem 0.85rem !important;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Ultra-compact screens (< 480px) */
+  #adminPostNoticeForm div[style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  #noticeBatchOptionsGrid {
+    grid-template-columns: 1fr !important;
+    gap: 0.45rem !important;
+  }
+
+  #editNoticeModal .inner-modal-header h3 {
+    font-size: 1rem !important;
+  }
+
+  #editNoticeModal .inner-modal-header {
+    padding: 0.75rem 1rem !important;
+  }
+}
+
