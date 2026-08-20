@@ -492,21 +492,10 @@
   pointer-events: none;
 }
 
-.floating-badge.badge-top {
-  top: calc(1rem + env(safe-area-inset-top));
-  left: calc(1rem + env(safe-area-inset-left));
-}
-
 .floating-badge.badge-top-right {
-  top: calc(1rem + env(safe-area-inset-top));
-  right: calc(1rem + env(safe-area-inset-right));
-  animation-delay: 1s;
-}
-
-.floating-badge.badge-bottom {
-  bottom: calc(1rem + env(safe-area-inset-bottom));
-  right: calc(1rem + env(safe-area-inset-right));
-  animation-delay: 2s;
+  top: calc(0.9rem + env(safe-area-inset-top));
+  right: calc(0.9rem + env(safe-area-inset-right));
+  animation: float-y 4s ease-in-out infinite;
 }
 
 .badge-icon {
@@ -1550,9 +1539,24 @@
   .stat-label {
     font-size: 0.72rem;
   }
-  /* M4: Hide floating badges on narrow mobile to avoid overlap */
-  .floating-badge {
-    display: none !important;
+  /* M4: Show single brand badge cleanly on mobile screens */
+  .floating-badge.badge-top-right {
+    display: flex !important;
+    top: 0.55rem;
+    right: 0.55rem;
+    padding: 0.22rem 0.5rem;
+    gap: 0.35rem;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+  }
+  .floating-badge.badge-top-right .badge-icon {
+    width: 20px;
+    height: 20px;
+  }
+  .floating-badge.badge-top-right .badge-text-title {
+    font-size: 0.68rem;
+  }
+  .floating-badge.badge-top-right .badge-text-sub {
+    font-size: 0.56rem;
   }
   .floating-actions-widget {
     bottom: 0.75rem;

@@ -1,19 +1,19 @@
 // Service Worker — Pragyan Institute Portal (v83.3)
-const CACHE_NAME = 'pragyan-portal-v90.0.2cc01737';
+const CACHE_NAME = 'pragyan-portal-v90.0.83a9c40f';
 
 // Static assets to pre-cache for instant loads
 const PRECACHE_ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './css/variables.css?v=90.0.2cc01737',
-  './css/main.css?v=90.0.2cc01737',
-  './css/components.css?v=90.0.2cc01737',
-  './css/animations.css?v=90.0.2cc01737',
-  './css/portal.css?v=90.0.2cc01737',
-  './js/supabase-sync.js?v=90.0.2cc01737',
-  './js/app.js?v=90.0.2cc01737',
-  './js/portal.js?v=90.0.2cc01737',
+  './css/variables.css?v=90.0.83a9c40f',
+  './css/main.css?v=90.0.83a9c40f',
+  './css/components.css?v=90.0.83a9c40f',
+  './css/animations.css?v=90.0.83a9c40f',
+  './css/portal.css?v=90.0.83a9c40f',
+  './js/supabase-sync.js?v=90.0.83a9c40f',
+  './js/app.js?v=90.0.83a9c40f',
+  './js/portal.js?v=90.0.83a9c40f',
   './assets/images/favicon.ico',
   './assets/images/logo.png',
   './assets/images/hero_slide_1.jpg',
