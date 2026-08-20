@@ -7525,23 +7525,23 @@ ${emailLogs.join('\n')}`);
                       ${catBadge}
                       ${targetBatchBadge}
                     </div>
-                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
                       <span style="font-size: 0.78rem; color: var(--text-muted); font-weight: 600;">📅 ${notice.date}</span>
-                      <button class="btn btn-edit-notice" data-id="${notice.id}" style="padding: 0.25rem 0.55rem; font-size: 0.75rem; background: #F1F5F9; color: #334155; border: 1px solid #CBD5E1; border-radius: 6px; cursor: pointer;" title="Edit Notice">
-                        <i class="fa-solid fa-pen"></i>
+                      <button type="button" class="btn btn-edit-notice" data-id="${notice.id}" style="padding: 0.35rem 0.75rem; font-size: 0.78rem; font-weight: 700; background: #ECFDF5; color: #065F46; border: 1px solid #10B981; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; transition: background 0.15s ease;" title="Edit Notice">
+                        <i class="fa-solid fa-pen-to-square"></i> Edit
                       </button>
-                      <button class="btn btn-delete-notice" data-id="${notice.id}" style="padding: 0.25rem 0.55rem; font-size: 0.75rem; background: #FEE2E2; color: #DC2626; border: 1px solid #FECACA; border-radius: 6px; cursor: pointer;" title="Delete Notice">
-                        <i class="fa-solid fa-trash"></i>
+                      <button type="button" class="btn btn-delete-notice" data-id="${notice.id}" style="padding: 0.35rem 0.75rem; font-size: 0.78rem; font-weight: 700; background: #FEE2E2; color: #DC2626; border: 1px solid #FECACA; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; transition: background 0.15s ease;" title="Delete Notice">
+                        <i class="fa-solid fa-trash-can"></i> Delete
                       </button>
                     </div>
                   </div>
 
-                  <h4 style="font-size: 1rem; font-weight: 700; color: var(--text-mahogany); margin: 0 0 0.5rem 0;">${escapeHtml(notice.title)}</h4>
-                  <p style="font-size: 0.85rem; color: #475569; line-height: 1.5; margin: 0; white-space: pre-wrap;">${escapeHtml(notice.message)}</p>
+                  <h4 style="font-size: 1.05rem; font-weight: 800; color: var(--text-mahogany); margin: 0 0 0.5rem 0;">${escapeHtml(notice.title)}</h4>
+                  <p style="font-size: 0.88rem; color: #374151; line-height: 1.6; margin: 0; white-space: pre-wrap;">${escapeHtml(notice.message)}</p>
 
                   ${notice.attachmentUrl || notice.attachment_url ? `
-                    <div style="margin-top: 0.85rem; padding-top: 0.65rem; border-top: 1px dashed #E2E8F0;">
-                      <a href="${notice.attachmentUrl || notice.attachment_url}" target="_blank" style="display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; font-weight: 700; color: var(--primary-emerald); text-decoration: underline;">
+                    <div style="margin-top: 0.85rem; padding-top: 0.65rem; border-top: 1px dashed #E2E8F0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+                      <a href="${notice.attachmentUrl || notice.attachment_url}" target="_blank" style="display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; font-weight: 700; color: var(--primary-emerald); text-decoration: underline;">
                         <i class="fa-solid fa-paperclip"></i> View Attached Document / Photo
                       </a>
                     </div>
@@ -7648,7 +7648,7 @@ ${emailLogs.join('\n')}`);
         const target = allN.find(n => n.id === id);
         if (!target) return;
 
-        if (confirm(`🗑️ Delete announcement "${target.title}"? This will permanently remove it from student portals.`)) {
+        if (confirm(`🗑️ Delete announcement "${target.title}"?\n\nThis will immediately and permanently remove it from all student dashboards and noticeboards.`)) {
           if (target.id && typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
             const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
             if (uuidRegex.test(target.id)) {
@@ -7659,7 +7659,9 @@ ${emailLogs.join('\n')}`);
           }
           const updated = allN.filter(n => n.id !== id);
           await AppState.saveNotices(updated);
-          alert('Announcement deleted.');
+          const author = getActiveTeacherName();
+          await AppState.addAuditLog(author, 'NOTICE_DELETED', target.targetBatch || 'All Batches', target.title, `Deleted notice "${target.title}".`);
+          alert('🗑️ Announcement successfully deleted and removed from noticeboard.');
           renderAdminDashboard();
         }
       });
@@ -7673,29 +7675,45 @@ ${emailLogs.join('\n')}`);
     if (!target) return;
 
     const modalHtml = `
-      <div class="inner-modal-backdrop active" id="editNoticeModal">
-        <div class="inner-modal-content" style="max-width: 600px;">
-          <div class="inner-modal-header">
-            <h3><i class="fa-solid fa-pen-to-square" style="color: var(--primary-emerald);"></i> Edit Announcement</h3>
-            <button class="btn-close-inner" onclick="document.getElementById('editNoticeModal').remove()"><i class="fa-solid fa-xmark"></i></button>
+      <div class="inner-modal-backdrop active" id="editNoticeModal" style="display: flex; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 9999; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(4px);">
+        <div class="inner-modal-content" style="max-width: 620px; width: 100%; background: #FAF9F6; border-radius: 12px; border: 1.5px solid var(--border-sand); box-shadow: 0 10px 25px rgba(0,0,0,0.15); overflow: hidden; max-height: 90vh; display: flex; flex-direction: column;">
+          <div class="inner-modal-header" style="background: #064E3B; color: #fff; padding: 1rem 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0; font-size: 1.15rem; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
+              <i class="fa-solid fa-pen-to-square" style="color: #34D399;"></i> Edit Noticeboard Announcement
+            </h3>
+            <button class="btn-close-inner" onclick="document.getElementById('editNoticeModal').remove()" style="background: none; border: none; color: #fff; font-size: 1.2rem; cursor: pointer;">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
           </div>
-          <form id="editNoticeForm">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; margin-bottom: 1rem;">
-              <div style="grid-column: span 2;">
-                <label style="font-size: 0.85rem; font-weight: 600;">Announcement Title *</label>
-                <input type="text" id="editNoticeTitle" class="portal-input" value="${target.title}" required>
-              </div>
+          
+          <form id="editNoticeForm" style="padding: 1.25rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem;">
+            <div>
+              <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #374151; margin-bottom: 0.35rem;">
+                Announcement Title *
+              </label>
+              <input type="text" id="editNoticeTitle" class="portal-input" value="${target.title ? target.title.replace(/"/g, '&quot;') : ''}" required style="width: 100%; font-weight: 600;">
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
               <div>
-                <label style="font-size: 0.85rem; font-weight: 600;">Category</label>
-                <select id="editNoticeCategory" class="portal-input">
-                  <option value="exam" ${target.category === 'exam' ? 'selected' : ''}>📝 Exam & Test</option>
-                  <option value="general" ${target.category === 'general' ? 'selected' : ''}>📢 General Notice</option>
-                  <option value="fees" ${target.category === 'fees' ? 'selected' : ''}>💳 Fee Update</option>
+                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #374151; margin-bottom: 0.35rem;">
+                  Category *
+                </label>
+                <select id="editNoticeCategory" class="portal-input" style="width: 100%;">
+                  <option value="general" ${target.category === 'general' ? 'selected' : ''}>📢 General Announcement</option>
+                  <option value="exam" ${target.category === 'exam' ? 'selected' : ''}>📝 Exam & Test Schedule</option>
+                  <option value="holiday" ${target.category === 'holiday' ? 'selected' : ''}>🏖️ Holiday / Class Off</option>
+                  <option value="schedule" ${target.category === 'schedule' ? 'selected' : ''}>⏰ Timing / Class Reschedule</option>
+                  <option value="fees" ${target.category === 'fees' ? 'selected' : ''}>💳 Fee Notice / Update</option>
+                  <option value="urgent" ${target.category === 'urgent' ? 'selected' : ''}>🚨 Urgent Alert</option>
                 </select>
               </div>
+
               <div>
-                <label style="font-size: 0.85rem; font-weight: 600;">Target Batch</label>
-                <select id="editNoticeBatch" class="portal-input">
+                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #374151; margin-bottom: 0.35rem;">
+                  Target Batch *
+                </label>
+                <select id="editNoticeBatch" class="portal-input" style="width: 100%;">
                   <option value="All Batches" ${target.targetBatch === 'All Batches' || !target.targetBatch ? 'selected' : ''}>🌟 All Batches</option>
                   <option value="Class 10th (ACHIEVER)" ${target.targetBatch && target.targetBatch.includes('10th') ? 'selected' : ''}>🎯 Class 10th (ACHIEVER)</option>
                   <option value="Class 9th (NURTURE)" ${target.targetBatch && target.targetBatch.includes('9th') ? 'selected' : ''}>🌱 Class 9th (NURTURE)</option>
@@ -7704,18 +7722,46 @@ ${emailLogs.join('\n')}`);
                 </select>
               </div>
             </div>
-            <div style="margin-bottom: 1.25rem;">
-              <label style="font-size: 0.85rem; font-weight: 600;">Announcement Message / Details *</label>
-              <textarea id="editNoticeMessage" class="portal-input" rows="4" required>${target.message}</textarea>
+
+            <div>
+              <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #374151; margin-bottom: 0.35rem;">
+                Announcement Details / Body Message *
+              </label>
+              <textarea id="editNoticeMessage" class="portal-input" rows="5" required style="width: 100%; font-family: inherit; font-size: 0.9rem; line-height: 1.55; resize: vertical;">${target.message || ''}</textarea>
             </div>
-            <button type="submit" class="btn btn-emerald" style="width: 100%; padding: 0.8rem;">
-              <i class="fa-solid fa-floppy-disk"></i> Save & Synchronize Announcement
-            </button>
+
+            ${target.attachmentUrl || target.attachment_url ? `
+              <div style="background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 8px; padding: 0.65rem 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap;">
+                <div style="font-size: 0.8rem; color: #334155; display: flex; align-items: center; gap: 0.4rem;">
+                  <i class="fa-solid fa-paperclip" style="color: var(--primary-emerald);"></i> Current Attachment: 
+                  <a href="${target.attachmentUrl || target.attachment_url}" target="_blank" style="font-weight: 700; color: var(--primary-emerald); text-decoration: underline;">View File</a>
+                </div>
+                <button type="button" id="btnRemoveAttachment" class="btn" style="padding: 0.2rem 0.5rem; font-size: 0.72rem; background: #FEE2E2; color: #DC2626; border: 1px solid #FECACA; border-radius: 4px; cursor: pointer;">
+                  <i class="fa-solid fa-xmark"></i> Remove Attachment
+                </button>
+              </div>
+            ` : ''}
+
+            <div style="display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 0.5rem;">
+              <button type="button" class="btn" onclick="document.getElementById('editNoticeModal').remove()" style="padding: 0.65rem 1.25rem; font-weight: 700; background: #F3F4F6; color: #374151; border: 1px solid #D1D5DB; border-radius: 8px;">
+                Cancel
+              </button>
+              <button type="submit" class="btn btn-emerald" style="padding: 0.65rem 1.5rem; font-weight: 800; border-radius: 8px; box-shadow: 0 4px 12px rgba(5,150,105,0.3);">
+                <i class="fa-solid fa-floppy-disk"></i> Save & Synchronize Notice
+              </button>
+            </div>
           </form>
         </div>
       </div>
     `;
     document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    // Remove attachment handler
+    document.getElementById('btnRemoveAttachment')?.addEventListener('click', () => {
+      target.attachmentUrl = '';
+      target.attachment_url = '';
+      document.getElementById('btnRemoveAttachment').parentElement.remove();
+    });
 
     document.getElementById('editNoticeForm').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -7725,8 +7771,11 @@ ${emailLogs.join('\n')}`);
       target.message = document.getElementById('editNoticeMessage').value.trim();
 
       await AppState.saveNotices(notices);
+      const author = getActiveTeacherName();
+      await AppState.addAuditLog(author, 'NOTICE_EDITED', target.targetBatch, target.title, `Updated notice "${target.title}".`);
+      
       document.getElementById('editNoticeModal').remove();
-      alert('✅ Announcement updated and synchronized across all student dashboards!');
+      alert('✅ Announcement updated and synchronized across all student noticeboards!');
       renderAdminDashboard();
     });
   }

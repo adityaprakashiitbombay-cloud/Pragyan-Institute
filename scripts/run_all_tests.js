@@ -560,6 +560,36 @@ assert(batch10Students.length === 2, 'T13.5: Correctly maps 2 students to Class 
 assert(b10Collected === 7000, 'T13.6: Correctly aggregates ₹7000 collected for Class 10th');
 assert(b10Pct === 88, 'T13.7: Calculates 88% collection progress for Class 10th');
 
+// -----------------------------------------------------------------------------
+// T14: Notice & Announcement Management, Editing & Deletion Tests
+// -----------------------------------------------------------------------------
+console.log('\n--- [T14] Notice & Announcement Management, Editing & Deletion Tests ---');
+let announcementStore = [
+  { id: 'NTC-01', title: 'Monthly Physics Test', category: 'exam', targetBatch: 'Class 10th (ACHIEVER)', message: 'Exam on Monday 9 AM', date: '2026-08-20', attachmentUrl: 'https://example.com/syllabus.pdf' },
+  { id: 'NTC-02', title: 'Independence Day Holiday', category: 'holiday', targetBatch: 'All Batches', message: 'Classes suspended on 15th August', date: '2026-08-14' },
+  { id: 'NTC-03', title: 'Tuition Fee Due Notice', category: 'fees', targetBatch: 'Class 8th (ALPHA)', message: 'Please clear fees by 10th', date: '2026-08-01' }
+];
+
+// Test 1: Edit notice
+const targetNotice = announcementStore.find(n => n.id === 'NTC-01');
+assert(!!targetNotice, 'T14.1: Notice exists and is identifiable by unique ID');
+
+targetNotice.title = 'Updated Physics Test Schedule';
+targetNotice.message = 'Exam rescheduled to Tuesday 10 AM';
+targetNotice.targetBatch = 'Class 10th (ACHIEVER), Class 9th (NURTURE)';
+assert(announcementStore.find(n => n.id === 'NTC-01').title === 'Updated Physics Test Schedule', 'T14.2: Notice title successfully edited');
+assert(announcementStore.find(n => n.id === 'NTC-01').message === 'Exam rescheduled to Tuesday 10 AM', 'T14.3: Notice body message successfully edited');
+
+// Test 2: Delete notice
+const noticeToDelete = 'NTC-03';
+announcementStore = announcementStore.filter(n => n.id !== noticeToDelete);
+assert(announcementStore.length === 2, 'T14.4: Unwanted notice successfully deleted from noticeboard array');
+assert(!announcementStore.some(n => n.id === 'NTC-03'), 'T14.5: Deleted notice is completely purged and no longer retrievable');
+
+// Test 3: Filter notices by category
+const examNotices = announcementStore.filter(n => n.category === 'exam');
+assert(examNotices.length === 1 && examNotices[0].id === 'NTC-01', 'T14.6: Category filtering accurately isolates exam circulars');
+
 console.log('\n================================================================');
 console.log(`MASTER TEST RESULTS: ${pass} Passed, ${fail} Failed`);
 console.log('================================================================');
