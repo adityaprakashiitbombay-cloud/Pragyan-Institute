@@ -494,30 +494,25 @@
 .floating-badge.badge-top-right {
   top: 14px;
   right: 14px;
-  animation: float-y 4s ease-in-out infinite;
 }
 
-/* Corner Logo on Images (Top-Left) */
+/* Corner Logo on Images (Top-Left) — Static & High-Resolution */
 .hero-corner-logo {
   position: absolute;
   top: 14px;
   left: 14px;
   z-index: 7;
-  width: 36px;
-  height: 36px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1.5px solid var(--primary-emerald);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  background: #ffffff;
+  border: 2px solid var(--primary-emerald);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 3px;
   pointer-events: none;
-  animation: float-y 4s ease-in-out infinite;
-  animation-delay: 1.5s;
 }
 
 .hero-corner-logo img {
@@ -530,23 +525,20 @@
 
 .gallery-corner-logo {
   position: absolute;
-  top: 12px;
-  left: 12px;
+  top: 14px;
+  left: 14px;
   z-index: 6;
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1.5px solid var(--primary-emerald);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+  background: #ffffff;
+  border: 2px solid var(--primary-emerald);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2.5px;
+  padding: 3px;
   pointer-events: none;
-  transition: transform var(--transition-normal);
 }
 
 .gallery-corner-logo img {
@@ -555,10 +547,6 @@
   object-fit: contain;
   border-radius: 50%;
   display: block;
-}
-
-.gallery-card:hover .gallery-corner-logo {
-  transform: scale(1.1) rotate(5deg);
 }
 
 .badge-icon {
@@ -1602,38 +1590,38 @@
   .stat-label {
     font-size: 0.72rem;
   }
-  /* M4: Show single brand badge and corner logos cleanly inside corners on mobile */
+  /* M4: Show static brand badge and bigger corner logos cleanly with safe clearance from border on mobile */
   .hero-corner-logo {
-    top: 8px !important;
-    left: 8px !important;
-    width: 26px !important;
-    height: 26px !important;
-    padding: 2px !important;
+    top: 12px !important;
+    left: 12px !important;
+    width: 36px !important;
+    height: 36px !important;
+    padding: 2.5px !important;
   }
   .gallery-corner-logo {
-    top: 8px !important;
-    left: 8px !important;
-    width: 26px !important;
-    height: 26px !important;
+    top: 12px !important;
+    left: 12px !important;
+    width: 32px !important;
+    height: 32px !important;
     padding: 2px !important;
   }
   .floating-badge.badge-top-right {
     display: flex !important;
-    top: 8px !important;
-    right: 8px !important;
-    padding: 0.2rem 0.45rem !important;
-    gap: 0.3rem !important;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+    top: 12px !important;
+    right: 12px !important;
+    padding: 0.25rem 0.55rem !important;
+    gap: 0.35rem !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35) !important;
   }
   .floating-badge.badge-top-right .badge-icon {
-    width: 20px !important;
-    height: 20px !important;
+    width: 22px !important;
+    height: 22px !important;
   }
   .floating-badge.badge-top-right .badge-text-title {
-    font-size: 0.65rem !important;
+    font-size: 0.7rem !important;
   }
   .floating-badge.badge-top-right .badge-text-sub {
-    font-size: 0.54rem !important;
+    font-size: 0.58rem !important;
   }
   .floating-actions-widget {
     bottom: 0.75rem;
