@@ -492,8 +492,18 @@
 }
 
 .floating-badge.badge-top-right {
-  top: 14px;
-  right: 14px;
+  top: 16px;
+  right: 16px;
+  animation: float-badge 3.5s ease-in-out infinite;
+}
+
+@keyframes float-badge {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
 }
 
 /* Corner Logo on Images (Top-Left) — Static & High-Resolution */
@@ -1590,28 +1600,29 @@
   .stat-label {
     font-size: 0.72rem;
   }
-  /* M4: Show static brand badge and bigger corner logos cleanly with safe clearance from border on mobile */
+  /* M4: Show animated brand badge and bigger static corner logos cleanly with safe clearance from border on mobile */
   .hero-corner-logo {
-    top: 12px !important;
-    left: 12px !important;
+    top: 14px !important;
+    left: 14px !important;
     width: 36px !important;
     height: 36px !important;
     padding: 2.5px !important;
   }
   .gallery-corner-logo {
-    top: 12px !important;
-    left: 12px !important;
+    top: 14px !important;
+    left: 14px !important;
     width: 32px !important;
     height: 32px !important;
     padding: 2px !important;
   }
   .floating-badge.badge-top-right {
     display: flex !important;
-    top: 12px !important;
-    right: 12px !important;
+    top: 14px !important;
+    right: 14px !important;
     padding: 0.25rem 0.55rem !important;
     gap: 0.35rem !important;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35) !important;
+    animation: float-badge 3.5s ease-in-out infinite !important;
   }
   .floating-badge.badge-top-right .badge-icon {
     width: 22px !important;
