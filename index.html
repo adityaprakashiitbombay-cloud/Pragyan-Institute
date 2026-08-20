@@ -38,11 +38,11 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
   <!-- CSS Design System -->
-  <link rel="stylesheet" href="./css/variables.css?v=90.0.564fece6">
-  <link rel="stylesheet" href="./css/main.css?v=90.0.564fece6">
-  <link rel="stylesheet" href="./css/components.css?v=90.0.564fece6">
-  <link rel="stylesheet" href="./css/animations.css?v=90.0.564fece6">
-  <link rel="stylesheet" href="./css/portal.css?v=90.0.564fece6">
+  <link rel="stylesheet" href="./css/variables.css?v=90.0.2cc01737">
+  <link rel="stylesheet" href="./css/main.css?v=90.0.2cc01737">
+  <link rel="stylesheet" href="./css/components.css?v=90.0.2cc01737">
+  <link rel="stylesheet" href="./css/animations.css?v=90.0.2cc01737">
+  <link rel="stylesheet" href="./css/portal.css?v=90.0.2cc01737">
   <!-- Schema.org JSON-LD Structured Data for Google Top Ranking & Knowledge Graph -->
   <script type="application/ld+json">
   {
@@ -231,13 +231,6 @@
             <!-- Slide Navigation Controls -->
             <button class="slide-nav-btn prev" id="heroPrevBtn" aria-label="Previous slide"><i class="fa-solid fa-chevron-left"></i></button>
             <button class="slide-nav-btn next" id="heroNextBtn" aria-label="Next slide"><i class="fa-solid fa-chevron-right"></i></button>
-
-            <!-- Slide Dots -->
-            <div class="hero-slide-dots">
-              <span class="dot active" data-slide="0"></span>
-              <span class="dot" data-slide="1"></span>
-              <span class="dot" data-slide="2"></span>
-            </div>
           </div>
 
           <!-- Floating Badges -->
@@ -1020,17 +1013,17 @@
   <!-- Application Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
-  <script defer src="./js/config.js?v=90.0.564fece6"></script>
-  <script defer src="./js/supabase-sync.js?v=90.0.564fece6"></script>
-  <script defer src="./js/chat.js?v=90.0.564fece6"></script>
-  <script defer src="./js/app.js?v=90.0.564fece6"></script>
-  <script defer src="./js/portal.js?v=90.0.564fece6"></script>
+  <script defer src="./js/config.js?v=90.0.2cc01737"></script>
+  <script defer src="./js/supabase-sync.js?v=90.0.2cc01737"></script>
+  <script defer src="./js/chat.js?v=90.0.2cc01737"></script>
+  <script defer src="./js/app.js?v=90.0.2cc01737"></script>
+  <script defer src="./js/portal.js?v=90.0.2cc01737"></script>
 
   <!-- PWA Service Worker Registration for Instant Offline Caching -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=90.0.564fece6').then(reg => {
+        navigator.serviceWorker.register('./sw.js?v=90.0.2cc01737').then(reg => {
           reg.update().catch(() => {});
         }).catch(err => console.log('SW reg error:', err));
       });
