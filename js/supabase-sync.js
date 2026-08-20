@@ -1127,8 +1127,32 @@
 
     normalizeBatch(b) {
       if (!b) return null;
-      const id = b.batch_id || b.id;
-      return { ...b, id, batch_id: id, name: b.name || b.batch_name || '', monthlyFee: Number(b.monthly_fee ?? b.monthlyFee ?? 0), timing: b.timing || b.schedule || '', room: b.room || b.room_no || '' };
+      const id = b.batch_id || b.id || 'BAT-01';
+      const name = b.name || b.className || b.batch_name || b.batchName || 'General Batch';
+      const fee = Number(b.monthly_fee ?? b.monthlyFee ?? 1000);
+      const timing = b.timing || b.timings || b.schedule || 'Mon – Sat: 4:00 PM – 6:30 PM';
+      const room = b.room || b.room_no || 'Hall 1';
+      const teacher = b.teacher || (Array.isArray(b.teachers) ? b.teachers.map(t => t.name || t).join(' & ') : 'Chandan Kumar & Ravi Ranjan');
+
+      return {
+        ...b,
+        id,
+        batch_id: id,
+        name: name,
+        className: name,
+        batchName: name,
+        batch_name: name,
+        monthlyFee: fee,
+        monthly_fee: fee,
+        timing: timing,
+        timings: timing,
+        room: room,
+        teacher: teacher,
+        teachers: Array.isArray(b.teachers) && b.teachers.length > 0 ? b.teachers : [
+          { name: 'CHANDAN KUMAR', subject: 'Science Mentor (Physics & Chemistry)' },
+          { name: 'RAVI RANJAN', subject: 'Maths Mentor (Algebra & Geometry)' }
+        ]
+      };
     },
 
     normalizeAdmin(a) {

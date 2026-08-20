@@ -119,12 +119,12 @@
   // Canonical Batch Category Normalizer (Global Top-Level Helper)
   function getBatchCategoryKey(str) {
     if (!str) return '';
-    const s = String(str).toLowerCase();
-    if (/\b(10|10th|achiever)\b/.test(s)) return '10th';
-    if (/\b(9|9th|nurture)\b/.test(s)) return '9th';
-    if (/\b(8|8th|alpha)\b/.test(s)) return '8th';
-    if (/\b(junior|junio)\b/.test(s)) return 'junio';
-    return s.trim();
+    const s = String(str).toLowerCase().trim();
+    if (s.includes('10th') || s.includes('achiever') || s.includes('class 10') || s.includes('bat-01') || s.includes('bat-10') || /\b(10|10th|x)\b/.test(s)) return '10th';
+    if (s.includes('9th') || s.includes('nurture') || s.includes('class 9') || s.includes('bat-02') || s.includes('bat-09') || /\b(9|9th|ix)\b/.test(s)) return '9th';
+    if (s.includes('8th') || s.includes('alpha') || s.includes('class 8') || s.includes('bat-03') || s.includes('bat-08') || /\b(8|8th|viii)\b/.test(s)) return '8th';
+    if (s.includes('junior') || s.includes('junio') || s.includes('bat-04') || s.includes('7th') || s.includes('6th') || s.includes('class 7') || s.includes('class 6') || /\b(junior|junio|7|6)\b/.test(s)) return 'junio';
+    return s;
   }
 
   // Indian Standard Time (IST) Date Parts Utility (Asia/Kolkata)
@@ -1403,12 +1403,41 @@
       } catch(e) {}
       if (!Array.isArray(batches) || batches.length === 0) {
         batches = [
-          { id: 'BAT-01', batch_id: 'BAT-01', name: 'Class 10th (ACHIEVER)', monthlyFee: 1000, monthly_fee: 1000, timing: '06:30 AM - 08:30 AM', room: 'Hall 1 (Digital Board)', teacher: 'Ravi Ranjan & Chandan Kumar' },
-          { id: 'BAT-02', batch_id: 'BAT-02', name: 'Class 9th (NURTURE)', monthlyFee: 1000, monthly_fee: 1000, timing: '08:30 AM - 10:30 AM', room: 'Hall 2 (Digital Board)', teacher: 'Chandan Kumar & Ravi Ranjan' },
-          { id: 'BAT-03', batch_id: 'BAT-03', name: 'Class 8th (ALPHA)', monthlyFee: 800, monthly_fee: 800, timing: '03:30 PM - 05:30 PM', room: 'Room 3', teacher: 'Chandan Kumar' },
-          { id: 'BAT-04', batch_id: 'BAT-04', name: 'Junior Batch (JUNIO)', monthlyFee: 700, monthly_fee: 700, timing: '04:00 PM - 05:30 PM', room: 'Room 4', teacher: 'Faculty' }
+          { id: 'BAT-01', batch_id: 'BAT-01', name: 'Class 10th (ACHIEVER)', className: 'Class 10th (ACHIEVER)', batchName: 'Class 10th (ACHIEVER)', monthlyFee: 1000, monthly_fee: 1000, timing: 'Mon – Sat: 4:00 PM – 6:30 PM', room: 'Hall 1 (Digital Board)', teacher: 'Ravi Ranjan Sir & Chandan Kumar Sir', badge: '🎯 Board Special', icon: 'fa-bullseye' },
+          { id: 'BAT-02', batch_id: 'BAT-02', name: 'Class 9th (NURTURE)', className: 'Class 9th (NURTURE)', batchName: 'Class 9th (NURTURE)', monthlyFee: 1000, monthly_fee: 1000, timing: 'Mon – Sat: 2:30 PM – 4:30 PM', room: 'Hall 2 (Digital Board)', teacher: 'Chandan Kumar Sir & Ravi Ranjan Sir', badge: '🌱 Foundation Prep', icon: 'fa-seedling' },
+          { id: 'BAT-03', batch_id: 'BAT-03', name: 'Class 8th (ALPHA)', className: 'Class 8th (ALPHA)', batchName: 'Class 8th (ALPHA)', monthlyFee: 800, monthly_fee: 800, timing: 'Mon – Sat: 3:00 PM – 5:00 PM', room: 'Room 3', teacher: 'Chandan Kumar Sir & Ravi Ranjan Sir', badge: '⚡ Middle Prep', icon: 'fa-bolt' },
+          { id: 'BAT-04', batch_id: 'BAT-04', name: 'Junior Batch (JUNIO)', className: 'Junior Batch (JUNIO)', batchName: 'Junior Batch (JUNIO)', monthlyFee: 700, monthly_fee: 700, timing: 'Mon – Sat: 3:30 PM – 5:00 PM', room: 'Room 4', teacher: 'Faculty Mentors', badge: '🚀 Primary / Basics', icon: 'fa-rocket' }
         ];
         localStorage.setItem(STORAGE_KEY_BATCHES, JSON.stringify(batches));
+      } else {
+        // Normalize any existing batch entries from Supabase / localStorage
+        batches = batches.map(b => {
+          const name = b.name || b.className || b.batch_name || b.batchName || 'General Batch';
+          let badge = '📚 Batch';
+          let icon = 'fa-graduation-cap';
+          if (name.includes('10th') || name.includes('ACHIEVER')) { badge = '🎯 Board Special'; icon = 'fa-bullseye'; }
+          else if (name.includes('9th') || name.includes('NURTURE')) { badge = '🌱 Foundation Prep'; icon = 'fa-seedling'; }
+          else if (name.includes('8th') || name.includes('ALPHA')) { badge = '⚡ Middle Prep'; icon = 'fa-bolt'; }
+          else if (name.includes('Junior') || name.includes('JUNIO')) { badge = '🚀 Primary / Basics'; icon = 'fa-rocket'; }
+
+          return {
+            ...b,
+            id: b.id || b.batch_id || 'BAT-01',
+            batch_id: b.batch_id || b.id || 'BAT-01',
+            name: name,
+            className: name,
+            batchName: name,
+            batch_name: name,
+            monthlyFee: Number(b.monthlyFee ?? b.monthly_fee ?? (name.includes('8th') ? 800 : (name.includes('Junior') || name.includes('JUNIO') ? 700 : 1000))),
+            monthly_fee: Number(b.monthlyFee ?? b.monthly_fee ?? (name.includes('8th') ? 800 : (name.includes('Junior') || name.includes('JUNIO') ? 700 : 1000))),
+            timing: b.timing || b.timings || b.schedule || 'Mon – Sat: Regular Timings',
+            timings: b.timing || b.timings || b.schedule || 'Mon – Sat: Regular Timings',
+            room: b.room || b.room_no || 'Classroom',
+            teacher: b.teacher || 'Chandan Kumar & Ravi Ranjan',
+            badge: b.badge || badge,
+            icon: b.icon || icon
+          };
+        });
       }
       this._batchesCache = batches;
       return batches;
@@ -5926,36 +5955,89 @@ function renderStudentDashboard() {
 
           <!-- Batch-Wise Financial Breakdown -->
           <div class="dash-card">
-            <h4 style="font-size: 1.1rem; font-weight: 700; color: var(--text-mahogany); margin-bottom: 1rem;">
-              <i class="fa-solid fa-layer-group" style="color: var(--primary-emerald);"></i> Batch-Wise Collection Breakdown
-            </h4>
-            <div style="display: flex; flex-direction: column; gap: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border-sand); padding-bottom: 0.75rem;">
+              <div>
+                <h4 style="font-size: 1.15rem; font-weight: 800; color: var(--text-mahogany); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                  <i class="fa-solid fa-layer-group" style="color: var(--primary-emerald);"></i> Batch-Wise Collection & Enrollment Breakdown
+                </h4>
+                <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 0.2rem;">Live revenue, collection efficiency, and dues tracking configured for every academic batch</div>
+              </div>
+              <span style="background: #ECFDF5; color: #065F46; border: 1px solid #10B981; padding: 0.3rem 0.75rem; border-radius: 99px; font-size: 0.78rem; font-weight: 700;">
+                <i class="fa-solid fa-graduation-cap"></i> 4 Standard Institutional Batches
+              </span>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 1.15rem;">
               ${batches.map(b => {
-                const bClass = b.className || '';
+                const bName = b.className || b.name || b.batchName || 'Academic Batch';
+                const bKey = (bName.includes('10th') || bName.includes('ACHIEVER')) ? '10th' :
+                             (bName.includes('9th') || bName.includes('NURTURE')) ? '9th' :
+                             (bName.includes('8th') || bName.includes('ALPHA')) ? '8th' : 'junior';
+
                 const batchStudents = students.filter(s => {
-                  const sClass = s.className || '';
-                  return sClass.includes(bClass) || (bClass.includes('10th') && sClass.includes('10th'));
+                  const sClass = (s.className || s.class_name || s.batchName || '').toLowerCase();
+                  if (bKey === '10th') return sClass.includes('10th') || sClass.includes('achiever') || sClass.includes('class 10') || sClass.includes('board');
+                  if (bKey === '9th') return sClass.includes('9th') || sClass.includes('nurture') || sClass.includes('class 9');
+                  if (bKey === '8th') return sClass.includes('8th') || sClass.includes('alpha') || sClass.includes('class 8');
+                  if (bKey === 'junior') return sClass.includes('junior') || sClass.includes('junio') || sClass.includes('7th') || sClass.includes('6th') || sClass.includes('class 7') || sClass.includes('class 6');
+                  return sClass.includes(bName.toLowerCase());
                 });
-                const bCollected = batchStudents.reduce((acc, c) => acc + (c.paidFee || 0), 0);
-                const bPending = batchStudents.reduce((acc, c) => acc + (c.pendingFee || 0), 0);
+
+                const bMonthlyRate = Number(b.monthlyFee ?? b.monthly_fee ?? (bKey === '8th' ? 800 : (bKey === 'junior' ? 700 : 1000)));
+                const bCollected = batchStudents.reduce((acc, c) => acc + (Number(c.paidFee ?? c.paid_fee ?? 0)), 0);
+                const bPending = batchStudents.reduce((acc, c) => acc + (Number(c.pendingFee ?? c.pending_fee ?? 0)), 0);
                 const bTotal = bCollected + bPending;
-                const bPct = bTotal > 0 ? ((bCollected / bTotal) * 100).toFixed(0) : 100;
+                const bPct = bTotal > 0 ? Math.min(100, Math.round((bCollected / bTotal) * 100)) : (batchStudents.length > 0 ? 0 : 0);
+
+                let badgeIcon = 'fa-graduation-cap';
+                let badgeText = 'Batch';
+                let badgeColor = '#065F46';
+                let badgeBg = '#D1FAE5';
+
+                if (bKey === '10th') { badgeIcon = 'fa-bullseye'; badgeText = '🎯 Board Special'; badgeColor = '#92400E'; badgeBg = '#FEF3C7'; }
+                else if (bKey === '9th') { badgeIcon = 'fa-seedling'; badgeText = '🌱 Foundation Prep'; badgeColor = '#065F46'; badgeBg = '#D1FAE5'; }
+                else if (bKey === '8th') { badgeIcon = 'fa-bolt'; badgeText = '⚡ Middle Prep'; badgeColor = '#1E40AF'; badgeBg = '#DBEAFE'; }
+                else if (bKey === 'junior') { badgeIcon = 'fa-rocket'; badgeText = '🚀 Primary / Basics'; badgeColor = '#6B21A8'; badgeBg = '#F3E8FF'; }
+
+                const clearedCount = batchStudents.filter(s => (Number(s.pendingFee ?? s.pending_fee ?? 0)) === 0).length;
 
                 return `
-                  <div style="border: 1px solid var(--border-sand); padding: 1rem; border-radius: 8px; background: #FAF9F6;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                      <div>
-                        <strong style="font-size: 1rem; color: var(--text-mahogany);">${b.className}</strong>
-                        <span style="font-size: 0.8rem; color: var(--text-muted); margin-left: 0.5rem;">(${batchStudents.length} Students • ₹${b.monthlyFee || 1000}/mo)</span>
+                  <div style="border: 1px solid var(--border-sand); padding: 1.15rem; border-radius: 10px; background: #FAF9F6; box-shadow: 0 2px 6px rgba(0,0,0,0.02); transition: transform 0.15s ease;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.65rem;">
+                      <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                        <strong style="font-size: 1.05rem; color: var(--text-mahogany); font-weight: 800;">${bName}</strong>
+                        <span style="font-size: 0.75rem; background: ${badgeBg}; color: ${badgeColor}; padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: 700;">
+                          ${badgeText}
+                        </span>
+                        <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">
+                          • <strong>${batchStudents.length}</strong> Enrolled • <strong>₹${bMonthlyRate.toLocaleString()}/mo</strong>
+                        </span>
                       </div>
-                      <span style="font-weight: 700; font-size: 0.9rem; color: var(--primary-emerald);">₹${bCollected.toLocaleString()} Collected</span>
+                      <div style="text-align: right;">
+                        <span style="font-weight: 800; font-size: 1.05rem; color: #059669; background: #ECFDF5; padding: 0.25rem 0.65rem; border-radius: 6px; border: 1px solid #A7F3D0;">
+                          <i class="fa-solid fa-circle-check" style="font-size: 0.85rem;"></i> ₹${bCollected.toLocaleString()} Collected
+                        </span>
+                      </div>
                     </div>
-                    <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.3rem;">
-                      <span>Progress: ${bPct}%</span>
-                      <span style="color: #DC2626;">Pending: ₹${bPending.toLocaleString()}</span>
+
+                    <div style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.6rem; display: flex; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                      <span><i class="fa-regular fa-clock" style="color: #6B7280;"></i> ${b.timing || b.timings || 'Mon – Sat: Regular Timings'}</span>
+                      <span><i class="fa-solid fa-door-open" style="color: #6B7280;"></i> ${b.room || 'Classroom'}</span>
+                      <span><i class="fa-solid fa-chalkboard-user" style="color: #6B7280;"></i> ${b.teacher || 'Chandan Kumar & Ravi Ranjan'}</span>
                     </div>
-                    <div style="width: 100%; height: 8px; background: #E5E7EB; border-radius: 99px; overflow: hidden;">
-                      <div style="width: ${bPct}%; height: 100%; background: var(--primary-emerald); border-radius: 99px;"></div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; margin-bottom: 0.4rem;">
+                      <span style="color: #374151; font-weight: 700;">
+                        Collection Progress: <strong style="color: ${bPct >= 80 ? '#059669' : (bPct >= 50 ? '#D97706' : '#DC2626')}; font-size: 0.9rem;">${bPct}%</strong>
+                        <span style="font-size: 0.76rem; color: var(--text-muted); font-weight: 500; margin-left: 0.4rem;">(${clearedCount}/${batchStudents.length} students cleared)</span>
+                      </span>
+                      <span style="color: #DC2626; font-weight: 700;">
+                        <i class="fa-solid fa-triangle-exclamation"></i> Pending Dues: ₹${bPending.toLocaleString()}
+                      </span>
+                    </div>
+
+                    <div style="width: 100%; height: 10px; background: #E5E7EB; border-radius: 99px; overflow: hidden; position: relative;">
+                      <div style="width: ${bPct}%; height: 100%; background: linear-gradient(90deg, #059669 0%, #10B981 100%); border-radius: 99px; transition: width 0.4s ease;"></div>
                     </div>
                   </div>
                 `;

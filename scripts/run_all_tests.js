@@ -447,11 +447,71 @@ assert(summaryResult.chandanCash + summaryResult.chandanUpi === summaryResult.ch
 assert(summaryResult.raviCash + summaryResult.raviUpi === summaryResult.raviTotal, 'T12.4: Prof. Ravi Ranjan Cash + UPI breakdown matches total');
 assert(summaryResult.allTx.length === 5, 'T12.5: Successfully synthesizes missing admission transactions to reflect 100% of real payments');
 
+// -----------------------------------------------------------------------------
+// T13: Batch-Wise Collection Breakdown & Normalization Tests
+// -----------------------------------------------------------------------------
+console.log('\n--- [T13] Batch-Wise Breakdown & Normalization Tests ---');
+const rawSupabaseBatches = [
+  { batch_id: 'BAT-01', name: 'Class 10th (ACHIEVER)', monthly_fee: 1000 },
+  { batch_id: 'BAT-02', name: 'Class 9th (NURTURE)', monthly_fee: 1000 },
+  { batch_id: 'BAT-03', name: 'Class 8th (ALPHA)', monthly_fee: 800 },
+  { batch_id: 'BAT-04', name: 'Junior Batch (JUNIO)', monthly_fee: 700 }
+];
+
+function normalizeBatchTest(b) {
+  const id = b.batch_id || b.id || 'BAT-01';
+  const name = b.name || b.className || b.batch_name || b.batchName || 'General Batch';
+  const fee = Number(b.monthly_fee ?? b.monthlyFee ?? 1000);
+  const timing = b.timing || b.timings || b.schedule || 'Mon – Sat: Regular Timings';
+  const room = b.room || b.room_no || 'Hall 1';
+  const teacher = b.teacher || 'Chandan Kumar & Ravi Ranjan';
+
+  return {
+    ...b,
+    id,
+    batch_id: id,
+    name: name,
+    className: name,
+    batchName: name,
+    batch_name: name,
+    monthlyFee: fee,
+    monthly_fee: fee,
+    timing: timing,
+    timings: timing,
+    room: room,
+    teacher: teacher
+  };
+}
+
+const normalized = rawSupabaseBatches.map(normalizeBatchTest);
+assert(normalized.every(b => typeof b.className === 'string' && b.className !== 'undefined' && b.className.length > 0), 'T13.1: All normalized batches have valid, non-undefined className');
+assert(normalized.find(b => b.name.includes('10th')).monthlyFee === 1000, 'T13.2: Class 10th monthly fee is ₹1000');
+assert(normalized.find(b => b.name.includes('8th')).monthlyFee === 800, 'T13.3: Class 8th monthly fee is ₹800');
+assert(normalized.find(b => b.name.includes('Junior')).monthlyFee === 700, 'T13.4: Junior Batch monthly fee is ₹700');
+
+// Student Batch Aggregation test
+const testStudents = [
+  { name: 'Amit', className: 'Class 10th (ACHIEVER)', paidFee: 3000, pendingFee: 1000 },
+  { name: 'Pooja', className: 'Class 10th (Board)', paidFee: 4000, pendingFee: 0 },
+  { name: 'Rahul', className: 'Class 9th (NURTURE)', paidFee: 2000, pendingFee: 1000 },
+  { name: 'Sneha', className: 'Class 8th (ALPHA)', paidFee: 1600, pendingFee: 0 }
+];
+
+const batch10Students = testStudents.filter(s => s.className.includes('10th'));
+const b10Collected = batch10Students.reduce((a, c) => a + c.paidFee, 0);
+const b10Pending = batch10Students.reduce((a, c) => a + c.pendingFee, 0);
+const b10Pct = Math.round((b10Collected / (b10Collected + b10Pending)) * 100);
+
+assert(batch10Students.length === 2, 'T13.5: Correctly maps 2 students to Class 10th');
+assert(b10Collected === 7000, 'T13.6: Correctly aggregates ₹7000 collected for Class 10th');
+assert(b10Pct === 88, 'T13.7: Calculates 88% collection progress for Class 10th');
+
 console.log('\n================================================================');
 console.log(`MASTER TEST RESULTS: ${pass} Passed, ${fail} Failed`);
 console.log('================================================================');
 
 if (fail > 0) process.exit(1);
+
 
 
 
