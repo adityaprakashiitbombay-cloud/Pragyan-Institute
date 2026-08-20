@@ -38,11 +38,11 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
   <!-- CSS Design System -->
-  <link rel="stylesheet" href="./css/variables.css?v=90.0.83a9c40f">
-  <link rel="stylesheet" href="./css/main.css?v=90.0.83a9c40f">
-  <link rel="stylesheet" href="./css/components.css?v=90.0.83a9c40f">
-  <link rel="stylesheet" href="./css/animations.css?v=90.0.83a9c40f">
-  <link rel="stylesheet" href="./css/portal.css?v=90.0.83a9c40f">
+  <link rel="stylesheet" href="./css/variables.css?v=90.0.420da5ed">
+  <link rel="stylesheet" href="./css/main.css?v=90.0.420da5ed">
+  <link rel="stylesheet" href="./css/components.css?v=90.0.420da5ed">
+  <link rel="stylesheet" href="./css/animations.css?v=90.0.420da5ed">
+  <link rel="stylesheet" href="./css/portal.css?v=90.0.420da5ed">
   <!-- Schema.org JSON-LD Structured Data for Google Top Ranking & Knowledge Graph -->
   <script type="application/ld+json">
   {
@@ -231,16 +231,16 @@
             <!-- Slide Navigation Controls -->
             <button class="slide-nav-btn prev" id="heroPrevBtn" aria-label="Previous slide"><i class="fa-solid fa-chevron-left"></i></button>
             <button class="slide-nav-btn next" id="heroNextBtn" aria-label="Next slide"><i class="fa-solid fa-chevron-right"></i></button>
-          </div>
 
-          <!-- Floating Brand Badge -->
-          <div class="floating-badge badge-top-right">
-            <div class="badge-icon" style="background: #ffffff; padding: 2px; border: 1.5px solid var(--primary-emerald); box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
-              <img src="assets/images/logo.png" alt="Pragyan Institute Logo" style="width: 100%; height: 100%; object-fit: contain; border-radius: 50%; display: block;">
-            </div>
-            <div class="badge-text-group">
-              <span class="badge-text-title" style="color: var(--primary-emerald); font-weight: 800;">PRAGYAN</span>
-              <span class="badge-text-sub">Lalganj Toppers</span>
+            <!-- Floating Brand Badge (Cleanly Inset in Top-Right Corner of Photo) -->
+            <div class="floating-badge badge-top-right">
+              <div class="badge-icon" style="background: #ffffff; padding: 2px; border: 1.5px solid var(--primary-emerald); box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
+                <img src="assets/images/logo.png" alt="Pragyan Institute Logo" style="width: 100%; height: 100%; object-fit: contain; border-radius: 50%; display: block;">
+              </div>
+              <div class="badge-text-group">
+                <span class="badge-text-title" style="color: var(--primary-emerald); font-weight: 800;">PRAGYAN</span>
+                <span class="badge-text-sub">Lalganj Toppers</span>
+              </div>
             </div>
           </div>
         </div>
@@ -997,17 +997,17 @@
   <!-- Application Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
-  <script defer src="./js/config.js?v=90.0.83a9c40f"></script>
-  <script defer src="./js/supabase-sync.js?v=90.0.83a9c40f"></script>
-  <script defer src="./js/chat.js?v=90.0.83a9c40f"></script>
-  <script defer src="./js/app.js?v=90.0.83a9c40f"></script>
-  <script defer src="./js/portal.js?v=90.0.83a9c40f"></script>
+  <script defer src="./js/config.js?v=90.0.420da5ed"></script>
+  <script defer src="./js/supabase-sync.js?v=90.0.420da5ed"></script>
+  <script defer src="./js/chat.js?v=90.0.420da5ed"></script>
+  <script defer src="./js/app.js?v=90.0.420da5ed"></script>
+  <script defer src="./js/portal.js?v=90.0.420da5ed"></script>
 
   <!-- PWA Service Worker Registration for Instant Offline Caching -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=90.0.83a9c40f').then(reg => {
+        navigator.serviceWorker.register('./sw.js?v=90.0.420da5ed').then(reg => {
           reg.update().catch(() => {});
         }).catch(err => console.log('SW reg error:', err));
       });

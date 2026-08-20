@@ -478,23 +478,22 @@
   position: absolute;
   display: flex;
   align-items: center;
-  gap: 0.45rem;
-  padding: 0.35rem 0.65rem;
+  gap: 0.5rem;
+  padding: 0.35rem 0.75rem;
   border-radius: 9999px;
-  background-color: rgba(255, 255, 255, 0.94);
+  background-color: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 4px 14px rgba(90, 46, 37, 0.12);
-  border: 1px solid var(--border-sand);
-  z-index: 10;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  z-index: 7;
   white-space: nowrap;
-  animation: float-y 4s ease-in-out infinite;
   pointer-events: none;
 }
 
 .floating-badge.badge-top-right {
-  top: calc(0.9rem + env(safe-area-inset-top));
-  right: calc(0.9rem + env(safe-area-inset-right));
+  top: 14px;
+  right: 14px;
   animation: float-y 4s ease-in-out infinite;
 }
 
@@ -1539,24 +1538,24 @@
   .stat-label {
     font-size: 0.72rem;
   }
-  /* M4: Show single brand badge cleanly on mobile screens */
+  /* M4: Show single brand badge cleanly inside top-right corner of photo on mobile */
   .floating-badge.badge-top-right {
     display: flex !important;
-    top: 0.55rem;
-    right: 0.55rem;
-    padding: 0.22rem 0.5rem;
-    gap: 0.35rem;
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+    top: 8px !important;
+    right: 8px !important;
+    padding: 0.2rem 0.45rem !important;
+    gap: 0.3rem !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
   }
   .floating-badge.badge-top-right .badge-icon {
-    width: 20px;
-    height: 20px;
+    width: 20px !important;
+    height: 20px !important;
   }
   .floating-badge.badge-top-right .badge-text-title {
-    font-size: 0.68rem;
+    font-size: 0.65rem !important;
   }
   .floating-badge.badge-top-right .badge-text-sub {
-    font-size: 0.56rem;
+    font-size: 0.54rem !important;
   }
   .floating-actions-widget {
     bottom: 0.75rem;
