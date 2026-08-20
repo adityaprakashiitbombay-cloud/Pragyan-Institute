@@ -127,6 +127,65 @@
     return s;
   }
 
+  // Financial Audit Helper: Distinguishes Real Money Payments from Administrative Adjustments / Dues
+  function isRealCollectedPayment(entry) {
+    if (!entry || typeof entry !== 'object') return false;
+    const amt = Number(entry.amount ?? 0);
+    if (amt <= 0 || isNaN(amt)) return false;
+
+    const recNo = String(entry.receiptNo || entry.receipt_no || '').trim().toUpperCase();
+    if (
+      recNo.startsWith('REC-BILL-') ||
+      recNo.startsWith('OLD-DUE') ||
+      recNo.startsWith('ADJ-') ||
+      recNo.startsWith('RATE-') ||
+      recNo.startsWith('EDIT-') ||
+      recNo.startsWith('DUE-') ||
+      recNo.startsWith('NTC-') ||
+      recNo.startsWith('DISC-') ||
+      recNo.startsWith('ADDON-')
+    ) {
+      return false;
+    }
+
+    const status = String(entry.status || '').trim().toLowerCase();
+    if (['adjusted', 'pending due', 'pending', 'cancelled', 'synchronized', 'failed', 'due', 'adjustment', 'waived', 'unpaid'].includes(status)) {
+      return false;
+    }
+
+    const mode = String(entry.mode || entry.paymentMode || entry.payment_mode || '').trim().toLowerCase();
+    if (
+      mode.includes('non-cash') ||
+      mode.includes('carryover') ||
+      mode.includes('adjustment') ||
+      mode.includes('waiver') ||
+      mode.includes('concession') ||
+      mode.includes('discount') ||
+      mode.includes('rate structure') ||
+      mode.includes('synchronization') ||
+      mode.includes('profile') ||
+      mode.includes('old unpaid') ||
+      mode.includes('billing ledger') ||
+      mode.includes('due')
+    ) {
+      return false;
+    }
+
+    const note = String(entry.note || '').trim().toLowerCase();
+    if (
+      note.includes('non-cash') ||
+      note.includes('waiver') ||
+      note.includes('concession') ||
+      note.includes('rate structure') ||
+      note.includes('fee adjustment') ||
+      note.includes('old fee carryover')
+    ) {
+      return false;
+    }
+
+    return status === 'paid' || status === 'completed' || status === 'verified' || !status;
+  }
+
   // Indian Standard Time (IST) Date Parts Utility (Asia/Kolkata)
   function getISTDateParts(date = new Date()) {
     try {
@@ -927,12 +986,13 @@
             this.safeSetItem('pragyan_db_fee_accounts_master', feeAccountsPayload);
           }
 
-          // H3 & H2: Delta Sync for receipts
+          // H3 & H2: Delta Sync for receipts (Only actual monetary collections)
           const newReceipts = [];
           students.forEach(s => {
             if (Array.isArray(s.feeHistory)) {
               const studentUuid = s.db_uuid || (s.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s.id) ? s.id : null);
               s.feeHistory.forEach(h => {
+                if (!isRealCollectedPayment(h)) return; // Strictly ignore non-cash adjustments, old dues, and penalties
                 const rNo = h.receiptNo || h.receipt_no;
                 if (!rNo) return;
                 if (!this._lastSavedReceiptsSet.has(rNo)) {
@@ -942,7 +1002,7 @@
                       student_id: studentUuid,
                       amount: Number(h.amount) || 0,
                       payment_mode: h.mode || h.payment_mode || 'Cash Collected',
-                      status: h.status || 'Paid',
+                      status: 'Paid',
                       payment_date: h.date || h.payment_date || new Date().toISOString().split('T')[0],
                       collected_by: h.by || h.collected_by || 'CHANDAN KUMAR',
                       note: h.note || ''
@@ -1083,16 +1143,18 @@
       if (this._receiptsCache) return this._receiptsCache;
       try {
         const raw = localStorage.getItem('pragyan_db_fee_receipts_master');
-        this._receiptsCache = raw ? JSON.parse(raw) : [];
+        const list = raw ? JSON.parse(raw) : [];
+        this._receiptsCache = Array.isArray(list) ? list.filter(r => isRealCollectedPayment(r)) : [];
       } catch (e) { this._receiptsCache = []; }
 
-      // Fallback: merge with any receipts found across all students' feeHistory
+      // Fallback: merge with any genuine payments found across all students' feeHistory
       if (!this._receiptsCache || this._receiptsCache.length === 0) {
         const fallback = [];
         const students = this.getStudents();
         students.forEach(s => {
           if (Array.isArray(s.feeHistory)) {
             s.feeHistory.forEach(h => {
+              if (!isRealCollectedPayment(h)) return; // Strictly ignore non-cash adjustments, old dues, rate changes
               const rNo = h.receiptNo || h.receipt_no;
               if (rNo && !fallback.some(r => (r.receiptNo || r.receipt_no) === rNo)) {
                 fallback.push({
@@ -1105,7 +1167,7 @@
                   payment_date: h.date || h.payment_date || '',
                   mode: h.mode || h.payment_mode || 'Cash Collected',
                   payment_mode: h.mode || h.payment_mode || 'Cash Collected',
-                  status: h.status || 'Paid',
+                  status: 'Paid',
                   by: h.by || h.collected_by || 'CHANDAN KUMAR',
                   collected_by: h.by || h.collected_by || 'CHANDAN KUMAR',
                   note: h.note || ''
@@ -5710,9 +5772,9 @@ function renderStudentDashboard() {
         let studentCollectedSum = 0;
         const studentTxList = [];
 
-        // 1.1 Process student's embedded feeHistory
+        // 1.1 Process student's embedded feeHistory (ONLY Genuine Monetary Payments)
         (s.feeHistory || []).forEach(h => {
-          if (h && (h.status === 'Paid' || !h.status) && (Number(h.amount) || 0) > 0) {
+          if (isRealCollectedPayment(h)) {
             const recNo = h.receiptNo || h.receipt_no || `REC-${sRoll}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
             if (!processedReceiptNos.has(recNo)) {
               processedReceiptNos.add(recNo);
@@ -5733,9 +5795,9 @@ function renderStudentDashboard() {
           }
         });
 
-        // 1.2 Process matched entries from masterReceipts (if not already processed)
+        // 1.2 Process matched entries from masterReceipts (ONLY Genuine Monetary Payments)
         masterReceipts.forEach(r => {
-          if (r && (r.status === 'Paid' || !r.status) && (Number(r.amount) || 0) > 0) {
+          if (isRealCollectedPayment(r)) {
             const rStuId = (r.student_id || r.studentId || '').toString().toLowerCase();
             const rNo = (r.receipt_no || r.receiptNo || '').toString();
             const isMatch = (sUuid && rStuId === sUuid) || (sId && rStuId === sId) || (sRoll && rStuId === sRoll) || (sRoll && rNo.includes(sRoll));
@@ -5758,7 +5820,7 @@ function renderStudentDashboard() {
           }
         });
 
-        // 1.3 If student has paidFee > studentCollectedSum, account for the difference (admission / base tuition payment)
+        // 1.3 If student has verified paidFee > studentCollectedSum, account for the difference (admission / base tuition payment)
         if (sPaidFee > studentCollectedSum) {
           const diff = sPaidFee - studentCollectedSum;
           const initRecNo = `REC-${sRoll || sId || 'ADM'}-INIT`;

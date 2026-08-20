@@ -335,14 +335,67 @@ const mockStudents = [
     pendingFee: 800,
     feeHistory: [
       { receiptNo: 'REC-1003-P1', amount: 800, mode: 'Cash at Counter', status: 'Paid', by: 'Prof. Ravi Ranjan' },
-      { receiptNo: 'REC-1003-P2', amount: 800, mode: 'Cash at Counter', status: 'Paid', by: 'Prof. Ravi Ranjan' }
+      { receiptNo: 'REC-1003-P2', amount: 800, mode: 'Cash at Counter', status: 'Paid', by: 'Prof. Ravi Ranjan' },
+      // Non-monetary adjustments that MUST NEVER count as money collected:
+      { receiptNo: 'OLD-DUE-9999', amount: 1500, mode: 'Old Unpaid Fee Carryover', status: 'Pending Due', by: 'Prof. Ravi Ranjan' },
+      { receiptNo: 'ADJ-8888', amount: -500, mode: 'Fee Concession / Waiver (Non-Cash)', status: 'Adjusted', by: 'CHANDAN KUMAR' },
+      { receiptNo: 'ADJ-7777', amount: 300, mode: 'Fee Correction / Add-on (Non-Cash)', status: 'Adjusted', by: 'CHANDAN KUMAR' },
+      { receiptNo: 'REC-BILL-s-103-2026-08', amount: 800, mode: 'Monthly Billing Ledger Accrual', status: 'Due', by: 'System' }
     ]
   }
 ];
 
 const mockMasterReceipts = [
-  { receipt_no: 'REC-1001-P1', student_id: 's-101', amount: 2000, payment_mode: 'UPI (PhonePe)', status: 'Paid', collected_by: 'CHANDAN KUMAR' }
+  { receipt_no: 'REC-1001-P1', student_id: 's-101', amount: 2000, payment_mode: 'UPI (PhonePe)', status: 'Paid', collected_by: 'CHANDAN KUMAR' },
+  // Non-monetary items in master receipts:
+  { receipt_no: 'OLD-DUE-5555', student_id: 's-102', amount: 2000, payment_mode: 'Old Unpaid Fee Carryover', status: 'Pending Due', collected_by: 'Prof. Ravi Ranjan' }
 ];
+
+function isRealCollectedPaymentTest(entry) {
+  if (!entry || typeof entry !== 'object') return false;
+  const amt = Number(entry.amount ?? 0);
+  if (amt <= 0 || isNaN(amt)) return false;
+
+  const recNo = String(entry.receiptNo || entry.receipt_no || '').trim().toUpperCase();
+  if (
+    recNo.startsWith('REC-BILL-') ||
+    recNo.startsWith('OLD-DUE') ||
+    recNo.startsWith('ADJ-') ||
+    recNo.startsWith('RATE-') ||
+    recNo.startsWith('EDIT-') ||
+    recNo.startsWith('DUE-') ||
+    recNo.startsWith('NTC-') ||
+    recNo.startsWith('DISC-') ||
+    recNo.startsWith('ADDON-')
+  ) {
+    return false;
+  }
+
+  const status = String(entry.status || '').trim().toLowerCase();
+  if (['adjusted', 'pending due', 'pending', 'cancelled', 'synchronized', 'failed', 'due', 'adjustment', 'waived', 'unpaid'].includes(status)) {
+    return false;
+  }
+
+  const mode = String(entry.mode || entry.paymentMode || entry.payment_mode || '').trim().toLowerCase();
+  if (
+    mode.includes('non-cash') ||
+    mode.includes('carryover') ||
+    mode.includes('adjustment') ||
+    mode.includes('waiver') ||
+    mode.includes('concession') ||
+    mode.includes('discount') ||
+    mode.includes('rate structure') ||
+    mode.includes('synchronization') ||
+    mode.includes('profile') ||
+    mode.includes('old unpaid') ||
+    mode.includes('billing ledger') ||
+    mode.includes('due')
+  ) {
+    return false;
+  }
+
+  return status === 'paid' || status === 'completed' || status === 'verified' || !status;
+}
 
 function aggregateTeacherCollections(students, masterReceipts) {
   const allTx = [];
@@ -359,7 +412,7 @@ function aggregateTeacherCollections(students, masterReceipts) {
     const studentTxList = [];
 
     (s.feeHistory || []).forEach(h => {
-      if (h && (h.status === 'Paid' || !h.status) && (Number(h.amount) || 0) > 0) {
+      if (isRealCollectedPaymentTest(h)) {
         const recNo = h.receiptNo || h.receipt_no;
         if (!processedNos.has(recNo)) {
           processedNos.add(recNo);
@@ -377,7 +430,7 @@ function aggregateTeacherCollections(students, masterReceipts) {
     });
 
     masterReceipts.forEach(r => {
-      if (r && (r.status === 'Paid' || !r.status) && (Number(r.amount) || 0) > 0) {
+      if (isRealCollectedPaymentTest(r)) {
         const rStuId = (r.student_id || r.studentId || '').toString().toLowerCase();
         const rNo = (r.receipt_no || r.receiptNo || '').toString();
         const isMatch = (rStuId === sId || rStuId === sRoll);
@@ -441,11 +494,12 @@ function aggregateTeacherCollections(students, masterReceipts) {
 const summaryResult = aggregateTeacherCollections(mockStudents, mockMasterReceipts);
 const totalMasterPaid = mockStudents.reduce((sum, s) => sum + s.paidFee, 0); // 4000 + 3000 + 1600 = 8600
 
-assert(summaryResult.totalAllModes === totalMasterPaid, `T12.1: Grand total (${summaryResult.totalAllModes}) perfectly matches total collected fee (${totalMasterPaid})`);
-assert(summaryResult.chandanTotal + summaryResult.raviTotal === totalMasterPaid, 'T12.2: Sum of Chandan Kumar + Prof. Ravi Ranjan collections matches total collected');
+assert(summaryResult.totalAllModes === totalMasterPaid, `T12.1: Grand total (${summaryResult.totalAllModes}) perfectly matches total collected fee (${totalMasterPaid}) with 0 inflation from old dues or adjustments`);
+assert(summaryResult.chandanTotal + summaryResult.raviTotal === totalMasterPaid, 'T12.2: Sum of Chandan Kumar + Prof. Ravi Ranjan collections matches total real collected');
 assert(summaryResult.chandanCash + summaryResult.chandanUpi === summaryResult.chandanTotal, 'T12.3: Chandan Kumar Cash + UPI breakdown matches total');
 assert(summaryResult.raviCash + summaryResult.raviUpi === summaryResult.raviTotal, 'T12.4: Prof. Ravi Ranjan Cash + UPI breakdown matches total');
 assert(summaryResult.allTx.length === 5, 'T12.5: Successfully synthesizes missing admission transactions to reflect 100% of real payments');
+assert(summaryResult.allTx.every(t => !t.receiptNo.startsWith('OLD-DUE') && !t.receiptNo.startsWith('ADJ-') && !t.receiptNo.startsWith('REC-BILL-')), 'T12.6: Zero non-cash adjustments or old dues in transaction ledger');
 
 // -----------------------------------------------------------------------------
 // T13: Batch-Wise Collection Breakdown & Normalization Tests

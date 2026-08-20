@@ -1053,18 +1053,39 @@
       return { ...n, id, notice_id: id, targetBatch: n.target_batch || n.targetBatch || 'All Batches', date: n.created_at || n.date || '', attachmentUrl: n.attachment_url || n.attachmentUrl || '' };
     },
 
-    // S4: Normalize receipts with consistent studentId
+    // S4: Normalize receipts with consistent studentId (Only genuine money payments)
     normalizeReceipt(r) {
       if (!r) return null;
       const receiptNo = r.receipt_no || r.receiptNo;
       if (!receiptNo) return null;
+      const recUpper = String(receiptNo).toUpperCase().trim();
+      if (
+        recUpper.startsWith('REC-BILL-') ||
+        recUpper.startsWith('OLD-DUE') ||
+        recUpper.startsWith('ADJ-') ||
+        recUpper.startsWith('RATE-') ||
+        recUpper.startsWith('EDIT-') ||
+        recUpper.startsWith('DUE-') ||
+        recUpper.startsWith('NTC-') ||
+        recUpper.startsWith('DISC-') ||
+        recUpper.startsWith('ADDON-')
+      ) {
+        return null;
+      }
+      const mode = String(r.payment_mode || r.mode || '').toLowerCase();
+      if (mode.includes('non-cash') || mode.includes('carryover') || mode.includes('adjustment') || mode.includes('waiver') || mode.includes('concession')) {
+        return null;
+      }
       const studentId = (r.student_id || r.studentId || '').toString().trim();
       return {
         receiptNo,
+        receipt_no: receiptNo,
         studentId,
+        student_id: studentId,
         date: r.payment_date || r.date || '',
         mode: r.payment_mode || r.mode || 'Cash',
         amount: Number(r.amount || 0),
+        status: r.status || 'Paid',
         by: r.collected_by || r.by || '',
         note: r.note || ''
       };
