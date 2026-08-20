@@ -590,6 +590,61 @@ assert(!announcementStore.some(n => n.id === 'NTC-03'), 'T14.5: Deleted notice i
 const examNotices = announcementStore.filter(n => n.category === 'exam');
 assert(examNotices.length === 1 && examNotices[0].id === 'NTC-01', 'T14.6: Category filtering accurately isolates exam circulars');
 
+// -----------------------------------------------------------------------------
+// T15: Multi-Dimensional Fee Modal Filter Suite (Month, Class, Admin, Mode)
+// -----------------------------------------------------------------------------
+console.log('\n--- [T15] Multi-Dimensional Fee Modal Filter Suite ---');
+const sampleTxList = [
+  { receiptNo: 'REC-01', studentName: 'Aman', className: 'Class 10th (ACHIEVER)', amount: 2000, mode: 'UPI (PhonePe)', collector: 'CHANDAN KUMAR', date: '2026-08-15' },
+  { receiptNo: 'REC-02', studentName: 'Rohan', className: 'Class 10th (ACHIEVER)', amount: 1000, mode: 'Cash at Counter', collector: 'CHANDAN KUMAR', date: '2026-08-18' },
+  { receiptNo: 'REC-03', studentName: 'Sneha', className: 'Class 8th (ALPHA)', amount: 800, mode: 'Cash at Counter', collector: 'Prof. Ravi Ranjan', date: '2026-08-10' },
+  { receiptNo: 'REC-04', studentName: 'Sneha', className: 'Class 8th (ALPHA)', amount: 800, mode: 'Cash at Counter', collector: 'Prof. Ravi Ranjan', date: '2026-07-15' },
+  { receiptNo: 'REC-05', studentName: 'Pooja', className: 'Class 9th (NURTURE)', amount: 1000, mode: 'UPI (GPay)', collector: 'CHANDAN KUMAR', date: '2026-07-20' }
+];
+
+function filterFeeTransactions(list, { month = 'all', batch = 'all', admin = 'all', mode = 'all' }) {
+  return list.filter(t => {
+    if (month !== 'all' && !t.date.startsWith(month)) return false;
+    if (batch !== 'all') {
+      const bKey = t.className.includes('10th') ? '10th' : t.className.includes('9th') ? '9th' : t.className.includes('8th') ? '8th' : 'junior';
+      if (bKey !== batch) return false;
+    }
+    if (admin !== 'all') {
+      const isChandan = t.collector.toLowerCase().includes('chandan');
+      if (admin === 'chandan' && !isChandan) return false;
+      if (admin === 'ravi' && isChandan) return false;
+    }
+    if (mode !== 'all') {
+      const isCash = t.mode.toLowerCase().includes('cash');
+      if (mode === 'cash' && !isCash) return false;
+      if (mode === 'upi' && isCash) return false;
+    }
+    return true;
+  });
+}
+
+// 1. Month filter: August 2026
+const augTx = filterFeeTransactions(sampleTxList, { month: '2026-08' });
+const augTotal = augTx.reduce((sum, t) => sum + t.amount, 0);
+assert(augTx.length === 3, 'T15.1: Month filter accurately isolates August transactions (3 receipts)');
+assert(augTotal === 3800, 'T15.2: August total revenue is ₹3,800');
+
+// 2. Class filter: Class 10th
+const class10Tx = filterFeeTransactions(sampleTxList, { batch: '10th' });
+const class10Total = class10Tx.reduce((sum, t) => sum + t.amount, 0);
+assert(class10Tx.length === 2, 'T15.3: Class filter isolates Class 10th (2 receipts)');
+assert(class10Total === 3000, 'T15.4: Class 10th total collection is ₹3,000');
+
+// 3. Admin filter: Prof. Ravi Ranjan
+const raviTx = filterFeeTransactions(sampleTxList, { admin: 'ravi' });
+const raviTotal = raviTx.reduce((sum, t) => sum + t.amount, 0);
+assert(raviTx.length === 2, 'T15.5: Admin filter isolates Prof. Ravi Ranjan collections');
+assert(raviTotal === 1600, 'T15.6: Prof. Ravi Ranjan total is ₹1,600');
+
+// 4. Combined Multi-Filter: Aug 2026 + Class 10th + Chandan Kumar + UPI
+const comboTx = filterFeeTransactions(sampleTxList, { month: '2026-08', batch: '10th', admin: 'chandan', mode: 'upi' });
+assert(comboTx.length === 1 && comboTx[0].receiptNo === 'REC-01', 'T15.7: Multi-dimensional intersection filter accurately isolates targeted transaction');
+
 console.log('\n================================================================');
 console.log(`MASTER TEST RESULTS: ${pass} Passed, ${fail} Failed`);
 console.log('================================================================');

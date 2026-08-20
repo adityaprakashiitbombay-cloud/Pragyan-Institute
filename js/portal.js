@@ -3974,92 +3974,488 @@ function renderStudentDashboard() {
   }
 
   /* ==========================================================================
-   * INTERACTIVE BREAKDOWN MODALS FOR KPI STAT CARDS
+   * INTERACTIVE BREAKDOWN MODALS FOR KPI STAT CARDS WITH MULTI-DIMENSIONAL FILTERS
    * ========================================================================== */
+  let feeModalMonthFilter = 'all';
+  let feeModalClassFilter = 'all';
+  let feeModalAdminFilter = 'all';
+  let feeModalModeFilter = 'all';
+  let feeModalSearchFilter = '';
+
   function openFeeCollectionBreakdownModal() {
     document.getElementById('feeCollectionModal')?.remove();
-    const students = AppState.getStudents();
-    const totalCollected = students.reduce((acc, curr) => acc + (curr.paidFee || 0), 0);
-
-    const batchMap = {};
-    students.forEach(s => {
-      const b = s.className || 'General';
-      if (!batchMap[b]) batchMap[b] = { count: 0, collected: 0 };
-      batchMap[b].count++;
-      batchMap[b].collected += (s.paidFee || 0);
-    });
-
-    const allPaidReceipts = [];
-    students.forEach(s => {
-      if (s.feeHistory) {
-        s.feeHistory.forEach(f => {
-          if (f.status === 'Paid') {
-            allPaidReceipts.push({ ...f, studentName: s.name, rollNo: s.rollNo, className: s.className });
-          }
-        });
-      }
-    });
 
     const modalHtml = `
-      <div class="inner-modal-backdrop active" id="feeCollectionModal">
-        <div class="inner-modal-content" style="max-width: 680px;">
-          <div class="inner-modal-header">
-            <h3><i class="fa-solid fa-indian-rupee-sign" style="color: var(--primary-emerald);"></i> Fee Collection & Revenue Breakdown</h3>
-            <button class="btn-close-inner" onclick="document.getElementById('feeCollectionModal').remove()"><i class="fa-solid fa-xmark"></i></button>
-          </div>
+      <div class="inner-modal-backdrop active" id="feeCollectionModal" style="display: flex; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 9999; align-items: center; justify-content: center; padding: 0.75rem; backdrop-filter: blur(4px);">
+        <div class="inner-modal-content" style="max-width: 820px; width: 100%; max-height: 90vh; background: #FAF9F6; border-radius: 12px; border: 1.5px solid var(--border-sand); box-shadow: 0 10px 30px rgba(0,0,0,0.2); overflow: hidden; display: flex; flex-direction: column;">
           
-          <div style="background: linear-gradient(135deg, #064E3B 0%, #02241b 100%); color: #fff; padding: 1.25rem; border-radius: 12px; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+          <!-- Header -->
+          <div class="inner-modal-header" style="background: #064E3B; color: #fff; padding: 1rem 1.25rem; display: flex; justify-content: space-between; align-items: center;">
             <div>
-              <div style="font-size: 0.85rem; opacity: 0.9;">Total Verified Revenue Collected</div>
-              <div style="font-size: 1.8rem; font-weight: 800; color: #34D399;">₹${totalCollected.toLocaleString()}</div>
+              <h3 style="margin: 0; font-size: 1.15rem; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fa-solid fa-indian-rupee-sign" style="color: #34D399;"></i> Fee Collection & Revenue Breakdown
+              </h3>
+              <div style="font-size: 0.75rem; color: #A7F3D0; margin-top: 0.15rem;">Interactive filterable view across months, academic batches & faculty collectors</div>
             </div>
-            <button class="btn" onclick="document.getElementById('feeCollectionModal').remove(); switchAdminTab('analytics');" style="background: rgba(255,255,255,0.2); color: #fff; border: 1px solid rgba(255,255,255,0.4); font-size: 0.82rem; font-weight: 700; padding: 0.45rem 0.85rem; border-radius: 6px; cursor: pointer;">
-              <i class="fa-solid fa-chart-pie"></i> View Fee Analytics
+            <button class="btn-close-inner" onclick="document.getElementById('feeCollectionModal').remove()" style="background: none; border: none; color: #fff; font-size: 1.2rem; cursor: pointer;">
+              <i class="fa-solid fa-xmark"></i>
             </button>
           </div>
 
-          <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text-mahogany); margin-bottom: 0.6rem;">Batch-Wise Collection Summary</h4>
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; margin-bottom: 1.25rem;">
-            ${Object.entries(batchMap).map(([batch, stats]) => `
-              <div style="background: #FAF9F6; border: 1px solid var(--border-sand); border-radius: 8px; padding: 0.85rem;">
-                <div style="font-weight: 700; font-size: 0.88rem; color: var(--text-mahogany);">${batch}</div>
-                <div style="font-size: 0.78rem; color: var(--text-muted);">${stats.count} Enrolled Students</div>
-                <div style="font-size: 1.1rem; font-weight: 800; color: var(--primary-emerald); margin-top: 0.35rem;">₹${stats.collected.toLocaleString()}</div>
+          <!-- Modal Body with Scroll -->
+          <div style="padding: 1.15rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem;">
+            
+            <!-- Dynamic KPI Banner -->
+            <div style="background: linear-gradient(135deg, #064E3B 0%, #02241b 100%); color: #fff; padding: 1.15rem 1.35rem; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; box-shadow: 0 4px 12px rgba(6,78,59,0.2);">
+              <div>
+                <div style="font-size: 0.82rem; color: #A7F3D0; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;" id="feeModalKpiLabel">
+                  Total Verified Revenue Collected
+                </div>
+                <div style="font-size: 1.85rem; font-weight: 800; color: #34D399;" id="feeModalKpiAmount">
+                  ₹0
+                </div>
+                <div style="font-size: 0.76rem; color: #D1FAE5; margin-top: 0.2rem;" id="feeModalKpiSubtext">
+                  Across all batches and payment records
+                </div>
               </div>
-            `).join('')}
-          </div>
+              <button type="button" class="btn" onclick="document.getElementById('feeCollectionModal').remove(); switchAdminTab('analytics');" style="background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.35); font-size: 0.82rem; font-weight: 700; padding: 0.45rem 0.85rem; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;">
+                <i class="fa-solid fa-chart-pie"></i> Detailed Fee Analytics →
+              </button>
+            </div>
 
-          <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text-mahogany); margin-bottom: 0.6rem;">Recent Verified Receipts (${allPaidReceipts.length})</h4>
-          <div style="max-height: 220px; overflow-y: auto; border: 1px solid var(--border-sand); border-radius: 8px;">
-            <table class="portal-table" style="font-size: 0.82rem; margin: 0;">
-              <thead>
-                <tr style="background: #F3F4F6;">
-                  <th>Receipt #</th>
-                  <th>Student</th>
-                  <th>Amount</th>
-                  <th>Mode</th>
-                  <th>Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${allPaidReceipts.length === 0 ? '<tr><td colspan="5" style="text-align:center; padding: 1rem;">No payments recorded yet.</td></tr>' : 
-                  allPaidReceipts.map(r => `
-                    <tr>
-                      <td><strong>${r.receiptNo}</strong></td>
-                      <td>${r.studentName} <span style="color:var(--text-muted); font-size:0.75rem;">(${r.className})</span></td>
-                      <td style="color: var(--primary-emerald); font-weight: 700;">₹${r.amount.toLocaleString()}</td>
-                      <td><span style="background:#D1FAE5; color:#065F46; padding:0.15rem 0.4rem; border-radius:4px; font-size:0.75rem; font-weight:700;">${r.mode}</span></td>
-                      <td style="font-size: 0.76rem; color: var(--text-muted);">${r.date}</td>
+            <!-- Multi-Filter Toolbar -->
+            <div style="background: #ffffff; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 0.85rem; display: flex; flex-direction: column; gap: 0.65rem;">
+              <div style="font-weight: 700; font-size: 0.82rem; color: var(--text-mahogany); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+                <span><i class="fa-solid fa-filter" style="color: var(--primary-emerald);"></i> Filter Collection Data:</span>
+                <button type="button" id="btnResetFeeModalFilters" style="background: none; border: none; font-size: 0.76rem; color: #059669; font-weight: 700; cursor: pointer; text-decoration: underline;">
+                  Reset All Filters
+                </button>
+              </div>
+
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.6rem;">
+                <!-- 1. Month Filter -->
+                <div>
+                  <label style="display: block; font-size: 0.74rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">🗓️ Month</label>
+                  <select id="feeModalMonthSelect" class="portal-input" style="width: 100%; font-size: 0.8rem; height: 36px; padding: 0.35rem 0.6rem;">
+                    <option value="all">All Months (All-Time)</option>
+                  </select>
+                </div>
+
+                <!-- 2. Class / Batch Filter -->
+                <div>
+                  <label style="display: block; font-size: 0.74rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">🎯 Class / Batch</label>
+                  <select id="feeModalClassSelect" class="portal-input" style="width: 100%; font-size: 0.8rem; height: 36px; padding: 0.35rem 0.6rem;">
+                    <option value="all">All Batches</option>
+                    <option value="10th">🎯 Class 10th (ACHIEVER)</option>
+                    <option value="9th">🌱 Class 9th (NURTURE)</option>
+                    <option value="8th">⚡ Class 8th (ALPHA)</option>
+                    <option value="junio">🚀 Junior Batch (JUNIO)</option>
+                  </select>
+                </div>
+
+                <!-- 3. Admin / Collector Filter -->
+                <div>
+                  <label style="display: block; font-size: 0.74rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">👨‍🏫 Faculty / Admin</label>
+                  <select id="feeModalAdminSelect" class="portal-input" style="width: 100%; font-size: 0.8rem; height: 36px; padding: 0.35rem 0.6rem;">
+                    <option value="all">All Faculty Collectors</option>
+                    <option value="chandan">👨‍🏫 Chandan Kumar (Science Lead & Admin)</option>
+                    <option value="ravi">👨‍🏫 Prof. Ravi Ranjan (Director)</option>
+                  </select>
+                </div>
+
+                <!-- 4. Payment Mode Filter -->
+                <div>
+                  <label style="display: block; font-size: 0.74rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">💳 Payment Mode</label>
+                  <select id="feeModalModeSelect" class="portal-input" style="width: 100%; font-size: 0.8rem; height: 36px; padding: 0.35rem 0.6rem;">
+                    <option value="all">All Payment Modes</option>
+                    <option value="cash">💵 Cash at Counter</option>
+                    <option value="upi">📱 UPI / Online (PhonePe/GPay)</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Search Input inside modal -->
+              <div style="position: relative; margin-top: 0.2rem;">
+                <input type="text" id="feeModalSearchInput" class="portal-input" placeholder="🔍 Search by student name, roll number, or receipt #..." style="width: 100%; font-size: 0.8rem; height: 36px; padding-left: 2.2rem;">
+                <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 0.8rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.8rem;"></i>
+              </div>
+            </div>
+
+            <!-- Dynamic Batch-Wise Collection Summary Grid -->
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <h4 style="font-size: 0.95rem; font-weight: 800; color: var(--text-mahogany); margin: 0; display: flex; align-items: center; gap: 0.4rem;">
+                  <i class="fa-solid fa-layer-group" style="color: var(--primary-emerald);"></i> Batch-Wise Collection Summary
+                </h4>
+                <span style="font-size: 0.75rem; color: var(--text-muted);" id="feeModalBatchCountLabel">4 Institutional Batches</span>
+              </div>
+              <div id="feeModalBatchGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem;">
+                <!-- Populated dynamically by updateFeeModalContent() -->
+              </div>
+            </div>
+
+            <!-- Dynamic Recent Verified Receipts List -->
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <h4 style="font-size: 0.95rem; font-weight: 800; color: var(--text-mahogany); margin: 0; display: flex; align-items: center; gap: 0.4rem;">
+                  <i class="fa-solid fa-receipt" style="color: var(--primary-emerald);"></i> Verified Payment Receipts
+                </h4>
+                <span id="feeModalReceiptCountBadge" style="background: #ECFDF5; color: #065F46; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 700; font-size: 0.76rem;">
+                  0 Receipts
+                </span>
+              </div>
+
+              <div style="max-height: 240px; overflow-y: auto; -webkit-overflow-scrolling: touch; border: 1.5px solid #E2E8F0; border-radius: 8px; background: #fff;">
+                <table class="portal-table" style="font-size: 0.82rem; margin: 0; width: 100%;">
+                  <thead>
+                    <tr style="background: #F8FAFC;">
+                      <th>Receipt #</th>
+                      <th>Student & Roll #</th>
+                      <th>Class</th>
+                      <th>Amount</th>
+                      <th>Mode</th>
+                      <th>Collector</th>
+                      <th>Date</th>
                     </tr>
-                  `).join('')
-                }
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody id="feeModalReceiptsTbody">
+                    <!-- Populated dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
     `;
     document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    // Build Master Monetary Transactions Pool for the Modal
+    const students = AppState.getStudents() || [];
+    const masterReceipts = (AppState.getFeeReceipts ? AppState.getFeeReceipts() : []) || [];
+    const processedNos = new Set();
+    const allCollectedPayments = [];
+
+    students.forEach(s => {
+      const sId = (s.student_id || s.id || s.rollNo || '').toString().toLowerCase();
+      const sRoll = (s.rollNo || s.roll_no || sId).toString().toLowerCase();
+      const sUuid = (s.db_uuid || (s.id && String(s.id).includes('-') ? s.id : '')).toString().toLowerCase();
+      const sClass = s.className || s.class_name || 'General';
+      const sPaidFee = Number(s.paidFee ?? s.paid_fee ?? 0);
+      let sCollected = 0;
+
+      // 1. Student Fee History
+      (s.feeHistory || []).forEach(h => {
+        if (isRealCollectedPayment(h)) {
+          const recNo = h.receiptNo || h.receipt_no || `REC-${sRoll}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+          if (!processedNos.has(recNo)) {
+            processedNos.add(recNo);
+            const amt = Number(h.amount) || 0;
+            sCollected += amt;
+            allCollectedPayments.push({
+              receiptNo: recNo,
+              studentId: s.id,
+              studentName: s.name,
+              rollNo: s.rollNo || s.roll_no || s.student_id || '',
+              className: sClass,
+              amount: amt,
+              mode: h.mode || h.payment_mode || 'Cash at Counter',
+              collector: h.by || h.collected_by || (sClass.includes('10th') ? 'CHANDAN KUMAR' : 'Prof. Ravi Ranjan'),
+              date: h.date || h.payment_date || new Date().toISOString().split('T')[0]
+            });
+          }
+        }
+      });
+
+      // 2. Master Receipts Ledger
+      masterReceipts.forEach(r => {
+        if (isRealCollectedPayment(r)) {
+          const rStuId = (r.student_id || r.studentId || '').toString().toLowerCase();
+          const rNo = (r.receipt_no || r.receiptNo || '').toString();
+          const isMatch = (sUuid && rStuId === sUuid) || (sId && rStuId === sId) || (sRoll && rStuId === sRoll) || (sRoll && rNo.includes(sRoll));
+          if (isMatch && rNo && !processedNos.has(rNo)) {
+            processedNos.add(rNo);
+            const amt = Number(r.amount) || 0;
+            sCollected += amt;
+            allCollectedPayments.push({
+              receiptNo: rNo,
+              studentId: s.id,
+              studentName: s.name,
+              rollNo: s.rollNo || s.roll_no || s.student_id || '',
+              className: sClass,
+              amount: amt,
+              mode: r.payment_mode || r.mode || 'Cash at Counter',
+              collector: r.collected_by || r.by || (sClass.includes('10th') ? 'CHANDAN KUMAR' : 'Prof. Ravi Ranjan'),
+              date: r.payment_date || r.date || new Date().toISOString().split('T')[0]
+            });
+          }
+        }
+      });
+
+      // 3. Admission base diff payment
+      if (sPaidFee > sCollected) {
+        const diff = sPaidFee - sCollected;
+        const initRecNo = `REC-${sRoll || sId || 'ADM'}-INIT`;
+        if (!processedNos.has(initRecNo)) {
+          processedNos.add(initRecNo);
+          const defaultAdmCollector = (sClass.includes('10th') || sClass.includes('Science'))
+            ? 'CHANDAN KUMAR (Science Lead & Admin)'
+            : 'Prof. Ravi Ranjan (Director)';
+          const defaultAdmMode = (sClass.includes('10th') || sClass.includes('Online'))
+            ? 'UPI (PhonePe)'
+            : 'Cash at Counter';
+
+          allCollectedPayments.push({
+            receiptNo: initRecNo,
+            studentId: s.id,
+            studentName: s.name,
+            rollNo: s.rollNo || s.roll_no || s.student_id || '',
+            className: sClass,
+            amount: diff,
+            mode: s.paymentMode || s.payment_mode || defaultAdmMode,
+            collector: s.admittedBy || defaultAdmCollector,
+            date: s.joiningMonth || (s.created_at ? new Date(s.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0])
+          });
+        }
+      }
+    });
+
+    // Populate Dynamic Months in Dropdown
+    const monthSelect = document.getElementById('feeModalMonthSelect');
+    const monthMap = new Map();
+    allCollectedPayments.forEach(p => {
+      if (p.date && p.date !== 'N/A') {
+        const d = new Date(p.date);
+        if (!isNaN(d.getTime())) {
+          const mKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          const mLabel = d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+          if (!monthMap.has(mKey)) monthMap.set(mKey, mLabel);
+        }
+      }
+    });
+
+    // Ensure current month is always present
+    const curDate = new Date();
+    const curKey = `${curDate.getFullYear()}-${String(curDate.getMonth() + 1).padStart(2, '0')}`;
+    const curLabel = curDate.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+    if (!monthMap.has(curKey)) monthMap.set(curKey, curLabel);
+
+    // Sort months descending
+    Array.from(monthMap.entries()).sort((a, b) => b[0].localeCompare(a[0])).forEach(([k, label]) => {
+      const opt = document.createElement('option');
+      opt.value = k;
+      opt.textContent = `📅 ${label}`;
+      if (feeModalMonthFilter === k) opt.selected = true;
+      monthSelect.appendChild(opt);
+    });
+
+    // Reactive Renderer Function for Modal Content
+    function updateFeeModalContent() {
+      const selectedMonth = document.getElementById('feeModalMonthSelect')?.value || 'all';
+      const selectedClass = document.getElementById('feeModalClassSelect')?.value || 'all';
+      const selectedAdmin = document.getElementById('feeModalAdminSelect')?.value || 'all';
+      const selectedMode = document.getElementById('feeModalModeSelect')?.value || 'all';
+      const query = (document.getElementById('feeModalSearchInput')?.value || '').toLowerCase().trim();
+
+      // Filter Payments
+      const filteredPayments = allCollectedPayments.filter(p => {
+        // Month filter
+        if (selectedMonth !== 'all') {
+          if (!p.date || p.date === 'N/A') return false;
+          const d = new Date(p.date);
+          if (isNaN(d.getTime())) return false;
+          const pMonthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          if (pMonthKey !== selectedMonth) return false;
+        }
+
+        // Class / Batch filter
+        if (selectedClass !== 'all') {
+          const bKey = getBatchCategoryKey(p.className);
+          if (bKey !== selectedClass) return false;
+        }
+
+        // Admin / Collector filter
+        if (selectedAdmin !== 'all') {
+          const colStr = String(p.collector || '').toLowerCase();
+          const modeStr = String(p.mode || '').toLowerCase();
+          const isChandan = colStr.includes('chandan') || modeStr.includes('phonepe') || modeStr.includes('gpay') || modeStr.includes('chandankr');
+          if (selectedAdmin === 'chandan' && !isChandan) return false;
+          if (selectedAdmin === 'ravi' && isChandan) return false;
+        }
+
+        // Payment Mode filter
+        if (selectedMode !== 'all') {
+          const mStr = String(p.mode || '').toLowerCase();
+          const isCash = mStr.includes('cash') || mStr.includes('counter');
+          if (selectedMode === 'cash' && !isCash) return false;
+          if (selectedMode === 'upi' && isCash) return false;
+        }
+
+        // Text Search query
+        if (query) {
+          const sName = String(p.studentName || '').toLowerCase();
+          const sRoll = String(p.rollNo || '').toLowerCase();
+          const rNo = String(p.receiptNo || '').toLowerCase();
+          const cName = String(p.className || '').toLowerCase();
+          if (!sName.includes(query) && !sRoll.includes(query) && !rNo.includes(query) && !cName.includes(query)) return false;
+        }
+
+        return true;
+      });
+
+      // 1. Update KPI Banner
+      const filteredTotal = filteredPayments.reduce((sum, p) => sum + p.amount, 0);
+      const kpiAmountEl = document.getElementById('feeModalKpiAmount');
+      if (kpiAmountEl) kpiAmountEl.textContent = `₹${filteredTotal.toLocaleString()}`;
+
+      const kpiSubtextEl = document.getElementById('feeModalKpiSubtext');
+      if (kpiSubtextEl) {
+        const parts = [];
+        if (selectedMonth !== 'all') parts.push(monthMap.get(selectedMonth) || selectedMonth);
+        if (selectedClass !== 'all') {
+          parts.push(selectedClass === '10th' ? 'Class 10th' : selectedClass === '9th' ? 'Class 9th' : selectedClass === '8th' ? 'Class 8th' : 'Junior Batch');
+        }
+        if (selectedAdmin !== 'all') parts.push(selectedAdmin === 'chandan' ? 'Chandan Kumar' : 'Prof. Ravi Ranjan');
+        if (selectedMode !== 'all') parts.push(selectedMode === 'cash' ? 'Cash' : 'UPI / Online');
+        
+        kpiSubtextEl.textContent = parts.length > 0
+          ? `Filtered by: ${parts.join(' • ')} (${filteredPayments.length} transactions)`
+          : `Showing total verified collections (${filteredPayments.length} transactions)`;
+      }
+
+      // 2. Update Batch Cards Summary
+      const canonicalBatches = [
+        { key: '10th', name: 'Class 10th (ACHIEVER)', icon: '🎯', rate: 1000 },
+        { key: '9th', name: 'Class 9th (NURTURE)', icon: '🌱', rate: 1000 },
+        { key: '8th', name: 'Class 8th (ALPHA)', icon: '⚡', rate: 800 },
+        { key: 'junio', name: 'Junior Batch (JUNIO)', icon: '🚀', rate: 700 }
+      ];
+
+      const visibleBatches = selectedClass === 'all'
+        ? canonicalBatches
+        : canonicalBatches.filter(b => b.key === selectedClass);
+
+      const batchGridEl = document.getElementById('feeModalBatchGrid');
+      if (batchGridEl) {
+        batchGridEl.innerHTML = visibleBatches.map(b => {
+          const batchStudents = students.filter(s => getBatchCategoryKey(s.className || s.class_name || '') === b.key);
+          const batchPayments = filteredPayments.filter(p => getBatchCategoryKey(p.className) === b.key);
+          const bCollected = batchPayments.reduce((sum, p) => sum + p.amount, 0);
+
+          return `
+            <div style="background: #ffffff; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 0.9rem; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                <span style="font-weight: 800; font-size: 0.88rem; color: var(--text-mahogany);">${b.icon} ${b.name}</span>
+                <span style="font-size: 0.72rem; background: #F1F5F9; color: #475569; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 700;">₹${b.rate}/mo</span>
+              </div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+                ${batchStudents.length} Enrolled • ${batchPayments.length} Filtered Receipts
+              </div>
+              <div style="font-size: 1.25rem; font-weight: 800; color: #059669;">
+                ₹${bCollected.toLocaleString()}
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // 3. Update Receipts Table
+      const tbody = document.getElementById('feeModalReceiptsTbody');
+      const badgeEl = document.getElementById('feeModalReceiptCountBadge');
+      if (badgeEl) badgeEl.textContent = `${filteredPayments.length} Receipts`;
+
+      if (tbody) {
+        if (filteredPayments.length === 0) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                <i class="fa-solid fa-receipt" style="font-size: 1.8rem; color: #CBD5E1; margin-bottom: 0.5rem; display: block;"></i>
+                No payments found matching the selected filters.
+              </td>
+            </tr>
+          `;
+        } else {
+          tbody.innerHTML = filteredPayments.map(r => {
+            const isCash = String(r.mode || '').toLowerCase().includes('cash');
+            const isChandan = String(r.collector || '').toLowerCase().includes('chandan');
+            return `
+              <tr>
+                <td style="font-family: monospace; font-weight: 700; color: var(--text-mahogany); font-size: 0.78rem;">
+                  ${r.receiptNo}
+                </td>
+                <td>
+                  <strong>${r.studentName}</strong>
+                  ${r.rollNo ? `<div style="font-size: 0.74rem; color: var(--text-muted);">Roll #${r.rollNo}</div>` : ''}
+                </td>
+                <td>
+                  <span style="background: #F8FAFC; border: 1px solid #E2E8F0; padding: 0.15rem 0.45rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                    ${r.className}
+                  </span>
+                </td>
+                <td style="font-weight: 800; color: #059669; font-size: 0.92rem;">
+                  ₹${r.amount.toLocaleString()}
+                </td>
+                <td>
+                  <span style="background: ${isCash ? '#FEF3C7; color: #92400E;' : '#D1FAE5; color: #065F46;'} padding: 0.15rem 0.45rem; border-radius: 99px; font-size: 0.72rem; font-weight: 700;">
+                    <i class="${isCash ? 'fa-solid fa-money-bill-wave' : 'fa-solid fa-mobile-screen'}"></i> ${r.mode}
+                  </span>
+                </td>
+                <td>
+                  <div style="font-weight: 700; font-size: 0.76rem; color: ${isChandan ? '#065F46' : '#0369A1'};">
+                    ${isChandan ? '👨‍🏫 Chandan Kumar' : '👨‍🏫 Prof. Ravi Ranjan'}
+                  </div>
+                </td>
+                <td style="font-size: 0.76rem; color: var(--text-muted); white-space: nowrap;">
+                  ${r.date}
+                </td>
+              </tr>
+            `;
+          }).join('');
+        }
+      }
+    }
+
+    // Bind Filter Event Listeners inside modal
+    document.getElementById('feeModalMonthSelect')?.addEventListener('change', (e) => {
+      feeModalMonthFilter = e.target.value;
+      updateFeeModalContent();
+    });
+
+    document.getElementById('feeModalClassSelect')?.addEventListener('change', (e) => {
+      feeModalClassFilter = e.target.value;
+      updateFeeModalContent();
+    });
+
+    document.getElementById('feeModalAdminSelect')?.addEventListener('change', (e) => {
+      feeModalAdminFilter = e.target.value;
+      updateFeeModalContent();
+    });
+
+    document.getElementById('feeModalModeSelect')?.addEventListener('change', (e) => {
+      feeModalModeFilter = e.target.value;
+      updateFeeModalContent();
+    });
+
+    document.getElementById('feeModalSearchInput')?.addEventListener('input', () => {
+      updateFeeModalContent();
+    });
+
+    document.getElementById('btnResetFeeModalFilters')?.addEventListener('click', () => {
+      feeModalMonthFilter = 'all';
+      feeModalClassFilter = 'all';
+      feeModalAdminFilter = 'all';
+      feeModalModeFilter = 'all';
+      if (document.getElementById('feeModalMonthSelect')) document.getElementById('feeModalMonthSelect').value = 'all';
+      if (document.getElementById('feeModalClassSelect')) document.getElementById('feeModalClassSelect').value = 'all';
+      if (document.getElementById('feeModalAdminSelect')) document.getElementById('feeModalAdminSelect').value = 'all';
+      if (document.getElementById('feeModalModeSelect')) document.getElementById('feeModalModeSelect').value = 'all';
+      if (document.getElementById('feeModalSearchInput')) document.getElementById('feeModalSearchInput').value = '';
+      updateFeeModalContent();
+    });
+
+    // Initial render of modal contents
+    updateFeeModalContent();
   }
 
   function openPendingFeesDefaultersModal() {
