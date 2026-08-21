@@ -2,4 +2,13 @@ User-agent: *
 Allow: /
 Disallow: /api/
 
+User-agent: Googlebot
+Allow: /
+Disallow: /api/
+
+User-agent: Googlebot-Image
+Allow: /assets/images/
+Allow: /
+
 Sitemap: https://pragyaninstitute.com/sitemap.xml
+

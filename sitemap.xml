@@ -1,18 +1,52 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
-        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
+        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd
+        http://www.google.com/schemas/sitemap-image/1.1
+        http://www.google.com/schemas/sitemap-image/1.1/sitemap-image.xsd">
+
+  <!-- Homepage & Main Coaching Portal -->
   <url>
     <loc>https://pragyaninstitute.com/</loc>
-    <lastmod>2026-08-19</lastmod>
-    <changefreq>weekly</changefreq>
+    <lastmod>2026-08-21</lastmod>
+    <changefreq>daily</changefreq>
     <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://pragyaninstitute.com/assets/images/logo.png</image:loc>
+      <image:title>Pragyan Institute Lalganj Official Logo</image:title>
+      <image:caption>Pragyan Institute - Premier Coaching for Class 8th, 9th, 10th in Lalganj, Vaishali</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://pragyaninstitute.com/assets/images/hero_slide_1.jpg</image:loc>
+      <image:title>Smartboard Digital Classroom Learning</image:title>
+      <image:caption>Interactive Science and Mathematics smartboard sessions at Pragyan Institute</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://pragyaninstitute.com/assets/images/hero_slide_2.jpg</image:loc>
+      <image:title>Focused Classroom Sessions</image:title>
+      <image:caption>Daily structured batches for Class 8th, 9th and 10th students</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://pragyaninstitute.com/assets/images/hero_slide_3.jpg</image:loc>
+      <image:title>Board Exam Prep and Test Series</image:title>
+      <image:caption>Comprehensive CBSE and Bihar Board test preparation at Pragyan Institute</image:caption>
+    </image:image>
   </url>
+
+  <!-- Online Fee Payment & Verification Hub -->
   <url>
     <loc>https://pragyaninstitute.com/pay.html</loc>
-    <lastmod>2026-08-19</lastmod>
-    <changefreq>monthly</changefreq>
+    <lastmod>2026-08-21</lastmod>
+    <changefreq>weekly</changefreq>
     <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://pragyaninstitute.com/assets/images/logo.png</image:loc>
+      <image:title>Pragyan Institute Online Fee Payment Portal</image:title>
+      <image:caption>Direct UPI fee payment and instant receipt verification</image:caption>
+    </image:image>
   </url>
+
 </urlset>
+
