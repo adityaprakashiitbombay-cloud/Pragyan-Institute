@@ -10,5 +10,10 @@ User-agent: Googlebot-Image
 Allow: /assets/images/
 Allow: /
 
+User-agent: Googlebot-Favicon
+Allow: /
+Allow: /favicon.ico
+Allow: /assets/images/
+
 Sitemap: https://pragyaninstitute.com/sitemap.xml
 
