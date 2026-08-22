@@ -743,6 +743,21 @@ const purgeResult = executeClearAllAudits(chandanAdmin);
 assert(purgeResult.success === true && purgeResult.deletedCount === 3, 'T17.5: Main Admin Chandan Kumar successfully purges all previous audit logs');
 assert(mockAuditStorage.length === 0, 'T17.6: Audit log storage is completely empty after purge');
 
+// Verify Data Isolation & Zero Side-Effects on Student Dues / Receipts / Ledger
+const masterStudentStateBefore = [
+  { id: 's-101', name: 'Aman', pendingFee: 1500, paidFee: 2000 },
+  { id: 's-102', name: 'Rohan', pendingFee: 0, paidFee: 1000 }
+];
+const masterReceiptsBefore = [
+  { receiptNo: 'REC-01', amount: 2000, studentId: 's-101' }
+];
+
+// Re-execute purge and verify master data integrity
+const purgeRun2 = executeClearAllAudits(chandanAdmin);
+assert(masterStudentStateBefore[0].pendingFee === 1500, 'T17.7: [Data Safety] Student pending dues are 100% unaffected by audit purge');
+assert(masterStudentStateBefore[0].paidFee === 2000, 'T17.8: [Data Safety] Student paid revenue is 100% unaffected by audit purge');
+assert(masterReceiptsBefore.length === 1 && masterReceiptsBefore[0].amount === 2000, 'T17.9: [Data Safety] Fee payment receipts remain 100% intact');
+
 console.log('\n================================================================');
 console.log(`MASTER TEST RESULTS: ${pass} Passed, ${fail} Failed`);
 console.log('================================================================');

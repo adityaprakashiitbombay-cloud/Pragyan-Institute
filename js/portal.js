@@ -10693,46 +10693,135 @@ ${emailLogs.join('\n')}`);
       });
     });
 
-    pane.querySelector('#btnClearAllAuditLogs')?.addEventListener('click', async () => {
-      if (!isMainAdmin()) {
-        alert('⚠️ Access Denied: Only Main Admin Chandan Kumar is authorized to purge the master audit history.');
-        return;
+    pane.querySelector('#btnClearAllAuditLogs')?.addEventListener('click', () => {
+      openAuditLogPurgeSecurityModal();
+    });
+  }
+
+  /* ==========================================================================
+   * STRICT SECURITY AUDIT PURGE MODAL (MAIN ADMIN CHANDAN KUMAR ONLY)
+   * ========================================================================== */
+  function openAuditLogPurgeSecurityModal() {
+    if (!isMainAdmin()) {
+      alert('⚠️ Access Denied: Only Main Admin Chandan Kumar is authorized to purge the master audit history.');
+      return;
+    }
+
+    const allLogs = AppState.getAuditLogs();
+    const totalCount = allLogs.length;
+    if (totalCount === 0) {
+      alert('ℹ️ Master audit history log is already empty.');
+      return;
+    }
+
+    document.getElementById('auditPurgeModal')?.remove();
+
+    const modalHtml = `
+      <div class="inner-modal-backdrop active" id="auditPurgeModal" style="display: flex; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 99999; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(5px);">
+        <div class="inner-modal-content" style="max-width: 580px; width: 100%; background: #FFFFFF; border-radius: 12px; border: 2.5px solid #DC2626; box-shadow: 0 20px 50px rgba(220,38,38,0.3); overflow: hidden; display: flex; flex-direction: column;">
+          
+          <!-- Danger Header -->
+          <div style="background: linear-gradient(135deg, #DC2626 0%, #991B1B 100%); color: #fff; padding: 1.15rem 1.35rem; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 0.65rem;">
+              <i class="fa-solid fa-triangle-exclamation" style="font-size: 1.6rem; color: #FEE2E2;"></i>
+              <div>
+                <h3 style="margin: 0; font-size: 1.15rem; font-weight: 800; color: #fff; letter-spacing: 0.3px;">
+                  ⚠️ STRICT SECURITY CONFIRMATION
+                </h3>
+                <div style="font-size: 0.76rem; color: #FEE2E2; margin-top: 0.15rem;">Main Admin Exclusive Action — Chandan Kumar</div>
+              </div>
+            </div>
+            <button onclick="document.getElementById('auditPurgeModal').remove()" style="background: none; border: none; color: #fff; font-size: 1.25rem; cursor: pointer;">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+
+          <!-- Body -->
+          <div style="padding: 1.35rem; display: flex; flex-direction: column; gap: 1rem;">
+            
+            <!-- Warning Alert Box -->
+            <div style="background: #FEF2F2; border: 1.5px solid #F87171; border-radius: 8px; padding: 1rem; color: #991B1B;">
+              <div style="font-weight: 800; font-size: 0.95rem; display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.35rem;">
+                <i class="fa-solid fa-trash-can"></i> Action: Permanent Deletion of All Audit Logs (${totalCount} Records)
+              </div>
+              <p style="font-size: 0.84rem; line-height: 1.5; margin: 0; color: #7F1D1D;">
+                You are about to permanently purge all <strong>${totalCount} historical activity logs</strong> from both local browser storage and the cloud database. Once deleted, this activity timeline cannot be recovered.
+              </p>
+            </div>
+
+            <!-- Guaranteed Protected Data Card -->
+            <div style="background: #F0FDF4; border: 1.5px solid #86EFAC; border-radius: 8px; padding: 1rem; color: #166534;">
+              <div style="font-weight: 800; font-size: 0.9rem; display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.45rem; color: #14532D;">
+                <i class="fa-solid fa-shield-halved" style="color: #16A34A;"></i> GUARANTEED DATA SAFETY (100% Protected & Zero Impact):
+              </div>
+              <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.82rem; line-height: 1.6; color: #166534;">
+                <li><strong>Student Pending Dues & Balances:</strong> 100% Intact & Unaffected</li>
+                <li><strong>Collected Revenue & Fee Receipts:</strong> 100% Intact & Unaffected</li>
+                <li><strong>Student Profiles, Roll Numbers & Classes:</strong> 100% Intact & Unaffected</li>
+                <li><strong>Portal Passwords, Batches & Announcements:</strong> 100% Intact & Unaffected</li>
+              </ul>
+            </div>
+
+            <!-- Typed Confirmation Input -->
+            <div>
+              <label style="display: block; font-size: 0.84rem; font-weight: 700; color: var(--text-mahogany); margin-bottom: 0.35rem;">
+                To confirm permanent deletion, type <code style="background: #FEE2E2; color: #991B1B; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 800;">DELETE</code> below:
+              </label>
+              <input type="text" id="confirmAuditPurgeInput" class="portal-input" placeholder="Type DELETE to enable button" style="width: 100%; font-size: 0.9rem; padding: 0.6rem 0.85rem; border: 1.5px solid #CBD5E1; text-transform: uppercase;">
+            </div>
+
+            <!-- Action Buttons -->
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 0.35rem;">
+              <button type="button" class="btn" onclick="document.getElementById('auditPurgeModal').remove()" style="background: #E2E8F0; color: #334155; font-weight: 700; padding: 0.6rem 1.15rem; font-size: 0.85rem; border-radius: 6px; cursor: pointer;">
+                Cancel / Keep Data
+              </button>
+              <button type="button" id="btnConfirmPurgeAuditLogs" class="btn" disabled style="background: #94A3B8; color: #fff; font-weight: 800; padding: 0.6rem 1.25rem; font-size: 0.85rem; border-radius: 6px; cursor: not-allowed; display: inline-flex; align-items: center; gap: 0.4rem; transition: all 0.2s;">
+                <i class="fa-solid fa-trash-can"></i> Permanently Purge Logs
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    const input = document.getElementById('confirmAuditPurgeInput');
+    const confirmBtn = document.getElementById('btnConfirmPurgeAuditLogs');
+
+    input?.focus();
+    input?.addEventListener('input', (e) => {
+      if (e.target.value.trim().toUpperCase() === 'DELETE') {
+        confirmBtn.disabled = false;
+        confirmBtn.style.background = 'linear-gradient(135deg, #DC2626 0%, #991B1B 100%)';
+        confirmBtn.style.cursor = 'pointer';
+        confirmBtn.style.boxShadow = '0 3px 10px rgba(220,38,38,0.35)';
+      } else {
+        confirmBtn.disabled = true;
+        confirmBtn.style.background = '#94A3B8';
+        confirmBtn.style.cursor = 'not-allowed';
+        confirmBtn.style.boxShadow = 'none';
       }
+    });
 
-      const totalCount = AppState.getAuditLogs().length;
-      if (totalCount === 0) {
-        alert('ℹ️ Audit history log is already empty.');
-        return;
-      }
+    confirmBtn?.addEventListener('click', async () => {
+      if (input.value.trim().toUpperCase() !== 'DELETE') return;
 
-      const confirmed = confirm(
-        `⚠️ PERMANENT MASTER AUDIT PURGE (Main Admin: Chandan Kumar)\n\n` +
-        `Are you sure you want to permanently delete and purge all ${totalCount} previous administrative audit records?\n\n` +
-        `• All audit history will be purged from the Supabase cloud database and local storage.\n` +
-        `• This action cannot be reversed.\n\n` +
-        `Click OK to confirm permanent deletion.`
-      );
-
-      if (!confirmed) return;
-
-      const btn = pane.querySelector('#btnClearAllAuditLogs');
-      if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Purging Database...';
-      }
+      confirmBtn.disabled = true;
+      confirmBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Purging Database...';
 
       try {
         await AppState.clearAllAuditLogs();
-        alert(`🗑️ Successfully purged all ${totalCount} audit log records from the database and local storage.`);
+        document.getElementById('auditPurgeModal')?.remove();
+        alert(`🗑️ Master audit log purge complete!\n\n• All ${totalCount} previous activity entries have been cleared from database & local storage.\n• Student dues, fee balances, receipts, and profiles remain 100% safe & intact.`);
         renderAdminAuditHistoryTab();
         renderAdminDashboard();
       } catch (err) {
         console.error('Failed to clear audit logs:', err);
         alert('❌ Error deleting audit logs: ' + (err.message || 'Unknown error'));
-        if (btn) {
-          btn.disabled = false;
-          btn.innerHTML = '<i class="fa-solid fa-trash-can"></i> Clear All Audits';
-        }
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i> Permanently Purge Logs';
       }
     });
   }
