@@ -606,9 +606,9 @@
 
 .mentors-single-row-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1.75rem;
-  max-width: 1050px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  max-width: 1250px;
   margin: 0 auto;
 }
 
@@ -677,6 +677,10 @@
   background: rgba(181, 84, 58, 0.92);
 }
 
+.mentor-role-badge.english {
+  background: rgba(30, 64, 175, 0.92);
+}
+
 .mentor-main-meta {
   flex-grow: 1;
 }
@@ -741,7 +745,13 @@
   margin-top: auto;
 }
 
-@media (max-width: 820px) {
+@media (max-width: 1024px) {
+  .mentors-single-row-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
   .mentors-single-row-grid {
     grid-template-columns: 1fr;
   }

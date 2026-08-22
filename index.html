@@ -47,11 +47,11 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
   <!-- CSS Design System -->
-  <link rel="stylesheet" href="./css/variables.css?v=90.0.3fd397c7">
-  <link rel="stylesheet" href="./css/main.css?v=90.0.3fd397c7">
-  <link rel="stylesheet" href="./css/components.css?v=90.0.3fd397c7">
-  <link rel="stylesheet" href="./css/animations.css?v=90.0.3fd397c7">
-  <link rel="stylesheet" href="./css/portal.css?v=90.0.3fd397c7">
+  <link rel="stylesheet" href="./css/variables.css?v=90.0.bfdbe199">
+  <link rel="stylesheet" href="./css/main.css?v=90.0.bfdbe199">
+  <link rel="stylesheet" href="./css/components.css?v=90.0.bfdbe199">
+  <link rel="stylesheet" href="./css/animations.css?v=90.0.bfdbe199">
+  <link rel="stylesheet" href="./css/portal.css?v=90.0.bfdbe199">
 
   <!-- Schema.org JSON-LD Structured Data for Google Top Ranking & Knowledge Graph -->
   <script type="application/ld+json">
@@ -98,6 +98,11 @@
             "@type": "Person",
             "name": "Prof. Ravi Ranjan",
             "jobTitle": "Lead Mathematics Faculty"
+          },
+          {
+            "@type": "Person",
+            "name": "Aditi Singh",
+            "jobTitle": "English & Grammar Faculty"
           }
         ],
         "openingHoursSpecification": {
@@ -406,6 +411,43 @@
                 <span class="rating-score">5.0</span>
               </div>
               <span class="student-count">12000+ Students Mentored</span>
+            </div>
+          </div>
+        </article>
+
+        <!-- Mentor 3: Aditi Singh -->
+        <article class="mentor-compact-card">
+          <div class="mentor-header-row">
+            <div class="mentor-avatar-wrap">
+              <img src="assets/images/teacher_aditi.jpg" alt="Aditi Singh - English Mentor" width="800" height="800" loading="lazy" decoding="async">
+              <span class="mentor-role-badge english">English</span>
+            </div>
+            <div class="mentor-main-meta">
+              <h3 class="mentor-name">ADITI SINGH</h3>
+              <div class="exp-highlight-badge">
+                <i class="fa-solid fa-award"></i> 5+ Years Experience
+              </div>
+              <div class="degree-pallets-wrap">
+                <span class="degree-pill">M.Com</span>
+                <span class="degree-pill">English Specialist</span>
+                <span class="degree-pill">Grammar Mentor</span>
+              </div>
+            </div>
+          </div>
+          <div class="mentor-body">
+            <p class="mentor-bio">
+              Dedicated English & Grammar Mentor empowering students with strong vocabulary, creative writing skills, reading comprehension, and top-tier board exam scores.
+            </p>
+            <div class="mentor-footer-row">
+              <div class="star-rating">
+                <i class="fa-solid fa-star"></i>
+                <i class="fa-solid fa-star"></i>
+                <i class="fa-solid fa-star"></i>
+                <i class="fa-solid fa-star"></i>
+                <i class="fa-solid fa-star"></i>
+                <span class="rating-score">5.0</span>
+              </div>
+              <span class="student-count">8000+ Students Mentored</span>
             </div>
           </div>
         </article>
@@ -1078,17 +1120,17 @@
   <!-- Application Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
-  <script defer src="./js/config.js?v=90.0.3fd397c7"></script>
-  <script defer src="./js/supabase-sync.js?v=90.0.3fd397c7"></script>
-  <script defer src="./js/chat.js?v=90.0.3fd397c7"></script>
-  <script defer src="./js/app.js?v=90.0.3fd397c7"></script>
-  <script defer src="./js/portal.js?v=90.0.3fd397c7"></script>
+  <script defer src="./js/config.js?v=90.0.bfdbe199"></script>
+  <script defer src="./js/supabase-sync.js?v=90.0.bfdbe199"></script>
+  <script defer src="./js/chat.js?v=90.0.bfdbe199"></script>
+  <script defer src="./js/app.js?v=90.0.bfdbe199"></script>
+  <script defer src="./js/portal.js?v=90.0.bfdbe199"></script>
 
   <!-- PWA Service Worker Registration for Instant Offline Caching -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=90.0.3fd397c7').then(reg => {
+        navigator.serviceWorker.register('./sw.js?v=90.0.bfdbe199').then(reg => {
           reg.update().catch(() => {});
         }).catch(err => console.log('SW reg error:', err));
       });

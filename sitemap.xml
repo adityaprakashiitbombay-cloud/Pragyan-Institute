@@ -33,6 +33,21 @@
       <image:title>Board Exam Prep and Test Series</image:title>
       <image:caption>Comprehensive CBSE and Bihar Board test preparation at Pragyan Institute</image:caption>
     </image:image>
+    <image:image>
+      <image:loc>https://pragyaninstitute.com/assets/images/teacher_chandan.jpg</image:loc>
+      <image:title>Chandan Kumar - Director and Science Faculty</image:title>
+      <image:caption>Expert Science Faculty at Pragyan Institute Lalganj</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://pragyaninstitute.com/assets/images/teacher_ravi.png</image:loc>
+      <image:title>Prof. Ravi Ranjan - Mathematics Faculty</image:title>
+      <image:caption>Lead Mathematics Faculty at Pragyan Institute Lalganj</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://pragyaninstitute.com/assets/images/teacher_aditi.jpg</image:loc>
+      <image:title>Aditi Singh - English and Grammar Faculty</image:title>
+      <image:caption>English and Grammar Faculty at Pragyan Institute Lalganj</image:caption>
+    </image:image>
   </url>
 
   <!-- Online Fee Payment & Verification Hub -->
