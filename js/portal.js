@@ -1633,6 +1633,20 @@
         }
       } catch(e) { console.warn('saveAuditLogs Supabase error:', e); }
     },
+    async clearAllAuditLogs() {
+      this._auditLogsCache = [];
+      localStorage.setItem(STORAGE_KEY_AUDIT_LOGS, '[]');
+      this.markMutation();
+
+      try {
+        if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
+          const r = await SupabaseSync.mutate('audit_logs', 'delete', null, { all: true });
+          if (!r?.success) console.warn('clearAllAuditLogs database delete note:', r?.error);
+        }
+      } catch(e) { console.warn('clearAllAuditLogs Supabase error:', e); }
+
+      return true;
+    },
     async addAuditLog(actor, actionType, studentName, studentRoll, description, details = {}) {
       const logs = this.getAuditLogs();
       logs.unshift({
@@ -10543,13 +10557,18 @@ ${emailLogs.join('\n')}`);
             </h3>
             <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">Complete chronological audit trial of all fee collections, approvals, announcements, adjustments, and registrations by specific educators</div>
           </div>
-          <div class="admin-audit-filter-wrap" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; width: 100%; max-width: 520px;">
-            <select id="adminAuditEducatorSelect" class="portal-input" style="flex: 1 1 180px; min-width: 150px; max-width: 100%; font-size: 0.82rem; height: 38px; padding: 0.4rem 0.65rem; border-color: var(--primary-emerald); font-weight: 600;">
+          <div class="admin-audit-filter-wrap" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; width: 100%; max-width: 580px; justify-content: flex-end;">
+            <select id="adminAuditEducatorSelect" class="portal-input" style="flex: 1 1 140px; min-width: 130px; max-width: 100%; font-size: 0.82rem; height: 38px; padding: 0.4rem 0.65rem; border-color: var(--primary-emerald); font-weight: 600;">
               <option value="all" ${currentAuditEducator === 'all' ? 'selected' : ''}>🌟 All Educators / Admins</option>
               <option value="Ravi" ${currentAuditEducator === 'Ravi' ? 'selected' : ''}>👔 Prof. Ravi Ranjan</option>
               <option value="Chandan" ${currentAuditEducator === 'Chandan' ? 'selected' : ''}>🔬 Chandan Kumar</option>
             </select>
-            <input type="text" id="adminAuditSearchInput" class="portal-input" placeholder="🔍 Search audit history..." value="${currentAuditSearch}" style="flex: 1 1 180px; min-width: 150px; max-width: 100%; font-size: 0.82rem; height: 38px; padding: 0.4rem 0.65rem;">
+            <input type="text" id="adminAuditSearchInput" class="portal-input" placeholder="🔍 Search audit history..." value="${currentAuditSearch}" style="flex: 1 1 140px; min-width: 130px; max-width: 100%; font-size: 0.82rem; height: 38px; padding: 0.4rem 0.65rem;">
+            ${isMainAdmin() ? `
+              <button id="btnClearAllAuditLogs" class="btn" title="Main Admin Exclusive: Purge all audit logs from database and local storage" style="background: linear-gradient(135deg, #DC2626 0%, #991B1B 100%); color: #fff; border: 1px solid #7F1D1D; height: 38px; padding: 0 0.85rem; font-size: 0.8rem; font-weight: 700; border-radius: 6px; display: inline-flex; align-items: center; gap: 0.4rem; box-shadow: 0 2px 6px rgba(220, 38, 38, 0.25); cursor: pointer; white-space: nowrap;">
+                <i class="fa-solid fa-trash-can"></i> Clear All Audits
+              </button>
+            ` : ''}
           </div>
         </div>
 
@@ -10672,6 +10691,49 @@ ${emailLogs.join('\n')}`);
         currentAuditFilter = btn.dataset.auditFilter;
         renderAdminAuditHistoryTab();
       });
+    });
+
+    pane.querySelector('#btnClearAllAuditLogs')?.addEventListener('click', async () => {
+      if (!isMainAdmin()) {
+        alert('⚠️ Access Denied: Only Main Admin Chandan Kumar is authorized to purge the master audit history.');
+        return;
+      }
+
+      const totalCount = AppState.getAuditLogs().length;
+      if (totalCount === 0) {
+        alert('ℹ️ Audit history log is already empty.');
+        return;
+      }
+
+      const confirmed = confirm(
+        `⚠️ PERMANENT MASTER AUDIT PURGE (Main Admin: Chandan Kumar)\n\n` +
+        `Are you sure you want to permanently delete and purge all ${totalCount} previous administrative audit records?\n\n` +
+        `• All audit history will be purged from the Supabase cloud database and local storage.\n` +
+        `• This action cannot be reversed.\n\n` +
+        `Click OK to confirm permanent deletion.`
+      );
+
+      if (!confirmed) return;
+
+      const btn = pane.querySelector('#btnClearAllAuditLogs');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Purging Database...';
+      }
+
+      try {
+        await AppState.clearAllAuditLogs();
+        alert(`🗑️ Successfully purged all ${totalCount} audit log records from the database and local storage.`);
+        renderAdminAuditHistoryTab();
+        renderAdminDashboard();
+      } catch (err) {
+        console.error('Failed to clear audit logs:', err);
+        alert('❌ Error deleting audit logs: ' + (err.message || 'Unknown error'));
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-trash-can"></i> Clear All Audits';
+        }
+      }
     });
   }
 

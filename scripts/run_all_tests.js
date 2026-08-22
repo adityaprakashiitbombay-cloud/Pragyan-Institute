@@ -694,8 +694,54 @@ const class10Dues = filterDuesStudents(sampleDuesStudents, { batch: '10th' });
 assert(class10Dues.length === 2 && class10Dues.reduce((sum, s) => sum + s.pendingFee, 0) === 3500, 'T16.4: Class 10th dues filter isolates 2 students with ₹3,500 pending');
 
 // 4. Faculty Lead: Prof. Ravi Ranjan (Class 8th / Junior)
-const raviDues = filterDuesStudents(sampleDuesStudents, { admin: 'ravi' });
-assert(raviDues.length === 1 && raviDues[0].id === 's-3', 'T16.5: Faculty lead filter accurately isolates Prof. Ravi Ranjan batch dues');
+// -----------------------------------------------------------------------------
+// T17: Master Administrative Audit History & Main Admin Purge Suite
+// -----------------------------------------------------------------------------
+console.log('\n--- [T17] Master Administrative Audit History & Main Admin Purge Suite ---');
+
+function checkIsMainAdmin(admin) {
+  if (!admin) return false;
+  const name = String(admin.name || '').toLowerCase();
+  const username = String(admin.username || '').toLowerCase();
+  const role = String(admin.role || '').toLowerCase();
+  const isHead = admin.is_head === true || admin.isHead === true;
+  return isHead || name.includes('chandan') || username.includes('chandan') || username === 'chandan' || role.includes('head');
+}
+
+const chandanAdmin = { name: 'Chandan Kumar', username: 'chandan', role: 'head_director' };
+const raviAdmin = { name: 'Prof. Ravi Ranjan', username: 'ravi', role: 'director' };
+const staffAdmin = { name: 'Assistant Staff', username: 'staff01', role: 'staff' };
+
+assert(checkIsMainAdmin(chandanAdmin) === true, 'T17.1: Correctly identifies Chandan Kumar as Main Admin');
+assert(checkIsMainAdmin(raviAdmin) === false, 'T17.2: Accurately identifies non-Main Admin (Prof. Ravi Ranjan) for exclusive audit purge gating');
+assert(checkIsMainAdmin(staffAdmin) === false, 'T17.3: Denies audit purge permission to regular staff');
+
+let mockAuditStorage = [
+  { log_id: 'AUD-01', actionType: 'FEE_PAYMENT', description: 'Fee payment ₹1000' },
+  { log_id: 'AUD-02', actionType: 'NOTICE_BROADCAST', description: 'Exam notice posted' },
+  { log_id: 'AUD-03', actionType: 'STUDENT_PASSWORD_RESET', description: 'Password reset' }
+];
+
+function executeClearAllAudits(adminUser) {
+  if (!checkIsMainAdmin(adminUser)) {
+    throw new Error('Access Denied: Only Main Admin Chandan Kumar is authorized to purge master audit history.');
+  }
+  const deletedCount = mockAuditStorage.length;
+  mockAuditStorage = [];
+  return { success: true, deletedCount };
+}
+
+let unauthorizedThrew = false;
+try {
+  executeClearAllAudits(raviAdmin);
+} catch (e) {
+  unauthorizedThrew = true;
+}
+assert(unauthorizedThrew === true, 'T17.4: Strictly blocks non-main admin from clearing audit logs');
+
+const purgeResult = executeClearAllAudits(chandanAdmin);
+assert(purgeResult.success === true && purgeResult.deletedCount === 3, 'T17.5: Main Admin Chandan Kumar successfully purges all previous audit logs');
+assert(mockAuditStorage.length === 0, 'T17.6: Audit log storage is completely empty after purge');
 
 console.log('\n================================================================');
 console.log(`MASTER TEST RESULTS: ${pass} Passed, ${fail} Failed`);

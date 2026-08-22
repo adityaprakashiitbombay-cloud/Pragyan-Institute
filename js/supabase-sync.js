@@ -796,12 +796,20 @@
             .map(([col, val]) => `${col}=eq.${val}`).join('&');
           result = await this._rest('PATCH', table, whereParams, data);
         } else if (operation === 'delete') {
-          if (!filters.where || Object.keys(filters.where).length === 0) {
-            return { success: false, error: 'Delete requires a where clause' };
+          if (filters.all === true) {
+            const idCol = ORDER_COLUMNS[table] || 'id';
+            result = await this._rest('DELETE', table, `${idCol}=not.is.null`);
+          } else {
+            if (!filters.where || Object.keys(filters.where).length === 0) {
+              return { success: false, error: 'Delete requires a where clause' };
+            }
+            const whereParams = Object.entries(filters.where)
+              .map(([col, val]) => {
+                if (String(val).includes('.')) return `${col}=${val}`;
+                return `${col}=eq.${val}`;
+              }).join('&');
+            result = await this._rest('DELETE', table, whereParams);
           }
-          const whereParams = Object.entries(filters.where)
-            .map(([col, val]) => `${col}=eq.${val}`).join('&');
-          result = await this._rest('DELETE', table, whereParams);
         } else {
           return { success: false, error: `Unknown operation: ${operation}` };
         }
