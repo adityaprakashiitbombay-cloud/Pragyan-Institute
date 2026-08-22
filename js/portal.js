@@ -1653,7 +1653,7 @@
         id: `AUD-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,5)}`,
         timestamp: getFormattedTimestamp(),
         date: new Date().toISOString().split('T')[0],
-        actor: actor || 'Prof. Ravi Ranjan (Director)',
+        actor: actor || (this.currentUser?.name || 'CHANDAN KUMAR (Director & Science Lead)'),
         actionType: actionType,
         studentName: studentName || 'System',
         studentRoll: studentRoll || 'N/A',
@@ -3632,7 +3632,7 @@ function renderStudentDashboard() {
         receiptNo: `REC-${s.rollNo || '001'}-INIT`,
         date: s.joiningMonth || 'April 2026',
         amount: s.paidFee,
-        by: 'Prof. Ravi Ranjan (Director)',
+        by: 'CHANDAN KUMAR (Director & Science Lead)',
         mode: 'Course Admission & Tuition Payment',
         note: 'Initial Admission Fee Paid',
         status: 'Paid'
@@ -3786,7 +3786,7 @@ function renderStudentDashboard() {
                     <td><strong>${item.receiptNo}</strong></td>
                     <td>${item.date}</td>
                     <td>${amtDisplayHtml}</td>
-                    <td><span style="font-size: 0.82rem; font-weight: 600; color: var(--text-mahogany);"><i class="fa-solid fa-user-tie"></i> ${item.by || 'Prof. Ravi Ranjan (Director)'}</span></td>
+                    <td><span style="font-size: 0.82rem; font-weight: 600; color: var(--text-mahogany);"><i class="fa-solid fa-user-tie"></i> ${item.by || 'CHANDAN KUMAR (Director & Science Lead)'}</span></td>
                     <td>
                       <div><strong>${item.mode}</strong></div>
                       ${item.note ? `<div style="font-size: 0.78rem; color: var(--text-muted);">${item.note}</div>` : ''}

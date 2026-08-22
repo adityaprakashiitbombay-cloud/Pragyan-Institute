@@ -43,7 +43,7 @@
       `🖥️ **Interactive Digital Smartboards & Visual Tech:**\n• **3D Animated Science:** Complex Physics & Chemistry concepts visualized with 3D molecular and mechanical models.\n• **Digital Maths Derivations:** Step-by-step graphical plotting and interactive geometry derivations.\n• **High Retention & Engagement:** Visual explanations make abstract board topics easy to understand.\n• **Recorded Concept Recaps:** Rapid revision before weekly mock tests.`,
 
     "Who are the teachers at Pragyan Institute?":
-      `👨‍🏫 **Expert Mentors & Leadership Faculty:**\n• **CHANDAN KUMAR** — Science Mentor & Director (M.Sc Physics, B.Ed, D.El.Ed, CTET Qualified, 10+ Yrs Exp, **10,000+ Students Mentored**)\n• **PROF. RAVI RANJAN** — Mathematics Mentor & Director (M.Sc Maths, B.Ed, CTET Qualified, 15+ Yrs Exp, **12,000+ Students Mentored**)\n• **ADITI SINGH** — English & Grammar Mentor (M.Com, 5+ Yrs Exp, **8,000+ Students Mentored**)\n\n🏆 *Proven track record of 100% board exam pass rates and top ranks across Lalganj & Vaishali!*`,
+      `👨‍🏫 **Expert Mentors & Leadership Faculty:**\n• **CHANDAN KUMAR** — Science Mentor & Director (M.Sc Physics, B.Ed, D.El.Ed, CTET Qualified, 10+ Yrs Exp, **10,000+ Students Mentored**)\n• **PROF. RAVI RANJAN** — Mathematics Mentor & Director (M.Sc Maths, B.Ed, CTET Qualified, 15+ Yrs Exp, **12,000+ Students Mentored**)\n• **ADITI SINGH** — English & Grammar Mentor (M.Com, 5+ Yrs Exp, **1,000+ Students Mentored**)\n\n🏆 *Proven track record of 100% board exam pass rates and top ranks across Lalganj & Vaishali!*`,
 
     "Tell me about the 3 days free demo classes":
       `🎁 **3 Days FREE Demo Classes:**\n• Experience our digital smartboards, concept-first pedagogy, and teaching excellence for 3 days with **zero cost and zero admission fee**!\n• Available for Class 8th, 9th, 10th, 11th & 12th (CBSE & BSEB).\n\n📲 Call / WhatsApp: **[+91 73698 91858](tel:+917369891858)** to reserve your demo seat today!`,
@@ -73,7 +73,7 @@ STRICT ANSWER FORMATTING & LENGTH RULES:
    - Expert & Experienced Faculty:
      * Chandan Kumar: Science Mentor & Director (M.Sc Physics, B.Ed, D.El.Ed, CTET, 10+ Yrs Exp, 10,000+ Students Mentored)
      * Prof. Ravi Ranjan: Maths Mentor & Director (M.Sc Maths, B.Ed, CTET, 15+ Yrs Exp, 12,000+ Students Mentored)
-     * Aditi Singh: English & Grammar Mentor (M.Com, 5+ Yrs Exp, 8,000+ Students Mentored)
+     * Aditi Singh: English & Grammar Mentor (M.Com, 5+ Yrs Exp, 1,000+ Students Mentored)
    - 100% Nominal Monthly Fees (Zero admission or annual hidden fees):
      * Class 10th (ACHIEVER): ₹1,000 / month
      * Class 9th (NURTURE): ₹1,000 / month
@@ -106,7 +106,7 @@ STRICT ANSWER FORMATTING & LENGTH RULES:
 
     // Faculty & Mentors
     if (q.includes('teacher') || q.includes('faculty') || q.includes('sir') || q.includes('chandan') || q.includes('ravi') || q.includes('aditi') || q.includes('english') || q.includes('mentor') || q.includes('founder') || q.includes('who teaches')) {
-      return `👨‍🏫 **Expert Mentors & Faculty Leadership:**\n• **CHANDAN KUMAR** — Science Mentor & Director (M.Sc Physics, B.Ed, D.El.Ed, CTET, 10+ Yrs Exp, **10,000+ Students Mentored**)\n• **PROF. RAVI RANJAN** — Maths Mentor & Director (M.Sc Maths, B.Ed, CTET, 15+ Yrs Exp, **12,000+ Students Mentored**)\n• **ADITI SINGH** — English & Grammar Mentor (M.Com, 5+ Yrs Exp, **8,000+ Students Mentored**)\n\n🏆 *Dedicated mentorship with a proven 100% board exam pass rate across Lalganj & Vaishali!*`;
+      return `👨‍🏫 **Expert Mentors & Faculty Leadership:**\n• **CHANDAN KUMAR** — Science Mentor & Director (M.Sc Physics, B.Ed, D.El.Ed, CTET, 10+ Yrs Exp, **10,000+ Students Mentored**)\n• **PROF. RAVI RANJAN** — Maths Mentor & Director (M.Sc Maths, B.Ed, CTET, 15+ Yrs Exp, **12,000+ Students Mentored**)\n• **ADITI SINGH** — English & Grammar Mentor (M.Com, 5+ Yrs Exp, **1,000+ Students Mentored**)\n\n🏆 *Dedicated mentorship with a proven 100% board exam pass rate across Lalganj & Vaishali!*`;
     }
 
     // Fees, Pricing & Scholarships

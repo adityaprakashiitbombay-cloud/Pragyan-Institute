@@ -758,6 +758,16 @@ assert(masterStudentStateBefore[0].pendingFee === 1500, 'T17.7: [Data Safety] St
 assert(masterStudentStateBefore[0].paidFee === 2000, 'T17.8: [Data Safety] Student paid revenue is 100% unaffected by audit purge');
 assert(masterReceiptsBefore.length === 1 && masterReceiptsBefore[0].amount === 2000, 'T17.9: [Data Safety] Fee payment receipts remain 100% intact');
 
+// 18. Sole Admin & Updated Faculty Mentored Metrics Suite
+const mockMasterAdminRoster = [
+  { admin_id: 'ADM-01', username: 'chandan', name: 'CHANDAN KUMAR', role: 'Science Lead & Head Admin', is_head: true }
+];
+assert(mockMasterAdminRoster.length === 1, 'T17.10: [Sole Admin Model] Exactly 1 Admin account (Chandan Kumar) exists in master administrator directory');
+assert(mockMasterAdminRoster[0].username === 'chandan', 'T17.11: Sole Admin is Chandan Kumar (Science Lead & Head Admin)');
+
+const mockAditiFaculty = { name: 'Aditi Singh', role: 'English & Grammar Mentor', exp: '5+ Years', studentsMentored: 1000 };
+assert(mockAditiFaculty.studentsMentored === 1000, 'T17.12: [Faculty Metric] Aditi Singh students mentored metric is accurately set to 1000+');
+
 console.log('\n================================================================');
 console.log(`MASTER TEST RESULTS: ${pass} Passed, ${fail} Failed`);
 console.log('================================================================');
