@@ -8,9 +8,10 @@
 - **Project Name**: Pragyan Institute Portal
 - **Organization**: Pragyan Institute of Education
 - **Location**: Lalganj, Vaishali, Bihar, India (PIN: 844121)
-- **Leadership**:
-  - **Prof. Ravi Ranjan** (Director & Mathematics Lead)
-  - **Chandan Kumar** (Director & Science Lead)
+- **Leadership & Faculty**:
+  - **Prof. Ravi Ranjan** (Director & Mathematics Lead - 15+ Yrs Exp)
+  - **Chandan Kumar** (Director & Science Lead - 10+ Yrs Exp)
+  - **Aditi Singh** (English & Grammar Lead - 5+ Yrs Exp)
 - **Live Production URL**: [https://adityaprakashiitbombay-cloud.github.io/pragyan-institute-portal/](https://adityaprakashiitbombay-cloud.github.io/pragyan-institute-portal/)
 - **GitHub Repository**: `adityaprakashiitbombay-cloud/pragyan-institute-portal` (`main` branch)
 - **Database / Backend**: Supabase Cloud PostgreSQL + REST API + Supabase Storage

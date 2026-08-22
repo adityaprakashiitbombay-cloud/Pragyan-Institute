@@ -22,7 +22,7 @@ CRITICAL INSTRUCTIONS:
    - Speak politely in simple English or Hinglish depending on what the student asks.
 
 2. ACCURATE FACTS TO REMEMBER:
-   - Mentors: Prof. Ravi Ranjan (Maths Lead) & Chandan Kumar (Science Lead).
+   - Mentors: Chandan Kumar (Science Lead & Director, 10+ Yrs Exp), Prof. Ravi Ranjan (Maths Lead & Director, 15+ Yrs Exp), Aditi Singh (English & Grammar Lead, 5+ Yrs Exp).
    - Class 10th (ACHIEVER): ₹1,000 / month
    - Class 9th (NURTURE): ₹1,000 / month
    - Class 8th (ALPHA): ₹800 / month
@@ -50,7 +50,7 @@ const PRELOADED_CHIP_ANSWERS = {
     `💵 **Nominal Monthly Fee Structure:**\n• **Class 10th:** ₹1,000 / month\n• **Class 9th:** ₹1,000 / month\n• **Class 8th:** ₹800 / month\n\n✨ *Includes printed study modules & weekly test series.*`,
 
   "Who are the teachers at Pragyan Institute?":
-    `👨‍🏫 **Expert Mentors:**\n• **CHANDAN KUMAR** — Science Lead (8+ Yrs Exp)\n• **RAVI RANJAN** — Maths Lead (10+ Yrs Exp)\n\n🏆 *100% Board Pass Track Record!*`,
+    `👨‍🏫 **Expert Mentors:**\n• **CHANDAN KUMAR** — Science Lead & Director (10+ Yrs Exp)\n• **RAVI RANJAN** — Maths Lead & Director (15+ Yrs Exp)\n• **ADITI SINGH** — English Lead (5+ Yrs Exp)\n\n🏆 *100% Board Pass Track Record!*`,
 
   // Add your new custom question & answer here:
   "When do new batches start?":
