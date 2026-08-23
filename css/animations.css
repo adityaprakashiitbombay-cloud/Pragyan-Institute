@@ -26,14 +26,22 @@
 /* Scroll Reveal Fade-Up Effect */
 .reveal-on-scroll {
   opacity: 0;
-  transform: translateY(30px);
-  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateY(20px);
+  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1), transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
   will-change: opacity, transform;
 }
 
 .reveal-on-scroll.is-visible {
-  opacity: 1;
-  transform: translateY(0);
+  opacity: 1 !important;
+  transform: translateY(0) !important;
+}
+
+/* Ensure above-the-fold hero section is always immediately visible */
+.hero-section,
+.hero-content,
+.hero-visual {
+  opacity: 1 !important;
+  transform: none !important;
 }
 
 /* Stagger Delay Utilities */

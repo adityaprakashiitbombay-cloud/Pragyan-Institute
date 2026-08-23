@@ -2035,14 +2035,19 @@
   font-size: 1.05rem;
 }
 
-.academy-banner-text {
+.academy-banner-text,
+.academy-banner p {
+  color: #FFFFFF !important;
   font-size: 1rem;
-  font-weight: 700;
-  line-height: 1.45;
+  font-weight: 500;
+  line-height: 1.5;
 }
 .academy-banner-text strong {
-  color: var(--status-warning-bg);
+  color: #FDE68A !important;
   font-weight: 800;
+  font-size: 1.05rem;
+  display: inline-block;
+  margin-bottom: 0.2rem;
 }
 
 /* -- Responsive: 2-col tablet, 3-col desktop -------------------------------- */

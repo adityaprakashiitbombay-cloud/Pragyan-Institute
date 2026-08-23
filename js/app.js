@@ -471,20 +471,24 @@
    * -------------------------------------------------------------------------- */
   function initScrollReveal() {
     const elements = Array.prototype.slice.call(document.querySelectorAll(
-      '.hero-content, .hero-visual, .mentor-compact-card, .teacher-card, .batch-card,' +
-      ' .gallery-card, .contact-card, .map-card, .faq-wrap, .scholarship-policy-card'
+      '.reveal-on-scroll, .mentor-compact-card, .teacher-card, .batch-card,' +
+      ' .gallery-card, .contact-card, .map-card, .faq-wrap, .scholarship-policy-card,' +
+      ' .academy-pillar, .academy-card, .academy-banner'
     ));
     if (!elements.length) return;
 
     // Reduced motion: show everything immediately rather than fading it in.
-    // Without this, content stayed at opacity 0 whenever the CSS override
-    // collapsed the transition to 0.01ms before the observer had fired.
     if (prefersReducedMotion() || !('IntersectionObserver' in window)) {
-      elements.forEach(el => el.classList.add('reveal-on-scroll', 'is-visible'));
+      elements.forEach(el => el.classList.add('is-visible'));
       return;
     }
 
     elements.forEach((el, idx) => {
+      // Never hide above-the-fold hero elements
+      if (el.closest('.hero-section') || el.classList.contains('hero-content') || el.classList.contains('hero-visual')) {
+        el.classList.add('is-visible');
+        return;
+      }
       el.classList.add('reveal-on-scroll');
       if (idx % 3 === 1) el.classList.add('delay-1');
       if (idx % 3 === 2) el.classList.add('delay-2');
@@ -496,9 +500,17 @@
         entry.target.classList.add('is-visible');
         obs.unobserve(entry.target);
       });
-    }, { threshold: 0.12, rootMargin: '0px 0px -5% 0px' });
+    }, { threshold: 0.05, rootMargin: '0px 0px 60px 0px' });
 
-    elements.forEach(el => observer.observe(el));
+    elements.forEach(el => {
+      if (el.classList.contains('is-visible')) return;
+      const rect = el.getBoundingClientRect();
+      if (rect.top < (window.innerHeight || document.documentElement.clientHeight) && rect.bottom > 0) {
+        el.classList.add('is-visible');
+      } else {
+        observer.observe(el);
+      }
+    });
   }
 
   /* --------------------------------------------------------------------------
