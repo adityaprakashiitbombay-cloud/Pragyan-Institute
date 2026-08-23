@@ -47,11 +47,11 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
   <!-- CSS Design System -->
-  <link rel="stylesheet" href="./css/variables.css?v=90.0.4d7b1c0e">
-  <link rel="stylesheet" href="./css/main.css?v=90.0.4d7b1c0e">
-  <link rel="stylesheet" href="./css/components.css?v=90.0.4d7b1c0e">
-  <link rel="stylesheet" href="./css/animations.css?v=90.0.4d7b1c0e">
-  <link rel="stylesheet" href="./css/portal.css?v=90.0.4d7b1c0e">
+  <link rel="stylesheet" href="./css/variables.css?v=90.0.59e5b309">
+  <link rel="stylesheet" href="./css/main.css?v=90.0.59e5b309">
+  <link rel="stylesheet" href="./css/components.css?v=90.0.59e5b309">
+  <link rel="stylesheet" href="./css/animations.css?v=90.0.59e5b309">
+  <link rel="stylesheet" href="./css/portal.css?v=90.0.59e5b309">
 
   <!-- Schema.org JSON-LD Structured Data for Google Top Ranking & Knowledge Graph -->
   <script type="application/ld+json">
@@ -888,15 +888,6 @@
           </a>
         </article>
       </div>
-
-      <!-- Value-add banner -->
-      <div class="academy-banner reveal-on-scroll">
-        <span class="academy-banner-icon" aria-hidden="true"><i class="fa-solid fa-people-group" aria-hidden="true"></i></span>
-        <p class="academy-banner-text">
-          <strong>Free Weekly Spoken English &amp; Group Discussion Sessions</strong>
-          <br>for all enrolled students — included with every tier, at no extra fee.
-        </p>
-      </div>
     </div>
   </section>
 
@@ -1446,20 +1437,20 @@
   <!-- Application Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
-  <script defer src="./js/config.js?v=90.0.4d7b1c0e"></script>
+  <script defer src="./js/config.js?v=90.0.59e5b309"></script>
   <!-- Canonical batch/fee/faculty table. Must load before app.js and portal.js,
        which read window.PRAGYAN_ACADEMIC instead of keeping their own copies. -->
-  <script defer src="./js/academic-config.js?v=90.0.4d7b1c0e"></script>
-  <script defer src="./js/supabase-sync.js?v=90.0.4d7b1c0e"></script>
-  <script defer src="./js/chat.js?v=90.0.4d7b1c0e"></script>
-  <script defer src="./js/app.js?v=90.0.4d7b1c0e"></script>
-  <script defer src="./js/portal.js?v=90.0.4d7b1c0e"></script>
+  <script defer src="./js/academic-config.js?v=90.0.59e5b309"></script>
+  <script defer src="./js/supabase-sync.js?v=90.0.59e5b309"></script>
+  <script defer src="./js/chat.js?v=90.0.59e5b309"></script>
+  <script defer src="./js/app.js?v=90.0.59e5b309"></script>
+  <script defer src="./js/portal.js?v=90.0.59e5b309"></script>
 
   <!-- PWA Service Worker Registration for Instant Offline Caching -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=90.0.4d7b1c0e').then(reg => {
+        navigator.serviceWorker.register('./sw.js?v=90.0.59e5b309').then(reg => {
           reg.update().catch(() => {});
         }).catch(err => console.log('SW reg error:', err));
       });
