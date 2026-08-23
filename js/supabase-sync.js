@@ -30,13 +30,15 @@
     student_requests:   'pragyan_db_requests_master',
     batches:            'pragyan_db_batches_master',
     admins:             'pragyan_db_admins_master',
-    audit_logs:         'pragyan_db_audit_logs_master'
+    audit_logs:         'pragyan_db_audit_logs_master',
+    blog_posts:         'pragyan_db_blog_master'
   };
 
   const ORDER_COLUMNS = {
     students: 'student_id', notices: 'id', fee_receipts: 'receipt_no',
     fee_billing_ledger: 'created_at', student_requests: 'created_at',
-    batches: 'batch_id', admins: 'admin_id', audit_logs: 'log_id'
+    batches: 'batch_id', admins: 'admin_id', audit_logs: 'log_id',
+    blog_posts: 'id'
   };
 
   const ALL_TABLES = Object.keys(KEY_MAP);
@@ -528,7 +530,7 @@
             sessionStorage.getItem('pragyan_portal_token') || localStorage.getItem('pragyan_portal_token'));
           const tables = hasSession
             ? ALL_TABLES
-            : ['notices', 'batches'];
+            : ['notices', 'batches', 'blog_posts'];
 
           // Fetch all tables in parallel with allSettled. Row scoping for the
           // student role is applied by the gateway from the signed session —
@@ -1020,7 +1022,8 @@
     // ── Normalize & Store Pulled Data ────────────────────────────────────────
     updateLocalState(data) {
       const normalized = {
-        students:           Array.isArray(data.students)           ? data.students.map(r => this.normalizeStudent(r)).filter(Boolean)  : undefined,
+        blog_posts:         Array.isArray(data.blog_posts)      ? data.blog_posts.map(r => this.normalizeBlogPost(r)).filter(Boolean) : undefined,
+    students:           Array.isArray(data.students)           ? data.students.map(r => this.normalizeStudent(r)).filter(Boolean)  : undefined,
         notices:            Array.isArray(data.notices)            ? data.notices.map(r => this.normalizeNotice(r)).filter(Boolean)     : undefined,
         fee_receipts:       Array.isArray(data.fee_receipts)       ? data.fee_receipts.map(r => this.normalizeReceipt(r)).filter(Boolean) : undefined,
         fee_billing_ledger: Array.isArray(data.fee_billing_ledger) ? data.fee_billing_ledger.map(r => this.normalizeLedger(r)).filter(Boolean) : undefined,
@@ -1115,7 +1118,8 @@
         // Money-adjacent queues: storage pressure must never destroy a payment
         // that has not reached the office yet.
         'pragyan_mutation_outbox',
-        'pragyan_undelivered_payment_submissions'
+        'pragyan_undelivered_payment_submissions',
+        'pragyan_db_blog_master'
       ]);
 
       try {
@@ -1452,6 +1456,31 @@
         studentRoll: l.student_roll || l.studentRoll || 'N/A',
         description: l.description || '',
         details: l.details || null
+      };
+    },
+
+    // Blog & Academic Insights: snake_case row -> portal-friendly object.
+    normalizeBlogPost(b) {
+      if (!b) return null;
+      const id = b.id || b.post_id;
+      if (!id || !b.slug) return null;
+      return {
+        id,
+        slug: String(b.slug || ''),
+        title: b.title || '',
+        excerpt: b.excerpt || '',
+        content_markdown: b.content_markdown || b.contentMarkdown || '',
+        cover_image_url: b.cover_image_url || b.coverImageUrl || '',
+        category: b.category || 'Study Tips',
+        tags: Array.isArray(b.tags) ? b.tags : [],
+        author_name: b.author_name || b.authorName || 'Chandan Kumar',
+        author_role: b.author_role || b.authorRole || 'Science Lead & Head Admin',
+        is_published: Boolean(b.is_published),
+        read_time_minutes: Number(b.read_time_minutes ?? b.readTimeMinutes ?? 3),
+        views_count: Number(b.views_count ?? b.viewsCount ?? 0),
+        published_at: b.published_at || b.publishedAt || null,
+        created_at: b.created_at || b.createdAt || '',
+        updated_at: b.updated_at || b.updatedAt || ''
       };
     },
 

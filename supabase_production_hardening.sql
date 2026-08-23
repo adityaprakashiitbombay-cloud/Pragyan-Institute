@@ -1314,3 +1314,100 @@ SELECT batch_id, monthly_fee, annual_fee, class_code, billing_day
 SELECT count(*) AS ledger_rows_missing_canonical_key
   FROM public.fee_billing_ledger
  WHERE idempotency_key <> 'BILL-' || upper(btrim(student_id)) || '-' || billing_month;
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- SECTION 14: BLOG & ACADEMIC INSIGHTS HUB  (public.blog_posts)
+-- ----------------------------------------------------------------------------
+-- Public readers get published rows only; every write path is admin-only and
+-- flows through the /api/db gateway (service_role). The anon SELECT policy is
+-- the single public surface, mirroring notices/batches but with a predicate.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS public.blog_posts (
+  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug              text UNIQUE NOT NULL,
+  title             text NOT NULL,
+  excerpt           text NOT NULL,
+  content_markdown  text NOT NULL,
+  cover_image_url   text,
+  category          text NOT NULL DEFAULT 'Study Tips'
+                    CHECK (category IN ('Board Exams','English Speaking','Study Tips','Institute News')),
+  tags              text[] NOT NULL DEFAULT ARRAY[]::text[],
+  author_name       text NOT NULL DEFAULT 'Chandan Kumar',
+  author_role       text NOT NULL DEFAULT 'Science Lead & Head Admin',
+  is_published      boolean NOT NULL DEFAULT false,
+  read_time_minutes integer NOT NULL DEFAULT 3,
+  views_count       integer NOT NULL DEFAULT 0,
+  published_at      timestamptz,
+  created_at        timestamptz NOT NULL DEFAULT now(),
+  updated_at        timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT blog_slug_format CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
+  CONSTRAINT blog_read_time_sane CHECK (read_time_minutes BETWEEN 1 AND 120)
+);
+
+CREATE INDEX IF NOT EXISTS idx_blog_published_feed
+  ON public.blog_posts (published_at DESC) WHERE is_published;
+CREATE INDEX IF NOT EXISTS idx_blog_category
+  ON public.blog_posts (category) WHERE is_published;
+
+DROP TRIGGER IF EXISTS trg_blog_posts_updated_at ON public.blog_posts;
+CREATE TRIGGER trg_blog_posts_updated_at
+  BEFORE UPDATE ON public.blog_posts
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+-- RLS: join the standard loop machinery (drop-then-recreate keeps re-runs idempotent)
+DO $do$
+DECLARE p record;
+BEGIN
+  FOR p IN SELECT policyname FROM pg_policies
+           WHERE schemaname='public' AND tablename='blog_posts'
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.blog_posts', p.policyname);
+  END LOOP;
+END $do$;
+
+ALTER TABLE public.blog_posts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.blog_posts FORCE ROW LEVEL SECURITY;
+
+CREATE POLICY "service_role_full_blog_posts" ON public.blog_posts
+  FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+-- Public surface: published rows only, read-only.
+CREATE POLICY "anon_read_published_blog_posts" ON public.blog_posts
+  FOR SELECT TO anon, authenticated USING (is_published = true);
+
+-- Admin sessions (portal JWTs authorize via the gateway; this authenticated
+-- grant is the documented admin capability should Supabase auth ever front it).
+CREATE POLICY "authenticated_admin_blog_posts" ON public.blog_posts
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+REVOKE ALL ON public.blog_posts FROM anon, authenticated;
+GRANT SELECT ON public.blog_posts TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.blog_posts TO authenticated;
+
+-- Atomic public view counter. Callable ONLY through the gateway's allowlisted
+-- rpc passthrough; direct PostgREST rpc stays revoked from anon/authenticated.
+CREATE OR REPLACE FUNCTION public.increment_blog_views(p_slug text)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $fn$
+DECLARE v_views integer;
+BEGIN
+  UPDATE public.blog_posts
+     SET views_count = views_count + 1
+   WHERE slug = btrim(p_slug)
+     AND is_published
+  RETURNING views_count INTO v_views;
+  RETURN COALESCE(v_views, 0);
+END;
+$fn$;
+
+REVOKE ALL ON FUNCTION public.increment_blog_views(text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.increment_blog_views(text) TO service_role;
+
+-- Verification:
+SELECT count(*) AS blog_posts_ready FROM pg_tables
+ WHERE schemaname='public' AND tablename='blog_posts';

@@ -47,11 +47,11 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
   <!-- CSS Design System -->
-  <link rel="stylesheet" href="./css/variables.css?v=90.0.cc82e62e">
-  <link rel="stylesheet" href="./css/main.css?v=90.0.cc82e62e">
-  <link rel="stylesheet" href="./css/components.css?v=90.0.cc82e62e">
-  <link rel="stylesheet" href="./css/animations.css?v=90.0.cc82e62e">
-  <link rel="stylesheet" href="./css/portal.css?v=90.0.cc82e62e">
+  <link rel="stylesheet" href="./css/variables.css?v=90.0.b8b39f22">
+  <link rel="stylesheet" href="./css/main.css?v=90.0.b8b39f22">
+  <link rel="stylesheet" href="./css/components.css?v=90.0.b8b39f22">
+  <link rel="stylesheet" href="./css/animations.css?v=90.0.b8b39f22">
+  <link rel="stylesheet" href="./css/portal.css?v=90.0.b8b39f22">
 
   <!-- Schema.org JSON-LD Structured Data for Google Top Ranking & Knowledge Graph -->
   <script type="application/ld+json">
@@ -947,6 +947,33 @@
     </div>
   </section>
 
+  <!-- ==========================================================================
+       5b. Blog & Academic Insights Hub
+       Fees/figures are rendered by js/app.js from the canonical config —
+       article content is markdown, sanitized by js/blog-markdown.js.
+       ========================================================================== -->
+  <section id="blog" class="blog-section" aria-labelledby="blogSectionTitle">
+    <div class="container">
+      <header class="section-header reveal-on-scroll">
+        <p class="section-tag"><i aria-hidden="true" class="fa-solid fa-newspaper"></i> Academic Insights Hub</p>
+        <h2 class="section-title" id="blogSectionTitle">Study Guides, Exam Strategy &amp; Institute News</h2>
+        <p class="section-subtitle">Free, practical articles from the Pragyan faculty — board-exam playbooks, English-speaking drills and study systems that actually work.</p>
+      </header>
+
+      <div class="tabs-container blog-tabs" role="tablist" aria-label="Filter articles by category">
+        <button type="button" class="tab-btn blog-tab active" role="tab" aria-selected="true" data-blog-cat="all">All Articles</button>
+        <button type="button" class="tab-btn blog-tab" role="tab" aria-selected="false" data-blog-cat="Board Exams">Board Exams (10th &amp; 12th)</button>
+        <button type="button" class="tab-btn blog-tab" role="tab" aria-selected="false" data-blog-cat="English Speaking">English Academy</button>
+        <button type="button" class="tab-btn blog-tab" role="tab" aria-selected="false" data-blog-cat="Study Tips">Study Tips &amp; Notes</button>
+        <button type="button" class="tab-btn blog-tab" role="tab" aria-selected="false" data-blog-cat="Institute News">Announcements</button>
+      </div>
+
+      <div class="blog-grid" id="blogGrid">
+        <div class="blog-loading"><i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i> Loading articles…</div>
+      </div>
+    </div>
+  </section>
+
   <!-- Lightbox Modal. Focus is trapped inside while open and returned to the
        thumbnail on close (see initLightboxModal). -->
   <div class="lightbox-modal" id="lightboxModal" role="dialog" aria-modal="true" aria-label="Enlarged institute photo" aria-hidden="true" style="display: none;">
@@ -1411,6 +1438,9 @@
           <button class="dash-tab-btn admin-tab-btn" data-tab="post-notice">
             <i aria-hidden="true" class="fa-solid fa-bullhorn"></i> Noticeboard & Announcements
           </button>
+          <button class="dash-tab-btn admin-tab-btn" data-tab="blog" id="adminTabBtnBlog">
+            <i aria-hidden="true" class="fa-solid fa-feather-pointed"></i> Articles &amp; Blog
+          </button>
           <button class="dash-tab-btn admin-tab-btn" data-tab="history" id="adminTabBtnHistory">
             <i aria-hidden="true" class="fa-solid fa-clock-rotate-left"></i> Audit History
           </button>
@@ -1429,6 +1459,7 @@
           <div class="tab-pane admin-tab-pane" id="adminTabPane-post-notice"></div>
           <div class="tab-pane admin-tab-pane" id="adminTabPane-history"></div>
           <div class="tab-pane admin-tab-pane" id="adminTabPane-settings"></div>
+          <div class="tab-pane admin-tab-pane" id="adminTabPane-blog"></div>
         </div>
       </div>
     </div>
@@ -1437,20 +1468,21 @@
   <!-- Application Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
-  <script defer src="./js/config.js?v=90.0.cc82e62e"></script>
+  <script defer src="./js/config.js?v=90.0.b8b39f22"></script>
   <!-- Canonical batch/fee/faculty table. Must load before app.js and portal.js,
        which read window.PRAGYAN_ACADEMIC instead of keeping their own copies. -->
-  <script defer src="./js/academic-config.js?v=90.0.cc82e62e"></script>
-  <script defer src="./js/supabase-sync.js?v=90.0.cc82e62e"></script>
-  <script defer src="./js/chat.js?v=90.0.cc82e62e"></script>
-  <script defer src="./js/app.js?v=90.0.cc82e62e"></script>
-  <script defer src="./js/portal.js?v=90.0.cc82e62e"></script>
+  <script defer src="./js/academic-config.js?v=90.0.b8b39f22"></script>
+  <script defer src="./js/supabase-sync.js?v=90.0.b8b39f22"></script>
+  <script type="module" src="./js/blog-markdown.js?v=90.0.b8b39f22"></script>
+        <script defer src="./js/chat.js?v=90.0.b8b39f22"></script>
+  <script defer src="./js/app.js?v=90.0.b8b39f22"></script>
+  <script defer src="./js/portal.js?v=90.0.b8b39f22"></script>
 
   <!-- PWA Service Worker Registration for Instant Offline Caching -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=90.0.cc82e62e').then(reg => {
+        navigator.serviceWorker.register('./sw.js?v=90.0.b8b39f22').then(reg => {
           reg.update().catch(() => {});
         }).catch(err => console.log('SW reg error:', err));
       });

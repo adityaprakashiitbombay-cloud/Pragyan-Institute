@@ -4738,3 +4738,46 @@ button, a, input, select, textarea {
     width: 100% !important;
   }
 }
+
+/* ==========================================================================
+   PHASE: ADMIN ARTICLES & BLOG MANAGER
+   ========================================================================== */
+.btn-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border-sand);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-surface-pure);
+  color: var(--text-heading);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: border-color var(--transition-fast), color var(--transition-fast),
+              transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+.btn-action:hover {
+  border-color: var(--primary-emerald);
+  color: var(--primary-emerald);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+.btn-action:active { transform: scale(0.94); }
+
+@media (pointer: coarse) {
+  .btn-action {
+    width: var(--tap-target);
+    height: var(--tap-target);
+  }
+}
+
+#blogCoverZone:hover,
+#blogCoverZone:focus-visible {
+  border-color: var(--primary-emerald) !important;
+  background-color: var(--primary-emerald-lighter);
+}
+#blogCoverZone:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: 2px;
+}

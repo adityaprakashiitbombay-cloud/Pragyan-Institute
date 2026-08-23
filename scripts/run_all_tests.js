@@ -10,6 +10,7 @@ import { runStaticA11yTests } from '../tests/a11y-static.test.js';
 import { runEmailQuotaTests } from '../tests/email-quota.test.js';
 import { runPaymentApprovalTests } from '../tests/payment-approval.test.js';
 import { runClientMoneyAndTouchTests } from '../tests/client-money-and-touch.test.js';
+import { runBlogTests } from '../tests/blog.test.js';
 
 console.log('================================================================');
 console.log('   PRAGYAN INSTITUTE — T1 TO T6 MASTER TEST RUNNER & AUDIT      ');
@@ -836,6 +837,15 @@ await runPaymentApprovalTests(assert);
 // -----------------------------------------------------------------------------
 console.log('\n--- [T24] Client-Side Money Paths, Sync Fidelity & Touch Targets ---');
 runClientMoneyAndTouchTests(assert);
+
+// -----------------------------------------------------------------------------
+// T25 — Blog & Academic Insights Hub. The feature spans SQL (blog_posts +
+// RLS + view RPC), the /api/db gateway (public read + allowlisted rpc), the
+// sync engine, the public homepage reader and the admin editor. This suite
+// unit-tests the shared markdown/slug module and then walks every seam.
+// -----------------------------------------------------------------------------
+console.log('\n--- [T25] Blog & Academic Insights Hub ---');
+runBlogTests(assert);
 
 console.log('\n================================================================');
 console.log(`MASTER TEST RESULTS: ${pass} Passed, ${fail} Failed`);

@@ -21,11 +21,12 @@ import { getSupabase, publicAdmin, requireSession, applyCors } from './_lib/auth
 
 const TABLES = new Set([
   'students', 'notices', 'fee_receipts', 'fee_billing_ledger',
-  'student_requests', 'batches', 'admins', 'audit_logs'
+  'student_requests', 'batches', 'admins', 'audit_logs',
+  'blog_posts'
 ]);
 
 // Readable without a session, because the marketing site renders before login.
-const PUBLIC_TABLES = new Set(['notices', 'batches']);
+const PUBLIC_TABLES = new Set(['notices', 'batches', 'blog_posts']);
 
 // Reachable at all by a student session. email_dispatch_log is absent from
 // TABLES entirely: the email quota ledger is server-only bookkeeping.
@@ -33,6 +34,14 @@ const STUDENT_TABLES = new Set([
   'students', 'notices', 'fee_receipts', 'fee_billing_ledger',
   'student_requests', 'batches', 'admins'
 ]);
+
+// Allowlisted server-side functions callable through this gateway's rpc
+// passthrough. Anything not listed here is refused — the gateway must never
+// become a generic SQL-rpc proxy. increment_blog_views is intentionally
+// anonymous-callable: counting a read needs no session.
+const RPC_ALLOWLIST = {
+  increment_blog_views: { anon: true, params: ['p_slug'] }
+};
 
 // Free-text self-edit fields are stripped of markup server-side so an approved
 // profile update can never carry stored XSS into admin render surfaces.
@@ -57,7 +66,7 @@ function sanitizeSelfEdit(data = {}) {
   return clean;
 }
 
-const OPERATIONS = new Set(['select', 'insert', 'upsert', 'update', 'delete']);
+const OPERATIONS = new Set(['select', 'insert', 'upsert', 'update', 'delete', 'rpc']);
 
 const ORDER_COLUMNS = {
   students: 'student_id', notices: 'created_at', fee_receipts: 'created_at',
@@ -66,7 +75,7 @@ const ORDER_COLUMNS = {
 };
 
 // Descending by default where the UI shows newest-first lists.
-const DEFAULT_DESCENDING = new Set(['notices', 'fee_receipts', 'fee_billing_ledger', 'student_requests', 'audit_logs']);
+const DEFAULT_DESCENDING = new Set(['notices', 'fee_receipts', 'fee_billing_ledger', 'student_requests', 'audit_logs', 'blog_posts']);
 
 // Columns a student may see on the institute's own admin records. This is the
 // payment identity shown on pay.html — never the credential columns.
@@ -229,6 +238,35 @@ export default async function handler(req, res) {
   const body = req.body || {};
   let { table, operation, data } = body;
   const filters = { ...(body.filters || {}) };
+  const rpcFn = typeof body.fn === 'string' ? body.fn : null;
+
+  // ---- Allowlisted RPC passthrough (table-independent) ---------------------
+  if (operation === 'rpc') {
+    const entry = RPC_ALLOWLIST[rpcFn];
+    if (!entry) {
+      return res.status(403).json({ success: false, error: 'Function is not callable through this gateway' });
+    }
+    const supabaseRpc = getSupabase();
+    if (!supabaseRpc) return res.status(503).json({ success: false, error: 'Server database configuration is missing' });
+
+    if (!entry.anon) {
+      const adminSession = requireSession(req, res, ['admin']);
+      if (!adminSession) return;
+    }
+    const rawParams = body.params && typeof body.params === 'object' ? body.params : {};
+    const params = {};
+    for (const key of entry.params) {
+      if (rawParams[key] !== undefined) params[key] = String(rawParams[key]).slice(0, 200);
+    }
+    try {
+      const { data: rpcData, error } = await supabaseRpc.rpc(rpcFn, params);
+      if (error) throw error;
+      return res.status(200).json({ success: true, data: rpcData });
+    } catch (err) {
+      console.error(`[db] rpc ${rpcFn} failed:`, err?.message);
+      return res.status(500).json({ success: false, error: 'Database request failed' });
+    }
+  }
 
   if (!TABLES.has(table)) {
     return res.status(400).json({ success: false, error: 'Unknown table' });
@@ -248,6 +286,12 @@ export default async function handler(req, res) {
   if (!isAnonymousRead) {
     session = requireSession(req, res, ['student', 'admin']);
     if (!session) return; // requireSession already answered
+  }
+
+  // Blog feed: anyone without an admin session — including anonymous visitors
+  // and students — may only ever see published rows. Drafts are admin-eyes-only.
+  if (table === 'blog_posts' && session?.role !== 'admin') {
+    filters.where = { ...(filters.where || {}), is_published: true };
   }
 
   try {

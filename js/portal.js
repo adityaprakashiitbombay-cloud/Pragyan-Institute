@@ -4638,7 +4638,8 @@ function renderStudentDashboard() {
     renderAdminRequestsManager();
     renderAdminAuditHistoryTab();
     renderAdminSettingsTab();
-    
+    renderAdminBlogTab();
+
     // Preserve the currently active admin tab!
     let targetTab = AppState.activeAdminTab || 'students';
     if (targetTab === 'email' && !isMainAdmin()) {
@@ -5523,6 +5524,8 @@ function renderStudentDashboard() {
       renderAdminAuditHistoryTab();
     } else if (tabName === 'settings') {
       renderAdminSettingsTab();
+    } else if (tabName === 'blog') {
+      renderAdminBlogTab();
     }
   }
 
@@ -11802,7 +11805,374 @@ function renderStudentDashboard() {
     });
   }
 
-  // Expose AppState to window for sync and testing
+
+  /* ==========================================================================
+   * ADMIN ARTICLES & BLOG MANAGER
+   * ========================================================================== */
+  const BLOG_STORAGE_KEY = 'pragyan_db_blog_master';
+  const BLOG_CATEGORIES_ADMIN = ['Board Exams', 'English Speaking', 'Study Tips', 'Institute News'];
+  let blogAdminFilter = 'all';
+  let blogCoverUploadUrl = '';
+
+  function blogReadLocal() {
+    try { return JSON.parse(localStorage.getItem(BLOG_STORAGE_KEY) || '[]'); }
+    catch (_) { return []; }
+  }
+  function blogWriteLocal(list) {
+    AppState.safeSetItem(BLOG_STORAGE_KEY, list);
+    if (AppState._blogCache) AppState._blogCache = list;
+  }
+  function blogStripMarkdown(md) {
+    return String(md || '')
+      .replace(/```[\s\S]*?```/g, ' ')
+      .replace(/[#>*_`~\-]{1,}/g, ' ')
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+      .replace(/\s+/g, ' ').trim();
+  }
+  function renderAdminBlogTab() {
+    const pane = document.getElementById('adminTabPane-blog');
+    if (!pane) return;
+
+    const posts = blogReadLocal().sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+    const totalViews = posts.reduce((s, p) => s + (Number(p.views_count) || 0), 0);
+    const publishedCount = posts.filter(p => p.is_published).length;
+
+    const filtered = posts.filter(p => {
+      if (blogAdminFilter === 'all') return true;
+      if (blogAdminFilter === 'published') return !!p.is_published;
+      if (blogAdminFilter === 'drafts') return !p.is_published;
+      return p.category === blogAdminFilter;
+    });
+
+    const filterOptions = [['all','All'],['published','Published'],['drafts','Drafts']]
+      .concat(BLOG_CATEGORIES_ADMIN.map(c => [c, c]));
+
+    pane.innerHTML = `
+      <div class="admin-stats-grid" style="margin-bottom:1.25rem;">
+        <div class="admin-stat-card"><div class="admin-icon-square"><i aria-hidden="true" class="fa-solid fa-newspaper"></i></div>
+          <div class="admin-stat-info"><h3>${posts.length}</h3><p>Total Articles</p></div></div>
+        <div class="admin-stat-card"><div class="admin-icon-square"><i aria-hidden="true" class="fa-solid fa-circle-check"></i></div>
+          <div class="admin-stat-info"><h3 style="color:var(--status-success-fg);">${publishedCount}</h3><p>Published</p></div></div>
+        <div class="admin-stat-card"><div class="admin-icon-square" style="background-color:#FEF3C7;color:#92400E;"><i aria-hidden="true" class="fa-solid fa-pen-ruler"></i></div>
+          <div class="admin-stat-info"><h3 style="color:#92400E;">${posts.length - publishedCount}</h3><p>Drafts</p></div></div>
+        <div class="admin-stat-card"><div class="admin-icon-square" style="background-color:rgba(217,119,6,.14);color:var(--gold-700);"><i aria-hidden="true" class="fa-solid fa-eye"></i></div>
+          <div class="admin-stat-info"><h3>${totalViews.toLocaleString('en-IN')}</h3><p>Total Reads</p></div></div>
+      </div>
+
+      <div class="dash-card">
+        <div class="dash-card-header">
+          <h3 class="dash-card-title"><i aria-hidden="true" class="fa-solid fa-feather-pointed"></i> Article Manager</h3>
+          <div style="display:flex; gap:0.6rem; align-items:center;">
+            <label for="blogAdminFilter" class="sr-only">Filter articles</label>
+            <select id="blogAdminFilter" style="min-height:38px; padding:0.4rem 0.7rem; border-radius:8px; border:1px solid var(--border-sand); font-weight:600;">
+              ${filterOptions.map(o => `<option value="${o[0]}" ${blogAdminFilter === o[0] ? 'selected' : ''}>${o[1]}</option>`).join('')}
+            </select>
+            <button type="button" class="btn btn-emerald" id="btnNewBlogPost" style="padding:0.55rem 1.1rem;">
+              <i aria-hidden="true" class="fa-solid fa-plus"></i> New Article
+            </button>
+          </div>
+        </div>
+
+        ${filtered.length === 0 ? `
+          <div style="text-align:center; color:var(--text-secondary); padding:2.5rem 1rem;">
+            <i aria-hidden="true" class="fa-solid fa-feather-pointed" style="font-size:2.2rem; opacity:.5;"></i>
+            <p style="font-weight:600; margin-top:0.6rem;">No articles here yet.</p>
+            <button type="button" class="btn btn-emerald" data-blog-edit="new" style="margin-top:0.75rem;">Write your first article</button>
+          </div>` : `
+          <div class="table-responsive">
+            <table class="portal-table">
+              <thead><tr>
+                <th>Cover</th><th>Title</th><th>Category</th><th>Status</th><th>Views</th><th>Date</th><th>Actions</th>
+              </tr></thead>
+              <tbody>
+                ${filtered.map(p => `
+                  <tr data-blog-row="${p.id}">
+                    <td>${p.cover_image_url
+                      ? `<img src="${sanitizeInput(p.cover_image_url)}" alt="" style="width:64px;height:40px;object-fit:cover;border-radius:6px;border:1px solid var(--border-sand);">`
+                      : `<span style="display:inline-flex;width:64px;height:40px;border-radius:6px;background:linear-gradient(135deg,var(--primary-emerald),#022C22);color:#fff;align-items:center;justify-content:center;font-weight:800;">${escapeHtml((p.title || 'B').charAt(0))}</span>`}</td>
+                    <td><strong>${sanitizeInput(p.title)}</strong><br><span style="font-size:.78rem;color:var(--text-muted);">/${sanitizeInput(p.slug)}</span></td>
+                    <td>${sanitizeInput(p.category)}</td>
+                    <td><span class="status-badge ${p.is_published ? 'status-verified' : 'status-adjusted'}">${p.is_published ? 'Published' : 'Draft'}</span></td>
+                    <td>${(Number(p.views_count) || 0).toLocaleString('en-IN')}</td>
+                    <td>${(p.published_at || p.created_at) ? new Date(p.published_at || p.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</td>
+                    <td>
+                      <div style="display:flex;gap:0.35rem;flex-wrap:wrap;">
+                        <button type="button" class="btn-action" data-blog-edit="${p.id}" aria-label="Edit article ${sanitizeInput(p.title)}" title="Edit"><i aria-hidden="true" class="fa-solid fa-pen"></i></button>
+                        <button type="button" class="btn-action" data-blog-toggle="${p.id}" aria-label="${p.is_published ? 'Unpublish' : 'Publish'} article ${sanitizeInput(p.title)}" title="${p.is_published ? 'Unpublish' : 'Publish Live'}">
+                          <i aria-hidden="true" class="fa-solid ${p.is_published ? 'fa-eye-slash' : 'fa-paper-plane'}"></i></button>
+                        <button type="button" class="btn-action" data-blog-delete="${p.id}" aria-label="Delete article ${sanitizeInput(p.title)}" title="Delete" style="color:#DC2626;"><i aria-hidden="true" class="fa-solid fa-trash"></i></button>
+                      </div>
+                    </td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>`}
+      </div>`;
+
+    pane.querySelector('#blogAdminFilter')?.addEventListener('change', (e) => {
+      blogAdminFilter = e.target.value;
+      renderAdminBlogTab();
+    });
+    pane.querySelector('#btnNewBlogPost')?.addEventListener('click', () => openBlogEditor(null));
+    pane.querySelector('[data-blog-edit="new"]')?.addEventListener('click', () => openBlogEditor(null));
+
+    pane.querySelectorAll('[data-blog-edit]').forEach(b => {
+      if (b.dataset.blogEdit === 'new') return;
+      b.addEventListener('click', () => {
+        const post = blogReadLocal().find(x => x.id === b.dataset.blogEdit);
+        if (post) openBlogEditor(post);
+      });
+    });
+
+    pane.querySelectorAll('[data-blog-toggle]').forEach(b => {
+      b.addEventListener('click', async () => {
+        const post = blogReadLocal().find(x => x.id === b.dataset.blogToggle);
+        if (!post) return;
+        const goingLive = !post.is_published;
+        if (goingLive && !confirm(`Publish "${post.title}" live to the website now?`)) return;
+        b.disabled = true;
+        const payload = {
+          ...post,
+          is_published: goingLive,
+          published_at: post.published_at || (goingLive ? new Date().toISOString() : null),
+          updated_at: new Date().toISOString()
+        };
+        delete payload._local_id;
+        const result = await SupabaseSync.mutate('blog_posts', 'update', payload, { where: { id: post.id } });
+        if (!result || result.success !== true) {
+          alert(`Could not update "${post.title}": ${result?.error || 'database rejected'}. Nothing changed.`);
+          b.disabled = false;
+          return;
+        }
+        blogWriteLocal(blogReadLocal().map(x => x.id === post.id ? payload : x));
+        renderAdminBlogTab();
+        showNotification(goingLive ? `"${post.title}" is now LIVE on the website.` : `"${post.title}" moved back to drafts.`, 'success');
+      });
+    });
+
+    pane.querySelectorAll('[data-blog-delete]').forEach(b => {
+      b.addEventListener('click', async () => {
+        const post = blogReadLocal().find(x => x.id === b.dataset.blogDelete);
+        if (!post) return;
+        if (!confirm(`DELETE "${post.title}" permanently?\n\nThis cannot be undone.`)) return;
+        b.disabled = true;
+        try {
+          await SupabaseSync.mutateOrThrow('blog_posts', 'delete', null, { where: { id: post.id } });
+          blogWriteLocal(blogReadLocal().filter(x => x.id !== post.id));
+          renderAdminBlogTab();
+          showNotification('Article deleted.', 'success');
+        } catch (err) {
+          alert(`Delete failed: ${err.message}`);
+          b.disabled = false;
+        }
+      });
+    });
+  }
+  /* -- Blog editor modal ------------------------------------------------------ */
+  function openBlogEditor(post) {
+    document.getElementById('blogEditorModal')?.remove();
+    const isNew = !post;
+    const md = (typeof window !== 'undefined' && window.PragyanBlogMarkdown) || null;
+    if (!md) { alert('The editor module did not load. Please refresh the page.'); return; }
+
+    const values = {
+      id: post?.id || '',
+      slug: post?.slug || '',
+      title: post?.title || '',
+      excerpt: post?.excerpt || '',
+      content_markdown: post?.content_markdown || '',
+      cover_image_url: post?.cover_image_url || '',
+      category: post?.category || 'Study Tips',
+      tags: Array.isArray(post?.tags) ? post.tags.join(', ') : '',
+      is_published: Boolean(post?.is_published),
+      views_count: Number(post?.views_count) || 0,
+      published_at: post?.published_at || null,
+      created_at: post?.created_at || ''
+    };
+    blogCoverUploadUrl = values.cover_image_url;
+
+    const modalHtml = `
+      <div class="inner-modal-backdrop active" id="blogEditorModal">
+        <div class="inner-modal-content" role="dialog" aria-modal="true" aria-labelledby="blogEditorTitle" tabindex="-1" style="max-width:860px; width:100%; max-height:92vh; overflow-y:auto;">
+          <button type="button" class="close-modal-btn" data-blog-editor-close aria-label="Close article editor">&times;</button>
+          <h3 id="blogEditorTitle" style="font-family:var(--font-heading); font-size:1.25rem; color:var(--text-mahogany); margin-bottom:1.1rem;">
+            <i aria-hidden="true" class="fa-solid fa-feather-pointed" style="color:var(--primary-emerald);"></i>
+            ${isNew ? 'Write a New Article' : 'Edit Article'}
+          </h3>
+          <form id="blogEditorForm" novalidate>
+            <div class="form-group">
+              <label class="form-label" for="blogEdTitle">Title *</label>
+              <input class="form-input" id="blogEdTitle" type="text" required maxlength="140" value="${escapeHtml(values.title)}" placeholder="e.g. Board Exam Strategy: How Toppers Revise in 30 Days">
+              <p class="form-hint">The URL slug is generated automatically from the title.</p>
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:0.9rem;">
+              <div class="form-group">
+                <label class="form-label" for="blogEdSlug">URL Slug *</label>
+                <input class="form-input" id="blogEdSlug" type="text" required value="${escapeHtml(values.slug)}" placeholder="board-exam-strategy">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="blogEdCategory">Category *</label>
+                <select class="form-input" id="blogEdCategory">
+                  ${BLOG_CATEGORIES_ADMIN.map(c => `<option value="${c}" ${values.category === c ? 'selected' : ''}>${c}</option>`).join('')}
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="blogEdTags">Tags <span style="font-weight:400; color:var(--text-muted);">(comma separated)</span></label>
+              <input class="form-input" id="blogEdTags" type="text" value="${escapeHtml(values.tags)}" placeholder="class-10, maths, revision">
+            </div>
+            <div class="form-group">
+              <span class="form-label">Cover Image</span>
+              <div id="blogCoverZone" tabindex="0" role="button" aria-label="Upload cover image" style="border:2px dashed var(--border-sand-dark); border-radius:var(--radius-md); padding:1rem; text-align:center; cursor:pointer; background:var(--bg-surface-cream);">
+                <i aria-hidden="true" class="fa-solid fa-cloud-arrow-up" style="font-size:1.4rem; color:var(--primary-emerald);"></i>
+                <div style="font-size:0.85rem; font-weight:700; margin-top:0.3rem;">Click or drop an image here</div>
+                <div style="font-size:0.78rem; color:var(--text-secondary);">JPG / PNG / WebP · max 5 MB · stored in pragyan-media/blog_covers/</div>
+              </div>
+              <input type="file" id="blogCoverInput" accept="image/jpeg,image/png,image/webp" hidden aria-label="Upload cover image">
+              <img id="blogCoverPreview" src="${escapeHtml(values.cover_image_url)}" alt="" style="${values.cover_image_url ? 'display:block' : 'display:none'}; margin-top:0.7rem; width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:var(--radius-md); border:1px solid var(--border-sand);">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="blogEdBody">Article body (Markdown) *</label>
+              <textarea class="form-input" id="blogEdBody" rows="12" style="font-family:ui-monospace,Consolas,monospace; font-size:0.88rem;" placeholder="# Heading&#10;&#10;Paragraph with **bold**, *italics*, - bullets, > quotes.&#10;:::tip&#10;Callout boxes like this one.&#10;:::">${escapeHtml(values.content_markdown)}</textarea>
+            </div>
+            <div class="form-group">
+              <button type="button" class="btn btn-outline-sage" id="blogPreviewToggle" aria-expanded="false" style="padding:0.45rem 1rem; font-size:0.85rem;">
+                <i aria-hidden="true" class="fa-solid fa-eye"></i> Live Preview
+              </button>
+              <div id="blogPreviewPane" class="blog-reader-body" hidden style="border:1px solid var(--border-sand); border-radius:var(--radius-md); padding:1.1rem; margin-top:0.7rem; background:var(--bg-surface-pure);"></div>
+            </div>
+            <div style="display:flex; gap:0.7rem; flex-wrap:wrap; justify-content:flex-end; border-top:1px solid var(--border-sand); padding-top:1rem;">
+              <button type="button" class="btn btn-outline-sage" data-blog-editor-close>Cancel</button>
+              <button type="button" class="btn btn-sage" data-blog-save="draft"><i aria-hidden="true" class="fa-solid fa-floppy-disk"></i> Save as Draft</button>
+              <button type="button" class="btn btn-emerald" data-blog-save="publish"><i aria-hidden="true" class="fa-solid fa-paper-plane"></i> Publish Live</button>
+            </div>
+          </form>
+        </div>
+      </div>`;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    const modalEl = document.getElementById('blogEditorModal');
+    const dialog = wireModalA11y(modalEl, { closeOnBackdrop: false });
+    modalEl.querySelectorAll('[data-blog-editor-close]').forEach(b => b.addEventListener('click', () => dialog.close()));
+
+    let slugTouched = Boolean(values.slug);
+    const titleIn = modalEl.querySelector('#blogEdTitle');
+    const slugIn = modalEl.querySelector('#blogEdSlug');
+    titleIn.addEventListener('input', () => { if (!slugTouched) slugIn.value = md.slugifyTitle(titleIn.value); });
+    slugIn.addEventListener('input', () => { slugTouched = slugIn.value.trim().length > 0; });
+
+    const zone = modalEl.querySelector('#blogCoverZone');
+    const coverInput = modalEl.querySelector('#blogCoverInput');
+    const preview = modalEl.querySelector('#blogCoverPreview');
+    zone.addEventListener('click', () => coverInput.click());
+    zone.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); coverInput.click(); } });
+    ['dragover', 'dragenter'].forEach(ev => zone.addEventListener(ev, (e) => { e.preventDefault(); zone.style.borderColor = 'var(--primary-emerald)'; }));
+    ['dragleave', 'drop'].forEach(ev => zone.addEventListener(ev, (e) => { e.preventDefault(); zone.style.borderColor = 'var(--border-sand-dark)'; }));
+    zone.addEventListener('drop', (e) => {
+      const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (!file) return;
+      try { const dt = new DataTransfer(); dt.items.add(file); coverInput.files = dt.files; } catch (_) {}
+      handleCoverFile(file);
+    });
+    coverInput.addEventListener('change', () => { const f = coverInput.files[0]; if (f) handleCoverFile(f); });
+
+    async function handleCoverFile(file) {
+      if (!/^image\/(jpeg|png|webp)$/.test(file.type)) { showNotification('Cover must be a JPG, PNG or WebP image.', 'error'); return; }
+      if (file.size > 5 * 1024 * 1024) { showNotification('Cover image must be under 5 MB.', 'error'); return; }
+      const icon = zone.querySelector('i');
+      icon.className = 'fa-solid fa-spinner fa-spin';
+      try {
+        blogCoverUploadUrl = await SupabaseSync.uploadFile(file, 'blog_covers');
+        preview.src = blogCoverUploadUrl;
+        preview.style.display = 'block';
+        showNotification('Cover uploaded.', 'success');
+      } catch (err) {
+        showNotification(err.message || 'Cover upload failed.', 'error');
+      } finally {
+        icon.className = 'fa-solid fa-cloud-arrow-up';
+      }
+    }
+
+    const previewToggle = modalEl.querySelector('#blogPreviewToggle');
+    const previewPane = modalEl.querySelector('#blogPreviewPane');
+    previewToggle.addEventListener('click', () => {
+      const showing = !previewPane.hidden;
+      if (showing) {
+        previewPane.hidden = true;
+        previewToggle.setAttribute('aria-expanded', 'false');
+        previewToggle.innerHTML = '<i aria-hidden="true" class="fa-solid fa-eye"></i> Live Preview';
+      } else {
+        previewPane.innerHTML = md.renderMarkdown(modalEl.querySelector('#blogEdBody').value);
+        previewPane.hidden = false;
+        previewToggle.setAttribute('aria-expanded', 'true');
+        previewToggle.innerHTML = '<i aria-hidden="true" class="fa-solid fa-pen"></i> Back to Editing';
+      }
+    });
+
+    async function saveBlog(mode) {
+      const title = titleIn.value.trim();
+      const slug = slugIn.value.trim();
+      const bodyMd = modalEl.querySelector('#blogEdBody').value.trim();
+      const category = modalEl.querySelector('#blogEdCategory').value;
+
+      if (title.length < 5) { showNotification('Give the article a title of at least 5 characters.', 'error'); titleIn.focus(); return; }
+      if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) { showNotification('Slug may only contain lowercase letters, numbers and single hyphens.', 'error'); slugIn.focus(); return; }
+      if (bodyMd.length < 50) { showNotification('Article body needs at least 50 characters of content.', 'error'); modalEl.querySelector('#blogEdBody').focus(); return; }
+      if (blogReadLocal().some(x => x.slug === slug && x.id !== values.id)) {
+        showNotification('That URL slug is already used by another article. Tweak the title or slug.', 'error');
+        slugIn.focus();
+        return;
+      }
+
+      const publishNow = mode === 'publish';
+      const plainForExcerpt = blogStripMarkdown(bodyMd);
+
+      const payload = {
+        id: values.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : undefined),
+        slug,
+        title,
+        excerpt: plainForExcerpt.slice(0, 180) || title,
+        content_markdown: bodyMd,
+        cover_image_url: blogCoverUploadUrl || '',
+        category,
+        tags: modalEl.querySelector('#blogEdTags').value.split(',').map(t => t.trim()).filter(Boolean).slice(0, 8),
+        author_name: AppState.currentUser && AppState.currentUser.name || 'Chandan Kumar',
+        author_role: AppState.currentUser && AppState.currentUser.role || 'Science Lead & Head Admin',
+        is_published: publishNow,
+        read_time_minutes: md.estimateReadingMinutes(bodyMd),
+        views_count: values.views_count,
+        published_at: values.published_at || (publishNow ? new Date().toISOString() : null),
+        updated_at: new Date().toISOString(),
+        created_at: values.created_at || new Date().toISOString()
+      };
+      if (!payload.id) { showNotification('Could not mint an article id in this browser.', 'error'); return; }
+
+      const saveBtns = modalEl.querySelectorAll('[data-blog-save]');
+      saveBtns.forEach(b => { b.disabled = true; });
+      try {
+        const result = await SupabaseSync.mutate(
+          'blog_posts',
+          isNew ? 'insert' : 'update',
+          payload,
+          isNew ? {} : { where: { id: values.id } }
+        );
+        if (!result || result.success !== true) throw new Error(result && result.error ? result.error : 'database rejected');
+
+        const list = blogReadLocal();
+        const idx = list.findIndex(x => x.id === payload.id);
+        if (idx >= 0) list[idx] = Object.assign({}, list[idx], payload); else list.unshift(payload);
+        blogWriteLocal(list);
+
+        dialog.close();
+        renderAdminBlogTab();
+        showNotification(publishNow ? `"${title}" is LIVE on the website!` : `"${title}" saved as draft.`, 'success');
+      } catch (err) {
+        saveBtns.forEach(b => { b.disabled = false; });
+        showNotification(`Save failed: ${err.message}`, 'error');
+      }
+    }
+    modalEl.querySelectorAll('[data-blog-save]').forEach(b => b.addEventListener('click', () => saveBlog(b.dataset.blogSave)));
+  }  // Expose AppState to window for sync and testing
   if (typeof window !== 'undefined') {
     window.AppState = AppState;
   }

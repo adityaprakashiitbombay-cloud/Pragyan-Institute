@@ -1118,3 +1118,234 @@
     NAME_PATTERN
   });
 })();
+
+
+/* --------------------------------------------------------------------------
+ * 12. Blog & Academic Insights Hub (public)
+ *     Data: published rows via POST /api/db (anon read is gateway-approved).
+ *     Rendering: PragyanBlogMarkdown.renderMarkdown() — escape-first, so
+ *     article content can never inject markup.
+ * -------------------------------------------------------------------------- */
+const BLOG_CATEGORIES = [
+  { key: 'all',            label: 'All Articles',              match: null },
+  { key: 'Board Exams',    label: 'Board Exams (10th & 12th)',  match: 'Board Exams' },
+  { key: 'English Speaking', label: 'English Academy',          match: 'English Speaking' },
+  { key: 'Study Tips',     label: 'Study Tips & Notes',         match: 'Study Tips' },
+  { key: 'Institute News', label: 'Announcements',              match: 'Institute News' }
+];
+
+let blogPostsCache = [];
+let blogActiveCategory = 'all';
+let blogReaderList = [];   // ordered slugs inside the active filter (prev/next)
+let blogReaderOpenSlug = null;
+
+function blogApiPost(body) {
+  return fetch('/api/db', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  }).then(r => r.json().catch(() => ({})));
+}
+
+function blogFmtDate(iso) {
+  const d = iso ? new Date(iso) : null;
+  if (!d || isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function blogCatClass(category) {
+  switch (category) {
+    case 'Board Exams':      return 'blog-cat-board';
+    case 'English Speaking': return 'blog-cat-english';
+    case 'Institute News':   return 'blog-cat-news';
+    default:                 return 'blog-cat-study';
+  }
+}
+
+async function fetchPublishedPosts() {
+  const grid = document.getElementById('blogGrid');
+  if (!grid || grid.dataset.loading === '1') return;
+  grid.dataset.loading = '1';
+  grid.innerHTML = '<div class="blog-loading"><i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i> Loading articles…</div>';
+  try {
+    const json = await blogApiPost({ table: 'blog_posts', operation: 'select', filters: { limit: 100 } });
+    if (json && json.success && Array.isArray(json.data)) {
+      blogPostsCache = json.data;
+    } else {
+      throw new Error(json?.error || 'unavailable');
+    }
+  } catch (err) {
+    grid.innerHTML = '<div class="blog-empty">Articles are temporarily unavailable. Please refresh in a moment.</div>';
+    delete grid.dataset.loading;
+    return;
+  }
+  delete grid.dataset.loading;
+  renderBlogGrid();
+}
+
+function renderBlogGrid() {
+  const grid = document.getElementById('blogGrid');
+  if (!grid) return;
+  const conf = BLOG_CATEGORIES.find(c => c.key === blogActiveCategory) || BLOG_CATEGORIES[0];
+  const list = blogPostsCache
+    .filter(p => !conf.match || p.category === conf.match)
+    .sort((a, b) => String(b.published_at || '').localeCompare(String(a.published_at || '')));
+
+  blogReaderList = list.map(p => p.slug);
+
+  if (!list.length) {
+    grid.innerHTML = '<div class="blog-empty">No articles in this section yet — check back soon!</div>';
+    return;
+  }
+
+  grid.innerHTML = list.map(p => {
+    const cover = p.cover_image_url
+      ? `<img src="${escapeHtml(p.cover_image_url)}" alt="" loading="lazy">`
+      : `<div class="blog-cover-fallback" aria-hidden="true">${escapeHtml((p.title || 'P').charAt(0))}</div>`;
+    return `
+      <article class="blog-card reveal-on-scroll is-visible">
+        <a class="blog-card-open" href="#read=${encodeURIComponent(p.slug)}" data-slug="${escapeHtml(p.slug)}" aria-label="Read article: ${escapeHtml(p.title)}">
+          <div class="blog-cover">${cover}</div>
+          <div class="blog-card-body">
+            <div class="blog-meta-row">
+              <span class="blog-cat-pill ${blogCatClass(p.category)}">${escapeHtml(p.category)}</span>
+              <span class="blog-read-badge">⏱️ ${Number(p.read_time_minutes) || 3} min read</span>
+            </div>
+            <h3 class="blog-title">${escapeHtml(p.title)}</h3>
+            <p class="blog-excerpt">${escapeHtml(p.excerpt)}</p>
+            <div class="blog-foot">
+              <span class="blog-date">${blogFmtDate(p.published_at || p.created_at)}</span>
+              <span class="blog-views" data-views-for="${escapeHtml(p.slug)}">👁 ${Number(p.views_count) || 0}</span>
+            </div>
+            <span class="blog-read-btn" aria-hidden="true">Read Article <i aria-hidden="true" class="fa-solid fa-arrow-right"></i></span>
+          </div>
+        </a>
+      </article>`;
+  }).join('');
+}
+
+function onBlogTabClick(btn) {
+  document.querySelectorAll('.blog-tab').forEach(b => {
+    const active = b === btn;
+    b.classList.toggle('active', active);
+    b.setAttribute('aria-selected', String(active));
+  });
+  blogActiveCategory = btn.dataset.blogCat || 'all';
+  renderBlogGrid();
+}
+
+/* -- Reader ---------------------------------------------------------------- */
+function closeBlogReader() {
+  const overlay = document.getElementById('blogReaderOverlay');
+  if (!overlay) return;
+  overlay.remove();
+  window.PragyanUI && window.PragyanUI.unlockScroll();
+  blogReaderOpenSlug = null;
+}
+
+function openBlogReader(slug) {
+  const post = blogPostsCache.find(p => p.slug === slug);
+  if (!post || typeof window.PragyanBlogMarkdown !== 'object') return;
+
+  closeBlogReader();
+  blogReaderOpenSlug = slug;
+
+  const md = window.PragyanBlogMarkdown;
+  const idx = blogReaderList.indexOf(slug);
+  const prevSlug = idx > 0 ? blogReaderList[idx - 1] : null;
+  const nextSlug = idx >= 0 && idx < blogReaderList.length - 1 ? blogReaderList[idx + 1] : null;
+  const shareUrl = `${location.origin}${location.pathname}#read=${encodeURIComponent(post.slug)}`;
+  const shareHref = `https://wa.me/?text=${encodeURIComponent(`${post.title} — ${shareUrl}`)}`;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'blog-reader-overlay';
+  overlay.id = 'blogReaderOverlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-labelledby', 'blogReaderTitle');
+  overlay.innerHTML = `
+    <div class="blog-reader-panel">
+      <button type="button" class="blog-reader-close" aria-label="Close article reader"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+      <header class="blog-reader-head">
+        <span class="blog-cat-pill ${blogCatClass(post.category)}">${escapeHtml(post.category)}</span>
+        <h2 id="blogReaderTitle">${escapeHtml(post.title)}</h2>
+        <p class="blog-reader-byline">
+          By <strong>${escapeHtml(post.author_name)}</strong> · ${escapeHtml(post.author_role)}
+          · ${blogFmtDate(post.published_at || post.created_at)}
+          · ⏱️ ${Number(post.read_time_minutes) || 3} min read
+          · 👁 <span data-live-views>${Number(post.views_count) || 0}</span>
+        </p>
+        ${post.cover_image_url ? `<img class="blog-reader-cover" src="${escapeHtml(post.cover_image_url)}" alt="">` : ''}
+      </header>
+      <div class="blog-reader-body">${md.renderMarkdown(post.content_markdown)}</div>
+      <footer class="blog-reader-footer">
+        <div class="blog-reader-nav">
+          <button type="button" class="blog-nav-btn" data-blog-nav="prev" ${prevSlug ? '' : 'disabled'}>
+            <i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Previous
+          </button>
+          <button type="button" class="blog-nav-btn" data-blog-nav="next" ${nextSlug ? '' : 'disabled'}>
+            Next <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+          </button>
+        </div>
+        <a class="blog-share-btn" href="${shareHref}" target="_blank" rel="noopener">
+          <i class="fa-brands fa-whatsapp" aria-hidden="true"></i> Share on WhatsApp
+        </a>
+      </footer>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  window.PragyanUI && window.PragyanUI.lockScroll();
+
+  const panel = overlay.querySelector('.blog-reader-panel');
+  panel.focus?.();
+  const focusables = () => Array.from(overlay.querySelectorAll('button, a[href], [tabindex]:not([tabindex="-1"])'))
+    .filter(el => el.offsetParent !== null);
+  overlay.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); closeBlogReader(); return; }
+    if (e.key !== 'Tab') return;
+    const items = focusables();
+    if (!items.length) return;
+    const first = items[0], last = items[items.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+  overlay.querySelector('.blog-reader-close').addEventListener('click', closeBlogReader);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeBlogReader(); });
+
+  // View counter: optimistic display + fire-and-forget atomic increment.
+  const viewsEl = overlay.querySelector('[data-live-views]');
+  blogApiPost({ operation: 'rpc', fn: 'increment_blog_views', params: { p_slug: post.slug } })
+    .then(json => {
+      if (json && json.success && viewsEl) viewsEl.textContent = String(Number(json.data) || Number(viewsEl.textContent) + 1);
+    })
+    .catch(() => {});
+
+  overlay.querySelector('[data-blog-nav="prev"]')?.addEventListener('click', () => prevSlug && openBlogReader(prevSlug));
+  overlay.querySelector('[data-blog-nav="next"]')?.addEventListener('click', () => nextSlug && openBlogReader(nextSlug));
+
+  history.replaceState(null, '', `#read=${encodeURIComponent(slug)}`);
+}
+
+function handleHashForBlog() {
+  const m = /^#read=([\w-]+)$/.exec(location.hash || '');
+  if (m) openBlogReader(decodeURIComponent(m[1]));
+}
+
+function initBlog() {
+  const tabsWrap = document.querySelector('.blog-tabs');
+  tabsWrap?.querySelectorAll('.blog-tab').forEach(btn => {
+    btn.addEventListener('click', () => onBlogTabClick(btn));
+  });
+
+  const grid = document.getElementById('blogGrid');
+  grid?.addEventListener('click', (e) => {
+    const opener = e.target.closest('[data-slug]');
+    if (!opener) return;
+    e.preventDefault();
+    openBlogReader(opener.dataset.slug);
+  });
+
+  window.addEventListener('hashchange', handleHashForBlog);
+
+  fetchPublishedPosts().then(handleHashForBlog);
+}

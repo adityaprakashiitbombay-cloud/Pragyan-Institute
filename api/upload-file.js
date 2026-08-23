@@ -3,7 +3,7 @@ import { getSupabase, requireSession, applyCors } from './_lib/auth.js';
 import { resolveBatch } from './_lib/academic-config.js';
 
 const MAX_BYTES = 5 * 1024 * 1024;
-const ALLOWED_FOLDERS = new Set(['admin_avatars', 'notice_attachments', 'profile_pictures', 'payment_proofs']);
+const ALLOWED_FOLDERS = new Set(['admin_avatars', 'notice_attachments', 'blog_covers', 'profile_pictures', 'payment_proofs']);
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
 
 export default async function handler(req, res) {
