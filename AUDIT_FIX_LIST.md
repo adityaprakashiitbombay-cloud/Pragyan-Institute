@@ -2,6 +2,20 @@
 **Generated:** 2026-08-23 · **Scope:** full-codebase audit of the post-merge working tree (`fa740c9` + uncommitted fixes)
 **Verification baseline:** `npm test` = 268/268 pass **against the working tree only** — committed `main` is broken (see F-01).
 
+> ## ✅ STATUS UPDATE — 2026-08-23 (post-remediation)
+> Four fix phases landed on `main`: `07d72ff` (Phase 1), `bae31e3` (Phase 2), `6ac1f0d` (Phase 3), `2d52217` (Phase 4). Suite: **268/268 green**, build re-stamped.
+>
+> **FIXED:** F-01, F-02, F-05, F-06, F-07 (gateway wired + payment endpoint), F-13–F-18, F-21 (all sites checked), F-22, F-23, F-24, F-25, F-27 (outbox flush covers post-logout risk partially), F-31, F-32, F-33, F-34, F-35, F-36, F-38, F-39, F-42 (key-in-header; model-ID verification still open), F-43, F-44, F-45, F-46, F-48, F-49 (vite.config deleted; fee-calculator kept — tests import it), F-50.
+>
+> **STILL OPEN (operator action / later work):**
+> - F-03/F-04/F-05-rotation: move the Resend key txt out of the folder and rotate ALL leaked credentials (anon key in git history, Gemini key historically committed). Code no longer ships any embedded secret except the anon-key inline fallbacks pending rotation.
+> - Apply `supabase_production_hardening.sql` in Supabase SQL Editor (safe now — client is on the gateway), then verify login + payments live.
+> - F-10 rate-limit shared store; F-11 Stream token TTL; F-12 ilike `_` escape.
+> - F-19 verify legacy UUID-keyed receipts visible after deploy (scope widening shipped server-side).
+> - F-20 legacy SQL files left as historical archive; canonical = hardening file.
+> - F-26 student-pull cache clobber on shared browsers; F-28 keyset pagination; F-29 partial-sync badge nuance; F-30 batch-transfer product gap; F-37 storage-folder doc decision (code whitelist is authoritative); F-40 boot-time version gate; F-41 SW cache size caps; F-42 model-ID verification against live API.
+> - Day-15 reminder removal confirmed deliberate and documented in AGENTS.md.
+
 Legend: **[P0]** deploy/security blocker · **[P1]** money/data-integrity · **[P2]** reliability/UX · **[P3]** hygiene/docs
 
 ---
