@@ -1087,19 +1087,23 @@
   background: linear-gradient(to top, rgba(181, 84, 58, 0.96) 0%, rgba(90, 46, 37, 0.75) 42%, transparent 75%);
 }
 
+/* Consolidated caption styles — the two competing definitions that used to
+   live here (1086/1113 pre-merge) are unified to the cascade-effective
+   values: title 1.15rem/700, sub 0.8125rem at 85% opacity. */
 .gallery-caption-title {
   font-family: var(--font-heading);
-  font-size: 1.2rem;
-  font-weight: 800;
-  margin-bottom: 0.35rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
   color: #FFFFFF;
   letter-spacing: -0.01em;
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
 }
 
 .gallery-caption-sub {
-  font-size: 0.85rem;
+  font-size: 0.8125rem;
   color: rgba(240, 230, 216, 0.95);
+  opacity: 0.85;
   font-weight: 500;
   line-height: 1.4;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
@@ -1112,18 +1116,6 @@
 
 .gallery-card:hover img {
   transform: scale(1.06);
-}
-
-.gallery-caption-title {
-  font-family: var(--font-heading);
-  font-size: 1.15rem;
-  font-weight: 700;
-  margin-bottom: 0.25rem;
-}
-
-.gallery-caption-sub {
-  font-size: 0.8125rem;
-  opacity: 0.85;
 }
 
 /* Lightbox Modal */
@@ -1711,4 +1703,47 @@
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch !important;
   }
+}
+
+
+/* ==========================================================================
+   PHASE 3 — MICRO-INTERACTION REFINEMENTS
+   --------------------------------------------------------------------------
+   Press feedback, close-button affordance, and a brand-gradient footer rule.
+   All transition-based, so the global reduced-motion reset covers them.
+   ========================================================================== */
+
+/* Tactile press: buttons settle instead of hovering mid-air. */
+.btn:active,
+.tab-btn:active {
+  transform: translateY(0) scale(0.98);
+}
+.slide-nav-btn:active {
+  transform: translateY(-50%) scale(0.94);
+}
+
+/* Close buttons telegraph their job: the cross rotates on hover. */
+.modal-close-btn i,
+.close-modal-btn i,
+.portal-close-btn i,
+.lightbox-close i {
+  transition: transform var(--transition-fast);
+}
+.modal-close-btn:hover i,
+.close-modal-btn:hover i,
+.portal-close-btn:hover i,
+.lightbox-close:hover i {
+  transform: rotate(90deg);
+}
+
+/* Footer rule: single flat terracotta bar -> quiet four-brand gradient. */
+.site-footer {
+  border-top: 4px solid;
+  border-image: linear-gradient(
+    90deg,
+    var(--gold-600) 0%,
+    var(--primary-terracotta) 35%,
+    var(--secondary-sage-text) 70%,
+    var(--primary-emerald) 100%
+  ) 1;
 }

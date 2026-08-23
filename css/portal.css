@@ -4544,3 +4544,56 @@ button, a, input, select, textarea {
   animation: modalSpringIn 0.38s cubic-bezier(0.34, 1.45, 0.64, 1) both;
   will-change: transform, opacity;
 }
+
+/* ==========================================================================
+   PHASE 3 — VIP ID PASS: PRINT STYLESHEET
+   --------------------------------------------------------------------------
+   Printing the dashboard previously produced a ink-heavy screenshot of the
+   whole app. This isolates the ID pass, flattens it to a printer-safe CR80
+   card (86 x 54 mm), strips glow/glimmer/shadows, and forces the front face.
+   ========================================================================== */
+@media print {
+  @page { size: A4 portrait; margin: 14mm; }
+
+  body * { visibility: hidden !important; }
+  .metallic-card-3d-container,
+  .metallic-card-3d-container * { visibility: visible !important; }
+
+  .metallic-card-3d-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    margin: 0;
+    max-width: none;
+    width: 86mm;
+  }
+
+  .card-flip-hint,
+  .metallic-card-glimmer { display: none !important; }
+
+  .metallic-card-3d,
+  .card-face {
+    transform: none !important;
+    box-shadow: none !important;
+    animation: none !important;
+    outline: none !important;
+    width: 86mm;
+    min-height: 54mm;
+    height: 54mm;
+    border-radius: 3.18mm; /* CR80 corner radius */
+  }
+
+  /* Monochrome, high-contrast face: gradients and gold foil do not survive
+     consumer printers; solid ink does. */
+  .card-face {
+    background: #ffffff !important;
+    background-image: none !important;
+    color: #0B1220 !important;
+    border: 1pt solid #064E3B !important;
+    backface-visibility: visible !important;
+  }
+  .card-face * {
+    color: #0B1220 !important;
+    text-shadow: none !important;
+  }
+}

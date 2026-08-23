@@ -503,23 +503,9 @@ html.scroll-locked body {
 }
 
 /* --- FAQ accordion -------------------------------------------------------
-   The headers are now <button>s, so the UA button styling has to be undone. */
-.faq-header {
-  width: 100%;
-  background: none;
-  border: 0;
-  font-family: inherit;
-  text-align: left;
-  gap: 0.75rem;
-}
-
-.faq-header > span {
-  flex: 1;
-}
-
-/* Fallback cap only: js/app.js measures each panel and sets an exact inline
-   max-height. The old 400px cut the UPI QR answer in half. The extra selector
-   is for weight — components.css loads after this file. */
+   The headers are now <button>s. UA chrome reset lives with the full
+   .faq-header style in components.css (single source; this file previously
+   carried a duplicate that drifted). */
 .faq-wrap .faq-item.open .faq-body {
   max-height: 2400px;
 }
