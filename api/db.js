@@ -34,6 +34,29 @@ const STUDENT_TABLES = new Set([
   'student_requests', 'batches', 'admins'
 ]);
 
+// Free-text self-edit fields are stripped of markup server-side so an approved
+// profile update can never carry stored XSS into admin render surfaces.
+function stripMarkup(value) {
+  return typeof value === 'string' ? value.replace(/<\/?[a-zA-Z][^>]*>/g, '').slice(0, 500) : value;
+}
+
+function sanitizeSelfEdit(data = {}) {
+  const clean = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (key === 'photo_url') {
+      // Same policy as the client sanitizer: storage/https/data-image only.
+      const v = String(value || '');
+      const ok = /^https:\/\/[^\s"'<>]+$/.test(v) ||
+        /^data:image\/(png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/i.test(v);
+      if (!ok) throw new BadRequestError('photo_url must be an https or data-image URL');
+      clean[key] = v;
+    } else {
+      clean[key] = stripMarkup(value);
+    }
+  }
+  return clean;
+}
+
 const OPERATIONS = new Set(['select', 'insert', 'upsert', 'update', 'delete']);
 
 const ORDER_COLUMNS = {
@@ -230,6 +253,9 @@ export default async function handler(req, res) {
   try {
     if (session?.role === 'student') {
       filters.where = authorizeStudent(table, operation, data, filters, session);
+      if (table === 'students' && operation === 'update') {
+        data = sanitizeSelfEdit(data);
+      }
       // Widen child-table scoping to every identifier form the student's rows
       // may carry (6-digit id + UUID). `students` itself keys on the canonical id.
       if (table !== 'students' && table !== 'admins') {

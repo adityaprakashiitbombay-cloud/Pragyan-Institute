@@ -290,7 +290,17 @@ export async function dispatchWithQuota({ items, category, getEmail, reference, 
     }
 
     // Once one wave has run out of quota, later waves cannot possibly fit.
-    if (reservation.deferred_count) break;
+    // Their recipients must still be REPORTED as deferred, though — a day-10
+    // final reminder that silently vanished from the results would never be
+    // retried by anything (statements self-heal via retryUnsentStatements;
+    // reminders do not).
+    if (reservation.deferred_count) {
+      const currentIdx = waves.indexOf(wave);
+      for (let w = currentIdx + 1; w < waves.length; w++) {
+        deferred.push(...waves[w].map(getEmail).filter(Boolean));
+      }
+      break;
+    }
   }
 
   return { results, deferred, quotaError: null };

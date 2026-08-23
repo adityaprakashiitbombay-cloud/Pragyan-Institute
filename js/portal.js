@@ -1690,15 +1690,24 @@
       // Order matters and so does checking the result. SupabaseSync.mutate RETURNS
       // its failures rather than throwing, so the `catch` that used to wrap this
       // block was unreachable: every one of these nine deletes could fail and the
-      // function still fell through to wipe the local copy and report success. The
-      // student then reappeared on the next pullAll() — with their receipts and
+      // function still fell through to wipe the local copy and report success. The      // student then reappeared on the next pullAll() — with their receipts and
       // requests intact — after the admin had been told the record was deleted.
       //
       // The photo delete has also moved to AFTER this block. It is irreversible,
       // and deleting it first meant a failed cascade left a surviving student row
       // pointing at a photo that no longer exists.
       const cascade = [];
-      if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
+      if (typeof SupabaseSync === 'undefined' || !SupabaseSync.mutate) {
+        // Fail-closed: without the sync layer there is no way to verify the
+        // cloud rows are gone. The old path skipped the cascade silently, wiped
+        // the local copy, reported success — and the student resurrected on the
+        // next pull with all children intact.
+        return {
+          success: false,
+          error: 'The database sync layer is unavailable right now, so the deletion was refused. Please retry once the connection is restored.'
+        };
+      }
+      {
         // Children first: a students row removed before its receipts would orphan
         // them under any FK that is not ON DELETE CASCADE.
         if (cleanUuid) cascade.push(['fee_receipts', { student_id: cleanUuid }]);
@@ -1712,10 +1721,15 @@
         if (cleanRoll && cleanRoll !== cleanStuId) cascade.push(['students', { roll_no: cleanRoll }]);
 
         const failures = [];
+        let studentRowsDeleted = 0;
         for (const [table, where] of cascade) {
           const result = await SupabaseSync.mutate(table, 'delete', null, { where });
           if (!result || result.success !== true) {
             failures.push(`${table} (${Object.keys(where)[0]}): ${result?.error || 'rejected'}`);
+          } else if (table === 'students') {
+            // A "successful" delete matching zero rows means the WHERE hit
+            // nothing — the parent row is still live and a local wipe would lie.
+            studentRowsDeleted += Array.isArray(result.data) ? result.data.length : 1;
           }
         }
 
@@ -1728,6 +1742,9 @@
             error: `${target.name || cleanStuId} was NOT deleted — the database rejected ${failures.length} of ${cascade.length} deletions. The record is unchanged. Check your connection and try again.`,
             details: failures
           };
+        }
+        if (studentRowsDeleted === 0) {
+          return { success: false, error: `${target.name || cleanStuId} was NOT deleted — no matching row found in the database. Refresh and check the roster.` };
         }
       }
 
@@ -3143,7 +3160,7 @@ function renderStudentDashboard() {
     if (avatarEl) {
       const photoUrl = student.photoUrl || student.photo_url || student.photo || '';
       if (photoUrl && (photoUrl.startsWith('http') || photoUrl.startsWith('data:image/'))) {
-        avatarEl.innerHTML = `<img src="${photoUrl}" alt="${student.name}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
+        avatarEl.innerHTML = `<img src="${photoUrl}" alt="${sanitizeInput(student.name)}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
       } else {
         avatarEl.textContent = (student.name ? student.name.charAt(0).toUpperCase() : '🎓');
       }
@@ -3342,10 +3359,10 @@ function renderStudentDashboard() {
                   </div>
                   <div class="metallic-nfc-wave" title="Contactless NFC Digital ID"><i aria-hidden="true" class="fa-solid fa-wifi"></i></div>
                 </div>
-                <h3>${s.name}</h3>
+                <h3>${sanitizeInput(s.name)}</h3>
                 <div class="metallic-pills-row">
                   <span class="metallic-id-chip"><i aria-hidden="true" class="fa-solid fa-id-badge"></i> ID: ${s.student_id || s.rollNo || s.id}</span>
-                  <span class="metallic-class-tag"><i aria-hidden="true" class="fa-solid fa-graduation-cap"></i> ${s.className}</span>
+                  <span class="metallic-class-tag"><i aria-hidden="true" class="fa-solid fa-graduation-cap"></i> ${sanitizeInput(s.className)}</span>
                 </div>
               </div>
             </div>
@@ -3353,8 +3370,8 @@ function renderStudentDashboard() {
             <div class="metallic-id-details-row">
               <div><span>Roll:</span> <strong>#${s.rollNo}</strong></div>
               <div><span>Status:</span> <strong class="fee-status-badge ${s.pendingFee > 0 ? 'status-due' : 'status-cleared'}"><i aria-hidden="true" class="fa-solid ${s.pendingFee > 0 ? 'fa-circle-exclamation' : 'fa-circle-check'}"></i> ${s.pendingFee > 0 ? `₹${s.pendingFee.toLocaleString()} Due` : '🟢 CLEARED'}</strong></div>
-              <div><span>Contact:</span> <strong>${s.mobile}</strong></div>
-              <div><span>Guardian:</span> <strong>${s.guardianName}</strong></div>
+              <div><span>Contact:</span> <strong>${sanitizeInput(s.mobile)}</strong></div>
+              <div><span>Guardian:</span> <strong>${sanitizeInput(s.guardianName)}</strong></div>
             </div>
 
             <div class="metallic-id-barcode-wrap">
@@ -3385,7 +3402,7 @@ function renderStudentDashboard() {
             <div class="back-card-content">
               <div class="back-meta-item">
                 <span class="back-label">Student Name:</span>
-                <span class="back-val">${s.name}</span>
+                <span class="back-val">${sanitizeInput(s.name)}</span>
               </div>
               <div class="back-meta-item">
                 <span class="back-label">Enrolled Batch:</span>
@@ -3449,7 +3466,7 @@ function renderStudentDashboard() {
           </div>
           <div class="detail-box">
             <div class="detail-label">Full Name</div>
-            <div class="detail-val">${s.name}</div>
+            <div class="detail-val">${sanitizeInput(s.name)}</div>
           </div>
           <div class="detail-box">
             <div class="detail-label">Student ID</div>
@@ -3461,7 +3478,7 @@ function renderStudentDashboard() {
           </div>
           <div class="detail-box">
             <div class="detail-label">Class & Course</div>
-            <div class="detail-val">${s.className}</div>
+            <div class="detail-val">${sanitizeInput(s.className)}</div>
           </div>
           <div class="detail-box">
             <div class="detail-label">Date of Birth (DOB)</div>
@@ -3469,7 +3486,7 @@ function renderStudentDashboard() {
           </div>
           <div class="detail-box">
             <div class="detail-label">Mobile Number</div>
-            <div class="detail-val">${s.mobile}</div>
+            <div class="detail-val">${sanitizeInput(s.mobile)}</div>
           </div>
           <div class="detail-box">
             <div class="detail-label">Father / Guardian Name</div>
@@ -3839,6 +3856,15 @@ function renderStudentDashboard() {
           const result = await SupabaseSync.mutate('student_requests', 'delete', null, { where: { request_id: pendingReq.id } });
           if (!result || result.success !== true) {
             alert(`⚠️ Your request could not be cancelled${result?.error ? `: ${result.error}` : ''}. It is still pending review. Please check your connection and try again.`);
+            return;
+          }
+          if (!Array.isArray(result.data) || result.data.length === 0) {
+            // The gateway returns the deleted rows; zero rows means the WHERE
+            // matched nothing — the cloud row is already gone or processed.
+            alert('ℹ️ This request is no longer pending in the system (it may have just been processed). Refreshing your dashboard.');
+            const allReqsSynced = AppState.getRequests().filter(r => !(isStudentRequestMatch(r, s) && String(r.status || '').toLowerCase() === 'pending'));
+            await AppState.saveRequests(allReqsSynced);
+            renderStudentDashboard();
             return;
           }
         }
@@ -4212,7 +4238,7 @@ function renderStudentDashboard() {
                     </div>
                     <span class="notice-date" style="font-size: 0.78rem; color: var(--text-muted);"><i aria-hidden="true" class="fa-regular fa-clock"></i> ${formatDate(notice.date)}</span>
                   </div>
-                  <div class="notice-title" style="font-size: 1.05rem; font-weight: 700; color: var(--text-mahogany); margin-bottom: 0.4rem;">${notice.title}</div>
+                  <div class="notice-title" style="font-size: 1.05rem; font-weight: 700; color: var(--text-mahogany); margin-bottom: 0.4rem;">${sanitizeInput(notice.title)}</div>
                   <div class="notice-body" style="font-size: 0.9rem; color: #374151; line-height: 1.6;">${notice.message}</div>
                   ${(notice.attachmentUrl || notice.attachment_url) ? `
                     <div style="margin-top:0.85rem;">
@@ -4423,7 +4449,7 @@ function renderStudentDashboard() {
                     <td><span style="font-size: 0.82rem; font-weight: 600; color: var(--text-mahogany);"><i aria-hidden="true" class="fa-solid fa-user-tie"></i> ${item.by || 'CHANDAN KUMAR (Director & Science Lead)'}</span></td>
                     <td>
                       <div><strong>${item.mode}</strong></div>
-                      ${item.note ? `<div style="font-size: 0.78rem; color: var(--text-muted);">${item.note}</div>` : ''}
+                      ${item.note ? `<div style="font-size: 0.78rem; color: var(--text-muted);">${sanitizeInput(item.note)}</div>` : ''}
                     </td>
                     <td>${statusPillHtml}</td>
                     <td>
@@ -5025,7 +5051,7 @@ function renderStudentDashboard() {
                   ${r.receiptNo}
                 </td>
                 <td>
-                  <strong>${r.studentName}</strong>
+                  <strong>${sanitizeInput(r.studentName)}</strong>
                   ${r.rollNo ? `<div style="font-size: 0.74rem; color: var(--text-muted);">Roll #${r.rollNo}</div>` : ''}
                 </td>
                 <td>
@@ -5368,7 +5394,7 @@ function renderStudentDashboard() {
             return `
               <tr>
                 <td>
-                  <strong>${s.name}</strong>
+                  <strong>${sanitizeInput(s.name)}</strong>
                   <div style="font-size: 0.74rem; color: var(--text-muted);">
                     Roll #${s.rollNo || s.roll_no || s.student_id || ''} • ID: ${s.id || ''}
                   </div>
@@ -6053,12 +6079,12 @@ function renderStudentDashboard() {
       <tr>
         <td><strong class="font-mono">${s.student_id || s.rollNo || s.id}</strong></td>
         <td>
-          <div style="font-weight: 700; color: var(--text-mahogany);">${s.name}</div>
+          <div style="font-weight: 700; color: var(--text-mahogany);">${sanitizeInput(s.name)}</div>
           <div style="font-size: 0.78rem; color: var(--text-muted);">Roll: #${s.rollNo} | ₹${studentMonthlyFee(s).toLocaleString('en-IN')}/mo</div>
         </td>
-        <td>${s.mobile}</td>
+        <td>${sanitizeInput(s.mobile)}</td>
         <td>${formatDate(s.dob)}</td>
-        <td>${s.className}</td>
+        <td>${sanitizeInput(s.className)}</td>
         <td>
           <div style="font-weight: 700; color: var(--primary-emerald);">Paid: ₹${s.paidFee.toLocaleString()}</div>
           ${s.pendingFee > 0 
@@ -6987,9 +7013,13 @@ function renderStudentDashboard() {
       target.joiningMonth = modalEl.querySelector('#mgmtStuJoiningMonth').value.trim();
       const previousPhoto = target.photo || target.photoUrl || target.photo_url || '';
       const updatedPhoto = modalEl.querySelector('#mgmtStuPhotoUrl')?.value;
+      // Deferred: only delete the replaced blob AFTER the student row has been
+      // persisted. Deleting first meant a failed save left the database pointing
+      // at a photo that no longer exists.
+      let oldPhotoToPurge = null;
       if (updatedPhoto && updatedPhoto !== previousPhoto) {
         if (previousPhoto && previousPhoto.includes('/pragyan-media/')) {
-          try { await SupabaseSync.deleteFile(previousPhoto); } catch(e) { console.warn('Old photo cleanup note:', e.message); }
+          oldPhotoToPurge = previousPhoto;
         }
         target.photo = updatedPhoto;
         target.photo_url = updatedPhoto;
@@ -7034,6 +7064,11 @@ function renderStudentDashboard() {
       }
 
       await AppState.saveStudents(students);
+
+      // Now safe to release the replaced storage object (post-persist).
+      if (oldPhotoToPurge && typeof SupabaseSync !== 'undefined' && SupabaseSync.deleteFile) {
+        try { await SupabaseSync.deleteFile(oldPhotoToPurge); } catch (e) { console.warn('Old photo cleanup note:', e.message); }
+      }
 
       // Relational Linking: Cascade profile changes to student_requests
       const reqList = AppState.getRequests();
@@ -8977,6 +9012,14 @@ function renderStudentDashboard() {
             const result = await SupabaseSync.mutate('notices', 'delete', null, { where });
             if (!result || result.success !== true) {
               alert(`⚠️ "${target.title}" was NOT deleted — the database rejected the request${result?.error ? `: ${result.error}` : ''}.\n\nThe announcement is still live. Check your connection and try again.`);
+              return;
+            }
+            if (!Array.isArray(result.data) || result.data.length === 0) {
+              // Zero deleted rows: the notice vanished server-side already.
+              alert('ℹ️ That notice no longer exists in the database — it was likely deleted by another session. Refreshing.');
+              const updatedSynced = allN.filter(n => n.id !== id);
+              await AppState.saveNotices(updatedSynced);
+              renderAdminDashboard();
               return;
             }
           }

@@ -254,7 +254,10 @@
       // reconnect is a leak, not a refresh.
       if (!this._connectivityBound) {
         this._connectivityBound = true;
-        window.addEventListener('online', () => this._schedulePull(100));
+        window.addEventListener('online', () => {
+          this._schedulePull(100);
+          this._flushOutbox().catch(() => {});
+        });
         window.addEventListener('focus', () => this._schedulePull(150));
         document.addEventListener('visibilitychange', () => {
           if (!document.hidden) {
@@ -575,6 +578,11 @@
           this.updateLocalState(data);
           this._connected = true;
           this.updateStatus('synced');
+          // A successful sync proves the path to the server works — replay
+          // anything the outbox has been holding from an outage.
+          if (this._readOutbox().length) {
+            this._flushOutbox().catch(err => console.warn('[Outbox] flush after sync failed:', err.message));
+          }
           this.callbacks.forEach(cb => {
             try { cb('full_sync', data); } catch (e) { console.warn('Callback error:', e); }
           });
@@ -915,6 +923,13 @@
         // never landed. Until every call site is converted, the log is the only
         // thing standing between a silent failure and a support call.
         console.error(`[SupabaseSync] Mutation FAILED [${table}:${operation}] — the local copy and the database now disagree:`, error.message);
+        // Queue transient failures (network / 5xx / auth blips) for replay.
+        // Permanent 4xx rejections are NOT queued — they would fail forever.
+        const statusMatch = /\((\d{3})\):/.test(error.message) ? Number(RegExp.$1) : 0;
+        const isTransient = statusMatch === 0 || statusMatch === 401 || statusMatch === 429 || statusMatch >= 500;
+        if (isTransient && table !== 'audit_logs') {
+          this._enqueueOutbox({ table, operation, data, filters });
+        }
         return { success: false, error: error.message };
       }
     },
@@ -934,6 +949,72 @@
         throw new Error(result?.error || `Database rejected the ${operation} on ${table}`);
       }
       return result;
+    },
+
+    // ── Mutation outbox ──────────────────────────────────────────────────────
+    // A failed write used to be simply lost: nothing retried it and the next
+    // pullAll() overwrote the local claim with server truth. Failures that look
+    // transient (network / 5xx / auth blips) are now queued — capped, oldest-
+    // dropped — and replayed when connectivity or a successful sync returns.
+    OUTBOX_KEY: 'pragyan_mutation_outbox',
+    OUTBOX_MAX: 50,
+
+    _readOutbox() {
+      try {
+        const raw = localStorage.getItem(this.OUTBOX_KEY);
+        const arr = raw ? JSON.parse(raw) : [];
+        return Array.isArray(arr) ? arr : [];
+      } catch (_) { return []; }
+    },
+
+    _writeOutbox(entries) {
+      try {
+        localStorage.setItem(this.OUTBOX_KEY, JSON.stringify(entries.slice(-this.OUTBOX_MAX)));
+        return true;
+      } catch (e) {
+        console.warn('[Outbox] could not persist queue:', e.message);
+        return false;
+      }
+    },
+
+    _enqueueOutbox(entry) {
+      const entries = this._readOutbox();
+      // Collapse exact duplicates (same table+op+key) so a flapping loop does
+      // not fill the cap with copies of one write.
+      const sig = JSON.stringify([entry.table, entry.operation, entry.filters, entry.data]);
+      const deduped = entries.filter(e => JSON.stringify([e.table, e.operation, e.filters, e.data]) !== sig);
+      deduped.push({ ...entry, queuedAt: new Date().toISOString() });
+      return this._writeOutbox(deduped);
+    },
+
+    async _flushOutbox() {
+      const entries = this._readOutbox();
+      if (!entries.length || this._outboxFlushing) return 0;
+      this._outboxFlushing = true;
+      let delivered = 0;
+      try {
+        const remaining = [];
+        for (const entry of entries) {
+          try {
+            const result = await this.mutate(entry.table, entry.operation, entry.data, entry.filters || {});
+            if (result && result.success === true) { delivered++; continue; }
+            // Permanent rejections (validation/permission/not-found) will never
+            // succeed on retry — drop them rather than clogging the queue.
+            if (/\((400|401|403|404|409)\):/.test(result?.error || '')) continue;
+            remaining.push(entry);
+          } catch (_) {
+            remaining.push(entry);
+          }
+        }
+        this._writeOutbox(remaining);
+        if (delivered > 0) {
+          console.log(`[Outbox] delivered ${delivered} queued mutation(s); ${remaining.length} still pending.`);
+          this.broadcastChange({ type: 'OUTBOX_FLUSHED', delivered });
+        }
+      } finally {
+        this._outboxFlushing = false;
+      }
+      return delivered;
     },
 
     // ── Normalize & Store Pulled Data ────────────────────────────────────────
@@ -1030,7 +1111,11 @@
         'pragyan_portal_role',
         'pragyan_session',
         'pragyan_portal_open',
-        'pragyan_last_local_mutation'
+        'pragyan_last_local_mutation',
+        // Money-adjacent queues: storage pressure must never destroy a payment
+        // that has not reached the office yet.
+        'pragyan_mutation_outbox',
+        'pragyan_undelivered_payment_submissions'
       ]);
 
       try {
