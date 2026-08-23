@@ -178,6 +178,19 @@
     if (scrollLockDepth === 0) document.body.style.overflow = scrollLockPrev;
   }
 
+  /**
+   * High-entropy suffix for client-minted receipt/request numbers. The old
+   * `Date.now().toString(36).slice(-4) + Math.random().toString(36).slice(2,5)`
+   * pattern carried ~16 bits of randomness inside a repeating time window and
+   * fed a destructive upsert — a collision silently REPLACED another receipt.
+   */
+  function randomIdSuffix() {
+    const buf = new Uint8Array(5);
+    (window.crypto || {}).getRandomValues ? window.crypto.getRandomValues(buf)
+      : buf.forEach((_, i) => { buf[i] = Math.floor(Math.random() * 256); });
+    return Array.from(buf).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+  }
+
   function focusableWithin(root) {
     if (!root) return [];
     return Array.from(root.querySelectorAll(FOCUSABLE_SELECTOR))
@@ -2172,10 +2185,13 @@
       localStorage.setItem(STORAGE_KEY_REQUESTS, JSON.stringify(reqs));
       this.markMutation();
 
-      try {
-        if (Array.isArray(reqs) && reqs.length > 0) {
-          const currentId = this.currentUser?.id || this.currentUser?.student_id || this.currentUser?.rollNo || '';
-          const supaPayload = reqs.map(r => ({
+try {
+if (Array.isArray(reqs) && reqs.length > 0) {
+const currentId = this.currentUser?.id || this.currentUser?.student_id || this.currentUser?.rollNo || '';
+// Rows the server already created (via /api/payment-request) must NOT be
+// pushed again — a student-session re-insert would just 409.
+const pushableReqs = reqs.filter(r => !r._serverCreated);
+const supaPayload = pushableReqs.map(r => ({
             request_id: r.id || r.request_id,
             student_id: r.studentId || r.student_id || currentId,
             student_name: r.studentName || r.student_name || this.currentUser?.name || '',
@@ -2189,8 +2205,17 @@
           }));
 
           if (supaPayload.length > 0 && typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
-            const r2 = await SupabaseSync.mutate('student_requests', 'upsert', supaPayload, { conflict: 'request_id' });
-            if (!r2?.success) console.warn('saveRequests write failed:', r2?.error);
+            // Student sessions may only INSERT requests (the gateway forbids
+            // upsert: its conflict-target write ignores WHERE and could let a
+            // crafted request_id overwrite another student's pending row).
+            const isStudentSession = SupabaseSync.sessionRole === 'student';
+            const op = isStudentSession ? 'insert' : 'upsert';
+            const payload = isStudentSession
+              ? supaPayload.filter(r => r.status === 'Pending')
+              : supaPayload;
+            const r2 = await SupabaseSync.mutate('student_requests', op, payload,
+              op === 'upsert' ? { conflict: 'request_id' } : {});
+            if (!r2?.success) console.warn(`saveRequests ${op} failed:`, r2?.error);
           }
         }
       } catch(e) { console.warn('saveRequests Supabase error:', e); }
@@ -6565,11 +6590,13 @@ function renderStudentDashboard() {
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 
     const modalEl = document.getElementById('studentManagementModal');
-    wireModalA11y(modalEl, { closeOnBackdrop: false });
+    // Capture the dialog handle: closing via .remove() strands the
+    // reference-counted body-scroll lock (depth never decremented).
+    const mgmtDialog = wireModalA11y(modalEl, { closeOnBackdrop: false });
 
     // Handle Danger Zone Delete Trigger
     modalEl.querySelector('#btnAdminTriggerDeleteStuModal')?.addEventListener('click', () => {
-      document.getElementById('studentManagementModal')?.remove();
+      mgmtDialog.close();
       openDeleteStudentModal(target.id);
     });
 
@@ -6694,20 +6721,50 @@ function renderStudentDashboard() {
     // Form 1: Partial Pay Submit
     modalEl.querySelector('#mgmtPayForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const amount = parseFloat(modalEl.querySelector('#mgmtPayAmount').value) || 0;
-      if (amount <= 0) {
+      const amount = Math.round(parseFloat(modalEl.querySelector('#mgmtPayAmount').value) * 100) / 100;
+      if (!(amount > 0)) {
         alert('Please enter a valid partial payment amount greater than ₹0.');
+        return;
+      }
+      // Sanity ceiling: rejects fat-finger entries like an extra zero row that
+      // would otherwise push paid_fee past every real-world total.
+      if (amount > 10000000) {
+        alert('That amount is larger than the ₹1,00,00,000 sanity limit. Please check the figure.');
         return;
       }
       const mode = modalEl.querySelector('#mgmtPayMode').value;
       const note = modalEl.querySelector('#mgmtPayNote').value.trim() || 'Partial tuition fee received';
 
+      const recNo = `REC-${randomIdSuffix()}`;
+      const studentUuid = target.db_uuid || (target.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(target.id) ? target.id : null);
+
+      // Cloud receipt FIRST and fail-closed: the previous flow mutated local
+      // balances before attempting the write and swallowed its result, so an
+      // offline/failed save still flashed ✅ and was wiped by the next pull.
+      let cloudSynced = false;
+      if (studentUuid && typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
+        const cloud = await SupabaseSync.mutate('fee_receipts', 'upsert', [{
+          receipt_no: recNo,
+          student_id: studentUuid,
+          amount: amount,
+          payment_mode: mode,
+          payment_date: new Date().toISOString().split('T')[0],
+          status: 'Paid',
+          collected_by: teacherName,
+          note: note
+        }], { conflict: 'receipt_no' });
+        if (!cloud || cloud.success !== true) {
+          alert(`❌ The receipt could not be saved to the cloud (${cloud?.error || 'unknown error'}). Nothing has been recorded — please try again when the connection is stable.`);
+          return;
+        }
+        cloudSynced = true;
+      }
+
       target.paidFee = (target.paidFee || 0) + amount;
       target.pendingFee = Math.max(0, (target.pendingFee || 0) - amount);
 
-      const recNo = `REC-${Date.now().toString(36).slice(-4).toUpperCase()}-${Math.random().toString(36).slice(2,5).toUpperCase()}`;
       if (!Array.isArray(target.feeHistory)) target.feeHistory = [];
-      const receiptItem = {
+      target.feeHistory.push({
         receiptNo: recNo,
         date: getFormattedTimestamp(),
         amount: amount,
@@ -6715,16 +6772,14 @@ function renderStudentDashboard() {
         status: 'Paid',
         by: teacherName,
         note: note
-      };
-      target.feeHistory.push(receiptItem);
+      });
 
       const receipts = (AppState.getFeeReceipts ? AppState.getFeeReceipts() : []) || [];
-      const studentUuid = target.db_uuid || (target.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(target.id) ? target.id : null);
-      const fullReceiptEntry = {
+      receipts.unshift({
         receipt_no: recNo,
         receiptNo: recNo,
-        student_id: target.student_id || target.id || target.rollNo,
-        studentId: target.student_id || target.id || target.rollNo,
+        student_id: studentUuid || target.student_id || target.id || target.rollNo,
+        studentId: studentUuid || target.student_id || target.id || target.rollNo,
         student_name: target.name,
         studentName: target.name,
         roll_no: target.rollNo || target.roll_no,
@@ -6740,50 +6795,41 @@ function renderStudentDashboard() {
         collected_by: teacherName,
         by: teacherName,
         note: note
-      };
-      receipts.unshift(fullReceiptEntry);
+      });
       AppState._receiptsCache = receipts;
       AppState.safeSetItem('pragyan_db_fee_receipts_master', receipts);
-
-      if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
-        try {
-          if (studentUuid) {
-            await SupabaseSync.mutate('fee_receipts', 'upsert', [{
-              receipt_no: recNo,
-              student_id: studentUuid,
-              amount: amount,
-              payment_mode: mode,
-              payment_date: new Date().toISOString().split('T')[0],
-              status: 'Paid',
-              collected_by: teacherName,
-              note: note
-            }], { conflict: 'receipt_no' });
-          }
-        } catch (syncErr) {
-          console.warn('Partial payment receipt cloud sync note:', syncErr.message);
-        }
-      }
 
       await AppState.saveStudents(students);
       AppState.addAuditLog(teacherName, 'FEE_PAYMENT', target.name, target.rollNo, `Recorded partial fee payment of ₹${amount.toLocaleString()} via ${mode} for ${target.name}. Remaining dues: ₹${target.pendingFee.toLocaleString()}`, { amount, mode, receiptNo: recNo, note, remainingDues: target.pendingFee });
 
-      modalEl.remove();
-      alert(`✅ Partial payment of ₹${amount.toLocaleString()} recorded by ${teacherName}! Remaining dues: ₹${target.pendingFee.toLocaleString()}. Official receipt issued.`);
+      mgmtDialog.close();
+      alert(`✅ Partial payment of ₹${amount.toLocaleString('en-IN')} recorded by ${teacherName}! Remaining dues: ₹${target.pendingFee.toLocaleString('en-IN')}. Official receipt issued.` + (cloudSynced ? '' : '\n⚠️ Saved on this device only — no student UUID was available to reach the cloud.'));
       renderAdminDashboard();
     });
 
     // Form 2: Old Due Submit
     modalEl.querySelector('#mgmtDueForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const amount = parseFloat(modalEl.querySelector('#mgmtDueAmount').value) || 0;
+      const amount = Math.round(parseFloat(modalEl.querySelector('#mgmtDueAmount').value) * 100) / 100;
       const note = modalEl.querySelector('#mgmtDueNote').value.trim();
+
+      // The old form accepted ₹0/negative values: a negative "carryover" reduced
+      // dues while the audit entry claimed money had been added.
+      if (!(amount > 0)) {
+        alert('Enter the OLD DUE as a positive amount greater than ₹0.');
+        return;
+      }
+      if (amount > 10000000) {
+        alert('That amount is larger than the ₹1,00,00,000 sanity limit. Please check the figure.');
+        return;
+      }
 
       target.totalFee = (target.totalFee || 0) + amount;
       target.pendingFee = (target.pendingFee || 0) + amount;
 
       if (!Array.isArray(target.feeHistory)) target.feeHistory = [];
       target.feeHistory.push({
-        receiptNo: `OLD-DUE-${Date.now().toString(36).slice(-4).toUpperCase()}-${Math.random().toString(36).slice(2,5).toUpperCase()}`,
+        receiptNo: `OLD-DUE-${randomIdSuffix()}`,
         date: getFormattedTimestamp(),
         amount: amount,
         mode: 'Old Unpaid Fee Carryover',
@@ -6793,10 +6839,10 @@ function renderStudentDashboard() {
       });
 
       await AppState.saveStudents(students);
-      AppState.addAuditLog(teacherName, 'OLD_DUE_ADDED', target.name, target.rollNo, `Added old fee carryover of ₹${amount.toLocaleString()} for ${target.name}`, { amount, note });
+      AppState.addAuditLog(teacherName, 'OLD_DUE_ADDED', target.name, target.rollNo, `Added old fee carryover of ₹${amount.toLocaleString('en-IN')} for ${target.name}`, { amount, note });
 
-      modalEl.remove();
-      alert(`🔴 Old fee carryover of ₹${amount.toLocaleString()} added for ${target.name} by ${teacherName}!`);
+      mgmtDialog.close();
+      alert(`🔴 Old fee carryover of ₹${amount.toLocaleString('en-IN')} added for ${target.name} by ${teacherName}!`);
       renderAdminDashboard();
     });
 
@@ -6808,7 +6854,7 @@ function renderStudentDashboard() {
       const note = modalEl.querySelector('#mgmtAdjNote').value.trim();
 
       if (!Array.isArray(target.feeHistory)) target.feeHistory = [];
-      const adjRecNo = `ADJ-${Date.now().toString(36).slice(-4).toUpperCase()}-${Math.random().toString(36).slice(2,5).toUpperCase()}`;
+      const adjRecNo = `ADJ-${randomIdSuffix()}`;
 
       if (actionType === 'discount') {
         target.pendingFee = Math.max(0, (target.pendingFee || 0) - amount);
@@ -6952,7 +6998,7 @@ function renderStudentDashboard() {
 
       if (!Array.isArray(target.feeHistory)) target.feeHistory = [];
       target.feeHistory.push({
-        receiptNo: `EDIT-PROF-${Date.now().toString(36).slice(-4)}-${Math.random().toString(36).slice(2,5)}`,
+        receiptNo: `EDIT-PROF-${randomIdSuffix()}`,
         date: getFormattedTimestamp(),
         amount: 0,
         mode: 'Profile Detail Synchronization',
@@ -6963,7 +7009,7 @@ function renderStudentDashboard() {
 
       if (feeRateChanged) {
         target.feeHistory.push({
-          receiptNo: `RATE-${Date.now().toString(36).slice(-4).toUpperCase()}-${Math.random().toString(36).slice(2,5).toUpperCase()}`,
+          receiptNo: `RATE-${randomIdSuffix()}`,
           date: getFormattedTimestamp(),
           amount: newMonthlyFee,
           mode: 'Monthly Rate Structure Adjusted',
@@ -10519,10 +10565,53 @@ function renderStudentDashboard() {
           }
         }
 
+        // Submit through the validated gateway endpoint: the server resolves
+        // identity from the signed session, mints a high-entropy request id,
+        // and rejects duplicate UTR claims. The local copy below is for instant
+        // UI only — the cloud row is created by the endpoint itself.
+        let serverRequestId = null;
+        try {
+          const token = SupabaseSync.sessionToken
+            || sessionStorage.getItem('pragyan_portal_token')
+            || localStorage.getItem('pragyan_portal_token');
+          const res = await fetch(getApiUrl('/api/payment-request'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            body: JSON.stringify({
+              roll: s.student_id || s.id || s.rollNo,
+              studentName: s.name,
+              batch: s.className || s.class_name,
+              amount,
+              mode,
+              paymentType: 'PARTIAL_PAYMENT',
+              claimedTotalDueBefore: Number(s.pendingFee ?? s.pending_fee ?? 0),
+              remainingDueAfter: Math.max(0, Number(s.pendingFee ?? s.pending_fee ?? 0) - amount),
+              utr,
+              note,
+              proofUrl: proofPhotoUrl
+            })
+          });
+          const json = await res.json().catch(() => ({}));
+          if (res.status === 200 && json.success) {
+            serverRequestId = json.requestId || null;
+          } else if (res.status === 409 && json.code === 'DUPLICATE_UTR') {
+            showNotification('This UTR has already been submitted. The office already has your payment.', 'warn');
+            releaseSubmit();
+            return;
+          } else {
+            // Fall through to the legacy local+cloud path below rather than
+            // losing the submission when the endpoint is unreachable.
+            console.warn('[Portal] /api/payment-request unavailable:', json.error || res.status);
+          }
+        } catch (endpointErr) {
+          console.warn('[Portal] payment-request endpoint error, using legacy path:', endpointErr.message);
+        }
+
         const allReqs = AppState.getRequests();
         allReqs.unshift({
-          id: `REQ-PAY-${Date.now().toString(36).slice(-4)}-${Math.random().toString(36).slice(2,5)}`,
+          id: serverRequestId || `REQ-PAY-${randomIdSuffix()}`,
           type: 'payment',
+          _serverCreated: Boolean(serverRequestId),
           studentId: s.id,
           studentName: s.name,
           rollNo: s.rollNo,
@@ -10666,6 +10755,29 @@ function renderStudentDashboard() {
                   date: sanitizeInput(req.date)
                 };
 
+                // ---- Dues cross-check --------------------------------------
+                // The gateway stores what the student CLAIMED the balance was at
+                // submission ("claimed" — URL-authored) and the office must see
+                // it next to the LIVE ledger figure before approving.
+                const payAmount = Number(p.amount || 0);
+                const claimedDue = Number(p.claimedTotalDueBefore ?? p.totalDueBefore ?? 0);
+                const remainingAfter = Number(p.remainingDueAfter ?? NaN);
+                const stuMatch = String(req.studentId || req.student_id || '').toLowerCase();
+                const rollMatch = String(req.rollNo || '').toLowerCase();
+                const liveStudent = (typeof AppState !== 'undefined' && AppState.getStudents ? (AppState.getStudents() || []) : [])
+                  .find(s => {
+                    const ids = [s.student_id, s.id, s.studentId].map(v => String(v || '').toLowerCase()).filter(Boolean);
+                    const rolls = [s.rollNo, s.roll_no].map(v => String(v || '').toLowerCase()).filter(Boolean);
+                    return (stuMatch && ids.includes(stuMatch)) || (rollMatch && rolls.includes(rollMatch));
+                  });
+                const livePendingRaw = liveStudent ? Number(liveStudent.pendingFee ?? liveStudent.pending_fee) : NaN;
+                const livePending = Number.isFinite(livePendingRaw) ? livePendingRaw : null;
+                const oneMonthGrace = Number(liveStudent ? (liveStudent.monthlyFee ?? liveStudent.monthly_fee ?? 0) : 0) || 0;
+                const claimsMoreThanDues = livePending !== null && claimedDue > 0 &&
+                  claimedDue > livePending + oneMonthGrace;
+                const claimMismatch = livePending !== null && claimedDue > 0 &&
+                  Math.abs(claimedDue - livePending) > 1;
+
                 return `
                   <div style="border: 1px solid var(--border-sand); border-radius: 10px; padding: 1.15rem; background: #FAF9F6;">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
@@ -10681,7 +10793,7 @@ function renderStudentDashboard() {
                     </div>
 
                     <div style="background: #ffffff; border: 1px solid #E5E7EB; border-radius: 8px; padding: 0.9rem; margin-bottom: 0.85rem; font-size: 0.88rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem;">
-                      <div><span style="color:var(--text-muted);">Payment Request Amount:</span> <br><strong style="font-size: 1.15rem; color: var(--primary-emerald);">₹${(p.amount || 0).toLocaleString()}</strong></div>
+                      <div><span style="color:var(--text-muted);">Payment Request Amount:</span> <br><strong style="font-size: 1.15rem; color: var(--primary-emerald);">₹${payAmount.toLocaleString('en-IN')}</strong></div>
                       <div><span style="color:var(--text-muted);">Submission Date:</span> <br><strong style="font-size: 0.9rem; color: var(--text-mahogany);">${req.date}</strong></div>
                       ${(p.utr || p.refNo) ? `<div><span style="color:var(--text-muted);">Transaction UTR / Ref ID:</span> <br><strong style="font-size: 0.95rem; color: #0284C7; font-family: monospace;">${sanitizeInput(p.utr || p.refNo)}</strong></div>` : ''}
                       ${p.note ? `<div style="grid-column: span 2;"><span style="color:var(--text-muted);">Student Description / Payment Note:</span> <br><em>${p.note}</em></div>` : ''}
@@ -10697,6 +10809,22 @@ function renderStudentDashboard() {
                         </div>
                       ` : ''}
                     </div>
+
+                    ${(claimedDue > 0) ? `
+                      <div style="border: 1px dashed ${claimsMoreThanDues ? '#DC2626' : '#A7F3D0'}; background: ${claimsMoreThanDues ? '#FEF2F2' : '#F0FDF4'}; border-radius: 8px; padding: 0.7rem 0.9rem; margin-bottom: 0.85rem; font-size: 0.84rem;">
+                        <strong style="color:${claimsMoreThanDues ? '#991B1B' : '#065F46'};">
+                          <i aria-hidden="true" class="fa-solid ${claimsMoreThanDues ? 'fa-triangle-exclamation' : 'fa-scale-balanced'}"></i>
+                          ${claimsMoreThanDues ? ' OVERCLAIM WARNING — verify against the bank statement before approving' : ' Dues cross-check'}
+                        </strong>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.5rem; margin-top: 0.45rem; color: var(--text-mahogany);">
+                          <div><span style="color:var(--text-muted);">Claimed due at submit:</span> <br><strong>₹${claimedDue.toLocaleString('en-IN')}</strong></div>
+                          ${Number.isFinite(remainingAfter) ? `<div><span style="color:var(--text-muted);">Claims after this payment:</span> <br><strong>₹${remainingAfter.toLocaleString('en-IN')}</strong></div>` : ''}
+                          <div><span style="color:var(--text-muted);">LIVE recorded dues:</span> <br><strong>${livePending === null ? 'Student not found in roster' : '₹' + livePending.toLocaleString('en-IN')}</strong></div>
+                        </div>
+                        ${claimsMoreThanDues ? `<div style="margin-top: 0.45rem; color:#991B1B; font-size: 0.78rem;">The claimed balance exceeds live dues + one month's fee. Confirm the transferred amount on the bank statement matches ₹${payAmount.toLocaleString('en-IN')} EXACTLY.</div>`
+                          : claimMismatch ? `<div style="margin-top: 0.45rem; color:#92400E; font-size: 0.78rem;">Claimed dues differ from the live record (statement was generated before a recent change?). Totals are reconciled automatically on approval.</div>` : ''}
+                      </div>
+                    ` : ''}
 
                     ${isPending ? `
                       <div class="req-action-buttons-wrap" style="display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: stretch; margin-top: 0.65rem;">

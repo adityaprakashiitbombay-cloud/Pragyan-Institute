@@ -57,6 +57,11 @@ export default async function handler(req, res) {
   const paymentType = String(body.paymentType ?? 'full').slice(0, 16);
   const claimedTotalDueBefore = Math.max(0, Math.round(Number(body.claimedTotalDueBefore) || 0));
   const remainingDueAfter = Math.max(0, Math.round(Number(body.remainingDueAfter) || 0));
+  // Optional payment-proof URL (portal uploads the file first via
+  // /api/upload-file). Only same-project storage or https URLs are accepted,
+  // and never interpolated anywhere without escaping downstream.
+  let proofUrl = String(body.proofUrl ?? '').trim().slice(0, 500);
+  if (proofUrl && !/^https:\/\/[^\s"']+$/.test(proofUrl)) proofUrl = '';
 
   if (!ID_PATTERN.test(roll)) {
     return res.status(400).json({ success: false, error: 'A valid roll number or student ID is required' });
@@ -117,7 +122,7 @@ export default async function handler(req, res) {
       old_data: {},
       new_data: {
         amount,
-        paymentDetails: { amount, mode, utr, note },
+        paymentDetails: { amount, mode, utr, note, ...(proofUrl ? { proofUrl, proof: proofUrl } : {}) },
         paymentType,
         claimedTotalDueBefore,
         remainingDueAfter,
