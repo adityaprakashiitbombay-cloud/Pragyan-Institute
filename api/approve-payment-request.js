@@ -29,8 +29,51 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, data: approved });
     }
 
-    // 2. Resilient Direct Execution Fallback (with atomic update to prevent race condition)
-    // ATOMIC: Update with WHERE condition to acquire exclusive lock
+    // 2. Resilient Direct Execution Fallback.
+    // ORDER MATTERS: validate the payment payload BEFORE flipping status to
+    // Approved — otherwise an amount-less request is approved with no money
+    // ever applied and is stuck (the old bug).
+    const { data: pendingRows, error: fetchErr } = await supabase
+      .from('student_requests')
+      .select('*')
+      .eq('request_id', p_req_id)
+      .maybeSingle();
+
+    if (fetchErr || !pendingRows) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
+    if (String(pendingRows.status || '').toLowerCase() !== 'pending') {
+      return res.status(404).json({ error: 'Request not found or already processed' });
+    }
+
+    const previewData = pendingRows.new_data || pendingRows.newData || {};
+    const isPaymentReq = pendingRows.type === 'payment' || pendingRows.req_type === 'PAYMENT_VERIFICATION' || pendingRows.req_type === 'PAYMENT' || !!(previewData && (previewData.amount || previewData.paymentDetails));
+    let previewAmount = 0;
+    if (isPaymentReq) {
+      const previewDetails = previewData.paymentDetails || (previewData.amount ? previewData : {});
+      previewAmount = Number(previewDetails.amount || pendingRows.amount || 0);
+    }
+    if (!isPaymentReq || !(previewAmount > 0)) {
+      // Non-payment requests (profile edits etc.) can be approved safely.
+      const { data: claimedNonPayment, error: claimErr } = await supabase
+        .from('student_requests')
+        .update({
+          status: 'Approved',
+          approved_at: new Date().toISOString(),
+          approved_by: p_verifier,
+          updated_at: new Date().toISOString()
+        })
+        .eq('request_id', p_req_id)
+        .eq('status', 'Pending')
+        .select('*')
+        .maybeSingle();
+      if (claimErr || !claimedNonPayment) {
+        return res.status(404).json({ error: 'Request not found or already processed' });
+      }
+      return res.status(200).json({ success: true, data: { request_id: p_req_id, status: 'Approved' } });
+    }
+
+    // ATOMIC claim: only one caller can flip Pending → Approved.
     const { data: reqRows, error: updateErr } = await supabase
       .from('student_requests')
       .update({
@@ -64,7 +107,6 @@ export default async function handler(req, res) {
       console.warn('Failed to update new_data, but request is already approved:', updateDataErr.message);
     }
 
-    const isPaymentReq = reqData.type === 'payment' || reqData.req_type === 'PAYMENT_VERIFICATION' || reqData.req_type === 'PAYMENT' || !!(newData && (newData.amount || newData.paymentDetails));
     if (isPaymentReq) {
       const paymentDetails = newData.paymentDetails || (newData.amount ? newData : {});
       const amount = Number(paymentDetails.amount || reqData.amount || 0);
@@ -129,23 +171,10 @@ export default async function handler(req, res) {
               note: `Auto-approved online payment (UTR: ${paymentDetails.utr || 'N/A'})`
             }], { onConflict: 'receipt_no' });
 
-          // Record in fee_billing_ledger
-          const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit' })
-            .formatToParts(new Date())
-            .reduce((all, part) => ({ ...all, [part.type]: part.value }), {});
-          const currentMonth = `${parts.year}-${parts.month}`;
-          await supabase
-            .from('fee_billing_ledger')
-            .upsert([{
-              student_id: stu.student_id || studentId,
-              billing_month: currentMonth,
-              batch_label: stu.class_name || 'General',
-              amount: amount,
-              previous_due: previousPending,
-              updated_due: newPending,
-              idempotency_key: `LEDGER-${receiptNo}`
-            }], { onConflict: 'idempotency_key' })
-            .catch(err => { console.warn('fee_billing_ledger log error:', err.message); });
+          // NOTE: payments are deliberately NOT written to fee_billing_ledger —
+          // its UNIQUE(student_id, billing_month) means one payment row would
+          // permanently block that student's monthly billing accrual. Payments
+          // live in fee_receipts above (matches migration 005 RPC behavior).
         }
 
         // Update student_fee_accounts

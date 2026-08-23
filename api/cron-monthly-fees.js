@@ -14,34 +14,114 @@ import {
 } from './_lib/email-templates.js';
 
 const BATCH_SCHEDULE = {
-  // Days 1-4: Monthly Tuition Fee Generation & Statements (Day 1 covers ALL active batches; Days 2-4 provide redundant idempotent catch-up)
-  1: { key: 'all', label: 'All Batches (1st-of-Month Unified Fee Accrual)', type: 'billing' },
-  2: { key: 'all', label: 'All Batches (Day 2 Idempotent Billing Catch-Up)', type: 'billing' },
-  3: { key: 'all', label: 'All Batches (Day 3 Idempotent Billing Catch-Up)', type: 'billing' },
-  4: { key: 'all', label: 'All Batches (Day 4 Idempotent Billing Catch-Up)', type: 'billing' },
+  // Days 1-6: 1st to 10th Rolling Monthly Billing (Staggered to preserve 100 emails/day quota)
+  1: { key: '10th_12th', label: 'Class 10th & Class 12th PCM/PCB (Day 1 Accrual & Billing)', type: 'billing' },
+  2: { key: '9th_11th', label: 'Class 9th & Class 11th PCM/PCB (Day 2 Accrual & Billing)', type: 'billing' },
+  3: { key: '8th', label: 'Class 8th ALPHA (Day 3 Accrual & Billing)', type: 'billing' },
+  4: { key: '6th_7th', label: 'Class 6th & 7th PIONEER (Day 4 Accrual & Billing)', type: 'billing' },
+  5: { key: '1st_5th', label: 'Class 1st to 5th Junior Foundation (Day 5 Accrual & Billing)', type: 'billing' },
+  6: { key: 'special_english', label: 'Special English Batches by Aditi Singh (Day 6 Accrual & Billing)', type: 'billing' },
 
-  // Days 15-19: Mid-Month Pending Due Reminders (Only for students with pending_fee > 0)
-  15: { key: '10th', label: 'Class 10th (ACHIEVER)', type: 'reminder' },
-  16: { key: '9th', label: 'Class 9th (NURTURE)', type: 'reminder' },
-  17: { key: '8th', label: 'Class 8th (ALPHA)', type: 'reminder' },
-  18: { key: 'junior', label: 'Junior Batch (JUNIO)', type: 'reminder' },
-  19: { key: 'all', label: 'All Batches (Pending Dues Reminder)', type: 'reminder' }
+  // Days 7-10: Gentle Mid-Window Reminders (Only for students with pending_fee > 0)
+  7: { key: '10th_12th', label: 'Class 10th & 12th (Unpaid Dues Reminder)', type: 'reminder' },
+  8: { key: '9th_11th', label: 'Class 9th & 11th (Unpaid Dues Reminder)', type: 'reminder' },
+  9: { key: '6th_8th', label: 'Class 6th to 8th (Unpaid Dues Reminder)', type: 'reminder' },
+  10: { key: 'all', label: 'All Batches (Final Grace Period Dues Reminder)', type: 'reminder' },
+
+  // Days 15-20: Mid-Month Follow-Up
+  15: { key: 'all', label: 'All Batches Mid-Month Pending Ledger Sync', type: 'reminder' }
 };
+
+// Canonical batch-rate resolver — keep in sync with js/portal.js resolveMonthlyFee()
+// and pay.html resolveDefaultMonthly(). Special English MUST be checked before raw
+// digit matching: "Special English: Class 9th to 12th" contains both '9' and '12'.
+function classNumberMatches(str, n) {
+  const ord = `${n}th`;
+  if (n === 1 && str.includes('1st')) return true;
+  if (n === 2 && str.includes('2nd')) return true;
+  if (n === 3 && str.includes('3rd')) return true;
+  if (n >= 4 && n <= 20 && str.includes(ord)) return true;
+  return new RegExp(`(^|[^0-9])${n}([^0-9]|$)`).test(str);
+}
 
 function getStudentDefaultMonthlyFee(className) {
   const str = String(className || '').toLowerCase();
-  if (str.includes('10')) return 1000;
-  if (str.includes('9')) return 1000;
-  if (str.includes('8')) return 800;
-  if (str.includes('junior') || str.includes('junio') || str.includes('6') || str.includes('7')) return 700;
+  if (str.includes('special english')) {
+    if ([12, 11, 10, 9].some(n => classNumberMatches(str, n))) return 1000;
+    if ([8, 7, 6].some(n => classNumberMatches(str, n))) return 700;
+    return 500;
+  }
+  if (classNumberMatches(str, 12) || classNumberMatches(str, 11)) return 1500;
+  if (classNumberMatches(str, 10)) return 1000;
+  if (classNumberMatches(str, 9)) return 1000;
+  if (classNumberMatches(str, 8)) return 800;
+  if (classNumberMatches(str, 6) || classNumberMatches(str, 7)) return 700;
+  if (str.includes('junior') || str.includes('junio') || [5, 4, 3, 2, 1].some(n => classNumberMatches(str, n))) return 500;
   return 1000;
+}
+
+// Precise batch-key matcher for the staggered schedule. Replaces the old
+// ilike-%N% PostgREST chains where '%1%' also matched Class 10th/11th/12th and
+// Special English batches, pulling foreign batches into the wrong billing day.
+function batchKeyMatches(key, className) {
+  const str = String(className || '').toLowerCase();
+  const isEng = str.includes('special english');
+  const has = n => classNumberMatches(str, n);
+  switch (key) {
+    case '10th_12th': return !isEng && (has(10) || has(12));
+    case '9th_11th': return !isEng && (has(9) || has(11));
+    case '8th': return !isEng && has(8);
+    case '6th_7th': return !isEng && (has(6) || has(7));
+    case '1st_5th': return !isEng && (str.includes('junior') || [1, 2, 3, 4, 5].some(has));
+    case 'special_english': return isEng;
+    case '6th_8th': return has(6) || has(7) || has(8);
+    case 'all': return true;
+    default: return str.includes(String(key).toLowerCase());
+  }
 }
 
 function indiaDateParts(date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' })
     .formatToParts(date)
     .reduce((all, part) => ({ ...all, [part.type]: part.value }), {});
-  return { day: Number(parts.day), monthKey: `${parts.year}-${parts.month}` };
+  return { day: Number(parts.day), monthKey: `${parts.year}-${parts.month}`, year: parts.year, month: parts.month };
+}
+
+// IST-aligned UTC ISO bounds for "today" in Asia/Kolkata. The Resend 100/day
+// limit resets on IST midnight for this institute's schedule, so all quota
+// counting MUST use these bounds (UTC-date counting leaks across the 05:30 offset).
+function istDayBoundsIso(date = new Date()) {
+  const p = indiaDateParts(date);
+  const start = new Date(`${p.year}-${p.month}-${String(p.day).padStart(2, '0')}T00:00:00+05:30`);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  return { startIso: start.toISOString(), endIso: end.toISOString() };
+}
+
+const DAILY_EMAIL_LIMIT = 100;
+
+async function countEmailsSentToday(supabase) {
+  const { startIso, endIso } = istDayBoundsIso();
+  let sent = 0;
+  try {
+    const { data: ledgerSent } = await supabase
+      .from('fee_billing_ledger')
+      .select('id')
+      .gte('email_sent_at', startIso)
+      .lt('email_sent_at', endIso);
+    sent += ledgerSent?.length || 0;
+    const { data: receiptsSent } = await supabase
+      .from('fee_receipts')
+      .select('receipt_no')
+      .gte('created_at', startIso)
+      .lt('created_at', endIso);
+    // Conservative by design: every receipt created today reserves a slot,
+    // because receipts may be emailed on demand later today.
+    sent += receiptsSent?.length || 0;
+  } catch (e) {
+    console.warn('[quota] count failed, assuming worst case:', e.message);
+    return DAILY_EMAIL_LIMIT; // fail closed: no sends if we cannot count
+  }
+  return sent;
 }
 
 const monthLabel = formatMonthLabel;
@@ -129,9 +209,30 @@ async function sendLedgerEmail(supabase, from, ledger, student) {
   }
 }
 
+// Reminder idempotency: claims a send slot in fee_email_log (migration 005).
+// Returns true=claimed (caller must send), false=already sent this cycle,
+// null=no dedup available (table missing / unknown error) — caller proceeds.
+async function claimReminderSend(supabase, refKey) {
+  const { data, error } = await supabase
+    .from('fee_email_log')
+    .insert({ ref_key: refKey, email_kind: 'reminder' })
+    .select('id');
+  if (!error && Array.isArray(data) && data.length) return true;
+  const msg = String(error?.message || '');
+  if (error?.code === '23505' || /duplicate|unique/i.test(msg)) return false;
+  console.warn('[reminder-dedup] claim unavailable, proceeding without dedup:', msg);
+  return null;
+}
+
 async function retryUnsentEmails(supabase, from) {
   const MAX_RETRY_ATTEMPTS = 3;
   const BASE_DELAY_MS = 2000; // Start with 2 seconds
+
+  const remainingQuota = Math.max(0, DAILY_EMAIL_LIMIT - await countEmailsSentToday(supabase));
+  if (remainingQuota <= 0) {
+    console.log('[Retry] Daily email quota exhausted; deferring unsent statements to next run.');
+    return [];
+  }
 
   const { data: pending, error } = await supabase
     .from('fee_billing_ledger')
@@ -139,7 +240,7 @@ async function retryUnsentEmails(supabase, from) {
     .is('email_sent_at', null)
     .lt('email_attempts', MAX_RETRY_ATTEMPTS) // Only retry if under max attempts
     .order('created_at', { ascending: true })
-    .limit(100);
+    .limit(Math.min(100, remainingQuota));
   if (error) throw error;
   if (!pending?.length) return [];
 
@@ -201,19 +302,16 @@ export default async function handler(req, res) {
 
   try {
     if (target) {
-      let query = supabase
+      // Fetch all active students once and filter precisely in JS — the old
+      // ilike-%N% chains matched foreign batches (e.g. '%1%' hit Class 10/11/12).
+      const { data: students, error } = await supabase
         .from('students')
         .select('student_id,name,roll_no,class_name,monthly_fee,status,pending_fee,email');
-      if (target.key && target.key !== 'all') {
-        if (target.key === 'junior') {
-          query = query.or('class_name.ilike.%junior%,class_name.ilike.%junio%,class_name.ilike.%6%,class_name.ilike.%7%');
-        } else {
-          query = query.ilike('class_name', `%${target.key}%`);
-        }
-      }
-      const { data: students, error } = await query;
       if (error) throw error;
-      const activeStudents = (students || []).filter(s => !s.status || s.status === 'Active' || s.status === 'active');
+      const activeStudents = (students || []).filter(s =>
+        (!s.status || s.status === 'Active' || s.status === 'active') &&
+        batchKeyMatches(target.key, s.class_name)
+      );
 
       if (target.type === 'billing') {
         // --- DAYS 1 to 4: MONTHLY FEE ADDITION & STATEMENT GENERATION ---
@@ -339,16 +437,27 @@ export default async function handler(req, res) {
           }
         }
       } else if (target.type === 'reminder') {
-        // --- DAYS 15 to 18: MID-MONTH PENDING DUE REMINDERS ---
+        // --- REMINDER DAYS: PENDING DUE REMINDERS (quota-guarded) ---
+        let remainingQuota = Math.max(0, DAILY_EMAIL_LIMIT - await countEmailsSentToday(supabase));
         const pendingStudents = activeStudents.filter(s => Number(s.pending_fee) > 0 && s.email && s.email.includes('@'));
 
-        console.log(`📧 Sending ${pendingStudents.length} reminder emails...`);
+        console.log(`📧 Sending ${pendingStudents.length} reminder emails... (remaining quota today: ${remainingQuota})`);
         let successCount = 0;
         let failureCount = 0;
         const CIRCUIT_BREAKER_THRESHOLD = Number(process.env.CIRCUIT_BREAKER_THRESHOLD) || 5;
         let consecutiveFailures = 0;
 
         for (const student of pendingStudents) {
+          // Hard Resend quota guard: stop before exceeding 100/day instead of
+          // burning failures; leftovers are reported for manual follow-up.
+          if (remainingQuota <= 0) {
+            results.push({
+              status: 'skipped_quota_exhausted',
+              message: `Daily ${DAILY_EMAIL_LIMIT}-email limit reached; ${pendingStudents.length - successCount - failureCount} reminders not sent`,
+            });
+            break;
+          }
+
           // Circuit breaker: Stop if too many consecutive failures
           if (consecutiveFailures >= CIRCUIT_BREAKER_THRESHOLD) {
             console.error(`🚨 Circuit breaker triggered after ${consecutiveFailures} failures. Stopping email batch.`);
@@ -361,6 +470,17 @@ export default async function handler(req, res) {
           }
 
           try {
+            // Skip students already reminded in this cycle (double-triggered
+            // crons — Vercel + GitHub Actions on the same day — must not
+            // send duplicate reminders; billing is idempotent, this makes
+            // reminders so too).
+            const claimKey = `reminder_${target.type}_${target.key}_${monthKey}_${student.student_id}`;
+            const claimed = await claimReminderSend(supabase, claimKey);
+            if (claimed === false) {
+              results.push({ studentId: student.student_id, status: 'reminder_already_sent' });
+              continue;
+            }
+
             const result = await sendEmailViaResend({
               from,
               to: student.email,
@@ -371,6 +491,7 @@ export default async function handler(req, res) {
             if (result.success) {
               results.push({ studentId: student.student_id, status: 'reminder_sent', emailId: result.data?.id });
               successCount++;
+              remainingQuota--;
               consecutiveFailures = 0; // Reset on success
             } else {
               results.push({ studentId: student.student_id, status: 'reminder_failed', error: extractResendErrorMessage(result.error) });

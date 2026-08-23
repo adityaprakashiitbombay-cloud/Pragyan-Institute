@@ -148,6 +148,18 @@ button {
   box-shadow: var(--shadow-sage-glow);
 }
 
+.btn-emerald {
+  background-color: var(--primary-emerald);
+  color: var(--text-on-accent);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-emerald:hover {
+  background-color: var(--primary-emerald-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-emerald-glow);
+}
+
 .btn-outline-terracotta {
   border: 2px solid var(--primary-terracotta);
   color: var(--primary-terracotta);

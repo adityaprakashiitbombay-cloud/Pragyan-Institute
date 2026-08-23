@@ -63,15 +63,22 @@ function sendEmailViaResend({ from, to, subject, html, text }) {
 // Billing: 1st=10th, 2nd=9th, 3rd=8th, 4th=Junior
 // Reminders: 15th=10th, 16th=9th, 17th=8th, 18th=Junior
 const scheduleMap = {
-  1:  { type: 'billing',  name: 'all',  label: 'All Batches (1st-of-Month Unified Fee Accrual)' },
-  2:  { type: 'billing',  name: 'all',  label: 'All Batches (Day 2 Idempotent Billing Catch-Up)' },
-  3:  { type: 'billing',  name: 'all',  label: 'All Batches (Day 3 Idempotent Billing Catch-Up)' },
-  4:  { type: 'billing',  name: 'all',  label: 'All Batches (Day 4 Idempotent Billing Catch-Up)' },
-  15: { type: 'reminder', name: '10th', label: 'Class 10th (ACHIEVER)' },
-  16: { type: 'reminder', name: '9th',  label: 'Class 9th (NURTURE)'   },
-  17: { type: 'reminder', name: '8th',  label: 'Class 8th (ALPHA)'     },
-  18: { type: 'reminder', name: 'junio',label: 'Junior Batch (JUNIO)'  },
-  19: { type: 'reminder', name: 'all',  label: 'All Batches (Pending Dues Reminder)' }
+  // Days 1-6: 1st to 10th Rolling Monthly Billing (Staggered to preserve 100 emails/day quota)
+  1:  { type: 'billing',  name: '10th_12th', label: 'Class 10th & Class 12th PCM/PCB (Day 1 Accrual & Billing)' },
+  2:  { type: 'billing',  name: '9th_11th',  label: 'Class 9th & Class 11th PCM/PCB (Day 2 Accrual & Billing)' },
+  3:  { type: 'billing',  name: '8th',       label: 'Class 8th ALPHA (Day 3 Accrual & Billing)' },
+  4:  { type: 'billing',  name: '6th_7th',   label: 'Class 6th & 7th PIONEER (Day 4 Accrual & Billing)' },
+  5:  { type: 'billing',  name: '1st_5th',   label: 'Class 1st to 5th Junior Foundation (Day 5 Accrual & Billing)' },
+  6:  { type: 'billing',  name: 'special_english', label: 'Special English Batches by Aditi Singh (Day 6 Accrual & Billing)' },
+
+  // Days 7-10: Gentle Mid-Window Reminders (Only for students with pending_fee > 0)
+  7:  { type: 'reminder', name: '10th_12th', label: 'Class 10th & 12th (Unpaid Dues Reminder)' },
+  8:  { type: 'reminder', name: '9th_11th',  label: 'Class 9th & 11th (Unpaid Dues Reminder)' },
+  9:  { type: 'reminder', name: '6th_8th',   label: 'Class 6th to 8th (Unpaid Dues Reminder)' },
+  10: { type: 'reminder', name: 'all',       label: 'All Batches (Final Grace Period Dues Reminder)' },
+
+  // Days 15-20: Mid-Month Follow-Up
+  15: { type: 'reminder', name: 'all',       label: 'All Batches Mid-Month Pending Ledger Sync' }
 };
 
 const today = new Date();
@@ -90,14 +97,40 @@ if (!target) {
 console.log(`🎯 Target: ${target.label} (Operation: ${target.type.toUpperCase()})`);
 
 try {
-  let query = supabase.from('students').select('*');
-  if (target.name && target.name !== 'all') {
-    query = query.ilike('class_name', `%${target.name}%`);
+  // Canonical batch matcher — keep in sync with api/cron-monthly-fees.js.
+  // Replaces ilike-%N% chains where '%1%' also matched Class 10th/11th/12th
+  // and Special English batches, pulling foreign batches onto the wrong day.
+  function classNumMatches(str, n) {
+    if (n === 1) return str.includes('1st') || /(^|[^0-9])1([^0-9]|$)/.test(str);
+    if (n === 2) return str.includes('2nd') || /(^|[^0-9])2([^0-9]|$)/.test(str);
+    if (n === 3) return str.includes('3rd') || /(^|[^0-9])3([^0-9]|$)/.test(str);
+    return str.includes(`${n}th`) || new RegExp(`(^|[^0-9])${n}([^0-9]|$)`).test(str);
   }
 
-  const { data: students, error } = await query;
+  function batchKeyMatches(key, className) {
+    const str = String(className || '').toLowerCase();
+    const isEng = str.includes('special english');
+    const has = n => classNumMatches(str, n);
+    switch (key) {
+      case '10th_12th': return !isEng && (has(10) || has(12));
+      case '9th_11th': return !isEng && (has(9) || has(11));
+      case '8th': return !isEng && has(8);
+      case '6th_7th': return !isEng && (has(6) || has(7));
+      case '1st_5th': return !isEng && (str.includes('junior') || [1, 2, 3, 4, 5].some(has));
+      case 'special_english': return isEng;
+      case '6th_8th': return has(6) || has(7) || has(8);
+      case 'all': return true;
+      default: return str.includes(String(key).toLowerCase());
+    }
+  }
+
+  let query = supabase.from('students').select('*');
+  const { data: allFetched, error } = await query;
 
   if (error) throw error;
+  const students = (allFetched || []).filter(s =>
+    target.name === 'all' ? true : batchKeyMatches(target.name, s.class_name)
+  );
   if (!students?.length) {
     console.log(`ℹ️ No students found for ${target.label}`);
     process.exit(0);
@@ -108,10 +141,20 @@ try {
   const results = [];
 
   for (const student of activeStudents) {
-    const monthlyRate = Number(student.monthly_fee) ||
-      (student.class_name?.includes('10th') ? 1000 :
-       student.class_name?.includes('9th')  ? 1000 :
-       student.class_name?.includes('8th')  ? 800  : 700);
+    const strClass = String(student.class_name || '').toLowerCase();
+    // Canonical 12-batch rate resolver: Special English tested BEFORE raw digit
+    // matching ("Special English: Class 9th to 12th" contains both '9' and '12').
+    const monthlyRate = Number(student.monthly_fee) || (
+      strClass.includes('special english') ? (
+        [12, 11, 10, 9].some(n => classNumMatches(strClass, n)) ? 1000 :
+        [8, 7, 6].some(n => classNumMatches(strClass, n)) ? 700 : 500
+      ) :
+      classNumMatches(strClass, 12) || classNumMatches(strClass, 11) ? 1500 :
+      classNumMatches(strClass, 10) || classNumMatches(strClass, 9) ? 1000 :
+      classNumMatches(strClass, 8) ? 800 :
+      classNumMatches(strClass, 6) || classNumMatches(strClass, 7) ? 700 :
+      strClass.includes('junior') || [5, 4, 3, 2, 1].some(n => classNumMatches(strClass, n)) ? 500 : 1000
+    );
 
     const prevPending = Number(student.pending_fee) || 0;
 

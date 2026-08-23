@@ -1,19 +1,21 @@
 // Service Worker — Pragyan Institute Portal (v83.3)
-const CACHE_NAME = 'pragyan-portal-v90.0.131a687f';
+const CACHE_NAME = 'pragyan-portal-v90.0.41b75292';
 
 // Static assets to pre-cache for instant loads
 const PRECACHE_ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './css/variables.css?v=90.0.131a687f',
-  './css/main.css?v=90.0.131a687f',
-  './css/components.css?v=90.0.131a687f',
-  './css/animations.css?v=90.0.131a687f',
-  './css/portal.css?v=90.0.131a687f',
-  './js/supabase-sync.js?v=90.0.131a687f',
-  './js/app.js?v=90.0.131a687f',
-  './js/portal.js?v=90.0.131a687f',
+  './css/variables.css?v=90.0.41b75292',
+  './css/main.css?v=90.0.41b75292',
+  './css/components.css?v=90.0.41b75292',
+  './css/animations.css?v=90.0.41b75292',
+  './css/portal.css?v=90.0.41b75292',
+  './js/config.js?v=90.0.41b75292',
+  './js/chat.js?v=90.0.41b75292',
+  './js/supabase-sync.js?v=90.0.41b75292',
+  './js/app.js?v=90.0.41b75292',
+  './js/portal.js?v=90.0.41b75292',
   './assets/images/favicon.ico',
   './assets/images/logo.png',
   './assets/images/hero_slide_1.jpg',
@@ -22,7 +24,8 @@ const PRECACHE_ASSETS = [
   './assets/images/hero_slide_4.jpg',
   './assets/images/chandan_upi_qr.png',
   './assets/images/teacher_chandan.jpg',
-  './assets/images/teacher_ravi.png'
+  './assets/images/teacher_ravi.png',
+  './assets/images/teacher_aditi.jpg'
 ];
 
 // Install: pre-cache critical shell assets
@@ -39,7 +42,7 @@ self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => {
       return Promise.all(
-        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+        keys.map(key => (key !== CACHE_NAME || self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1') ? caches.delete(key) : null)
       );
     }).then(() => self.clients.claim())
   );
@@ -49,8 +52,8 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // Skip non-GET requests, API backend routes, and direct Supabase database calls from SW interception
-  if (event.request.method !== 'GET' || url.pathname.startsWith('/api/') || url.hostname.includes('supabase.co')) {
+  // Skip non-GET requests, API backend routes, direct Supabase calls, and localhost development from SW caching
+  if (event.request.method !== 'GET' || url.pathname.startsWith('/api/') || url.hostname.includes('supabase.co') || url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
     return;
   }
 

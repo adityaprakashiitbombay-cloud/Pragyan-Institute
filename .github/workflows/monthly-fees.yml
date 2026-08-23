@@ -1,23 +1,19 @@
 name: Monthly Fee Billing & Reminders Automation
-# Runs on the 1st–4th of each month for Billing and 15th-18th for Reminders at 6 AM IST (00:30 UTC)
+# Runs on the 1st-10th of each month (staggered billing days 1-6 + reminder
+# days 7-10) and the 15th for mid-month follow-up at 6 AM IST (00:30 UTC).
+# Must stay in sync with BATCH_SCHEDULE in api/cron-monthly-fees.js.
 # Also triggerable manually from GitHub Actions tab
 
 on:
   schedule:
-    # 1st-4th: Fee Invoicing
-    - cron: '30 0 1 * *'   # 1st  → Class 10th (ACHIEVER)
-    - cron: '30 0 2 * *'   # 2nd  → Class 9th  (NURTURE)
-    - cron: '30 0 3 * *'   # 3rd  → Class 8th  (ALPHA)
-    - cron: '30 0 4 * *'   # 4th  → Junior     (JUNIO)
-    # 15th-18th: Fee Due Reminders
-    - cron: '30 0 15 * *'  # 15th → Class 10th (ACHIEVER) Reminder
-    - cron: '30 0 16 * *'  # 16th → Class 9th  (NURTURE) Reminder
-    - cron: '30 0 17 * *'  # 17th → Class 8th  (ALPHA) Reminder
-    - cron: '30 0 18 * *'  # 18th → Junior     (JUNIO) Reminder
+    # Days 1-6: staggered fee invoicing | Days 7-10: due reminders
+    - cron: '30 0 1-10 * *'
+    # Day 15: mid-month follow-up / pending ledger sync
+    - cron: '30 0 15 * *'
   workflow_dispatch:
     inputs:
       force_day:
-        description: 'Override day of month (1-4 or 15-18) for manual testing'
+        description: 'Override day of month (1-10 or 15) for manual testing'
         required: false
         type: string
 

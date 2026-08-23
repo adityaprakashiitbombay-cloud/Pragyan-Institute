@@ -13,12 +13,22 @@ function getClassCode(className = '') {
     return '09';
   } else if (cStr.includes('8') || cStr.includes('ALPHA') || cStr.includes('VIII')) {
     return '08';
-  } else if (cStr.includes('7') || cStr.includes('JUNIOR') || cStr.includes('VII')) {
+  } else if (cStr.includes('7') || cStr.includes('VII')) {
     return '07';
   } else if (cStr.includes('6') || cStr.includes('VI')) {
     return '06';
+  } else if (cStr.includes('5') || cStr.includes('V') || cStr.includes('1ST TO 5TH') || cStr.includes('1-5') || cStr.includes('PRIMARY') || cStr.includes('JUNIOR')) {
+    return '05';
+  } else if (cStr.includes('4') || cStr.includes('IV')) {
+    return '04';
+  } else if (cStr.includes('3') || cStr.includes('III')) {
+    return '03';
+  } else if (cStr.includes('2') || cStr.includes('II')) {
+    return '02';
+  } else if (cStr.includes('1') || cStr.includes('IST') || cStr.includes('1ST')) {
+    return '01';
   }
-  const match = cStr.match(/\b([6-9]|1[0-2])\b/);
+  const match = cStr.match(/\b([1-9]|1[0-2])\b/);
   if (match) return match[1].padStart(2, '0');
   return '10';
 }

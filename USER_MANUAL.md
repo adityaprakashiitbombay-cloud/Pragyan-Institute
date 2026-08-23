@@ -79,17 +79,24 @@ Accessible 24/7 on mobile, tablet, and desktop at **[pragyaninstitute.com](https
 └───────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 1. Hero Banner & Class 8-10 Batches
+### 1. Hero Banner & Comprehensive Academic Batches (Class 1st to 12th)
 - **Interactive Slideshow**: Visual showcase of smartboards, science experiments, and classroom activities.
-- **Batch Cards**:
-  - **Class 10th (Board Achievers)**: Comprehensive syllabus coverage, chapter-wise test series, and board preparation.
-  - **Class 9th (Foundation)**: Core conceptual clarity in Math & Science.
-  - **Class 8th (Concept Building)**: Fundamentals and Olympiad preparation.
-  - **Junior Foundation**: Basic English grammar and mental mathematics.
+- **Master Batch Cards**:
+  - **Class 12th & 11th (PCM / PCB Target & Foundation)**: ₹1,500/mo — Advanced Physics, Chemistry, Mathematics & Biology with NEET/JEE orientation.
+  - **Class 10th (ACHIEVER / Matric Board)**: ₹1,000/mo — Comprehensive syllabus coverage, chapter-wise mock test series, and board preparation.
+  - **Class 9th (NURTURE / Foundation)**: ₹1,000/mo — Core conceptual clarity in Math, Physics, Chemistry & Biology.
+  - **Class 8th (ALPHA / Middle School)**: ₹800/mo — Fundamentals, logical reasoning, and Olympiad preparation.
+  - **Class 6th & 7th (PIONEER Foundation)**: ₹700/mo — Middle school foundation in Science & Mathematics.
+  - **Class 1st to 5th (Junior Foundation)**: ₹500/mo — Elementary conceptual building, mental math & foundational skills.
+  - **Special English Batches (by Aditi Singh, M.Com)**:
+    - *Class 9th to 12th*: ₹1,000/mo
+    - *Class 6th to 8th*: ₹700/mo
+    - *Class 1st to 5th*: ₹500/mo
 
-### 2. Interactive Fee Calculator
-- Select your target class (Class 8, 9, or 10) to instantly view the transparent monthly fee structure (e.g. ₹1,000/month).
-- No hidden charges or registration surcharges.
+### 2. Interactive Fee Structure & 5% Annual Scholarship
+- Select any of the 12 academic batches to view the transparent monthly fee structure.
+- **5% Annual Scholarship**: 5% discount on full annual advance lump-sum payments.
+- Zero admission fees or hidden charges.
 
 ### 3. Smart AI Assistant (Gemini AI Chatbot)
 - Located at the **bottom-left** of the screen with a friendly floating robot icon.

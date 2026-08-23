@@ -261,43 +261,214 @@
   }
 
   /* --------------------------------------------------------------------------
-   * 4. Batches & Pricing Filter Tabs & Billing Toggle
+   * 4. Batches & Pricing Filter Tabs, Stream Switchers & Billing Toggle
    * -------------------------------------------------------------------------- */
   function initBatchTabs() {
     const tabButtons = document.querySelectorAll('.tab-btn');
     const toggleSwitch = document.getElementById('billingToggle');
-    const batchCards = document.querySelectorAll('.batch-card');
+    const batchCards = document.querySelectorAll('.batches-grid .batch-card');
+    const englishShowcase = document.getElementById('specialEnglishShowcase');
 
     const pricingData = {
-      junior:  { monthly: '₹700',   annual: '₹7,980' },
-      class8:  { monthly: '₹800',   annual: '₹9,120' },
-      class9:  { monthly: '₹1,000', annual: '₹11,400' },
-      class10: { monthly: '₹1,000', annual: '₹11,400' }
+      class12pcm: { monthly: '₹1,500', annual: '₹17,100' },
+      class12pcb: { monthly: '₹1,500', annual: '₹17,100' },
+      class11pcm: { monthly: '₹1,500', annual: '₹17,100' },
+      class11pcb: { monthly: '₹1,500', annual: '₹17,100' },
+      class10:    { monthly: '₹1,000', annual: '₹11,400' },
+      class9:     { monthly: '₹1,000', annual: '₹11,400' },
+      class8:     { monthly: '₹800',   annual: '₹9,120' },
+      class67:    { monthly: '₹700',   annual: '₹7,980' },
+      class15:    { monthly: '₹500',   annual: '₹5,700' },
+      eng912:     { monthly: '₹1,000', annual: '₹11,400' },
+      eng68:      { monthly: '₹700',   annual: '₹7,980' },
+      eng15:      { monthly: '₹500',   annual: '₹5,700' },
+      junior:     { monthly: '₹500',   annual: '₹5,700' }
+    };
+
+    const englishData = {
+      eng912: {
+        title: 'Special English (Class 9th to 12th)',
+        timing: 'Mon – Sat: 5:30 PM – 6:45 PM',
+        monthly: '₹1,000',
+        annual: '₹11,400',
+        priceKey: 'eng912',
+        features: [
+          'Advanced English Grammar, Tenses & Clause Transformations',
+          'Board Essay, Letter, Notice & Formal Writing Masterclasses',
+          'High-Scoring Answer Structuring & Error Correction Drills',
+          'Spoken English Fluency & Vocabulary Expansion'
+        ],
+        waText: 'Hello Pragyan Institute, I am interested in Special English for Classes 9th to 12th by Aditi Singh.'
+      },
+      eng68: {
+        title: 'Special English (Class 6th to 8th)',
+        timing: 'Mon – Sat: 4:30 PM – 5:30 PM',
+        monthly: '₹700',
+        annual: '₹7,980',
+        priceKey: 'eng68',
+        features: [
+          'Tenses, Active/Passive Voice, Prepositions & Narration',
+          'Vocabulary Expansion, Synonyms/Antonyms & Word Power',
+          'Spoken English Pronunciation & Daily Fluency Drills',
+          'Reading Comprehension, Storytelling & School Sync'
+        ],
+        waText: 'Hello Pragyan Institute, I am interested in Special English for Classes 6th to 8th by Aditi Singh.'
+      },
+      eng15: {
+        title: 'Special English (Class 1st to 5th)',
+        timing: 'Mon – Sat: 3:30 PM – 4:30 PM',
+        monthly: '₹500',
+        annual: '₹5,700',
+        priceKey: 'eng15',
+        features: [
+          'Phonics, Sound Blending & Accurate Pronunciation',
+          'Basic Parts of Speech, Articles & Sentence Building',
+          'Picture Story Reading & Early Reader Confidence',
+          'Fun Interactive Language Games & Mentor Attention'
+        ],
+        waText: 'Hello Pragyan Institute, I am interested in Special English for Classes 1st to 5th by Aditi Singh.'
+      }
     };
 
     let isAnnual = false;
 
+    // 1. Tab Filtering
     tabButtons.forEach(btn => {
       btn.addEventListener('click', () => {
         tabButtons.forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
 
-        const selectedClass = btn.getAttribute('data-class');
+        const selectedClass = btn.getAttribute('data-class') || 'all';
 
         batchCards.forEach(card => {
-          const cardClass = card.getAttribute('data-class');
-          if (selectedClass === 'all' || cardClass === selectedClass) {
+          const cardClass = card.getAttribute('data-class') || '';
+          const cardCategory = card.getAttribute('data-category') || '';
+
+          let isMatch = false;
+          if (selectedClass === 'all') {
+            isMatch = true;
+          } else if (selectedClass === 'senior') {
+            isMatch = cardCategory.includes('senior') || cardClass.includes('12') || cardClass.includes('11');
+          } else if (selectedClass === 'high') {
+            isMatch = cardCategory.includes('high') || cardClass.includes('10') || cardClass.includes('9');
+          } else if (selectedClass === 'middle') {
+            isMatch = cardCategory.includes('middle') || cardClass.includes('8') || cardClass.includes('67');
+          } else if (selectedClass === 'junior') {
+            isMatch = cardCategory.includes('junior') || cardClass.includes('15') || cardClass.includes('junior');
+          } else if (selectedClass === 'english') {
+            isMatch = false;
+          }
+
+          if (isMatch) {
             card.style.display = 'flex';
             card.classList.remove('batch-card-animating');
-            void card.offsetWidth; // trigger reflow
+            void card.offsetWidth;
             card.classList.add('batch-card-animating');
           } else {
             card.style.display = 'none';
           }
         });
+
+        if (englishShowcase) {
+          if (selectedClass === 'english') {
+            englishShowcase.style.display = 'block';
+            englishShowcase.classList.remove('batch-card-animating');
+            void englishShowcase.offsetWidth;
+            englishShowcase.classList.add('batch-card-animating');
+            englishShowcase.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          } else if (selectedClass === 'all') {
+            englishShowcase.style.display = 'block';
+          } else {
+            englishShowcase.style.display = 'none';
+          }
+        }
       });
     });
 
+    // 2. Stream Switchers (Class 12th & Class 11th PCM/PCB)
+    const streamSwitches = document.querySelectorAll('.batch-stream-switch');
+    streamSwitches.forEach(switchContainer => {
+      const cardId = switchContainer.getAttribute('data-card-id');
+      const card = document.getElementById(cardId) || switchContainer.closest('.batch-card');
+      if (!card) return;
+
+      const streamBtns = switchContainer.querySelectorAll('.stream-btn');
+      streamBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const stream = btn.getAttribute('data-stream'); // 'pcm' or 'pcb'
+          streamBtns.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+
+          const pcmPane = card.querySelector('.stream-pane-pcm');
+          const pcbPane = card.querySelector('.stream-pane-pcb');
+          const titleEl = card.querySelector('.batch-class');
+
+          if (stream === 'pcb') {
+            if (pcmPane) pcmPane.style.display = 'none';
+            if (pcbPane) {
+              pcbPane.style.display = 'flex';
+              pcbPane.classList.remove('batch-card-animating');
+              void pcbPane.offsetWidth;
+              pcbPane.classList.add('batch-card-animating');
+            }
+            if (titleEl) {
+              const is12th = card.id.includes('12');
+              titleEl.textContent = is12th ? 'Class 12th — PCB' : 'Class 11th — PCB';
+            }
+          } else {
+            if (pcbPane) pcbPane.style.display = 'none';
+            if (pcmPane) {
+              pcmPane.style.display = 'flex';
+              pcmPane.classList.remove('batch-card-animating');
+              void pcmPane.offsetWidth;
+              pcmPane.classList.add('batch-card-animating');
+            }
+            if (titleEl) {
+              const is12th = card.id.includes('12');
+              titleEl.textContent = is12th ? 'Class 12th — PCM' : 'Class 11th — PCM';
+            }
+          }
+        });
+      });
+    });
+
+    // 3. Special English Showcase Switcher
+    const engLevelBtns = document.querySelectorAll('.english-level-btn');
+    const engTitleEl = document.getElementById('englishLevelTitle');
+    const engTimingEl = document.getElementById('englishLevelTiming');
+    const engPriceEl = document.getElementById('englishPriceDisplay');
+    const engFeaturesList = document.getElementById('englishFeaturesList');
+    const engWaBtn = document.getElementById('englishWhatsAppBtn');
+
+    engLevelBtns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const level = btn.getAttribute('data-eng-level');
+        if (!englishData[level]) return;
+
+        engLevelBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        const data = englishData[level];
+        if (engTitleEl) engTitleEl.textContent = data.title;
+        if (engTimingEl) engTimingEl.innerHTML = `<i class="fa-regular fa-clock"></i> ${data.timing}`;
+        if (engPriceEl) {
+          engPriceEl.setAttribute('data-price-key', data.priceKey);
+          engPriceEl.textContent = isAnnual ? data.annual : data.monthly;
+        }
+        if (engFeaturesList) {
+          engFeaturesList.innerHTML = data.features.map(f => `
+            <li><span class="check-icon"><i class="fa-solid fa-check"></i></span> ${window.escapeHtml(f)}</li>
+          `).join('');
+        }
+        if (engWaBtn) {
+          engWaBtn.href = `https://wa.me/917369891858?text=${encodeURIComponent(data.waText)}`;
+        }
+      });
+    });
+
+    // 4. Annual / Monthly Billing Toggle
     if (toggleSwitch) {
       toggleSwitch.addEventListener('click', () => {
         isAnnual = !isAnnual;

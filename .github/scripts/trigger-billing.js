@@ -206,11 +206,36 @@ async function run() {
 
   const results = [];
 
+  // Canonical 12-batch rate resolver — keep in sync with api/cron-monthly-fees.js.
+  // Special English tested BEFORE raw digit matching ("...Class 9th to 12th"
+  // contains both '9' and '12'); the old else-chain priced Class 11th/12th at
+  // ₹700 and Class 1st-5th at ₹700.
+  function classNumMatches(str, n) {
+    if (n === 1) return str.includes('1st') || /(^|[^0-9])1([^0-9]|$)/.test(str);
+    if (n === 2) return str.includes('2nd') || /(^|[^0-9])2([^0-9]|$)/.test(str);
+    if (n === 3) return str.includes('3rd') || /(^|[^0-9])3([^0-9]|$)/.test(str);
+    return str.includes(`${n}th`) || new RegExp(`(^|[^0-9])${n}([^0-9]|$)`).test(str);
+  }
+
+  function resolveMonthlyFee(className) {
+    const s = String(className || '').toLowerCase();
+    if (s.includes('special english')) {
+      if ([12, 11, 10, 9].some(n => classNumMatches(s, n))) return 1000;
+      if ([8, 7, 6].some(n => classNumMatches(s, n))) return 700;
+      return 500;
+    }
+    if (classNumMatches(s, 12) || classNumMatches(s, 11)) return 1500;
+    if (classNumMatches(s, 10) || classNumMatches(s, 9)) return 1000;
+    if (classNumMatches(s, 8)) return 800;
+    if (classNumMatches(s, 6) || classNumMatches(s, 7)) return 700;
+    if (s.includes('junior') || [5, 4, 3, 2, 1].some(n => classNumMatches(s, n))) return 500;
+    return 1000;
+  }
+
   for (const student of activeStudents) {
-    const monthlyRate = Number(student.monthly_fee) ||
-      (student.class_name?.includes('10th') ? 1000 :
-       student.class_name?.includes('9th')  ? 1000 :
-       student.class_name?.includes('8th')  ? 800  : 700);
+    const monthlyRate = Number(student.monthly_fee) > 0
+      ? Number(student.monthly_fee)
+      : resolveMonthlyFee(student.class_name);
 
     const prevPending = Number(student.pending_fee) || 0;
 

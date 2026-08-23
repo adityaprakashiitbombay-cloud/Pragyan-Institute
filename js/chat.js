@@ -37,16 +37,16 @@
   // Preloaded Answers for Quick Suggestion Chips
   const PRELOADED_CHIP_ANSWERS = {
     "What are the fee structures for Class 8, 9, and 10?":
-      `💵 **Nominal Monthly Fee Structure (Zero Hidden Charges):**\n• **Class 10th (ACHIEVER / Matric Mastery):** ₹1,000 / month\n• **Class 9th (NURTURE / Foundation):** ₹1,000 / month\n• **Class 8th (ALPHA / Middle Foundation):** ₹800 / month\n• **Class 11th & 12th (ASCEND / I.Sc.):** ₹1,200 – ₹1,500 / month\n• **Annual Advance Scholarship:** 5% scholarship discount on full-year lump sum payment\n\n✨ *Includes printed study modules, Sunday board mock test series & 3D digital VIP pass access.*`,
+      `💵 **Nominal Monthly Fee Structure (Zero Hidden Charges):**\n• **Class 12th (PCM & PCB):** ₹1,500 / month\n• **Class 11th (PCM & PCB):** ₹1,500 / month\n• **Class 10th & 9th (Matric & Foundation):** ₹1,000 / month\n• **Class 8th (ALPHA):** ₹800 / month | **Class 6th & 7th:** ₹700 / month | **Class 1st to 5th:** ₹500 / month\n• **Special English by Aditi Singh:** 1st–5th (₹500), 6th–8th (₹700), 9th–12th (₹1,000)\n• **Annual Advance Scholarship:** 5% scholarship discount on full-year lump sum payment\n\n✨ *Includes printed study modules, Sunday board mock test series & digital smartboard access.*`,
 
     "How do Digital Smartboards enhance learning?":
       `🖥️ **Interactive Digital Smartboards & Visual Tech:**\n• **3D Animated Science:** Complex Physics & Chemistry concepts visualized with 3D molecular and mechanical models.\n• **Digital Maths Derivations:** Step-by-step graphical plotting and interactive geometry derivations.\n• **High Retention & Engagement:** Visual explanations make abstract board topics easy to understand.\n• **Recorded Concept Recaps:** Rapid revision before weekly mock tests.`,
 
     "Who are the teachers at Pragyan Institute?":
-      `👨‍🏫 **Expert Mentors & Leadership Faculty:**\n• **CHANDAN KUMAR** — Science Mentor & Director (M.Sc Physics, B.Ed, D.El.Ed, CTET Qualified, 10+ Yrs Exp, **10,000+ Students Mentored**)\n• **PROF. RAVI RANJAN** — Mathematics Mentor & Director (M.Sc Maths, B.Ed, CTET Qualified, 15+ Yrs Exp, **12,000+ Students Mentored**)\n• **ADITI SINGH** — English & Grammar Mentor (M.Com, 5+ Yrs Exp, **1,000+ Students Mentored**)\n\n🏆 *Proven track record of 100% board exam pass rates and top ranks across Lalganj & Vaishali!*`,
+      `👨‍🏫 **Expert Mentors & Leadership Faculty:**\n• **CHANDAN KUMAR** — Science Lead & Sole Administrator (M.Sc Physics, B.Ed, D.El.Ed, CTET Qualified, 10+ Yrs Exp, **10,000+ Students Mentored**)\n• **PROF. RAVI RANJAN** — Mathematics Mentor (M.Sc Maths, B.Ed, CTET Qualified, 15+ Yrs Exp, **12,000+ Students Mentored**)\n• **ADITI SINGH** — English & Grammar Mentor (M.Com, 5+ Yrs Exp, **1,000+ Students Mentored**)\n\n🏆 *Proven track record of 100% board exam pass rates and top ranks across Lalganj & Vaishali!*`,
 
     "Tell me about the 3 days free demo classes":
-      `🎁 **3 Days FREE Demo Classes:**\n• Experience our digital smartboards, concept-first pedagogy, and teaching excellence for 3 days with **zero cost and zero admission fee**!\n• Available for Class 8th, 9th, 10th, 11th & 12th (CBSE & BSEB).\n\n📲 Call / WhatsApp: **[+91 73698 91858](tel:+917369891858)** to reserve your demo seat today!`,
+      `🎁 **3 Days FREE Demo Classes:**\n• Experience our digital smartboards, concept-first pedagogy, and teaching excellence for 3 days with **zero cost and zero admission fee**!\n• Available for Class 1st to 12th and Special English Batches.\n\n📲 Call / WhatsApp: **[+91 73698 91858](tel:+917369891858)** to reserve your demo seat today!`,
 
     "Where is Pragyan Institute located in Lalganj, Bihar?":
       `📍 **Location & Directions:**\n• **Address:** At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj\n• 🗺️ **Google Maps:** [Click for exact directions](https://maps.app.goo.gl/jhpW5ynQntfTMa2aA)\n• ⏰ **Timings:** Mon–Sat: 6:30 AM – 8:00 PM | Sun: 9:00 AM – 1:00 PM`
@@ -65,21 +65,30 @@ STRICT ANSWER FORMATTING & LENGTH RULES:
    - Use bold emoji headers for each bullet point to make it visually engaging (e.g. 🐾 **Species & Nature**, 🧠 **Key Attributes**, 💡 **Importance**).
    - NEVER output raw markdown '#' or '###' header tags.
 
-2. ACCURATE PRAGYAN INSTITUTE FACTS:
+2. ACCURATE PRAGYAN INSTITUTE FACTS & ACADEMIC STRUCTURE:
    - Location: At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj (Google Maps: https://maps.app.goo.gl/jhpW5ynQntfTMa2aA)
    - Helpline & WhatsApp: +91 73698 91858
    - Timings: Mon-Sat 6:30 AM - 8:00 PM | Sun 9:00 AM - 1:00 PM
    - Interactive Digital Smartboards: High-tech smartboards in all classrooms for 3D physics/chemistry visual animations and step-by-step digital math solving.
-   - Expert & Experienced Faculty:
-     * Chandan Kumar: Science Mentor & Director (M.Sc Physics, B.Ed, D.El.Ed, CTET, 10+ Yrs Exp, 10,000+ Students Mentored)
-     * Prof. Ravi Ranjan: Maths Mentor & Director (M.Sc Maths, B.Ed, CTET, 15+ Yrs Exp, 12,000+ Students Mentored)
+   - Sole Administrator & Expert Faculty:
+     * Chandan Kumar: Science Lead & Sole Administrator (M.Sc Physics, B.Ed, D.El.Ed, CTET, 10+ Yrs Exp, 10,000+ Students Mentored)
+     * Prof. Ravi Ranjan: Higher Mathematics Lead (M.Sc Maths, B.Ed, CTET, 15+ Yrs Exp, 12,000+ Students Mentored)
      * Aditi Singh: English & Grammar Mentor (M.Com, 5+ Yrs Exp, 1,000+ Students Mentored)
-   - 100% Nominal Monthly Fees (Zero admission or annual hidden fees):
-     * Class 10th (ACHIEVER): ₹1,000 / month
-     * Class 9th (NURTURE): ₹1,000 / month
-     * Class 8th (ALPHA): ₹800 / month
-     * Junior Batch (JUNIO): ₹700 / month
-     * 5% scholarship discount on annual advance lump-sum payment.
+   - Master 12 Canonical Batches & Nominal Monthly Fees:
+     * Class 12th PCM: ₹1,500 / month
+     * Class 12th PCB: ₹1,500 / month
+     * Class 11th PCM: ₹1,500 / month
+     * Class 11th PCB: ₹1,500 / month
+     * Class 10th (ACHIEVER / Matric Board): ₹1,000 / month
+     * Class 9th (NURTURE / Foundation): ₹1,000 / month
+     * Class 8th (ALPHA / Middle School): ₹800 / month
+     * Class 6th & 7th (PIONEER Foundation): ₹700 / month
+     * Class 1st to 5th (Junior Foundation): ₹500 / month
+     * Special English (Class 9th to 12th) by Aditi Singh: ₹1,000 / month
+     * Special English (Class 6th to 8th) by Aditi Singh: ₹700 / month
+     * Special English (Class 1st to 5th) by Aditi Singh: ₹500 / month
+     * 5% scholarship discount on full annual advance lump-sum payment.
+     * 10-day rolling billing window (1st to 10th of each month) with daily 100 email quota guard.
    - 3 Days Free Demo Classes for all prospective students.
    - Boards: CBSE and Bihar Board (BSEB) in English & Hindi mediums.
 
@@ -96,7 +105,7 @@ STRICT ANSWER FORMATTING & LENGTH RULES:
 
     // Greetings
     if (q.match(/\b(hi|hello|hey|namaste|pranam|good morning|good afternoon|good evening|kaisa|kaise|sup)\b/)) {
-      return `👋 **Namaste & Welcome to Pragyan Institute!**\n\nI am your **Pragyan AI Academic Assistant**. How can I help you today?\n• 💵 **Fee Structure & Batches (Class 8th–10th)**\n• 🎁 **3 Days Free Demo Classes**\n• 👨‍🏫 **Faculty (Chandan Sir, Ravi Sir & Aditi Ma'am)**\n• 🖥️ **Smart Classrooms & 3D Visual Learning**\n• 📍 **Location, Directions & Timings in Lalganj**\n\n*Type your question below or click any quick suggestion chip!*`;
+      return `👋 **Namaste & Welcome to Pragyan Institute!**\n\nI am your **Pragyan AI Academic Assistant**. How can I help you today?\n• 💵 **Fee Structure & Batches (Class 1st to 12th & Special English)**\n• 🎁 **3 Days Free Demo Classes**\n• 👨‍🏫 **Faculty (Chandan Sir, Ravi Sir & Aditi Ma'am)**\n• 🖥️ **Smart Classrooms & 3D Visual Learning**\n• 📍 **Location, Directions & Timings in Lalganj**\n\n*Type your question below or click any quick suggestion chip!*`;
     }
 
     // Smartboards & Visual Tech
@@ -106,17 +115,17 @@ STRICT ANSWER FORMATTING & LENGTH RULES:
 
     // Faculty & Mentors
     if (q.includes('teacher') || q.includes('faculty') || q.includes('sir') || q.includes('chandan') || q.includes('ravi') || q.includes('aditi') || q.includes('english') || q.includes('mentor') || q.includes('founder') || q.includes('who teaches')) {
-      return `👨‍🏫 **Expert Mentors & Faculty Leadership:**\n• **CHANDAN KUMAR** — Science Mentor & Director (M.Sc Physics, B.Ed, D.El.Ed, CTET, 10+ Yrs Exp, **10,000+ Students Mentored**)\n• **PROF. RAVI RANJAN** — Maths Mentor & Director (M.Sc Maths, B.Ed, CTET, 15+ Yrs Exp, **12,000+ Students Mentored**)\n• **ADITI SINGH** — English & Grammar Mentor (M.Com, 5+ Yrs Exp, **1,000+ Students Mentored**)\n\n🏆 *Dedicated mentorship with a proven 100% board exam pass rate across Lalganj & Vaishali!*`;
+      return `👨‍🏫 **Expert Mentors & Faculty Leadership:**\n• **CHANDAN KUMAR** — Science Lead & Sole Administrator (M.Sc Physics, B.Ed, D.El.Ed, CTET, 10+ Yrs Exp, **10,000+ Students Mentored**)\n• **PROF. RAVI RANJAN** — Higher Maths Mentor (M.Sc Maths, B.Ed, CTET, 15+ Yrs Exp, **12,000+ Students Mentored**)\n• **ADITI SINGH** — English & Grammar Mentor (M.Com, 5+ Yrs Exp, **1,000+ Students Mentored**)\n\n🏆 *Dedicated mentorship with a proven 100% board exam pass rate across Lalganj & Vaishali!*`;
     }
 
     // Fees, Pricing & Scholarships
     if (q.includes('fee') || q.includes('fees') || q.includes('cost') || q.includes('price') || q.includes('nominal') || q.includes('charge') || q.includes('payment') || q.includes('money') || q.includes('scholarship') || q.includes('paisa') || q.includes('kitna')) {
-      return `💵 **Nominal Monthly Fee Structure (Zero Hidden Charges):**\n• **Class 10th (ACHIEVER / Matric Board):** ₹1,000 / month\n• **Class 9th (NURTURE / Foundation):** ₹1,000 / month\n• **Class 8th (ALPHA / Middle School):** ₹800 / month\n• **Class 11th & 12th (ASCEND / I.Sc.):** ₹1,200 – ₹1,500 / month\n• **5% Annual Scholarship:** 5% discount on full annual lump-sum advance payment\n\n✨ *No admission fee. Includes printed study modules, weekly board test series & 3D VIP portal access.*`;
+      return `💵 **Nominal Monthly Fee Structure (Zero Hidden Charges):**\n• **Class 11th & 12th (PCM / PCB):** ₹1,500 / month\n• **Class 9th & 10th (Matric / Foundation):** ₹1,000 / month\n• **Class 8th:** ₹800 / mo | **Class 6th & 7th:** ₹700 / mo | **Class 1st to 5th:** ₹500 / mo\n• **Special English by Aditi Singh:** 1st–5th (₹500), 6th–8th (₹700), 9th–12th (₹1,000)\n• **5% Annual Scholarship:** 5% concession on full annual lump-sum advance payment\n\n✨ *No admission fee. Includes printed study modules, weekly board test series & digital smartboard access.*`;
     }
 
     // Demo Classes
     if (q.includes('demo') || q.includes('trial') || q.includes('free') || q.includes('free class')) {
-      return `🎁 **3 Days FREE Demo Classes:**\n• Experience our digital smartboards and conceptual teaching pedagogy for 3 days with **zero cost and zero admission fee**!\n• Open for Class 8th, 9th, 10th, 11th & 12th (CBSE & BSEB).\n\n📲 Call / WhatsApp: **[+91 73698 91858](tel:+917369891858)** to reserve your demo seat!`;
+      return `🎁 **3 Days FREE Demo Classes:**\n• Experience our digital smartboards and conceptual teaching pedagogy for 3 days with **zero cost and zero admission fee**!\n• Open for Class 1st to 12th (CBSE & BSEB) and Special English batches.\n\n📲 Call / WhatsApp: **[+91 73698 91858](tel:+917369891858)** to reserve your demo seat!`;
     }
 
     // Admissions & Enrollment

@@ -116,15 +116,89 @@
     return `${base}${cleanPath}`;
   }
 
-  // Canonical Batch Category Normalizer (Global Top-Level Helper)
+  // Canonical Batch Category Normalizer (Global Top-Level Helper for all 12 batches)
   function getBatchCategoryKey(str) {
     if (!str) return '';
     const s = String(str).toLowerCase().trim();
+    // Special English first (to prevent 9th-12th matching raw 12 or 9)
+    if (s.includes('eng') || s.includes('english') || s.includes('aditi')) {
+      if (s.includes('9') || s.includes('10') || s.includes('11') || s.includes('12')) return 'eng_912';
+      if (s.includes('6') || s.includes('7') || s.includes('8')) return 'eng_68';
+      if (s.includes('1') || s.includes('2') || s.includes('3') || s.includes('4') || s.includes('5')) return 'eng_15';
+      return 'eng_912';
+    }
+    // Senior Secondary (12th / 11th)
+    if (s.includes('12') || s.includes('xii') || s.includes('bat-12')) {
+      if (s.includes('pcb') || s.includes('bio') || s.includes('medical')) return '12th_pcb';
+      if (s.includes('pcm') || s.includes('math') || s.includes('engineering')) return '12th_pcm';
+      return '12th_pcm';
+    }
+    if (s.includes('11') || s.includes('xi') || s.includes('bat-11')) {
+      if (s.includes('pcb') || s.includes('bio') || s.includes('medical')) return '11th_pcb';
+      if (s.includes('pcm') || s.includes('math') || s.includes('engineering')) return '11th_pcm';
+      return '11th_pcm';
+    }
+    // High School & Middle
     if (s.includes('10th') || s.includes('achiever') || s.includes('class 10') || s.includes('bat-01') || s.includes('bat-10') || /\b(10|10th|x)\b/.test(s)) return '10th';
     if (s.includes('9th') || s.includes('nurture') || s.includes('class 9') || s.includes('bat-02') || s.includes('bat-09') || /\b(9|9th|ix)\b/.test(s)) return '9th';
     if (s.includes('8th') || s.includes('alpha') || s.includes('class 8') || s.includes('bat-03') || s.includes('bat-08') || /\b(8|8th|viii)\b/.test(s)) return '8th';
-    if (s.includes('junior') || s.includes('junio') || s.includes('bat-04') || s.includes('7th') || s.includes('6th') || s.includes('class 7') || s.includes('class 6') || /\b(junior|junio|7|6)\b/.test(s)) return 'junio';
+    if (s.includes('6th') || s.includes('7th') || s.includes('pioneer') || s.includes('bat-67') || s.includes('class 6') || s.includes('class 7') || /\b(6|7|6th|7th)\b/.test(s)) return '6th_7th';
+    if (s.includes('junior') || s.includes('junio') || s.includes('bat-04') || s.includes('bat-15') || s.includes('1st') || s.includes('5th') || s.includes('class 1') || s.includes('class 5') || /\b(junior|junio|1|2|3|4|5)\b/.test(s)) return '1st_5th';
     return s;
+  }
+
+  function matchesBatchFilter(studentClassName, filterVal) {
+    if (!filterVal || filterVal === 'all') return true;
+    const bKey = getBatchCategoryKey(studentClassName);
+    if (bKey === filterVal) return true;
+    const s = String(studentClassName || '').toLowerCase();
+    const f = String(filterVal).toLowerCase();
+    if (f === 'senior' && (bKey.startsWith('12th') || bKey.startsWith('11th') || s.includes('12') || s.includes('11'))) return true;
+    if (f === 'high' && (bKey === '10th' || bKey === '9th' || s.includes('10') || s.includes('9'))) return true;
+    if (f === 'middle' && (bKey === '8th' || bKey === '6th_7th' || s.includes('8') || s.includes('7') || s.includes('6'))) return true;
+    if (f === '12th' && (bKey.startsWith('12th') || s.includes('12'))) return true;
+    if (f === '11th' && (bKey.startsWith('11th') || s.includes('11'))) return true;
+    if (f === '10th' && (bKey === '10th' || s.includes('10'))) return true;
+    if (f === '9th' && (bKey === '9th' || s.includes('9'))) return true;
+    if (f === '8th' && (bKey === '8th' || s.includes('8'))) return true;
+    if ((f === '6th_7th' || f === '6th' || f === '7th') && (bKey === '6th_7th' || s.includes('6th') || s.includes('7th') || s.includes('pioneer'))) return true;
+    if ((f === '1st_5th' || f === '1st' || f === 'junior' || f === 'junio') && (bKey === '1st_5th' || s.includes('junior') || s.includes('1st') || s.includes('5th'))) return true;
+    if (f.startsWith('eng') || f === 'special english' || f === 'english') {
+      if (bKey.startsWith('eng') || s.includes('english')) {
+        if (f === 'eng_912' && (bKey === 'eng_912' || s.includes('9') || s.includes('12'))) return true;
+        if (f === 'eng_68' && (bKey === 'eng_68' || s.includes('6') || s.includes('8'))) return true;
+        if (f === 'eng_15' && (bKey === 'eng_15' || s.includes('1') || s.includes('5'))) return true;
+        if (f === 'english' || f === 'special english') return true;
+      }
+    }
+    return s.includes(f);
+  }
+
+  // Canonical monthly fee resolver for the 12 official batches. Keep in sync
+  // with api/cron-monthly-fees.js getStudentDefaultMonthlyFee() and pay.html.
+  // Special English MUST be tested before raw digit matching ("Special English:
+  // Class 9th to 12th" contains both '9' and '12'; '1' also occurs in 'Class 10th').
+  function classNumMatches(s, n) {
+    if (n === 1) return s.includes('1st') || /(^|[^0-9])1([^0-9]|$)/.test(s);
+    if (n === 2) return s.includes('2nd') || /(^|[^0-9])2([^0-9]|$)/.test(s);
+    if (n === 3) return s.includes('3rd') || /(^|[^0-9])3([^0-9]|$)/.test(s);
+    return s.includes(`${n}th`) || new RegExp(`(^|[^0-9])${n}([^0-9]|$)`).test(s);
+  }
+
+  function resolveMonthlyFee(className) {
+    const s = String(className || '').toLowerCase();
+    if (!s) return 1000;
+    if (s.includes('special english')) {
+      if ([12, 11, 10, 9].some(n => classNumMatches(s, n))) return 1000;
+      if ([8, 7, 6].some(n => classNumMatches(s, n))) return 700;
+      return 500;
+    }
+    if (classNumMatches(s, 12) || classNumMatches(s, 11)) return 1500;
+    if (classNumMatches(s, 10) || classNumMatches(s, 9)) return 1000;
+    if (classNumMatches(s, 8)) return 800;
+    if (classNumMatches(s, 6) || classNumMatches(s, 7)) return 700;
+    if (s.includes('junior') || s.includes('junio') || [5, 4, 3, 2, 1].some(n => classNumMatches(s, n))) return 500;
+    return 1000;
   }
 
   // Financial Audit Helper: Distinguishes Real Money Payments from Administrative Adjustments / Dues
@@ -486,12 +560,22 @@
       return '09';
     } else if (cStr.includes('8') || cStr.includes('ALPHA') || cStr.includes('VIII')) {
       return '08';
-    } else if (cStr.includes('7') || cStr.includes('JUNIOR') || cStr.includes('VII')) {
+    } else if (cStr.includes('7') || cStr.includes('VII')) {
       return '07';
     } else if (cStr.includes('6') || cStr.includes('VI')) {
       return '06';
+    } else if (cStr.includes('5') || cStr.includes('V') || cStr.includes('1ST TO 5TH') || cStr.includes('1-5') || cStr.includes('PRIMARY') || cStr.includes('JUNIOR')) {
+      return '05';
+    } else if (cStr.includes('4') || cStr.includes('IV')) {
+      return '04';
+    } else if (cStr.includes('3') || cStr.includes('III')) {
+      return '03';
+    } else if (cStr.includes('2') || cStr.includes('II')) {
+      return '02';
+    } else if (cStr.includes('1') || cStr.includes('IST') || cStr.includes('1ST')) {
+      return '01';
     }
-    const match = cStr.match(/\b([6-9]|1[0-2])\b/);
+    const match = cStr.match(/\b([1-9]|1[0-2])\b/);
     if (match) return match[1].padStart(2, '0');
     return '10';
   }
@@ -646,67 +730,217 @@
     if (!localStorage.getItem(STORAGE_KEY_BATCHES)) {
       const initialBatches = [
         {
+          id: 'BAT-12PCM',
+          batch_id: 'BAT-12PCM',
+          name: 'Class 12th PCM (Target 12th Board & JEE)',
+          className: 'Class 12th PCM (Target 12th Board & JEE)',
+          monthlyFee: 1500,
+          monthly_fee: 1500,
+          timings: 'Mon – Sat: 6:00 AM – 8:30 AM',
+          room: 'Hall 1 (Digital Board)',
+          progress: 80,
+          teacher: 'Chandan Kumar & Prof. Ravi Ranjan',
+          badge: '🔬 Target 12th PCM',
+          icon: 'fa-atom',
+          teachers: [
+            { name: 'CHANDAN KUMAR', subject: 'Physics & Chemistry Lead' },
+            { name: 'PROF. RAVI RANJAN', subject: 'Higher Mathematics Lead' }
+          ]
+        },
+        {
+          id: 'BAT-12PCB',
+          batch_id: 'BAT-12PCB',
+          name: 'Class 12th PCB (Target 12th Board & NEET)',
+          className: 'Class 12th PCB (Target 12th Board & NEET)',
+          monthlyFee: 1500,
+          monthly_fee: 1500,
+          timings: 'Mon – Sat: 6:00 AM – 8:30 AM',
+          room: 'Hall 2 (Digital Board)',
+          progress: 80,
+          teacher: 'Chandan Kumar & Biology Faculty',
+          badge: '🧬 Target 12th PCB',
+          icon: 'fa-dna',
+          teachers: [
+            { name: 'CHANDAN KUMAR', subject: 'Physics & Chemistry Lead' },
+            { name: 'BIOLOGY FACULTY', subject: 'Botany & Zoology' }
+          ]
+        },
+        {
+          id: 'BAT-11PCM',
+          batch_id: 'BAT-11PCM',
+          name: 'Class 11th PCM (I.Sc. Foundation)',
+          className: 'Class 11th PCM (I.Sc. Foundation)',
+          monthlyFee: 1500,
+          monthly_fee: 1500,
+          timings: 'Mon – Sat: 3:30 PM – 6:00 PM',
+          room: 'Hall 1 (Digital Board)',
+          progress: 70,
+          teacher: 'Chandan Kumar & Prof. Ravi Ranjan',
+          badge: '📐 11th PCM Foundation',
+          icon: 'fa-microscope',
+          teachers: [
+            { name: 'CHANDAN KUMAR', subject: 'Physics & Chemistry Lead' },
+            { name: 'PROF. RAVI RANJAN', subject: 'Higher Mathematics Lead' }
+          ]
+        },
+        {
+          id: 'BAT-11PCB',
+          batch_id: 'BAT-11PCB',
+          name: 'Class 11th PCB (I.Sc. Foundation)',
+          className: 'Class 11th PCB (I.Sc. Foundation)',
+          monthlyFee: 1500,
+          monthly_fee: 1500,
+          timings: 'Mon – Sat: 3:30 PM – 6:00 PM',
+          room: 'Hall 2 (Digital Board)',
+          progress: 70,
+          teacher: 'Chandan Kumar & Biology Faculty',
+          badge: '🌿 11th PCB Foundation',
+          icon: 'fa-heart-pulse',
+          teachers: [
+            { name: 'CHANDAN KUMAR', subject: 'Physics & Chemistry Lead' },
+            { name: 'BIOLOGY FACULTY', subject: 'Botany & Zoology' }
+          ]
+        },
+        {
           id: 'BAT-10',
-          className: 'Class 10th (ACHIEVER)',
+          batch_id: 'BAT-10',
+          name: 'Class 10th (ACHIEVER / Matric Board)',
+          className: 'Class 10th (ACHIEVER / Matric Board)',
           monthlyFee: 1000,
+          monthly_fee: 1000,
           timings: 'Mon – Sat: 4:00 PM – 6:30 PM',
-          room: 'Hall A (1st Floor)',
+          room: 'Hall 1 (Digital Board)',
           progress: 75,
+          teacher: 'Chandan Kumar, Prof. Ravi Ranjan & Aditi Singh',
+          badge: '🎯 Board Special',
+          icon: 'fa-bullseye',
           teachers: [
             { name: 'CHANDAN KUMAR', subject: 'Science Mentor (Physics & Chemistry)' },
-            { name: 'RAVI RANJAN', subject: 'Maths Mentor (Algebra & Geometry)' }
-          ],
-          schedule: [
-            { subject: 'Mathematics (Ravi Ranjan Sir)', time: '4:00 PM - 5:15 PM' },
-            { subject: 'Science (Chandan Kumar Sir)', time: '5:15 PM - 6:30 PM' }
+            { name: 'PROF. RAVI RANJAN', subject: 'Maths Mentor (Algebra & Geometry)' },
+            { name: 'ADITI SINGH', subject: 'English & Grammar Mentor' }
           ]
         },
         {
           id: 'BAT-09',
-          className: 'Class 9th (NURTURE)',
+          batch_id: 'BAT-09',
+          name: 'Class 9th (NURTURE / Foundation)',
+          className: 'Class 9th (NURTURE / Foundation)',
           monthlyFee: 1000,
+          monthly_fee: 1000,
           timings: 'Mon – Sat: 2:30 PM – 4:30 PM',
-          room: 'Hall B (Ground Floor)',
+          room: 'Hall 2 (Digital Board)',
           progress: 68,
+          teacher: 'Chandan Kumar, Prof. Ravi Ranjan & Aditi Singh',
+          badge: '🌱 Foundation Prep',
+          icon: 'fa-seedling',
           teachers: [
             { name: 'CHANDAN KUMAR', subject: 'Science Mentor' },
-            { name: 'RAVI RANJAN', subject: 'Maths Mentor' }
-          ],
-          schedule: [
-            { subject: 'Mathematics (Ravi Ranjan Sir)', time: '2:30 PM - 3:30 PM' },
-            { subject: 'Science (Chandan Kumar Sir)', time: '3:30 PM - 4:30 PM' }
+            { name: 'PROF. RAVI RANJAN', subject: 'Maths Mentor' },
+            { name: 'ADITI SINGH', subject: 'English & Grammar Mentor' }
           ]
         },
         {
           id: 'BAT-08',
-          className: 'Class 8th (ALPHA)',
+          batch_id: 'BAT-08',
+          name: 'Class 8th (ALPHA / Middle School)',
+          className: 'Class 8th (ALPHA / Middle School)',
           monthlyFee: 800,
+          monthly_fee: 800,
           timings: 'Mon – Sat: 3:00 PM – 5:00 PM',
-          room: 'Classroom 3',
+          room: 'Room 3',
           progress: 60,
+          teacher: 'Chandan Kumar, Prof. Ravi Ranjan & Aditi Singh',
+          badge: '⚡ Middle Prep',
+          icon: 'fa-bolt',
           teachers: [
             { name: 'CHANDAN KUMAR', subject: 'Science Mentor' },
-            { name: 'RAVI RANJAN', subject: 'Maths Mentor' }
-          ],
-          schedule: [
-            { subject: 'Science & Environment (Chandan Sir)', time: '3:00 PM - 4:00 PM' },
-            { subject: 'Mathematics & Logic (Ravi Sir)', time: '4:00 PM - 5:00 PM' }
+            { name: 'PROF. RAVI RANJAN', subject: 'Maths Mentor' },
+            { name: 'ADITI SINGH', subject: 'English & Grammar Mentor' }
           ]
         },
         {
-          id: 'BAT-JUNIO',
-          className: 'Junior Batch (JUNIO)',
+          id: 'BAT-67',
+          batch_id: 'BAT-67',
+          name: 'Class 6th & 7th (PIONEER Foundation)',
+          className: 'Class 6th & 7th (PIONEER Foundation)',
           monthlyFee: 700,
-          timings: 'Mon – Sat: 3:30 PM – 5:00 PM',
-          room: 'Classroom 1',
+          monthly_fee: 700,
+          timings: 'Mon – Sat: 3:30 PM – 5:30 PM',
+          room: 'Room 4',
           progress: 55,
+          teacher: 'Faculty Mentors',
+          badge: '📘 Middle Foundation',
+          icon: 'fa-book-open',
           teachers: [
-            { name: 'CHANDAN KUMAR', subject: 'Science Mentor' },
-            { name: 'RAVI RANJAN', subject: 'Maths Mentor' }
-          ],
-          schedule: [
-            { subject: 'Basic Numeracy (Ravi Sir)', time: '3:30 PM - 4:15 PM' },
-            { subject: 'Basic Science & Logic (Chandan Sir)', time: '4:15 PM - 5:00 PM' }
+            { name: 'FACULTY MENTORS', subject: 'Maths & Science Basics' }
+          ]
+        },
+        {
+          id: 'BAT-15',
+          batch_id: 'BAT-15',
+          name: 'Class 1st to 5th (Junior Foundation)',
+          className: 'Class 1st to 5th (Junior Foundation)',
+          monthlyFee: 500,
+          monthly_fee: 500,
+          timings: 'Mon – Sat: 3:30 PM – 5:00 PM',
+          room: 'Room 5',
+          progress: 50,
+          teacher: 'Faculty Mentors',
+          badge: '🚀 Primary Foundation',
+          icon: 'fa-shapes',
+          teachers: [
+            { name: 'FACULTY MENTORS', subject: 'Numeracy, Literacy & Logic' }
+          ]
+        },
+        {
+          id: 'BAT-ENG-912',
+          batch_id: 'BAT-ENG-912',
+          name: 'Special English: Class 9th to 12th (Grammar & Board Writing)',
+          className: 'Special English: Class 9th to 12th (Grammar & Board Writing)',
+          monthlyFee: 1000,
+          monthly_fee: 1000,
+          timings: 'Mon – Sat: 5:30 PM – 6:45 PM',
+          room: 'Language Lab (1st Floor)',
+          progress: 65,
+          teacher: 'Aditi Singh (M.Com)',
+          badge: '✍️ Advanced English & Writing',
+          icon: 'fa-pen-fancy',
+          teachers: [
+            { name: 'ADITI SINGH', subject: 'Grammar, Reading Comprehension & Creative Writing' }
+          ]
+        },
+        {
+          id: 'BAT-ENG-68',
+          batch_id: 'BAT-ENG-68',
+          name: 'Special English: Class 6th to 8th (Grammar & Fluency)',
+          className: 'Special English: Class 6th to 8th (Grammar & Fluency)',
+          monthlyFee: 700,
+          monthly_fee: 700,
+          timings: 'Mon – Sat: 4:30 PM – 5:30 PM',
+          room: 'Language Lab (1st Floor)',
+          progress: 60,
+          teacher: 'Aditi Singh (M.Com)',
+          badge: '📖 Grammar & Fluency',
+          icon: 'fa-book-bookmark',
+          teachers: [
+            { name: 'ADITI SINGH', subject: 'English Grammar, Vocab & Fluency' }
+          ]
+        },
+        {
+          id: 'BAT-ENG-15',
+          batch_id: 'BAT-ENG-15',
+          name: 'Special English: Class 1st to 5th (Phonics & Basic Grammar)',
+          className: 'Special English: Class 1st to 5th (Phonics & Basic Grammar)',
+          monthlyFee: 500,
+          monthly_fee: 500,
+          timings: 'Mon – Sat: 3:30 PM – 4:30 PM',
+          room: 'Language Lab (1st Floor)',
+          progress: 55,
+          teacher: 'Aditi Singh (M.Com)',
+          badge: '🔤 Phonics & Grammar Basics',
+          icon: 'fa-spell-check',
+          teachers: [
+            { name: 'ADITI SINGH', subject: 'Phonics, Vocabulary & English Foundation' }
           ]
         }
       ];
@@ -1465,10 +1699,18 @@
       } catch(e) {}
       if (!Array.isArray(batches) || batches.length === 0) {
         batches = [
-          { id: 'BAT-01', batch_id: 'BAT-01', name: 'Class 10th (ACHIEVER)', className: 'Class 10th (ACHIEVER)', batchName: 'Class 10th (ACHIEVER)', monthlyFee: 1000, monthly_fee: 1000, timing: 'Mon – Sat: 4:00 PM – 6:30 PM', room: 'Hall 1 (Digital Board)', teacher: 'Ravi Ranjan Sir & Chandan Kumar Sir', badge: '🎯 Board Special', icon: 'fa-bullseye' },
-          { id: 'BAT-02', batch_id: 'BAT-02', name: 'Class 9th (NURTURE)', className: 'Class 9th (NURTURE)', batchName: 'Class 9th (NURTURE)', monthlyFee: 1000, monthly_fee: 1000, timing: 'Mon – Sat: 2:30 PM – 4:30 PM', room: 'Hall 2 (Digital Board)', teacher: 'Chandan Kumar Sir & Ravi Ranjan Sir', badge: '🌱 Foundation Prep', icon: 'fa-seedling' },
-          { id: 'BAT-03', batch_id: 'BAT-03', name: 'Class 8th (ALPHA)', className: 'Class 8th (ALPHA)', batchName: 'Class 8th (ALPHA)', monthlyFee: 800, monthly_fee: 800, timing: 'Mon – Sat: 3:00 PM – 5:00 PM', room: 'Room 3', teacher: 'Chandan Kumar Sir & Ravi Ranjan Sir', badge: '⚡ Middle Prep', icon: 'fa-bolt' },
-          { id: 'BAT-04', batch_id: 'BAT-04', name: 'Junior Batch (JUNIO)', className: 'Junior Batch (JUNIO)', batchName: 'Junior Batch (JUNIO)', monthlyFee: 700, monthly_fee: 700, timing: 'Mon – Sat: 3:30 PM – 5:00 PM', room: 'Room 4', teacher: 'Faculty Mentors', badge: '🚀 Primary / Basics', icon: 'fa-rocket' }
+          { id: 'BAT-12PCM', batch_id: 'BAT-12PCM', name: 'Class 12th PCM (Target 12th Board & JEE)', className: 'Class 12th PCM (Target 12th Board & JEE)', monthlyFee: 1500, monthly_fee: 1500, timing: 'Mon – Sat: 6:00 AM – 8:30 AM', room: 'Hall 1 (Digital Board)', teacher: 'Chandan Kumar & Prof. Ravi Ranjan', badge: '🔬 Target 12th PCM', icon: 'fa-atom' },
+          { id: 'BAT-12PCB', batch_id: 'BAT-12PCB', name: 'Class 12th PCB (Target 12th Board & NEET)', className: 'Class 12th PCB (Target 12th Board & NEET)', monthlyFee: 1500, monthly_fee: 1500, timing: 'Mon – Sat: 6:00 AM – 8:30 AM', room: 'Hall 2 (Digital Board)', teacher: 'Chandan Kumar & Biology Faculty', badge: '🧬 Target 12th PCB', icon: 'fa-dna' },
+          { id: 'BAT-11PCM', batch_id: 'BAT-11PCM', name: 'Class 11th PCM (I.Sc. Foundation)', className: 'Class 11th PCM (I.Sc. Foundation)', monthlyFee: 1500, monthly_fee: 1500, timing: 'Mon – Sat: 3:30 PM – 6:00 PM', room: 'Hall 1 (Digital Board)', teacher: 'Chandan Kumar & Prof. Ravi Ranjan', badge: '📐 11th PCM Foundation', icon: 'fa-microscope' },
+          { id: 'BAT-11PCB', batch_id: 'BAT-11PCB', name: 'Class 11th PCB (I.Sc. Foundation)', className: 'Class 11th PCB (I.Sc. Foundation)', monthlyFee: 1500, monthly_fee: 1500, timing: 'Mon – Sat: 3:30 PM – 6:00 PM', room: 'Hall 2 (Digital Board)', teacher: 'Chandan Kumar & Biology Faculty', badge: '🌿 11th PCB Foundation', icon: 'fa-heart-pulse' },
+          { id: 'BAT-10', batch_id: 'BAT-10', name: 'Class 10th (ACHIEVER / Matric Board)', className: 'Class 10th (ACHIEVER / Matric Board)', monthlyFee: 1000, monthly_fee: 1000, timing: 'Mon – Sat: 4:00 PM – 6:30 PM', room: 'Hall 1 (Digital Board)', teacher: 'Chandan Kumar, Prof. Ravi Ranjan & Aditi Singh', badge: '🎯 Board Special', icon: 'fa-bullseye' },
+          { id: 'BAT-09', batch_id: 'BAT-09', name: 'Class 9th (NURTURE / Foundation)', className: 'Class 9th (NURTURE / Foundation)', monthlyFee: 1000, monthly_fee: 1000, timing: 'Mon – Sat: 2:30 PM – 4:30 PM', room: 'Hall 2 (Digital Board)', teacher: 'Chandan Kumar, Prof. Ravi Ranjan & Aditi Singh', badge: '🌱 Foundation Prep', icon: 'fa-seedling' },
+          { id: 'BAT-08', batch_id: 'BAT-08', name: 'Class 8th (ALPHA / Middle School)', className: 'Class 8th (ALPHA / Middle School)', monthlyFee: 800, monthly_fee: 800, timing: 'Mon – Sat: 3:00 PM – 5:00 PM', room: 'Room 3', teacher: 'Chandan Kumar, Prof. Ravi Ranjan & Aditi Singh', badge: '⚡ Middle Prep', icon: 'fa-bolt' },
+          { id: 'BAT-67', batch_id: 'BAT-67', name: 'Class 6th & 7th (PIONEER Foundation)', className: 'Class 6th & 7th (PIONEER Foundation)', monthlyFee: 700, monthly_fee: 700, timing: 'Mon – Sat: 3:30 PM – 5:30 PM', room: 'Room 4', teacher: 'Faculty Mentors', badge: '📘 Middle Foundation', icon: 'fa-book-open' },
+          { id: 'BAT-15', batch_id: 'BAT-15', name: 'Class 1st to 5th (Junior Foundation)', className: 'Class 1st to 5th (Junior Foundation)', monthlyFee: 500, monthly_fee: 500, timing: 'Mon – Sat: 3:30 PM – 5:00 PM', room: 'Room 5', teacher: 'Faculty Mentors', badge: '🚀 Primary Foundation', icon: 'fa-shapes' },
+          { id: 'BAT-ENG-912', batch_id: 'BAT-ENG-912', name: 'Special English: Class 9th to 12th (Grammar & Board Writing)', className: 'Special English: Class 9th to 12th (Grammar & Board Writing)', monthlyFee: 1000, monthly_fee: 1000, timing: 'Mon – Sat: 5:30 PM – 6:45 PM', room: 'Language Lab (1st Floor)', teacher: 'Aditi Singh (M.Com)', badge: '✍️ Advanced English & Writing', icon: 'fa-pen-fancy' },
+          { id: 'BAT-ENG-68', batch_id: 'BAT-ENG-68', name: 'Special English: Class 6th to 8th (Grammar & Fluency)', className: 'Special English: Class 6th to 8th (Grammar & Fluency)', monthlyFee: 700, monthly_fee: 700, timing: 'Mon – Sat: 4:30 PM – 5:30 PM', room: 'Language Lab (1st Floor)', teacher: 'Aditi Singh (M.Com)', badge: '📖 Grammar & Fluency', icon: 'fa-book-bookmark' },
+          { id: 'BAT-ENG-15', batch_id: 'BAT-ENG-15', name: 'Special English: Class 1st to 5th (Phonics & Basic Grammar)', className: 'Special English: Class 1st to 5th (Phonics & Basic Grammar)', monthlyFee: 500, monthly_fee: 500, timing: 'Mon – Sat: 3:30 PM – 4:30 PM', room: 'Language Lab (1st Floor)', teacher: 'Aditi Singh (M.Com)', badge: '🔤 Phonics & Grammar Basics', icon: 'fa-spell-check' }
         ];
         localStorage.setItem(STORAGE_KEY_BATCHES, JSON.stringify(batches));
       } else {
@@ -1477,25 +1719,44 @@
           const name = b.name || b.className || b.batch_name || b.batchName || 'General Batch';
           let badge = '📚 Batch';
           let icon = 'fa-graduation-cap';
-          if (name.includes('10th') || name.includes('ACHIEVER')) { badge = '🎯 Board Special'; icon = 'fa-bullseye'; }
+          if (name.includes('12th') && name.includes('PCB')) { badge = '🧬 Target 12th PCB'; icon = 'fa-dna'; }
+          else if (name.includes('12th')) { badge = '🔬 Target 12th PCM'; icon = 'fa-atom'; }
+          else if (name.includes('11th') && name.includes('PCB')) { badge = '🌿 11th PCB Foundation'; icon = 'fa-heart-pulse'; }
+          else if (name.includes('11th')) { badge = '📐 11th PCM Foundation'; icon = 'fa-microscope'; }
+          else if (name.includes('Special English') && (name.includes('9th') || name.includes('10th') || name.includes('11th') || name.includes('12th'))) { badge = '✍️ Advanced English & Writing'; icon = 'fa-pen-fancy'; }
+          else if (name.includes('Special English') && (name.includes('6th') || name.includes('7th') || name.includes('8th'))) { badge = '📖 Grammar & Fluency'; icon = 'fa-book-bookmark'; }
+          else if (name.includes('Special English')) { badge = '🔤 Phonics & Grammar Basics'; icon = 'fa-spell-check'; }
+          else if (name.includes('10th') || name.includes('ACHIEVER')) { badge = '🎯 Board Special'; icon = 'fa-bullseye'; }
           else if (name.includes('9th') || name.includes('NURTURE')) { badge = '🌱 Foundation Prep'; icon = 'fa-seedling'; }
           else if (name.includes('8th') || name.includes('ALPHA')) { badge = '⚡ Middle Prep'; icon = 'fa-bolt'; }
-          else if (name.includes('Junior') || name.includes('JUNIO')) { badge = '🚀 Primary / Basics'; icon = 'fa-rocket'; }
+          else if (name.includes('6th') || name.includes('7th') || name.includes('PIONEER')) { badge = '📘 Middle Foundation'; icon = 'fa-book-open'; }
+          else if (name.includes('1st') || name.includes('5th') || name.includes('Junior') || name.includes('JUNIO')) { badge = '🚀 Primary Foundation'; icon = 'fa-shapes'; }
+
+          const resolvedFee = Number(b.monthlyFee ?? b.monthly_fee ?? (
+            name.includes('12th') || name.includes('11th') ? 1500 :
+            (name.includes('Special English') && (name.includes('9th') || name.includes('10th') || name.includes('11th') || name.includes('12th'))) ? 1000 :
+            (name.includes('Special English') && (name.includes('6th') || name.includes('7th') || name.includes('8th'))) ? 700 :
+            (name.includes('Special English') && (name.includes('1st') || name.includes('5th'))) ? 500 :
+            name.includes('10th') || name.includes('9th') ? 1000 :
+            name.includes('8th') ? 800 :
+            name.includes('6th') || name.includes('7th') ? 700 :
+            name.includes('1st') || name.includes('5th') ? 500 : 700
+          ));
 
           return {
             ...b,
-            id: b.id || b.batch_id || 'BAT-01',
-            batch_id: b.batch_id || b.id || 'BAT-01',
+            id: b.id || b.batch_id || 'BAT-10',
+            batch_id: b.batch_id || b.id || 'BAT-10',
             name: name,
             className: name,
             batchName: name,
             batch_name: name,
-            monthlyFee: Number(b.monthlyFee ?? b.monthly_fee ?? (name.includes('8th') ? 800 : (name.includes('Junior') || name.includes('JUNIO') ? 700 : 1000))),
-            monthly_fee: Number(b.monthlyFee ?? b.monthly_fee ?? (name.includes('8th') ? 800 : (name.includes('Junior') || name.includes('JUNIO') ? 700 : 1000))),
+            monthlyFee: resolvedFee,
+            monthly_fee: resolvedFee,
             timing: b.timing || b.timings || b.schedule || 'Mon – Sat: Regular Timings',
             timings: b.timing || b.timings || b.schedule || 'Mon – Sat: Regular Timings',
             room: b.room || b.room_no || 'Classroom',
-            teacher: b.teacher || 'Chandan Kumar & Ravi Ranjan',
+            teacher: b.teacher || 'Chandan Kumar & Faculty',
             badge: b.badge || badge,
             icon: b.icon || icon
           };
@@ -1830,14 +2091,10 @@
 
         if (alreadyBilled) continue;
 
-        // Calculate student's monthly fee rate
+        // Calculate student's monthly fee rate (canonical 12-batch resolver)
         let monthlyFee = Number(s.monthlyFee || s.monthly_fee || 0);
         if (monthlyFee <= 0) {
-          const cName = String(s.className || s.class_name || '').toLowerCase();
-          if (cName.includes('10')) monthlyFee = 1000;
-          else if (cName.includes('9')) monthlyFee = 1000;
-          else if (cName.includes('8')) monthlyFee = 800;
-          else monthlyFee = 700;
+          monthlyFee = resolveMonthlyFee(s.className || s.class_name);
         }
 
         const prevDue = Number(s.pendingFee || s.pending_fee || 0);
@@ -3926,9 +4183,28 @@ function renderStudentDashboard() {
             <div class="stat-click-hint"><i class="fa-solid fa-arrow-right"></i> Post Notices</div>
           </div>
         </div>
+        <div class="admin-stat-card" id="statCardEmailQuota" title="Resend Free Tier: 100 Emails/Day Quota Monitor (100 - X Available)">
+          <div class="admin-icon-square" style="background-color: #EDE9FE; color: #6D28D9;"><i class="fa-solid fa-envelope-circle-check"></i></div>
+          <div class="admin-stat-info">
+            <h3 id="statAdminEmailQuotaVal" style="color: #6D28D9;">100 / 100</h3>
+            <p>Daily Email Quota (100−X)</p>
+            <div class="stat-click-hint" style="color: #6D28D9;"><i class="fa-solid fa-bolt"></i> 1st–10th Staggered</div>
+          </div>
+        </div>
       `;
 
-      // Bind Click Listeners to all 4 cards
+      // Async fetch live daily email quota
+      fetch('/api/email-quota', { headers: { 'Authorization': `Bearer ${localStorage.getItem('pragyan_token') || ''}` } })
+        .then(r => r.json())
+        .then(data => {
+          if (data && data.success) {
+            const el = document.getElementById('statAdminEmailQuotaVal');
+            if (el) el.textContent = `${data.remainingQuota} / ${data.dailyLimit}`;
+          }
+        })
+        .catch(() => {});
+
+      // Bind Click Listeners to cards
       statsContainer.querySelector('#statCardStudents')?.addEventListener('click', () => {
         switchAdminTab('students');
         document.getElementById('adminSearchStudent')?.focus();
@@ -3944,6 +4220,10 @@ function renderStudentDashboard() {
 
       statsContainer.querySelector('#statCardNotices')?.addEventListener('click', () => {
         switchAdminTab('post-notice');
+      });
+
+      statsContainer.querySelector('#statCardEmailQuota')?.addEventListener('click', () => {
+        alert('📬 Resend Daily Email Quota Monitor\n\n• Free Limit: 100 emails / day\n• 1st to 10th Rolling Window: Kids divided into 2-3 batches daily\n• Remaining Today: Live (100 - X) calculated automatically');
       });
     }
 
@@ -4059,11 +4339,19 @@ function renderStudentDashboard() {
                 <div>
                   <label style="display: block; font-size: 0.74rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">🎯 Class / Batch</label>
                   <select id="feeModalClassSelect" class="portal-input" style="width: 100%; font-size: 0.8rem; height: 36px; padding: 0.35rem 0.6rem;">
-                    <option value="all">All Batches</option>
-                    <option value="10th">🎯 Class 10th (ACHIEVER)</option>
-                    <option value="9th">🌱 Class 9th (NURTURE)</option>
-                    <option value="8th">⚡ Class 8th (ALPHA)</option>
-                    <option value="junio">🚀 Junior Batch (JUNIO)</option>
+                    <option value="all">🌟 All Batches</option>
+                    <option value="12th_pcm">🎯 Class 12th PCM (₹1,500/mo)</option>
+                    <option value="12th_pcb">🧬 Class 12th PCB (₹1,500/mo)</option>
+                    <option value="11th_pcm">🎯 Class 11th PCM (₹1,500/mo)</option>
+                    <option value="11th_pcb">🧬 Class 11th PCB (₹1,500/mo)</option>
+                    <option value="10th">🎯 Class 10th ACHIEVER (₹1,000/mo)</option>
+                    <option value="9th">🌱 Class 9th NURTURE (₹1,000/mo)</option>
+                    <option value="8th">⚡ Class 8th ALPHA (₹800/mo)</option>
+                    <option value="6th_7th">🚀 Class 6th & 7th PIONEER (₹700/mo)</option>
+                    <option value="1st_5th">👶 Class 1st to 5th Junior (₹500/mo)</option>
+                    <option value="eng_912">✍️ Special English 9th–12th (₹1,000/mo)</option>
+                    <option value="eng_68">✍️ Special English 6th–8th (₹700/mo)</option>
+                    <option value="eng_15">✍️ Special English 1st–5th (₹500/mo)</option>
                   </select>
                 </div>
 
@@ -4285,8 +4573,7 @@ function renderStudentDashboard() {
 
         // Class / Batch filter
         if (selectedClass !== 'all') {
-          const bKey = getBatchCategoryKey(p.className);
-          if (bKey !== selectedClass) return false;
+          if (!matchesBatchFilter(p.className, selectedClass)) return false;
         }
 
         // Admin / Collector filter
@@ -4537,11 +4824,19 @@ function renderStudentDashboard() {
                 <div>
                   <label style="display: block; font-size: 0.74rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">🎯 Class / Batch</label>
                   <select id="pendingModalClassSelect" class="portal-input" style="width: 100%; font-size: 0.8rem; height: 36px; padding: 0.35rem 0.6rem;">
-                    <option value="all">All Batches</option>
-                    <option value="10th">🎯 Class 10th (ACHIEVER)</option>
-                    <option value="9th">🌱 Class 9th (NURTURE)</option>
-                    <option value="8th">⚡ Class 8th (ALPHA)</option>
-                    <option value="junio">🚀 Junior Batch (JUNIO)</option>
+                    <option value="all">🌟 All Batches</option>
+                    <option value="12th_pcm">🎯 Class 12th PCM (₹1,500/mo)</option>
+                    <option value="12th_pcb">🧬 Class 12th PCB (₹1,500/mo)</option>
+                    <option value="11th_pcm">🎯 Class 11th PCM (₹1,500/mo)</option>
+                    <option value="11th_pcb">🧬 Class 11th PCB (₹1,500/mo)</option>
+                    <option value="10th">🎯 Class 10th ACHIEVER (₹1,000/mo)</option>
+                    <option value="9th">🌱 Class 9th NURTURE (₹1,000/mo)</option>
+                    <option value="8th">⚡ Class 8th ALPHA (₹800/mo)</option>
+                    <option value="6th_7th">🚀 Class 6th & 7th PIONEER (₹700/mo)</option>
+                    <option value="1st_5th">👶 Class 1st to 5th Junior (₹500/mo)</option>
+                    <option value="eng_912">✍️ Special English 9th–12th (₹1,000/mo)</option>
+                    <option value="eng_68">✍️ Special English 6th–8th (₹700/mo)</option>
+                    <option value="eng_15">✍️ Special English 1st–5th (₹500/mo)</option>
                   </select>
                 </div>
 
@@ -4639,11 +4934,11 @@ function renderStudentDashboard() {
         const bKey = getBatchCategoryKey(s.className || s.class_name || '');
 
         // 1. Class / Batch Filter
-        if (selectedClass !== 'all' && bKey !== selectedClass) return false;
+        if (selectedClass !== 'all' && !matchesBatchFilter(s.className || s.class_name || '', selectedClass)) return false;
 
         // 2. Admin / Faculty Lead Filter
         if (selectedAdmin !== 'all') {
-          const isChandanLead = (bKey === '10th' || bKey === '9th');
+          const isChandanLead = (bKey === '10th' || bKey === '9th' || bKey.startsWith('12th') || bKey.startsWith('11th'));
           if (selectedAdmin === 'chandan' && !isChandanLead) return false;
           if (selectedAdmin === 'ravi' && isChandanLead) return false;
         }
@@ -4679,7 +4974,7 @@ function renderStudentDashboard() {
       const kpiSubtextEl = document.getElementById('pendingModalKpiSubtext');
       if (kpiSubtextEl) {
         const parts = [];
-        if (selectedClass !== 'all') parts.push(selectedClass === '10th' ? 'Class 10th' : selectedClass === '9th' ? 'Class 9th' : selectedClass === '8th' ? 'Class 8th' : 'Junior Batch');
+        if (selectedClass !== 'all') parts.push(selectedClass);
         if (selectedAdmin !== 'all') parts.push(selectedAdmin === 'chandan' ? 'Chandan Kumar Leads' : 'Prof. Ravi Ranjan Leads');
         if (selectedRange !== 'all') parts.push(selectedRange === 'high' ? 'High Dues (> ₹2,000)' : selectedRange === 'mid' ? 'Medium Dues' : 'Minor Dues');
         
@@ -4688,34 +4983,42 @@ function renderStudentDashboard() {
           : 'Showing all students with outstanding balances across all batches';
       }
 
-      // 2. Update Batch Cards Summary
+      // 2. Update Batch Cards Summary for all 12 canonical batches
       const canonicalBatches = [
+        { key: '12th_pcm', name: 'Class 12th PCM', icon: '🎯', rate: 1500 },
+        { key: '12th_pcb', name: 'Class 12th PCB', icon: '🧬', rate: 1500 },
+        { key: '11th_pcm', name: 'Class 11th PCM', icon: '🎯', rate: 1500 },
+        { key: '11th_pcb', name: 'Class 11th PCB', icon: '🧬', rate: 1500 },
         { key: '10th', name: 'Class 10th (ACHIEVER)', icon: '🎯', rate: 1000 },
         { key: '9th', name: 'Class 9th (NURTURE)', icon: '🌱', rate: 1000 },
         { key: '8th', name: 'Class 8th (ALPHA)', icon: '⚡', rate: 800 },
-        { key: 'junio', name: 'Junior Batch (JUNIO)', icon: '🚀', rate: 700 }
+        { key: '6th_7th', name: 'Class 6th & 7th (PIONEER)', icon: '🚀', rate: 700 },
+        { key: '1st_5th', name: 'Class 1st to 5th (Junior)', icon: '👶', rate: 500 },
+        { key: 'eng_912', name: 'Special English (9th–12th)', icon: '✍️', rate: 1000 },
+        { key: 'eng_68', name: 'Special English (6th–8th)', icon: '✍️', rate: 700 },
+        { key: 'eng_15', name: 'Special English (1st–5th)', icon: '✍️', rate: 500 }
       ];
 
       const visibleBatches = selectedClass === 'all'
         ? canonicalBatches
-        : canonicalBatches.filter(b => b.key === selectedClass);
+        : canonicalBatches.filter(b => matchesBatchFilter(b.name, selectedClass) || b.key === selectedClass);
 
       const batchGridEl = document.getElementById('pendingModalBatchGrid');
       if (batchGridEl) {
         batchGridEl.innerHTML = visibleBatches.map(b => {
-          const batchDefaulters = filteredStudents.filter(s => getBatchCategoryKey(s.className || s.class_name || '') === b.key);
+          const batchDefaulters = filteredStudents.filter(s => getBatchCategoryKey(s.className || s.class_name || '') === b.key || matchesBatchFilter(s.className || s.class_name || '', b.key));
           const bPendingSum = batchDefaulters.reduce((sum, s) => sum + (Number(s.pendingFee ?? s.pending_fee ?? 0)), 0);
 
           return `
-            <div style="background: #ffffff; border: 1.5px solid #FCA5A5; border-radius: 10px; padding: 0.9rem; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+            <div style="background: #ffffff; border: 1.5px solid #FCA5A5; border-radius: 10px; padding: 0.85rem; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
-                <span style="font-weight: 800; font-size: 0.88rem; color: var(--text-mahogany);">${b.icon} ${b.name}</span>
+                <span style="font-weight: 800; font-size: 0.82rem; color: var(--text-mahogany);">${b.icon} ${b.name}</span>
                 <span style="font-size: 0.72rem; background: #FEF2F2; color: #991B1B; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 700;">₹${b.rate}/mo</span>
               </div>
-              <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.4rem;">
                 ${batchDefaulters.length} Students Pending Balance
               </div>
-              <div style="font-size: 1.25rem; font-weight: 800; color: #DC2626;">
+              <div style="font-size: 1.15rem; font-weight: 800; color: #DC2626;">
                 ₹${bPendingSum.toLocaleString()}
               </div>
             </div>
@@ -5248,7 +5551,7 @@ function renderStudentDashboard() {
       // 2. Class Wise Filter
       let matchesClass = true;
       if (directoryClassFilter !== 'all') {
-        matchesClass = s.className.toLowerCase().includes(directoryClassFilter.toLowerCase());
+        matchesClass = matchesBatchFilter(s.className || s.class_name || '', directoryClassFilter);
       }
 
       // 3. Fee Status Filter
@@ -5307,13 +5610,20 @@ function renderStudentDashboard() {
         <!-- Filter & Sorting Bar (Class Wise, Fee Status, Fee Max-Min) -->
         <div class="admin-filter-bar" style="display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; justify-content: space-between; background: #FAF9F6; border: 1px solid var(--border-sand); padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1.25rem;">
           <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
-            <!-- FILTER 1: CLASS WISE -->
             <select id="filterClassWise" class="portal-input" style="width: auto; font-size: 0.83rem; padding: 0.45rem 0.75rem;">
               <option value="all" ${directoryClassFilter === 'all' ? 'selected' : ''}>📚 Class Wise: All Batches</option>
-              <option value="10th" ${directoryClassFilter === '10th' ? 'selected' : ''}>Class 10th (ACHIEVER Batch)</option>
-              <option value="9th" ${directoryClassFilter === '9th' ? 'selected' : ''}>Class 9th (NURTURE Batch)</option>
-              <option value="8th" ${directoryClassFilter === '8th' ? 'selected' : ''}>Class 8th (ALPHA Batch)</option>
-              <option value="junio" ${directoryClassFilter === 'junio' ? 'selected' : ''}>Junior Batch (JUNIO)</option>
+              <option value="12th_pcm" ${directoryClassFilter === '12th_pcm' ? 'selected' : ''}>🎯 Class 12th PCM</option>
+              <option value="12th_pcb" ${directoryClassFilter === '12th_pcb' ? 'selected' : ''}>🧬 Class 12th PCB</option>
+              <option value="11th_pcm" ${directoryClassFilter === '11th_pcm' ? 'selected' : ''}>🎯 Class 11th PCM</option>
+              <option value="11th_pcb" ${directoryClassFilter === '11th_pcb' ? 'selected' : ''}>🧬 Class 11th PCB</option>
+              <option value="10th" ${directoryClassFilter === '10th' ? 'selected' : ''}>🎯 Class 10th (ACHIEVER)</option>
+              <option value="9th" ${directoryClassFilter === '9th' ? 'selected' : ''}>🌱 Class 9th (NURTURE)</option>
+              <option value="8th" ${directoryClassFilter === '8th' ? 'selected' : ''}>⚡ Class 8th (ALPHA)</option>
+              <option value="6th_7th" ${directoryClassFilter === '6th_7th' ? 'selected' : ''}>🚀 Class 6th & 7th (PIONEER)</option>
+              <option value="1st_5th" ${directoryClassFilter === '1st_5th' ? 'selected' : ''}>👶 Class 1st to 5th (Junior)</option>
+              <option value="eng_912" ${directoryClassFilter === 'eng_912' ? 'selected' : ''}>✍️ Special English: 9th–12th</option>
+              <option value="eng_68" ${directoryClassFilter === 'eng_68' ? 'selected' : ''}>✍️ Special English: 6th–8th</option>
+              <option value="eng_15" ${directoryClassFilter === 'eng_15' ? 'selected' : ''}>✍️ Special English: 1st–5th</option>
             </select>
 
             <!-- FILTER 2: FEE STATUS -->
@@ -5843,9 +6153,18 @@ function renderStudentDashboard() {
                 <div>
                   <label style="font-size: 0.85rem; font-weight: 600;">Class / Batch Assignment</label>
                   <select id="mgmtStuClass" class="portal-input">
-                    <option value="Class 10th (Board Batch)" ${target.className.includes('10th') ? 'selected' : ''}>Class 10th (Board Batch)</option>
-                    <option value="Class 9th (Foundation)" ${target.className.includes('9th') ? 'selected' : ''}>Class 9th (Foundation)</option>
-                    <option value="Class 8th (Junior Achievers)" ${target.className.includes('8th') ? 'selected' : ''}>Class 8th (Junior Achievers)</option>
+                    <option value="Class 12th PCM (Target 12th Board & JEE)" ${target.className.includes('12') && target.className.includes('PCM') ? 'selected' : ''}>Class 12th PCM (Target Board & JEE) — ₹1,500/mo</option>
+                    <option value="Class 12th PCB (Target 12th Board & NEET)" ${target.className.includes('12') && target.className.includes('PCB') ? 'selected' : ''}>Class 12th PCB (Target Board & NEET) — ₹1,500/mo</option>
+                    <option value="Class 11th PCM (I.Sc. Foundation)" ${target.className.includes('11') && target.className.includes('PCM') ? 'selected' : ''}>Class 11th PCM (I.Sc. Foundation) — ₹1,500/mo</option>
+                    <option value="Class 11th PCB (I.Sc. Foundation)" ${target.className.includes('11') && target.className.includes('PCB') ? 'selected' : ''}>Class 11th PCB (I.Sc. Foundation) — ₹1,500/mo</option>
+                    <option value="Class 10th (ACHIEVER / Matric Board)" ${target.className.includes('10th') || target.className.includes('ACHIEVER') ? 'selected' : ''}>Class 10th (ACHIEVER / Matric) — ₹1,000/mo</option>
+                    <option value="Class 9th (NURTURE / Foundation)" ${target.className.includes('9th') || target.className.includes('NURTURE') ? 'selected' : ''}>Class 9th (NURTURE / Foundation) — ₹1,000/mo</option>
+                    <option value="Class 8th (ALPHA / Middle School)" ${target.className.includes('8th') || target.className.includes('ALPHA') ? 'selected' : ''}>Class 8th (ALPHA / Middle School) — ₹800/mo</option>
+                    <option value="Class 6th & 7th (PIONEER Foundation)" ${target.className.includes('6th') || target.className.includes('7th') || target.className.includes('PIONEER') ? 'selected' : ''}>Class 6th & 7th (PIONEER) — ₹700/mo</option>
+                    <option value="Class 1st to 5th (Junior Foundation)" ${target.className.includes('1st') || target.className.includes('5th') || target.className.includes('Junior') || target.className.includes('JUNIO') ? 'selected' : ''}>Class 1st to 5th (Junior Foundation) — ₹500/mo</option>
+                    <option value="Special English: Class 9th to 12th (Grammar & Board Writing)" ${target.className.includes('Special English') && (target.className.includes('9th') || target.className.includes('10th') || target.className.includes('11th') || target.className.includes('12th')) ? 'selected' : ''}>Special English (9th–12th) by Aditi Singh — ₹1,000/mo</option>
+                    <option value="Special English: Class 6th to 8th (Grammar & Fluency)" ${target.className.includes('Special English') && (target.className.includes('6th') || target.className.includes('7th') || target.className.includes('8th')) ? 'selected' : ''}>Special English (6th–8th) by Aditi Singh — ₹700/mo</option>
+                    <option value="Special English: Class 1st to 5th (Phonics & Basic Grammar)" ${target.className.includes('Special English') && (target.className.includes('1st') || target.className.includes('5th')) ? 'selected' : ''}>Special English (1st–5th) by Aditi Singh — ₹500/mo</option>
                   </select>
                 </div>
                 <div>
@@ -6657,10 +6976,18 @@ function renderStudentDashboard() {
                 </label>
                 <select id="adminBillingTargetClass" class="portal-input" style="width: 100%; font-weight: 600; padding: 0.6rem 0.85rem; border-radius: 8px; border: 1.5px solid var(--border-sand); background: #fff;">
                   <option value="all">🌟 All Batches (All Enrolled Students)</option>
-                  <option value="10th" selected>🎯 Class 10th (ACHIEVER Batch)</option>
-                  <option value="9th">🌱 Class 9th (NURTURE Batch)</option>
-                  <option value="8th">⚡ Class 8th (ALPHA Batch)</option>
-                  <option value="junio">🚀 Junior Batch (JUNIO Batch)</option>
+                  <option value="12th_pcm">🎯 Class 12th PCM (₹1,500/mo)</option>
+                  <option value="12th_pcb">🧬 Class 12th PCB (₹1,500/mo)</option>
+                  <option value="11th_pcm">🎯 Class 11th PCM (₹1,500/mo)</option>
+                  <option value="11th_pcb">🧬 Class 11th PCB (₹1,500/mo)</option>
+                  <option value="10th" selected>🎯 Class 10th (ACHIEVER — ₹1,000/mo)</option>
+                  <option value="9th">🌱 Class 9th (NURTURE — ₹1,000/mo)</option>
+                  <option value="8th">⚡ Class 8th (ALPHA — ₹800/mo)</option>
+                  <option value="6th_7th">🚀 Class 6th & 7th (PIONEER — ₹700/mo)</option>
+                  <option value="1st_5th">👶 Class 1st to 5th (Junior — ₹500/mo)</option>
+                  <option value="eng_912">✍️ Special English: 9th–12th (₹1,000/mo)</option>
+                  <option value="eng_68">✍️ Special English: 6th–8th (₹700/mo)</option>
+                  <option value="eng_15">✍️ Special English: 1st–5th (₹500/mo)</option>
                 </select>
               </div>
 
@@ -6707,41 +7034,37 @@ function renderStudentDashboard() {
                 <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 0.2rem;">Live revenue, collection efficiency, and dues tracking configured for every academic batch</div>
               </div>
               <span style="background: #ECFDF5; color: #065F46; border: 1px solid #10B981; padding: 0.3rem 0.75rem; border-radius: 99px; font-size: 0.78rem; font-weight: 700;">
-                <i class="fa-solid fa-graduation-cap"></i> 4 Standard Institutional Batches
+                <i class="fa-solid fa-graduation-cap"></i> ${batches.length} Institutional Batches
               </span>
             </div>
 
             <div style="display: flex; flex-direction: column; gap: 1.15rem;">
               ${batches.map(b => {
                 const bName = b.className || b.name || b.batchName || 'Academic Batch';
-                const bKey = (bName.includes('10th') || bName.includes('ACHIEVER')) ? '10th' :
-                             (bName.includes('9th') || bName.includes('NURTURE')) ? '9th' :
-                             (bName.includes('8th') || bName.includes('ALPHA')) ? '8th' : 'junior';
+                const bKey = b.id || b.batch_id || getBatchCategoryKey(bName);
 
                 const batchStudents = students.filter(s => {
-                  const sClass = (s.className || s.class_name || s.batchName || '').toLowerCase();
-                  if (bKey === '10th') return sClass.includes('10th') || sClass.includes('achiever') || sClass.includes('class 10') || sClass.includes('board');
-                  if (bKey === '9th') return sClass.includes('9th') || sClass.includes('nurture') || sClass.includes('class 9');
-                  if (bKey === '8th') return sClass.includes('8th') || sClass.includes('alpha') || sClass.includes('class 8');
-                  if (bKey === 'junior') return sClass.includes('junior') || sClass.includes('junio') || sClass.includes('7th') || sClass.includes('6th') || sClass.includes('class 7') || sClass.includes('class 6');
-                  return sClass.includes(bName.toLowerCase());
+                  return matchesBatchFilter(s.className || s.class_name || s.batchName || '', bKey) || matchesBatchFilter(s.className || s.class_name || s.batchName || '', bName);
                 });
 
-                const bMonthlyRate = Number(b.monthlyFee ?? b.monthly_fee ?? (bKey === '8th' ? 800 : (bKey === 'junior' ? 700 : 1000)));
+                const bMonthlyRate = Number(b.monthlyFee ?? b.monthly_fee ?? resolveMonthlyFee(bName));
                 const bCollected = batchStudents.reduce((acc, c) => acc + (Number(c.paidFee ?? c.paid_fee ?? 0)), 0);
                 const bPending = batchStudents.reduce((acc, c) => acc + (Number(c.pendingFee ?? c.pending_fee ?? 0)), 0);
                 const bTotal = bCollected + bPending;
                 const bPct = bTotal > 0 ? Math.min(100, Math.round((bCollected / bTotal) * 100)) : (batchStudents.length > 0 ? 0 : 0);
 
                 let badgeIcon = 'fa-graduation-cap';
-                let badgeText = 'Batch';
+                let badgeText = 'Academic Batch';
                 let badgeColor = '#065F46';
                 let badgeBg = '#D1FAE5';
 
-                if (bKey === '10th') { badgeIcon = 'fa-bullseye'; badgeText = '🎯 Board Special'; badgeColor = '#92400E'; badgeBg = '#FEF3C7'; }
-                else if (bKey === '9th') { badgeIcon = 'fa-seedling'; badgeText = '🌱 Foundation Prep'; badgeColor = '#065F46'; badgeBg = '#D1FAE5'; }
-                else if (bKey === '8th') { badgeIcon = 'fa-bolt'; badgeText = '⚡ Middle Prep'; badgeColor = '#1E40AF'; badgeBg = '#DBEAFE'; }
-                else if (bKey === 'junior') { badgeIcon = 'fa-rocket'; badgeText = '🚀 Primary / Basics'; badgeColor = '#6B21A8'; badgeBg = '#F3E8FF'; }
+                if (bName.includes('12') || bName.includes('11')) { badgeIcon = 'fa-bullseye'; badgeText = '🎯 Senior Secondary'; badgeColor = '#92400E'; badgeBg = '#FEF3C7'; }
+                else if (bName.includes('10th') || bName.includes('ACHIEVER')) { badgeIcon = 'fa-bullseye'; badgeText = '🎯 Board Special'; badgeColor = '#92400E'; badgeBg = '#FEF3C7'; }
+                else if (bName.includes('9th') || bName.includes('NURTURE')) { badgeIcon = 'fa-seedling'; badgeText = '🌱 Foundation Prep'; badgeColor = '#065F46'; badgeBg = '#D1FAE5'; }
+                else if (bName.includes('8th') || bName.includes('ALPHA')) { badgeIcon = 'fa-bolt'; badgeText = '⚡ Middle Prep'; badgeColor = '#1E40AF'; badgeBg = '#DBEAFE'; }
+                else if (bName.includes('6th') || bName.includes('7th') || bName.includes('PIONEER')) { badgeIcon = 'fa-rocket'; badgeText = '🚀 Middle School'; badgeColor = '#6B21A8'; badgeBg = '#F3E8FF'; }
+                else if (bName.includes('1st') || bName.includes('Junior') || bName.includes('JUNIO')) { badgeIcon = 'fa-child'; badgeText = '👶 Junior Basics'; badgeColor = '#047857'; badgeBg = '#D1FAE5'; }
+                else if (bName.includes('English') || bName.includes('Special')) { badgeIcon = 'fa-pen-fancy'; badgeText = '✍️ Special English'; badgeColor = '#B45309'; badgeBg = '#FEF3C7'; }
 
                 const clearedCount = batchStudents.filter(s => (Number(s.pendingFee ?? s.pending_fee ?? 0)) === 0).length;
 
@@ -6976,8 +7299,7 @@ function renderStudentDashboard() {
         let filtered = allStudents;
         if (selectedClass !== 'all') {
           filtered = allStudents.filter(s => {
-            const c = (s.className || s.class_name || '').toLowerCase();
-            return c.includes(selectedClass.toLowerCase());
+            return matchesBatchFilter(s.className || s.class_name || '', selectedClass);
           });
         }
 
@@ -8027,10 +8349,13 @@ ${emailLogs.join('\n')}`);
       if (currentNoticeFilter === 'exam') matchesFilter = (n.category === 'exam');
       else if (currentNoticeFilter === 'general') matchesFilter = (n.category === 'general');
       else if (currentNoticeFilter === 'fees') matchesFilter = (n.category === 'fees');
-      else if (currentNoticeFilter === '10th') matchesFilter = (n.targetBatch && n.targetBatch.includes('10th'));
-      else if (currentNoticeFilter === '9th') matchesFilter = (n.targetBatch && n.targetBatch.includes('9th'));
-      else if (currentNoticeFilter === '8th') matchesFilter = (n.targetBatch && n.targetBatch.includes('8th'));
-      else if (currentNoticeFilter === 'junio') matchesFilter = (n.targetBatch && (n.targetBatch.includes('Junior') || n.targetBatch.includes('JUNIO')));
+      else if (currentNoticeFilter === 'senior') matchesFilter = (n.targetBatch && (n.targetBatch.includes('12') || n.targetBatch.includes('11') || n.targetBatch === 'All Batches'));
+      else if (currentNoticeFilter === '10th') matchesFilter = (n.targetBatch && (n.targetBatch.includes('10th') || n.targetBatch === 'All Batches'));
+      else if (currentNoticeFilter === '9th') matchesFilter = (n.targetBatch && (n.targetBatch.includes('9th') || n.targetBatch === 'All Batches'));
+      else if (currentNoticeFilter === '8th') matchesFilter = (n.targetBatch && (n.targetBatch.includes('8th') || n.targetBatch === 'All Batches'));
+      else if (currentNoticeFilter === 'middle') matchesFilter = (n.targetBatch && (n.targetBatch.includes('6th') || n.targetBatch.includes('7th') || n.targetBatch === 'All Batches'));
+      else if (currentNoticeFilter === 'junior' || currentNoticeFilter === 'junio') matchesFilter = (n.targetBatch && (n.targetBatch.includes('Junior') || n.targetBatch.includes('JUNIO') || n.targetBatch.includes('1st') || n.targetBatch === 'All Batches'));
+      else if (currentNoticeFilter === 'english') matchesFilter = (n.targetBatch && (n.targetBatch.includes('English') || n.targetBatch === 'All Batches'));
 
       let matchesSearch = true;
       if (currentNoticeSearch) {
@@ -8046,10 +8371,18 @@ ${emailLogs.join('\n')}`);
     const draftBody = pane.querySelector('#noticeBodyInput')?.value || '';
 
     const canonicalBatchList = [
+      { key: '12th_pcm', name: 'Class 12th PCM', icon: '🎯' },
+      { key: '12th_pcb', name: 'Class 12th PCB', icon: '🧬' },
+      { key: '11th_pcm', name: 'Class 11th PCM', icon: '🎯' },
+      { key: '11th_pcb', name: 'Class 11th PCB', icon: '🧬' },
       { key: '10th', name: 'Class 10th (ACHIEVER)', icon: '🎯' },
       { key: '9th', name: 'Class 9th (NURTURE)', icon: '🌱' },
       { key: '8th', name: 'Class 8th (ALPHA)', icon: '⚡' },
-      { key: 'junio', name: 'Junior Batch (JUNIO)', icon: '🚀' }
+      { key: '6th_7th', name: 'Class 6th & 7th (PIONEER)', icon: '🚀' },
+      { key: '1st_5th', name: 'Class 1st to 5th (Junior)', icon: '👶' },
+      { key: 'eng_912', name: 'Special English (9th–12th)', icon: '✍️' },
+      { key: 'eng_68', name: 'Special English (6th–8th)', icon: '✍️' },
+      { key: 'eng_15', name: 'Special English (1st–5th)', icon: '✍️' }
     ];
 
     pane.innerHTML = `
@@ -8171,10 +8504,13 @@ ${emailLogs.join('\n')}`);
           <button class="notice-admin-filter-chip ${currentNoticeFilter === 'exam' ? 'active' : ''}" data-filter="exam">📝 Exams</button>
           <button class="notice-admin-filter-chip ${currentNoticeFilter === 'general' ? 'active' : ''}" data-filter="general">📢 General</button>
           <button class="notice-admin-filter-chip ${currentNoticeFilter === 'fees' ? 'active' : ''}" data-filter="fees">💳 Fees</button>
+          <button class="notice-admin-filter-chip ${currentNoticeFilter === 'senior' ? 'active' : ''}" data-filter="senior">🎯 11th & 12th</button>
           <button class="notice-admin-filter-chip ${currentNoticeFilter === '10th' ? 'active' : ''}" data-filter="10th">Class 10th</button>
           <button class="notice-admin-filter-chip ${currentNoticeFilter === '9th' ? 'active' : ''}" data-filter="9th">Class 9th</button>
           <button class="notice-admin-filter-chip ${currentNoticeFilter === '8th' ? 'active' : ''}" data-filter="8th">Class 8th</button>
-          <button class="notice-admin-filter-chip ${currentNoticeFilter === 'junio' ? 'active' : ''}" data-filter="junio">Junior</button>
+          <button class="notice-admin-filter-chip ${currentNoticeFilter === 'middle' ? 'active' : ''}" data-filter="middle">Class 6th & 7th</button>
+          <button class="notice-admin-filter-chip ${currentNoticeFilter === 'junior' ? 'active' : ''}" data-filter="junior">Class 1st to 5th</button>
+          <button class="notice-admin-filter-chip ${currentNoticeFilter === 'english' ? 'active' : ''}" data-filter="english">Special English</button>
         </div>
 
         <!-- Announcements List -->
@@ -8253,7 +8589,7 @@ ${emailLogs.join('\n')}`);
       const title = pane.querySelector('#noticeTitleInput').value.trim();
       const category = pane.querySelector('#noticeCategorySelect').value;
       const chks = Array.from(pane.querySelectorAll('.notice-batch-chk:checked'));
-      const targetBatch = chks.length === 4 ? 'All Batches' : (chks.map(c => c.dataset.name).join(', ') || 'Custom');
+      const targetBatch = (chks.length === 12 || chks.length === 0) ? 'All Batches' : (chks.map(c => c.dataset.name).join(', ') || 'All Batches');
       const message = pane.querySelector('#noticeBodyInput').value.trim();
       const attachmentFile = pane.querySelector('#noticeAttachmentInput')?.files[0];
 
@@ -8396,11 +8732,19 @@ ${emailLogs.join('\n')}`);
                   Target Batch *
                 </label>
                 <select id="editNoticeBatch" class="portal-input" style="width: 100%;">
-                  <option value="All Batches" ${target.targetBatch === 'All Batches' || !target.targetBatch ? 'selected' : ''}>🌟 All Batches</option>
+                  <option value="All Batches" ${target.targetBatch === 'All Batches' || !target.targetBatch ? 'selected' : ''}>🌟 All Batches (Broadcast to Everyone)</option>
+                  <option value="Class 12th PCM" ${target.targetBatch && target.targetBatch.includes('12th PCM') ? 'selected' : ''}>🎯 Class 12th PCM</option>
+                  <option value="Class 12th PCB" ${target.targetBatch && target.targetBatch.includes('12th PCB') ? 'selected' : ''}>🧬 Class 12th PCB</option>
+                  <option value="Class 11th PCM" ${target.targetBatch && target.targetBatch.includes('11th PCM') ? 'selected' : ''}>🎯 Class 11th PCM</option>
+                  <option value="Class 11th PCB" ${target.targetBatch && target.targetBatch.includes('11th PCB') ? 'selected' : ''}>🧬 Class 11th PCB</option>
                   <option value="Class 10th (ACHIEVER)" ${target.targetBatch && target.targetBatch.includes('10th') ? 'selected' : ''}>🎯 Class 10th (ACHIEVER)</option>
                   <option value="Class 9th (NURTURE)" ${target.targetBatch && target.targetBatch.includes('9th') ? 'selected' : ''}>🌱 Class 9th (NURTURE)</option>
                   <option value="Class 8th (ALPHA)" ${target.targetBatch && target.targetBatch.includes('8th') ? 'selected' : ''}>⚡ Class 8th (ALPHA)</option>
-                  <option value="Junior Batch (JUNIO)" ${target.targetBatch && (target.targetBatch.includes('Junior') || target.targetBatch.includes('JUNIO')) ? 'selected' : ''}>🚀 Junior Batch (JUNIO)</option>
+                  <option value="Class 6th & 7th (PIONEER)" ${target.targetBatch && (target.targetBatch.includes('6th') || target.targetBatch.includes('7th')) ? 'selected' : ''}>🚀 Class 6th & 7th (PIONEER)</option>
+                  <option value="Class 1st to 5th (Junior)" ${target.targetBatch && (target.targetBatch.includes('1st') || target.targetBatch.includes('Junior') || target.targetBatch.includes('JUNIO')) ? 'selected' : ''}>👶 Class 1st to 5th (Junior)</option>
+                  <option value="Special English (9th to 12th)" ${target.targetBatch && target.targetBatch.includes('English') && (target.targetBatch.includes('9') || target.targetBatch.includes('12')) ? 'selected' : ''}>✍️ Special English (9th–12th)</option>
+                  <option value="Special English (6th to 8th)" ${target.targetBatch && target.targetBatch.includes('English') && (target.targetBatch.includes('6') || target.targetBatch.includes('8')) ? 'selected' : ''}>✍️ Special English (6th–8th)</option>
+                  <option value="Special English (1st to 5th)" ${target.targetBatch && target.targetBatch.includes('English') && (target.targetBatch.includes('1') || target.targetBatch.includes('5')) ? 'selected' : ''}>✍️ Special English (1st–5th)</option>
                 </select>
               </div>
             </div>
@@ -8494,7 +8838,7 @@ ${emailLogs.join('\n')}`);
   function replaceEmailPlaceholders(text, student) {
     if (!text || !student) return text || '';
     const curMonth = new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
-    const monthlyFee = student.monthlyFee || (student.className && student.className.includes('10') ? 1000 : (student.className && student.className.includes('9') ? 1000 : (student.className && student.className.includes('8') ? 800 : 700)));
+    const monthlyFee = Number(student.monthlyFee) > 0 ? Number(student.monthlyFee) : resolveMonthlyFee(student.className || student.class_name);
     const pendingFee = student.pendingFee || 0;
     const prevDue = Math.max(0, pendingFee - monthlyFee);
 
@@ -8513,7 +8857,7 @@ ${emailLogs.join('\n')}`);
   function generateCampaignEmailHtml(student, templateType, subject, bodyText, includePaymentLink, includeSeal) {
     const s = student || {};
     const curMonth = new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
-    const monthlyFee = s.monthlyFee || (s.className && s.className.includes('10') ? 1000 : (s.className && s.className.includes('9') ? 1000 : (s.className && s.className.includes('8') ? 800 : 700)));
+    const monthlyFee = Number(s.monthlyFee) > 0 ? Number(s.monthlyFee) : resolveMonthlyFee(s.className || s.class_name);
     const pendingFee = s.pendingFee || 0;
     const prevDue = Math.max(0, pendingFee - monthlyFee);
     const author = getActiveTeacherName();
@@ -8688,18 +9032,6 @@ ${emailLogs.join('\n')}`);
     if (adminEmailAudience === 'all') {
       targetStudents = activeStudents;
       audienceLabel = 'All Enrolled Students';
-    } else if (adminEmailAudience === '10th') {
-      targetStudents = activeStudents.filter(s => getBatchCategoryKey(s.className || s.class_name || s.batchName || '') === '10th');
-      audienceLabel = 'Class 10th (ACHIEVER)';
-    } else if (adminEmailAudience === '9th') {
-      targetStudents = activeStudents.filter(s => getBatchCategoryKey(s.className || s.class_name || s.batchName || '') === '9th');
-      audienceLabel = 'Class 9th (NURTURE)';
-    } else if (adminEmailAudience === '8th') {
-      targetStudents = activeStudents.filter(s => getBatchCategoryKey(s.className || s.class_name || s.batchName || '') === '8th');
-      audienceLabel = 'Class 8th (ALPHA)';
-    } else if (adminEmailAudience === 'junio') {
-      targetStudents = activeStudents.filter(s => getBatchCategoryKey(s.className || s.class_name || s.batchName || '') === 'junio');
-      audienceLabel = 'Junior Batch (JUNIO)';
     } else if (adminEmailAudience === 'defaulters') {
       targetStudents = activeStudents.filter(s => (s.pendingFee || 0) > 0);
       audienceLabel = 'Pending Dues Defaulters Only';
@@ -8708,6 +9040,23 @@ ${emailLogs.join('\n')}`);
       targetStudents = match ? [match] : (activeStudents.length ? [activeStudents[0]] : []);
       if (targetStudents[0]) adminEmailSelectedStudentId = targetStudents[0].id || targetStudents[0].student_id || targetStudents[0].rollNo;
       audienceLabel = targetStudents[0] ? `${targetStudents[0].name} (Roll #${targetStudents[0].rollNo})` : 'Individual Student';
+    } else {
+      targetStudents = activeStudents.filter(s => matchesBatchFilter(s.className || s.class_name || s.batchName || '', adminEmailAudience));
+      const bMap = {
+        '12th_pcm': 'Class 12th PCM',
+        '12th_pcb': 'Class 12th PCB',
+        '11th_pcm': 'Class 11th PCM',
+        '11th_pcb': 'Class 11th PCB',
+        '10th': 'Class 10th (ACHIEVER)',
+        '9th': 'Class 9th (NURTURE)',
+        '8th': 'Class 8th (ALPHA)',
+        '6th_7th': 'Class 6th & 7th (PIONEER)',
+        '1st_5th': 'Class 1st to 5th (Junior)',
+        'eng_912': 'Special English (9th–12th)',
+        'eng_68': 'Special English (6th–8th)',
+        'eng_15': 'Special English (1st–5th)'
+      };
+      audienceLabel = bMap[adminEmailAudience] || adminEmailAudience;
     }
 
     // Dynamic Computations & Indian Standard Time (IST) Quota Guards
@@ -8809,11 +9158,19 @@ ${emailLogs.join('\n')}`);
                 <i class="fa-solid fa-users-viewfinder" style="color: var(--primary-emerald);"></i> 1. Select Target Audience *
               </label>
               <select id="adminEmailAudienceSelect" class="portal-input" style="font-weight: 600; width: 100%;">
-                <option value="all" ${adminEmailAudience === 'all' ? 'selected' : ''}>🎯 All Enrolled Students (All Batches)</option>
-                <option value="10th" ${adminEmailAudience === '10th' ? 'selected' : ''}>Class 10th (ACHIEVER Batch)</option>
-                <option value="9th" ${adminEmailAudience === '9th' ? 'selected' : ''}>Class 9th (NURTURE Batch)</option>
-                <option value="8th" ${adminEmailAudience === '8th' ? 'selected' : ''}>Class 8th (ALPHA Batch)</option>
-                <option value="junio" ${adminEmailAudience === 'junio' ? 'selected' : ''}>Junior Batch (JUNIO)</option>
+                <option value="all" ${adminEmailAudience === 'all' ? 'selected' : ''}>🎯 All Enrolled Students (All 12 Batches)</option>
+                <option value="12th_pcm" ${adminEmailAudience === '12th_pcm' ? 'selected' : ''}>Class 12th PCM (₹1,500/mo)</option>
+                <option value="12th_pcb" ${adminEmailAudience === '12th_pcb' ? 'selected' : ''}>Class 12th PCB (₹1,500/mo)</option>
+                <option value="11th_pcm" ${adminEmailAudience === '11th_pcm' ? 'selected' : ''}>Class 11th PCM (₹1,500/mo)</option>
+                <option value="11th_pcb" ${adminEmailAudience === '11th_pcb' ? 'selected' : ''}>Class 11th PCB (₹1,500/mo)</option>
+                <option value="10th" ${adminEmailAudience === '10th' ? 'selected' : ''}>Class 10th (ACHIEVER — ₹1,000/mo)</option>
+                <option value="9th" ${adminEmailAudience === '9th' ? 'selected' : ''}>Class 9th (NURTURE — ₹1,000/mo)</option>
+                <option value="8th" ${adminEmailAudience === '8th' ? 'selected' : ''}>Class 8th (ALPHA — ₹800/mo)</option>
+                <option value="6th_7th" ${adminEmailAudience === '6th_7th' ? 'selected' : ''}>Class 6th & 7th (PIONEER — ₹700/mo)</option>
+                <option value="1st_5th" ${adminEmailAudience === '1st_5th' ? 'selected' : ''}>Class 1st to 5th (Junior — ₹500/mo)</option>
+                <option value="eng_912" ${adminEmailAudience === 'eng_912' ? 'selected' : ''}>Special English: 9th–12th (₹1,000/mo)</option>
+                <option value="eng_68" ${adminEmailAudience === 'eng_68' ? 'selected' : ''}>Special English: 6th–8th (₹700/mo)</option>
+                <option value="eng_15" ${adminEmailAudience === 'eng_15' ? 'selected' : ''}>Special English: 1st–5th (₹500/mo)</option>
                 <option value="defaulters" ${adminEmailAudience === 'defaulters' ? 'selected' : ''}>⚠️ Defaulters Only (Students with Pending Fees)</option>
                 <option value="student" ${adminEmailAudience === 'student' ? 'selected' : ''}>👤 Specific Individual Student</option>
               </select>
@@ -9129,10 +9486,18 @@ ${emailLogs.join('\n')}`);
               <div>
                 <label style="font-size: 0.85rem; font-weight: 600;">Class / Batch Assignment *</label>
                 <select id="newStuClass" class="portal-input">
-                  <option value="Class 10th (ACHIEVER)" data-monthly="1000">Class 10th (ACHIEVER) — ₹1,000/Month</option>
-                  <option value="Class 9th (NURTURE)" data-monthly="1000">Class 9th (NURTURE) — ₹1,000/Month</option>
-                  <option value="Class 8th (ALPHA)" data-monthly="800">Class 8th (ALPHA) — ₹800/Month</option>
-                  <option value="Junior Batch (JUNIO)" data-monthly="700">Junior Batch (JUNIO) — ₹700/Month</option>
+                  <option value="Class 12th PCM (Target 12th Board & JEE)" data-monthly="1500">Class 12th PCM (Target Board & JEE) — ₹1,500/Month</option>
+                  <option value="Class 12th PCB (Target 12th Board & NEET)" data-monthly="1500">Class 12th PCB (Target Board & NEET) — ₹1,500/Month</option>
+                  <option value="Class 11th PCM (I.Sc. Foundation)" data-monthly="1500">Class 11th PCM (I.Sc. Foundation) — ₹1,500/Month</option>
+                  <option value="Class 11th PCB (I.Sc. Foundation)" data-monthly="1500">Class 11th PCB (I.Sc. Foundation) — ₹1,500/Month</option>
+                  <option value="Class 10th (ACHIEVER / Matric Board)" data-monthly="1000" selected>Class 10th (ACHIEVER / Matric) — ₹1,000/Month</option>
+                  <option value="Class 9th (NURTURE / Foundation)" data-monthly="1000">Class 9th (NURTURE / Foundation) — ₹1,000/Month</option>
+                  <option value="Class 8th (ALPHA / Middle School)" data-monthly="800">Class 8th (ALPHA / Middle School) — ₹800/Month</option>
+                  <option value="Class 6th & 7th (PIONEER Foundation)" data-monthly="700">Class 6th & 7th (PIONEER Foundation) — ₹700/Month</option>
+                  <option value="Class 1st to 5th (Junior Foundation)" data-monthly="500">Class 1st to 5th (Junior Foundation) — ₹500/Month</option>
+                  <option value="Special English: Class 9th to 12th (Grammar & Board Writing)" data-monthly="1000">Special English (9th–12th) by Aditi Singh — ₹1,000/Month</option>
+                  <option value="Special English: Class 6th to 8th (Grammar & Fluency)" data-monthly="700">Special English (6th–8th) by Aditi Singh — ₹700/Month</option>
+                  <option value="Special English: Class 1st to 5th (Phonics & Basic Grammar)" data-monthly="500">Special English (1st–5th) by Aditi Singh — ₹500/Month</option>
                 </select>
               </div>
               <div>
