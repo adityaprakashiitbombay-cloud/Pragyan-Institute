@@ -232,10 +232,13 @@ export default async function handler(req, res) {
         }
 
         // 2. Check Date of Birth (DOB) as default / fallback (with DDMMYYYY support)
+        // SECURITY: comparison must be EXACT. A substring test here
+        // (`dobDigits.includes(inputDigits)`) let any 6+ consecutive digits of
+        // a student's DOB authenticate — a ~6-guess credential.
         const studentNorms = normalizeDob(s.dob);
         const dobMatch = inputNorms.some(i => studentNorms.includes(i));
         const dobDigits = String(s.dob || '').replace(/\D/g, '');
-        let rawDigitsMatch = inputDigits.length >= 6 && (inputDigits === dobDigits || dobDigits.includes(inputDigits));
+        let rawDigitsMatch = inputDigits.length >= 6 && inputDigits === dobDigits;
 
         // Check if input DDMMYYYY digits match student's DOB
         const stuNorm = studentNorms[0];

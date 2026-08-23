@@ -90,20 +90,21 @@ The Pragyan Institute Portal enforces a multi-layered, zero-trust cybersecurity 
 
 ---
 
-## 3. Administrator Access & Leadership Structure
+## 3. Administrator Access & Director Accounts
 
-The platform enforces a dedicated **Sole Administrator Governance Model** for centralized management, audit accountability, and data protection:
+The platform features two permanent leadership administrator accounts with complete supervisory privileges:
 
-### 👨‍🏫 Institutional Leadership Roster
-1. **Sole Administrator & Managing Director**:
+### 👨‍🏫 Active Director Accounts
+1. **Director 1 (Managing Director & Science Lead)**:
    - **Username**: `chandan`
    - **Full Name**: `CHANDAN KUMAR`
-   - **Role**: Managing Director, Science Lead & Sole Head Admin
+   - **Role**: Managing Director & Science Lead (Head of Institute)
    - **Official UPI ID**: `chandankr1501998@ybl`
 
-2. **Faculty Mentors**:
-   - **Prof. RAVI RANJAN**: Higher Mathematics Lead
-   - **ADITI SINGH**: English & Grammar Mentor (M.Com, 1,000+ Students Mentored)
+2. **Director 2 (Co-Director & Mathematics Lead)**:
+   - **Username**: `ravi`
+   - **Full Name**: `Prof. RAVI RANJAN`
+   - **Role**: Director & Mathematics Lead
 
 ---
 
@@ -112,7 +113,7 @@ The platform enforces a dedicated **Sole Administrator Governance Model** for ce
 1. Open **[https://pragyaninstitute.com](https://pragyaninstitute.com)** in any modern web browser on PC, tablet, or smartphone.
 2. Click the **"Portal Login"** button in the top navigation bar (or scroll to the bottom and click "Director / Student Portal").
 3. Select the **"Director / Admin"** tab on the login screen.
-4. Enter your Username (`chandan`) and your secure password.
+4. Enter your Username (`chandan` or `ravi`) and your secure password.
 5. Click **"Authenticate & Access ERP Portal"**.
 
 ---
@@ -122,27 +123,22 @@ In the **"Admin Settings & Profile"** tab (Tab 7), administrators can:
 - **Change Profile Photo**: Tap **"Change Photo"** to upload an image from your device or capture a live photo using your phone's camera (automatically optimized and stored).
 - **Change Administrator Password**: Enter your new password and verify with your current security password.
 - **Update Official UPI ID**: Set the active institute UPI VPA (e.g. `chandankr1501998@ybl`) printed on receipts and embedded in student payment QR gateways.
-- **Monitor Daily Email Quota**: View the live $100 - X$ daily Resend email meter with automatic rolling billing tracking.
 
 ---
 
 ## 4. Student ID Structure & Dynamic Roll Number Engine (YYCCSS)
 
-Pragyan Institute utilizes the standardized **`YYCCSS`** institutional identification architecture across all 12 academic batches:
+Pragyan Institute utilizes the standardized **`YYCCSS`** institutional identification architecture:
 
 ```
-  ┌───────────────┬──────────────────────────────────────────┬────────────────────────┐
-  │   YY (Year)   │             CC (Class Code)              │    SS (Serial Number)  │
-  ├───────────────┼──────────────────────────────────────────┼────────────────────────┤
-  │ 26 = Year 2026│ 12 = Class 12th (PCM / PCB Target)       │ 01 = Student #1        │
-  │ 27 = Year 2027│ 11 = Class 11th (PCM / PCB Foundation)   │ 02 = Student #2        │
-  │               │ 10 = Class 10th (ACHIEVER / Matric Board)│ 03 = Student #3        │
-  │               │ 09 = Class 9th (NURTURE / Foundation)    │ ...up to 99 per batch  │
-  │               │ 08 = Class 8th (ALPHA / Middle School)   │                        │
-  │               │ 07 = Class 6th & 7th (PIONEER Foundation)│                        │
-  │               │ 05 = Class 1st to 5th (Junior Foundation)│                        │
-  │               │ 01 = Special English / Primary Foundation│                        │
-  └───────────────┴──────────────────────────────────────────┴────────────────────────┘
+  ┌───────────────┬───────────────────────────────┬────────────────────────┐
+  │   YY (Year)   │         CC (Class Code)       │    SS (Serial Number)  │
+  ├───────────────┼───────────────────────────────┼────────────────────────┤
+  │ 26 = Year 2026│ 10 = Class 10th (ACHIEVER)    │ 01 = Student #1        │
+  │ 27 = Year 2027│ 09 = Class 9th (NURTURE)      │ 02 = Student #2        │
+  │               │ 08 = Class 8th (ALPHA)        │ 03 = Student #3        │
+  │               │ 07 = Junior Batch (JUNIO)     │ ...up to 99 per batch  │
+  └───────────────┴───────────────────────────────┴────────────────────────┘
 ```
 
 ### 🔢 Automatic Sequential Roll Generation
@@ -215,27 +211,27 @@ Every student possesses a digital, high-security **3D Metallic VIP ID Pass** acc
 
 ---
 
-## 7. 10-Day Rolling Billing Cron & Live $100 - X$ Email Quota Engine
+## 7. Real-Time Automated Billing & Resend Email Engine
 
-The portal is integrated with an enterprise automated email infrastructure powered by **Resend** (dispatched via verified domain `noreply@pragyaninstitute.com`):
+The portal is integrated with an enterprise automated email infrastructure powered by **Resend** (dispatched via verified domain `noreply@pragyaninstitute.com`).
 
 ```
  ┌──────────────────────────────────────────────────────────────────────────┐
- │  📅 1st–6th of Month: Staggered Class Fee Accrual (2-3 Batches/Day)      │
- │  📅 7th–10th of Month: Targeted Unpaid Dues Reminders & Grace Period     │
- │  📊 Live Daily Quota: 100 Emails/Day Limit Guard (100 - X Remaining)    │
+ │  🎯 1. Select Batch  ➔  👤 2. Target Student  ➔  📬 3. Action Mode      │
+ │  [Class 10th ACHIEVER]     [All Students / Individual]  [Invoice / Reminder]│
+ │                                                                          │
+ │           [ ⚡ Trigger Real-Time Dispatch via Verified Domain ]           │
  └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 📬 Rolling Billing & Quota Features:
-1. **📅 1st–10th Rolling Billing Window**:
-   - **Days 1–6**: Automated monthly fee accrual and statement generation staggered across 2–3 batches per day (keeping daily email load safely under 100/day).
-   - **Days 7–10**: Gentle mid-window reminders dispatched only to students with pending balances (`pending_fee > 0`).
-2. **🛡️ Live $100 - X$ Quota Protection**:
-   - Real-time meter in Admin Overview tracks $X$ emails sent today (automated billing + receipts) and displays the remaining $(100 - X)$ available slots.
-   - Prevents email exhaustion by rejecting bulk non-critical dispatches if the daily 100 limit is reached.
-3. **📄 Manual On-Demand Invoices & Reminders**:
-   - Administrators can manually dispatch statements or reminder notices to individual students or specific batches on-demand at any time.
+### 📬 Dispatch Options:
+1. **📄 Monthly Fee Invoice & Billing**:
+   - Dispatches a professional, branded tuition invoice with itemized previous dues, current month charges, total payable, and official PhonePe payment QR code (`chandankr1501998@ybl`).
+2. **⚠️ Extra Fee Reminder**:
+   - Dispatches an urgent payment reminder notice with 1-click online payment links.
+3. **Targeting Scope**:
+   - Send to an **individual student** or broadcast to an **entire class batch** simultaneously.
+   - Works **all 30 days of the month on-demand**.
 
 ---
 

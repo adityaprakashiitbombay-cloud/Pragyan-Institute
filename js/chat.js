@@ -12,16 +12,10 @@
   ];
 
   function getActiveApiKey() {
-    const custom = (typeof localStorage !== 'undefined' && localStorage.getItem('pragyan_gemini_key')) ||
+    return (typeof localStorage !== 'undefined' && localStorage.getItem('pragyan_gemini_key')) ||
       (typeof window !== 'undefined' && window.PRAGYAN_CONFIG && window.PRAGYAN_CONFIG.GEMINI_API_KEY) ||
       (typeof window !== 'undefined' && window.ENV_GEMINI_API_KEY) ||
       '';
-    if (custom) return custom;
-    try {
-      return (typeof atob === 'function') ? atob('QVEuQWI4Uk42TEFJZDdNOThWc3pIUWJzVW9VcGd4emYySjRtWGpScDJiODhqYnowZU9jZFE=') : '';
-    } catch (_) {
-      return '';
-    }
   }
 
   function setActiveApiKey(key) {
@@ -34,12 +28,6 @@
   let chatSessionHistory = [];
   const MAX_HISTORY_MESSAGES = 20;
 
-<<<<<<< HEAD
-  // Preloaded Answers for Quick Suggestion Chips
-  const PRELOADED_CHIP_ANSWERS = {
-    "What are the fee structures for Class 8, 9, and 10?":
-      `💵 **Nominal Monthly Fee Structure (Zero Hidden Charges):**\n• **Class 12th (PCM & PCB):** ₹1,500 / month\n• **Class 11th (PCM & PCB):** ₹1,500 / month\n• **Class 10th & 9th (Matric & Foundation):** ₹1,000 / month\n• **Class 8th (ALPHA):** ₹800 / month | **Class 6th & 7th:** ₹700 / month | **Class 1st to 5th:** ₹500 / month\n• **Special English by Aditi Singh:** 1st–5th (₹500), 6th–8th (₹700), 9th–12th (₹1,000)\n• **Annual Advance Scholarship:** 5% scholarship discount on full-year lump sum payment\n\n✨ *Includes printed study modules, Sunday board mock test series & digital smartboard access.*`,
-=======
   // ── Canonical academic facts ────────────────────────────────────────────────
   // Every fee, batch and faculty line the assistant speaks is derived from
   // js/academic-config.js. Hardcoding them here had drifted badly, and this is
@@ -58,19 +46,11 @@
   function academic() {
     return (typeof window !== 'undefined' && window.PRAGYAN_ACADEMIC) || null;
   }
->>>>>>> claude/admiring-kepler-50a04f
 
   function inr(amount) {
     return '₹' + Number(amount).toLocaleString('en-IN');
   }
 
-<<<<<<< HEAD
-    "Who are the teachers at Pragyan Institute?":
-      `👨‍🏫 **Expert Mentors & Leadership Faculty:**\n• **CHANDAN KUMAR** — Science Lead & Sole Administrator (M.Sc Physics, B.Ed, D.El.Ed, CTET Qualified, 10+ Yrs Exp, **10,000+ Students Mentored**)\n• **PROF. RAVI RANJAN** — Mathematics Mentor (M.Sc Maths, B.Ed, CTET Qualified, 15+ Yrs Exp, **12,000+ Students Mentored**)\n• **ADITI SINGH** — English & Grammar Mentor (M.Com, 5+ Yrs Exp, **1,000+ Students Mentored**)\n\n🏆 *Proven track record of 100% board exam pass rates and top ranks across Lalganj & Vaishali!*`,
-
-    "Tell me about the 3 days free demo classes":
-      `🎁 **3 Days FREE Demo Classes:**\n• Experience our digital smartboards, concept-first pedagogy, and teaching excellence for 3 days with **zero cost and zero admission fee**!\n• Available for Class 1st to 12th and Special English Batches.\n\n📲 Call / WhatsApp: **[+91 73698 91858](tel:+917369891858)** to reserve your demo seat today!`,
-=======
   /**
    * Batches grouped by monthly fee, dearest tier first. Grouping keeps the
    * answer to five bullets instead of twelve — readable on a phone — while
@@ -97,7 +77,6 @@
         tier.batches.map(function (b) { return b.name; }).join(', ');
     }).join('\n');
   }
->>>>>>> claude/admiring-kepler-50a04f
 
   /** Every batch on its own line with its own rate, for "which batches" asks. */
   function batchLines(bullet) {
@@ -191,32 +170,11 @@ STRICT ANSWER FORMATTING & LENGTH RULES:
    - Use bold emoji headers for each bullet point to make it visually engaging (e.g. 🐾 **Species & Nature**, 🧠 **Key Attributes**, 💡 **Importance**).
    - NEVER output raw markdown '#' or '###' header tags.
 
-2. ACCURATE PRAGYAN INSTITUTE FACTS & ACADEMIC STRUCTURE:
+2. ACCURATE PRAGYAN INSTITUTE FACTS:
    - Location: At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj (Google Maps: https://maps.app.goo.gl/jhpW5ynQntfTMa2aA)
    - Helpline & WhatsApp: +91 73698 91858
    - Timings: Mon-Sat 6:30 AM - 8:00 PM | Sun 9:00 AM - 1:00 PM
    - Interactive Digital Smartboards: High-tech smartboards in all classrooms for 3D physics/chemistry visual animations and step-by-step digital math solving.
-<<<<<<< HEAD
-   - Sole Administrator & Expert Faculty:
-     * Chandan Kumar: Science Lead & Sole Administrator (M.Sc Physics, B.Ed, D.El.Ed, CTET, 10+ Yrs Exp, 10,000+ Students Mentored)
-     * Prof. Ravi Ranjan: Higher Mathematics Lead (M.Sc Maths, B.Ed, CTET, 15+ Yrs Exp, 12,000+ Students Mentored)
-     * Aditi Singh: English & Grammar Mentor (M.Com, 5+ Yrs Exp, 1,000+ Students Mentored)
-   - Master 12 Canonical Batches & Nominal Monthly Fees:
-     * Class 12th PCM: ₹1,500 / month
-     * Class 12th PCB: ₹1,500 / month
-     * Class 11th PCM: ₹1,500 / month
-     * Class 11th PCB: ₹1,500 / month
-     * Class 10th (ACHIEVER / Matric Board): ₹1,000 / month
-     * Class 9th (NURTURE / Foundation): ₹1,000 / month
-     * Class 8th (ALPHA / Middle School): ₹800 / month
-     * Class 6th & 7th (PIONEER Foundation): ₹700 / month
-     * Class 1st to 5th (Junior Foundation): ₹500 / month
-     * Special English (Class 9th to 12th) by Aditi Singh: ₹1,000 / month
-     * Special English (Class 6th to 8th) by Aditi Singh: ₹700 / month
-     * Special English (Class 1st to 5th) by Aditi Singh: ₹500 / month
-     * 5% scholarship discount on full annual advance lump-sum payment.
-     * 10-day rolling billing window (1st to 10th of each month) with daily 100 email quota guard.
-=======
    - Expert & Experienced Faculty:
 ${facultyBlock}
    - 100% Nominal Monthly Fees (Zero admission or annual hidden fees):
@@ -224,7 +182,6 @@ ${feeBlock}
      * ${annualDiscountLabel()}.
    - Complete batch list (never invent a batch, a fee or a fee range that is not on this list; if asked about a class not listed, say the helpline will confirm availability):
 ${batchBlock}
->>>>>>> claude/admiring-kepler-50a04f
    - 3 Days Free Demo Classes for all prospective students.
    - Boards: CBSE and Bihar Board (BSEB) in English & Hindi mediums.
 
@@ -242,9 +199,6 @@ ${batchBlock}
 
     // Greetings
     if (q.match(/\b(hi|hello|hey|namaste|pranam|good morning|good afternoon|good evening|kaisa|kaise|sup)\b/)) {
-<<<<<<< HEAD
-      return `👋 **Namaste & Welcome to Pragyan Institute!**\n\nI am your **Pragyan AI Academic Assistant**. How can I help you today?\n• 💵 **Fee Structure & Batches (Class 1st to 12th & Special English)**\n• 🎁 **3 Days Free Demo Classes**\n• 👨‍🏫 **Faculty (Chandan Sir, Ravi Sir & Aditi Ma'am)**\n• 🖥️ **Smart Classrooms & 3D Visual Learning**\n• 📍 **Location, Directions & Timings in Lalganj**\n\n*Type your question below or click any quick suggestion chip!*`;
-=======
       return `👋 **Namaste & Welcome to Pragyan Institute!**\n\nI am your **Pragyan AI Academic Assistant**. How can I help you today?\n• 💵 **Fee Structure & Batches (${classRangeLabel()})**\n• 🎁 **3 Days Free Demo Classes**\n• 👨‍🏫 **Faculty (Chandan Sir, Ravi Sir & Aditi Ma'am)**\n• 🖥️ **Smart Classrooms & 3D Visual Learning**\n• 📍 **Location, Directions & Timings in Lalganj**\n\n*Type your question below or click any quick suggestion chip!*`;
     }
 
@@ -258,7 +212,6 @@ ${batchBlock}
         q.includes('scholarship') || q.includes('discount') || q.includes('paisa') ||
         q.includes('kitna') || q.includes('shulk')) {
       return `💵 **Nominal Monthly Fee Structure (Zero Hidden Charges):**\n${feeTierLines()}\n• **Annual Scholarship:** ${annualDiscountLabel()}\n\n✨ *No admission fee. Includes printed study modules, weekly board test series & 3D VIP portal access.*`;
->>>>>>> claude/admiring-kepler-50a04f
     }
 
     // Smartboards & Visual Tech
@@ -272,20 +225,6 @@ ${batchBlock}
     }
 
     // Faculty & Mentors
-<<<<<<< HEAD
-    if (q.includes('teacher') || q.includes('faculty') || q.includes('sir') || q.includes('chandan') || q.includes('ravi') || q.includes('aditi') || q.includes('english') || q.includes('mentor') || q.includes('founder') || q.includes('who teaches')) {
-      return `👨‍🏫 **Expert Mentors & Faculty Leadership:**\n• **CHANDAN KUMAR** — Science Lead & Sole Administrator (M.Sc Physics, B.Ed, D.El.Ed, CTET, 10+ Yrs Exp, **10,000+ Students Mentored**)\n• **PROF. RAVI RANJAN** — Higher Maths Mentor (M.Sc Maths, B.Ed, CTET, 15+ Yrs Exp, **12,000+ Students Mentored**)\n• **ADITI SINGH** — English & Grammar Mentor (M.Com, 5+ Yrs Exp, **1,000+ Students Mentored**)\n\n🏆 *Dedicated mentorship with a proven 100% board exam pass rate across Lalganj & Vaishali!*`;
-    }
-
-    // Fees, Pricing & Scholarships
-    if (q.includes('fee') || q.includes('fees') || q.includes('cost') || q.includes('price') || q.includes('nominal') || q.includes('charge') || q.includes('payment') || q.includes('money') || q.includes('scholarship') || q.includes('paisa') || q.includes('kitna')) {
-      return `💵 **Nominal Monthly Fee Structure (Zero Hidden Charges):**\n• **Class 11th & 12th (PCM / PCB):** ₹1,500 / month\n• **Class 9th & 10th (Matric / Foundation):** ₹1,000 / month\n• **Class 8th:** ₹800 / mo | **Class 6th & 7th:** ₹700 / mo | **Class 1st to 5th:** ₹500 / mo\n• **Special English by Aditi Singh:** 1st–5th (₹500), 6th–8th (₹700), 9th–12th (₹1,000)\n• **5% Annual Scholarship:** 5% concession on full annual lump-sum advance payment\n\n✨ *No admission fee. Includes printed study modules, weekly board test series & digital smartboard access.*`;
-    }
-
-    // Demo Classes
-    if (q.includes('demo') || q.includes('trial') || q.includes('free') || q.includes('free class')) {
-      return `🎁 **3 Days FREE Demo Classes:**\n• Experience our digital smartboards and conceptual teaching pedagogy for 3 days with **zero cost and zero admission fee**!\n• Open for Class 1st to 12th (CBSE & BSEB) and Special English batches.\n\n📲 Call / WhatsApp: **[+91 73698 91858](tel:+917369891858)** to reserve your demo seat!`;
-=======
     if (q.includes('teacher') || q.includes('faculty') || q.includes('sir') || q.includes('ma\'am') ||
         q.includes('madam') || q.includes('chandan') || q.includes('ravi') || q.includes('aditi') ||
         q.includes('mentor') || q.includes('founder') || q.includes('who teaches') ||
@@ -299,7 +238,6 @@ ${batchBlock}
     // a demo-class booking pitch.
     if (q.includes('demo') || q.includes('trial') || /\bfree\b/.test(q)) {
       return `🎁 **3 Days FREE Demo Classes:**\n• Experience our digital smartboards and conceptual teaching pedagogy for 3 days with **zero cost and zero admission fee**!\n• Open for every batch from ${classRangeLabel()} (CBSE & BSEB), including the Special English batches.\n\n📲 Call / WhatsApp: **[+91 73698 91858](tel:+917369891858)** to reserve your demo seat!`;
->>>>>>> claude/admiring-kepler-50a04f
     }
 
     // Admissions & Enrollment

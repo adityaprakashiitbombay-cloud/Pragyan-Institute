@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-// Service Worker — Pragyan Institute Portal (v83.3)
-const CACHE_NAME = 'pragyan-portal-v90.0.41b75292';
-=======
 // ============================================================================
 // Service Worker — Pragyan Institute Portal
 // ----------------------------------------------------------------------------
@@ -21,8 +17,7 @@ const CACHE_NAME = 'pragyan-portal-v90.0.41b75292';
 //      with { ignoreSearch: true }.
 // ============================================================================
 
-const CACHE_NAME = 'pragyan-portal-v90.0.4dc3a91d';
->>>>>>> claude/admiring-kepler-50a04f
+const CACHE_NAME = 'pragyan-portal-v90.0.e3b106a9';
 
 // Static assets to pre-cache for instant loads
 const PRECACHE_ASSETS = [
@@ -31,30 +26,17 @@ const PRECACHE_ASSETS = [
   './pay.html',
   './features.html',
   './manifest.json',
-<<<<<<< HEAD
-  './css/variables.css?v=90.0.41b75292',
-  './css/main.css?v=90.0.41b75292',
-  './css/components.css?v=90.0.41b75292',
-  './css/animations.css?v=90.0.41b75292',
-  './css/portal.css?v=90.0.41b75292',
-  './js/config.js?v=90.0.41b75292',
-  './js/chat.js?v=90.0.41b75292',
-  './js/supabase-sync.js?v=90.0.41b75292',
-  './js/app.js?v=90.0.41b75292',
-  './js/portal.js?v=90.0.41b75292',
-=======
-  './css/variables.css?v=90.0.4dc3a91d',
-  './css/main.css?v=90.0.4dc3a91d',
-  './css/components.css?v=90.0.4dc3a91d',
-  './css/animations.css?v=90.0.4dc3a91d',
-  './css/portal.css?v=90.0.4dc3a91d',
-  './js/config.js?v=90.0.4dc3a91d',
-  './js/academic-config.js?v=90.0.4dc3a91d',
-  './js/supabase-sync.js?v=90.0.4dc3a91d',
-  './js/chat.js?v=90.0.4dc3a91d',
-  './js/app.js?v=90.0.4dc3a91d',
-  './js/portal.js?v=90.0.4dc3a91d',
->>>>>>> claude/admiring-kepler-50a04f
+  './css/variables.css?v=90.0.e3b106a9',
+  './css/main.css?v=90.0.e3b106a9',
+  './css/components.css?v=90.0.e3b106a9',
+  './css/animations.css?v=90.0.e3b106a9',
+  './css/portal.css?v=90.0.e3b106a9',
+  './js/config.js?v=90.0.e3b106a9',
+  './js/academic-config.js?v=90.0.e3b106a9',
+  './js/supabase-sync.js?v=90.0.e3b106a9',
+  './js/chat.js?v=90.0.e3b106a9',
+  './js/app.js?v=90.0.e3b106a9',
+  './js/portal.js?v=90.0.e3b106a9',
   './assets/images/favicon.ico',
   './assets/images/logo.png',
   './assets/images/apple-touch-icon.png',
@@ -127,17 +109,9 @@ self.addEventListener('install', event => {
 // Activate: clean up older cache generations and claim clients immediately
 self.addEventListener('activate', event => {
   event.waitUntil(
-<<<<<<< HEAD
-    caches.keys().then(keys => {
-      return Promise.all(
-        keys.map(key => (key !== CACHE_NAME || self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1') ? caches.delete(key) : null)
-      );
-    }).then(() => self.clients.claim())
-=======
     caches.keys()
       .then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))))
       .then(() => self.clients.claim())
->>>>>>> claude/admiring-kepler-50a04f
   );
 });
 
@@ -148,18 +122,11 @@ self.addEventListener('message', event => {
 
 // Fetch: network-first for code, cache-first for media
 self.addEventListener('fetch', event => {
-<<<<<<< HEAD
-  const url = new URL(event.request.url);
-
-  // Skip non-GET requests, API backend routes, direct Supabase calls, and localhost development from SW caching
-  if (event.request.method !== 'GET' || url.pathname.startsWith('/api/') || url.hostname.includes('supabase.co') || url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
-=======
   const request = event.request;
   let url;
   try {
     url = new URL(request.url);
   } catch (_) {
->>>>>>> claude/admiring-kepler-50a04f
     return;
   }
 

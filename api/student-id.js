@@ -24,42 +24,8 @@
 //      `now() AT TIME ZONE 'Asia/Kolkata'`.
 // ============================================================================
 
-<<<<<<< HEAD
-function getClassCode(className = '') {
-  const cStr = String(className || '').toUpperCase();
-  if (cStr.includes('12') || cStr.includes('XII') || cStr.includes('TARGET 12')) {
-    return '12';
-  } else if (cStr.includes('11') || cStr.includes('XI') || cStr.includes('TARGET 11')) {
-    return '11';
-  } else if (cStr.includes('10') || cStr.includes('ACHIEVER') || cStr.includes('X') || cStr.includes('BOARD') || cStr.includes('MATRIC')) {
-    return '10';
-  } else if (cStr.includes('9') || cStr.includes('NURTURE') || cStr.includes('IX')) {
-    return '09';
-  } else if (cStr.includes('8') || cStr.includes('ALPHA') || cStr.includes('VIII')) {
-    return '08';
-  } else if (cStr.includes('7') || cStr.includes('VII')) {
-    return '07';
-  } else if (cStr.includes('6') || cStr.includes('VI')) {
-    return '06';
-  } else if (cStr.includes('5') || cStr.includes('V') || cStr.includes('1ST TO 5TH') || cStr.includes('1-5') || cStr.includes('PRIMARY') || cStr.includes('JUNIOR')) {
-    return '05';
-  } else if (cStr.includes('4') || cStr.includes('IV')) {
-    return '04';
-  } else if (cStr.includes('3') || cStr.includes('III')) {
-    return '03';
-  } else if (cStr.includes('2') || cStr.includes('II')) {
-    return '02';
-  } else if (cStr.includes('1') || cStr.includes('IST') || cStr.includes('1ST')) {
-    return '01';
-  }
-  const match = cStr.match(/\b([1-9]|1[0-2])\b/);
-  if (match) return match[1].padStart(2, '0');
-  return '10';
-}
-=======
 import { getSupabase, requireSession, applyCors } from './_lib/auth.js';
 import { resolveBatch } from './_lib/academic-config.js';
->>>>>>> claude/admiring-kepler-50a04f
 
 export default async function handler(req, res) {
   if (applyCors(req, res)) return;

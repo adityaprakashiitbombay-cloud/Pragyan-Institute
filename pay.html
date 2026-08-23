@@ -979,17 +979,6 @@
 
     </main>
 
-<<<<<<< HEAD
-    <!-- Footer -->
-    <div class="footer-note">
-      <strong>PRAGYAN INSTITUTE LALGANJ</strong> • At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj, Bihar<br>
-      Helpline / WhatsApp: <strong>+91 73698 91858</strong>
-    </div>
-  </div>
-
-  <script src="js/config.js?v=90.0.41b75292"></script>
-  <script src="js/supabase-sync.js?v=90.0.41b75292"></script>
-=======
     <footer class="footer-note">
       <strong>PRAGYAN INSTITUTE LALGANJ</strong> &bull; Near Gandhi Chowk, Lalganj, Vaishali, Bihar
       <span class="helpline-row">
@@ -1005,10 +994,9 @@
     </footer>
   </div>
 
-  <script src="js/academic-config.js?v=90.0.4dc3a91d"></script>
-  <script src="js/config.js?v=90.0.4dc3a91d"></script>
-  <script src="js/supabase-sync.js?v=90.0.4dc3a91d"></script>
->>>>>>> claude/admiring-kepler-50a04f
+  <script src="js/academic-config.js?v=90.0.e3b106a9"></script>
+  <script src="js/config.js?v=90.0.e3b106a9"></script>
+  <script src="js/supabase-sync.js?v=90.0.e3b106a9"></script>
   <script>
   /* ==========================================================================
    * PAYMENT GATEWAY PAGE LOGIC
@@ -1041,47 +1029,6 @@
   (function () {
     'use strict';
 
-<<<<<<< HEAD
-    // Guaranteed Mathematical Consistency & Batch Fee Rate Resolution.
-    // Canonical 12-batch resolver — keep in sync with api/cron-monthly-fees.js
-    // getStudentDefaultMonthlyFee(). Special English is tested FIRST because
-    // "Special English: Class 9th to 12th" contains both '9' and '12'; raw
-    // substring checks also wrongly matched '1' inside 'Class 10th' (₹500 bug).
-    const strBatch = String(batch || '').toLowerCase();
-    function classNum(n) {
-      if (n === 1) return strBatch.includes('1st') || /(^|[^0-9])1([^0-9]|$)/.test(strBatch);
-      if (n === 2) return strBatch.includes('2nd') || /(^|[^0-9])2([^0-9]|$)/.test(strBatch);
-      if (n === 3) return strBatch.includes('3rd') || /(^|[^0-9])3([^0-9]|$)/.test(strBatch);
-      return strBatch.includes(`${n}th`) || new RegExp(`(^|[^0-9])${n}([^0-9]|$)`).test(strBatch);
-    }
-    let defaultMonthly = 1000;
-    if (strBatch.includes('special english')) {
-      if ([12, 11, 10, 9].some(classNum)) defaultMonthly = 1000;
-      else if ([8, 7, 6].some(classNum)) defaultMonthly = 700;
-      else defaultMonthly = 500;
-    } else if (classNum(12) || classNum(11)) defaultMonthly = 1500;
-    else if (classNum(10) || classNum(9)) defaultMonthly = 1000;
-    else if (classNum(8)) defaultMonthly = 800;
-    else if (classNum(6) || classNum(7)) defaultMonthly = 700;
-    else if (strBatch.includes('junior') || [5, 4, 3, 2, 1].some(classNum)) defaultMonthly = 500;
-
-    if (prev + curr !== totalDueAmount || (prev === 0 && curr === 0 && totalDueAmount > 0)) {
-      if (totalDueAmount <= 0) {
-        prev = 0;
-        curr = 0;
-      } else if (totalDueAmount > defaultMonthly) {
-        prev = totalDueAmount - defaultMonthly;
-        curr = defaultMonthly;
-      } else {
-        prev = 0;
-        curr = totalDueAmount;
-      }
-    }
-
-    const defaultMonthlyRate = curr > 0 ? curr : defaultMonthly;
-    let paymentMode = 'full'; // 'full' or 'partial'
-    let activePayAmount = totalDueAmount > 0 ? totalDueAmount : defaultMonthlyRate;
-=======
     var ACADEMIC = window.PRAGYAN_ACADEMIC || null;
     var PAYEE = (ACADEMIC && ACADEMIC.PAYEE) ||
       { upiId: 'chandankr1501998@ybl', name: 'CHANDAN KUMAR', displayName: 'Chandan Kumar', role: 'Managing Director, Pragyan Institute' };
@@ -1133,7 +1080,6 @@
         return false;
       }
     }
->>>>>>> claude/admiring-kepler-50a04f
 
     // ---- Incoming link ----------------------------------------------------
     var params = new URLSearchParams(window.location.search);
@@ -1515,41 +1461,32 @@
       // whole balance into the partial field reaches the admin queue as the full
       // payment it is.
       var isFull = !isAdvance && paying >= totalDue;
-      var requestId = ('REQ-PAY-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 5)).toUpperCase();
-      var payload = {
-        request_id: requestId,
-        student_id: roll || studentName,
-        student_name: studentName,
-        roll_no: roll,
-        class_name: resolvedBatch ? resolvedBatch.className : batchName,
-        req_type: 'PAYMENT_VERIFICATION',
-        status: 'Pending',
-        request_date: ACADEMIC && ACADEMIC.istDateKey ? ACADEMIC.istDateKey(new Date()) : new Date().toISOString().slice(0, 10),
-        new_data: {
-          paymentDetails: {
-            amount: paying,
-            paymentType: isFull ? 'FULL_PAYMENT' : 'PARTIAL_PAYMENT',
-            // Named "claimed" because these come from the query string, which
-            // the student controls. The admin approval screen is the authority.
-            claimedTotalDueBefore: totalDue,
-            totalDueBefore: totalDue,
-            remainingDueAfter: Math.max(0, totalDue - paying),
-            batchId: resolvedBatch ? resolvedBatch.batchId : null,
-            utr: utr,
-            mode: el('payModeSelect').value,
-            submittedAt: new Date().toISOString(),
-            note: 'Online ' + (isAdvance ? 'advance' : (isFull ? 'full' : 'partial')) + ' payment of ' + inr(paying) +
-                  ' submitted via the payment gateway for ' + studentName + (roll ? ' (' + roll + ')' : '')
-          }
-        }
+      // Flat submission body for /api/payment-request — the server resolves
+      // identity, mints the real request_id and enforces UTR uniqueness. The
+      // name/batch below are display hints only and are never stored as truth.
+      var submission = {
+        roll: roll,
+        studentName: studentName,
+        batch: batchName,
+        amount: paying,
+        mode: el('payModeSelect').value,
+        paymentType: isFull ? 'FULL_PAYMENT' : 'PARTIAL_PAYMENT',
+        // Named "claimed" because these come from the query string, which the
+        // student controls. The approval screen shows them next to the live dues.
+        claimedTotalDueBefore: totalDue,
+        remainingDueAfter: Math.max(0, totalDue - paying),
+        utr: utr,
+        note: 'Online ' + (isAdvance ? 'advance' : (isFull ? 'full' : 'partial')) + ' payment of ' + inr(paying) +
+              ' submitted via the payment gateway for ' + studentName + (roll ? ' (' + roll + ')' : '')
       };
+      var requestId = null; // assigned by the server on success
 
       submitBtn.disabled = true;
       submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Submitting…';
       setStatus('Sending your payment reference to the institute…', null);
 
       function finishFailure(reason) {
-        rememberUndelivered(payload, reason);
+        rememberUndelivered(submission, reason);
         setStatus(
           'We could not deliver this to the institute. ' + reason +
           ' Your details are saved on this device only — nothing has reached the office yet.' +
@@ -1560,17 +1497,21 @@
         submitBtn.innerHTML = '<i class="fa-solid fa-rotate-right" aria-hidden="true"></i> Retry submission';
       }
 
-      function finishSuccess() {
+      function finishSuccess(serverRequestId, alreadyRecorded) {
+        requestId = serverRequestId || requestId || ('LOCAL-' + utr);
         // Record the UTR so a second tap on Submit is caught locally, and drop
         // any copy queued by an earlier failed attempt now that it has landed.
         writeJson(DELIVERED_UTR_KEY, readJsonArray(DELIVERED_UTR_KEY).concat([utr]).slice(-50));
         writeJson(UNDELIVERED_KEY, readJsonArray(UNDELIVERED_KEY).filter(function (queued) {
-          var details = queued && queued.payload && queued.payload.new_data && queued.payload.new_data.paymentDetails;
-          return !details || String(details.utr || '').toUpperCase() !== utr;
+          var qUtr = queued && queued.payload ? queued.payload.utr : null;
+          return !qUtr || String(qUtr).toUpperCase() !== utr.toUpperCase();
         }));
 
+        var prefix = alreadyRecorded
+          ? 'This UTR was already submitted earlier — no duplicate has been created.'
+          : 'Payment reference received.';
         setStatus(
-          'Payment reference received. Amount ' + inr(paying) + ', UTR ' + utr + ', request ID ' + requestId + '.' +
+          prefix + ' Amount ' + inr(paying) + ', UTR ' + utr + ', request ID ' + requestId + '.' +
           ' The administration will verify it and update your fee statement, usually within 24 hours.',
           'ok'
         );
@@ -1582,18 +1523,29 @@
         }, 3000);
       }
 
-      // mutate() resolves with { success: false, error } instead of throwing, so
-      // the result has to be inspected. The old code only had a catch block and
-      // therefore reported every rejected write as a success.
-      if (!window.SupabaseSync || typeof window.SupabaseSync.mutate !== 'function') {
-        finishFailure('The sync service did not load.');
-        return;
-      }
-
-      window.SupabaseSync.mutate('student_requests', 'insert', payload, { conflict: 'request_id' })
+      fetch('/api/payment-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(submission)
+      })
+        .then(function (response) {
+          return response.json().catch(function () { return {}; }).then(function (json) {
+            return { status: response.status, json: json };
+          });
+        })
         .then(function (result) {
-          if (result && result.success) finishSuccess();
-          else finishFailure(result && result.error ? 'The database reported: ' + result.error + '.' : 'The database rejected the request.');
+          var json = result.json || {};
+          if (result.status === 200 && json.success) {
+            finishSuccess(json.requestId, false);
+          } else if (result.status === 409 && json.code === 'DUPLICATE_UTR') {
+            // Already recorded — that is a delivery, not a failure. Treating it
+            // as one stops the retry loop the old error text invited.
+            finishSuccess(json.alreadyMine ? json.requestId : null, true);
+          } else if (json && json.error) {
+            finishFailure('The office replied: ' + String(json.error).slice(0, 140));
+          } else {
+            finishFailure('The submission service answered with status ' + result.status + '.');
+          }
         })
         .catch(function (err) {
           finishFailure('Network error: ' + (err && err.message ? err.message : 'unknown') + '.');

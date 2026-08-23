@@ -66,47 +66,9 @@ export default async function handler(req, res) {
     : null;
 
   try {
-    const supabase = getSupabase({ allowAnon: true });
-
-    // Quota Guard: Enforce 100 emails/day Resend limit.
-    // Counting window is IST-aligned (Asia/Kolkata midnight) to match the
-    // billing schedule; UTC-date windows leaked sends across the 05:30 offset.
-    let totalSentToday = 0;
-    if (supabase) {
-      const istParts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' })
-        .formatToParts(new Date())
-        .reduce((all, part) => ({ ...all, [part.type]: part.value }), {});
-      const startIso = new Date(`${istParts.year}-${istParts.month}-${istParts.day}T00:00:00+05:30`).toISOString();
-      const endIso = new Date(new Date(startIso).getTime() + 24 * 60 * 60 * 1000).toISOString();
-      const { data: ledgerSent } = await supabase
-        .from('fee_billing_ledger')
-        .select('id')
-        .gte('email_sent_at', startIso)
-        .lt('email_sent_at', endIso);
-      const { data: receiptsSent } = await supabase
-        .from('fee_receipts')
-        .select('receipt_no')
-        .gte('created_at', startIso)
-        .lt('created_at', endIso);
-      totalSentToday = (ledgerSent?.length || 0) + (receiptsSent?.length || 0);
-
-      const remainingSlots = Math.max(0, 100 - totalSentToday);
-      if (totalSentToday + recipients.length > 100) {
-        return res.status(429).json({
-          success: false,
-          error: `Daily email limit exceeded. Today's usage is ${totalSentToday}/100 with only ${remainingSlots} slots remaining.`,
-          totalSentToday,
-          remainingQuota: remainingSlots
-        });
-      }
-    }
-
     if (session.role === 'student') {
-<<<<<<< HEAD
-=======
       // getSupabase is service-role only; there is no anon fallback to opt into.
       const supabase = getSupabase();
->>>>>>> claude/admiring-kepler-50a04f
       if (supabase) {
         const { data: student } = await supabase.from('students').select('email').eq('student_id', session.sub).maybeSingle();
         if (student?.email && recipients[0].toLowerCase() !== student.email.toLowerCase()) {
@@ -136,10 +98,6 @@ export default async function handler(req, res) {
       }
       throw quotaError;
     }
-<<<<<<< HEAD
-    const newRemainingQuota = Math.max(0, 100 - (totalSentToday + recipients.length));
-    return res.status(200).json({ success: true, data: result.data, remainingQuota: newRemainingQuota });
-=======
 
     if (!reservation.granted_count) {
       // 429 with the numbers, so the dashboard can say exactly what is left
@@ -241,7 +199,6 @@ export default async function handler(req, res) {
       deferred: reservation.deferred,
       quota: { limit: reservation.limit, remaining: reservation.remaining_after }
     });
->>>>>>> claude/admiring-kepler-50a04f
   } catch (error) {
     const errMsg = extractResendErrorMessage(error);
     console.error('Send email error:', errMsg);

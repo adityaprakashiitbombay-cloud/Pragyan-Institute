@@ -73,11 +73,7 @@
   "crons": [
     {
       "path": "/api/cron-monthly-fees",
-<<<<<<< HEAD
-      "schedule": "0 4 1,2,3,4,5,6,7,8,9,10,15 * *"
-=======
       "schedule": "0 4 1-10 * *"
->>>>>>> claude/admiring-kepler-50a04f
     }
   ]
 }

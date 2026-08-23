@@ -15,6 +15,12 @@
 
   const REST_BASE = `${SUPABASE_URL}/rest/v1`;
 
+  // Authenticated data gateway (api/db.js). All table reads/writes route through
+  // this JWT-gated endpoint so Row Level Security can lock PostgREST down to
+  // public notices/batches only. The legacy REST_BASE above remains solely for
+  // pre-auth fallback paths that are being retired.
+  const API_BASE = (_cfg.API_BASE || (typeof window !== 'undefined' && window.PRAGYAN_API_BASE) || '').replace(/\/$/, '');
+
   // ── localStorage key map ────────────────────────────────────────────────────
   const KEY_MAP = {
     students:           'pragyan_db_students_master',
@@ -403,15 +409,43 @@
       return text ? JSON.parse(text) : [];
     },
 
+    /**
+     * Authenticated gateway transport (POST /api/db).
+     * Resolves with the response `data` payload; throws on any failure with a
+     * message that keeps the HTTP status prefix so existing catch-site logging
+     * stays meaningful.
+     */
+    async _apiDb(table, operation, { data = null, filters = {}, options = {} } = {}) {
+      const token = this.sessionToken;
+      if (!token) {
+        throw new Error(`Gateway ${operation} ${table} failed (401): no active session`);
+      }
+      const response = await fetch(`${API_BASE}/api/db`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ table, operation, data, filters }),
+        signal: options?.signal
+      });
+      let json = null;
+      try { json = await response.json(); } catch (_) {}
+      if (!response.ok || !json || json.success !== true) {
+        const msg = json?.error || `HTTP ${response.status}`;
+        throw new Error(`Gateway ${operation} ${table} failed (${response.status}): ${String(msg).slice(0, 200)}`);
+      }
+      return Array.isArray(json.data) ? json.data : (json.data ?? []);
+    },
+
     // ── Read All Records from a Table ───────────────────────────────────────
     async readAll(table, extraQuery = '', options = {}) {
       const QUERY_TIMEOUT_MS = options.timeout || 15000; // 15 seconds default
-      const orderCol = ORDER_COLUMNS[table] || 'id';
-      const dir = (table === 'student_requests' || table === 'notices' || table === 'audit_logs') ? 'desc' : 'asc';
-      const pageSize = 1000;
+      const pageSize = 1000;                            // gateway hard cap per page
       const maxRows = options.maxRows || 10000;
       let offset = 0;
       let allRows = [];
+      const seenIds = new Set();                        // offset-paging drift guard
       const startTime = Date.now();
 
       while (offset < maxRows) {
@@ -421,9 +455,6 @@
           throw new Error(`Query timeout: ${table} took longer than ${QUERY_TIMEOUT_MS}ms`);
         }
 
-        let params = `select=*&order=${orderCol}.${dir}&limit=${pageSize}&offset=${offset}`;
-        if (extraQuery) params += `&${extraQuery}`;
-
         // Create AbortController for this page fetch
         const pageAbortController = new AbortController();
         const pageTimeout = setTimeout(() => {
@@ -432,14 +463,24 @@
         }, 5000); // 5 seconds per page
 
         try {
-          const page = await this._rest('GET', table, params, null, {}, {
-            ...options,
-            signal: pageAbortController.signal
+          // Row scoping (student role) is enforced server-side by the gateway;
+          // the legacy extraQuery filter string is no longer needed here.
+          const page = await this._apiDb(table, 'select', {
+            filters: { limit: pageSize, offset },
+            options: { signal: pageAbortController.signal }
           });
           clearTimeout(pageTimeout);
 
           if (!Array.isArray(page) || page.length === 0) break;
-          allRows.push(...page);
+          for (const row of page) {
+            const dedupeKey = row && typeof row === 'object'
+              ? (row.id ?? row.receipt_no ?? row.request_id ?? row.log_id ??
+                 row.student_id ?? row.batch_id ?? row.admin_id ?? JSON.stringify(row))
+              : row;
+            if (seenIds.has(dedupeKey)) continue;
+            seenIds.add(dedupeKey);
+            allRows.push(row);
+          }
           if (page.length < pageSize) break;
           offset += pageSize;
         } catch (err) {
@@ -476,42 +517,22 @@
           const currentStudent = (activeRole === 'student' && typeof AppState !== 'undefined' && AppState.currentUser) ? AppState.currentUser : null;
           const currentStudentId = currentStudent ? (currentStudent.id || currentStudent.student_id || currentStudent.rollNo) : null;
 
-          const tables = ALL_TABLES;
+          // Role-aware table set. Row scoping for signed-in roles is enforced
+          // SERVER-SIDE by the gateway; anonymous visitors may only pull the
+          // public catalogue — every other table would 401 and poison the
+          // failure accounting on the marketing site.
+          const hasSession = Boolean(this.sessionToken ||
+            sessionStorage.getItem('pragyan_portal_token') || localStorage.getItem('pragyan_portal_token'));
+          const tables = hasSession
+            ? ALL_TABLES
+            : ['notices', 'batches'];
 
-          // Fetch all tables in parallel with allSettled
+          // Fetch all tables in parallel with allSettled. Row scoping for the
+          // student role is applied by the gateway from the signed session —
+          // client-side filter strings are neither needed nor trusted.
           const fetchResults = await Promise.allSettled(
             tables.map(async table => {
-              let filter = '';
-              if (activeRole === 'student' && currentStudentId) {
-                // SECURITY: Sanitize all user input before using in queries
-                const sanitizedId = this._sanitizeForQuery(currentStudentId);
-                const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sanitizedId);
-                const sRoll = this._sanitizeForQuery(String(currentStudent.rollNo || currentStudent.roll_no || ''));
-                const sStuId = this._sanitizeForQuery(String(currentStudent.student_id || currentStudent.id || ''));
-
-                if (table === 'students') {
-                  if (isUuid) {
-                    filter = `or=(student_id.eq.${this._encodeFilterValue(sStuId || sanitizedId)},id.eq.${this._encodeFilterValue(sanitizedId)})`;
-                  } else {
-                    const clauses = [`student_id.eq.${this._encodeFilterValue(sanitizedId)}`];
-                    if (sRoll && sRoll !== sanitizedId) clauses.push(`roll_no.eq.${this._encodeFilterValue(sRoll)}`);
-                    filter = clauses.length > 1 ? `or=(${clauses.join(',')})` : clauses[0];
-                  }
-                } else if (table === 'fee_receipts') {
-                  const dbUuid = this._sanitizeForQuery(currentStudent.db_uuid || (isUuid ? sanitizedId : ''));
-                  if (dbUuid) {
-                    filter = `student_id.eq.${this._encodeFilterValue(dbUuid)}`;
-                  }
-                } else if (table === 'fee_billing_ledger') {
-                  const sStuId = this._sanitizeForQuery(String(currentStudent.student_id || currentStudent.id || sanitizedId));
-                  filter = `student_id.eq.${this._encodeFilterValue(sStuId)}`;
-                } else if (table === 'student_requests') {
-                  const clauses = [`student_id.eq.${this._encodeFilterValue(sanitizedId)}`];
-                  if (sRoll && sRoll !== sanitizedId) clauses.push(`roll_no.eq.${this._encodeFilterValue(sRoll)}`);
-                  filter = clauses.length > 1 ? `or=(${clauses.join(',')})` : clauses[0];
-                }
-              }
-              const rows = await this.readAll(table, filter);
+              const rows = await this.readAll(table);
               return { table, rows };
             })
           );
@@ -833,39 +854,50 @@
           return rowObj;
         });
 
-        if (operation === 'insert') {
+        if (operation === 'insert' || operation === 'upsert') {
+          // Notices whose ids are client-minted non-UUIDs must go through a
+          // plain insert so Postgres generates a real uuid; everything else
+          // rides the conflict-targeted upsert (merge semantics preserved).
           const hasNonUuidNotice = table === 'notices' && rows.some(r => !r.id);
-          const params = (conflictCol && !hasNonUuidNotice) ? `on_conflict=${conflictCol}` : '';
-          result = await this._rest('POST', table, params, rows, {
-            'Prefer': 'return=representation,resolution=merge-duplicates'
-          });
-        } else if (operation === 'upsert') {
-          const hasNonUuidNotice = table === 'notices' && rows.some(r => !r.id);
-          const params = (conflictCol && !hasNonUuidNotice) ? `on_conflict=${conflictCol}` : '';
-          result = await this._rest('POST', table, params, rows, {
-            'Prefer': 'return=representation,resolution=merge-duplicates'
+          const gatewayOp = (operation === 'upsert' && !hasNonUuidNotice && conflictCol)
+            ? 'upsert'
+            : 'insert';
+          result = await this._apiDb(table, gatewayOp, {
+            data: rows,
+            filters: gatewayOp === 'upsert' ? { conflict: conflictCol } : {}
           });
         } else if (operation === 'update') {
           if (!filters.where || Object.keys(filters.where).length === 0) {
             return { success: false, error: 'Update requires a where clause' };
           }
-          const whereParams = Object.entries(filters.where)
-            .map(([col, val]) => `${col}=eq.${val}`).join('&');
-          result = await this._rest('PATCH', table, whereParams, data);
+          // Send the NORMALIZED row, not the raw caller object — the legacy
+          // path PATCHed camelCase/virtual fields straight through and every
+          // such write failed server-side with a silent 400.
+          result = await this._apiDb(table, 'update', {
+            data: rows.length ? rows[0] : {},
+            filters: { where: { ...filters.where } }
+          });
         } else if (operation === 'delete') {
           if (filters.all === true) {
+            // Bulk purge: chunk by primary key so no unfiltered DELETE can ever
+            // reach the wire (the gateway rejects those outright).
             const idCol = ORDER_COLUMNS[table] || 'id';
-            result = await this._rest('DELETE', table, `${idCol}=not.is.null`);
+            const allRows = await this._apiDb(table, 'select', {
+              filters: { columns: idCol, limit: 1000 }
+            });
+            const ids = (allRows || []).map(r => r?.[idCol]).filter(Boolean);
+            for (let i = 0; i < ids.length; i += 500) {
+              const chunk = ids.slice(i, i + 500);
+              await this._apiDb(table, 'delete', { filters: { where: { [idCol]: chunk } } });
+            }
+            result = ids;
           } else {
             if (!filters.where || Object.keys(filters.where).length === 0) {
               return { success: false, error: 'Delete requires a where clause' };
             }
-            const whereParams = Object.entries(filters.where)
-              .map(([col, val]) => {
-                if (String(val).includes('.')) return `${col}=${val}`;
-                return `${col}=eq.${val}`;
-              }).join('&');
-            result = await this._rest('DELETE', table, whereParams);
+            result = await this._apiDb(table, 'delete', {
+              filters: { where: { ...filters.where } }
+            });
           }
         } else {
           return { success: false, error: `Unknown operation: ${operation}` };
@@ -1759,6 +1791,12 @@
             }
           }
         }
+
+        // SECURITY: no credential-less fallback exists here by design. Any
+        // "dev bypass" that mints an admin session without verifying the
+        // password is a remote-code-equivalent hole in shipped code — sign-in
+        // requires the server (/api/auth-login) or a verified cloud record.
+
         return { success: false, error: 'Incorrect Admin Username, Email or Password.' };
       }
 

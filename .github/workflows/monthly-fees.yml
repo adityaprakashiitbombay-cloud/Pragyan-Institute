@@ -1,21 +1,3 @@
-<<<<<<< HEAD
-name: Monthly Fee Billing & Reminders Automation
-# Runs on the 1st-10th of each month (staggered billing days 1-6 + reminder
-# days 7-10) and the 15th for mid-month follow-up at 6 AM IST (00:30 UTC).
-# Must stay in sync with BATCH_SCHEDULE in api/cron-monthly-fees.js.
-# Also triggerable manually from GitHub Actions tab
-
-on:
-  schedule:
-    # Days 1-6: staggered fee invoicing | Days 7-10: due reminders
-    - cron: '30 0 1-10 * *'
-    # Day 15: mid-month follow-up / pending ledger sync
-    - cron: '30 0 15 * *'
-  workflow_dispatch:
-    inputs:
-      force_day:
-        description: 'Override day of month (1-10 or 15) for manual testing'
-=======
 name: Monthly Fee Billing (manual backstop)
 
 # NOTE ON SCHEDULING
@@ -43,7 +25,6 @@ on:
     inputs:
       force_day:
         description: 'Billing calendar day to run (1-10). Blank = today.'
->>>>>>> claude/admiring-kepler-50a04f
         required: false
         type: string
 

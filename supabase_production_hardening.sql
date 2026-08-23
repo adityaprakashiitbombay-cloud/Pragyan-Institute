@@ -1254,7 +1254,7 @@ BEGIN
     'public.generate_next_student_id(text)',
     'public.claim_ledger_email(uuid, integer)',
     'public.settle_ledger_email(uuid, boolean, text, text)',
-    'public.reserve_email_quota(text, text[], text, integer)',
+    'public.reserve_email_quota(text, text[], text, integer, text[])',
     'public.settle_email_dispatch(bigint[], text, text, text)',
     'public.email_quota_status(integer)',
     'public.prune_email_dispatch_log(integer)'

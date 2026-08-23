@@ -94,6 +94,25 @@ function sanitize(table, data) {
 }
 
 /**
+ * Resolve a student session identity into every identifier their rows may
+ * carry. `fee_receipts` rows historically store the UUID while `student_id`
+ * columns elsewhere store the 6-digit YYCCSS id, so child-table scoping must
+ * match both or students silently stop seeing their own receipts.
+ */
+async function resolveStudentScope(supabase, sub) {
+  const ids = new Set([sub]);
+  try {
+    const { data } = await supabase
+      .from('students')
+      .select('id, student_id')
+      .eq('student_id', sub)
+      .limit(1);
+    if (data?.[0]?.id) ids.add(data[0].id);
+  } catch (_) { /* scope falls back to the raw sub */ }
+  return [...ids];
+}
+
+/**
  * Narrow a student's request to data they own, or reject it.
  * Returns the WHERE clause the query must run with.
  */
@@ -114,6 +133,9 @@ function authorizeStudent(table, operation, data, filters, session) {
     return filters?.where || {};
   }
 
+  // Child tables may key on either identifier form; `students` itself is the
+  // canonical 6-digit id. The resolved in-list is attached by the handler,
+  // which is async — this function returns the base scope.
   const scoped = { ...(filters?.where || {}), student_id: session.sub };
 
   if (operation === 'select') return scoped;
@@ -131,7 +153,7 @@ function authorizeStudent(table, operation, data, filters, session) {
   }
 
   if (table === 'student_requests') {
-    if (operation === 'insert' || operation === 'upsert') {
+    if (operation === 'insert') {
       for (const row of rows(data)) {
         if (row?.student_id !== session.sub) {
           throw new ForbiddenError('Students may only create requests for their own record');
@@ -141,6 +163,12 @@ function authorizeStudent(table, operation, data, filters, session) {
         }
       }
       return filters?.where || {};
+    }
+    if (operation === 'upsert') {
+      // Upsert targets a conflict column and therefore ignores any WHERE —
+      // meaning a crafted request_id could overwrite another student's pending
+      // row wholesale. Students get plain inserts only; duplicates answer 409.
+      throw new ForbiddenError('Use insert to create requests');
     }
     if (operation === 'update' || operation === 'delete') {
       if (!filters?.where?.request_id && !filters?.where?.id) {
@@ -202,6 +230,12 @@ export default async function handler(req, res) {
   try {
     if (session?.role === 'student') {
       filters.where = authorizeStudent(table, operation, data, filters, session);
+      // Widen child-table scoping to every identifier form the student's rows
+      // may carry (6-digit id + UUID). `students` itself keys on the canonical id.
+      if (table !== 'students' && table !== 'admins') {
+        const scopeIds = await resolveStudentScope(supabase, session.sub);
+        filters.where = { ...filters.where, student_id: scopeIds };
+      }
     } else if (session?.role === 'admin' && table === 'admins' && operation !== 'select') {
       data = authorizeAdminTableWrite(operation, data, filters, session);
     }
