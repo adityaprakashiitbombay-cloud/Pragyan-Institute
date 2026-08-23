@@ -466,25 +466,41 @@
 .hero-slide-dots {
   position: absolute;
   bottom: 0.85rem;
-  right: 1.25rem;
+  right: 1.15rem;
   display: flex;
+  align-items: center;
   gap: 0.45rem;
-  z-index: 5;
+  z-index: 6;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 5px 10px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .hero-slide-dots .dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background-color: rgba(255, 255, 255, 0.45);
+  width: 9px !important;
+  height: 9px !important;
+  min-height: 9px !important;
+  min-width: 9px !important;
+  max-height: 9px !important;
+  max-width: 24px !important;
+  border-radius: 50% !important;
+  background-color: rgba(255, 255, 255, 0.55) !important;
+  border: none !important;
+  padding: 0 !important;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
 .hero-slide-dots .dot.active {
-  width: 24px;
-  border-radius: 12px;
-  background-color: var(--primary-terracotta);
+  width: 22px !important;
+  height: 9px !important;
+  min-height: 9px !important;
+  border-radius: 9999px !important;
+  background-color: var(--primary-terracotta) !important;
+  box-shadow: 0 0 8px rgba(181, 84, 58, 0.8) !important;
 }
 
 .floating-badge {
@@ -874,16 +890,22 @@
 
 .toggle-switch {
   position: relative;
-  width: 50px;
-  height: 26px;
+  width: 54px !important;
+  height: 30px !important;
+  min-height: 30px !important;
+  max-height: 30px !important;
   background-color: var(--border-sand-dark);
-  border-radius: 13px;
+  border-radius: 15px !important;
   cursor: pointer;
+  padding: 0 !important;
+  border: 2px solid transparent !important;
   transition: background-color var(--transition-fast);
+  flex-shrink: 0;
+  display: inline-block;
 }
 
 .toggle-switch.active {
-  background-color: var(--secondary-sage);
+  background-color: var(--primary-emerald);
 }
 
 .toggle-slider {
@@ -894,6 +916,7 @@
   height: 20px;
   border-radius: 50%;
   background-color: #fff;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.25);
   transition: transform var(--transition-fast);
 }
 
@@ -1561,9 +1584,22 @@
     height: 44px !important;
     font-size: 1rem !important;
   }
+  .hero-slide-dots {
+    bottom: 0.75rem !important;
+    right: 0.85rem !important;
+    padding: 4px 8px !important;
+    gap: 0.4rem !important;
+  }
   .hero-slide-dots .dot {
-    width: 12px;
-    height: 12px;
+    width: 8px !important;
+    height: 8px !important;
+    min-height: 8px !important;
+    min-width: 8px !important;
+  }
+  .hero-slide-dots .dot.active {
+    width: 20px !important;
+    height: 8px !important;
+    min-height: 8px !important;
   }
   .hero-stats-row {
     grid-template-columns: repeat(3, 1fr);
@@ -2066,6 +2102,7 @@
 
 @media (max-width: 480px) {
   .english-academy-section { padding-block: 3.25rem; }
-  .academy-pillar { flex-direction: column; gap: 0.75rem; }
-  .academy-banner { flex-direction: column; gap: 0.7rem; padding: 1.25rem 1.1rem; }
+  .academy-pillar { padding: 1.1rem 1.15rem; gap: 0.85rem; }
+  .academy-card { padding: 1.35rem 1.15rem; }
+  .academy-cta { width: 100%; justify-content: center; }
 }

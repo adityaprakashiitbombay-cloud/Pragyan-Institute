@@ -4597,3 +4597,144 @@ button, a, input, select, textarea {
     text-shadow: none !important;
   }
 }
+
+/* ==========================================================================
+   PHASE 4 — ADMIN & STUDENT PORTAL COMPREHENSIVE MOBILE RESPONSIVENESS
+   --------------------------------------------------------------------------
+   Guarantees clean, touch-friendly rendering across phones and tablets for
+   admin dashboards, statistics grids, management dialogs, filter bars,
+   and student fee tables.
+   ========================================================================== */
+@media (max-width: 768px) {
+  .portal-overlay {
+    padding: 0.5rem !important;
+  }
+
+  .portal-modal-card {
+    max-height: 96dvh !important;
+    border-radius: 14px !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
+  .portal-close-btn {
+    top: 0.65rem !important;
+    right: 0.65rem !important;
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
+    font-size: 1.1rem !important;
+  }
+
+  .dashboard-header-bar {
+    padding: 1rem 1.15rem !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.85rem !important;
+  }
+
+  .dashboard-user-info {
+    width: 100% !important;
+    gap: 0.85rem !important;
+  }
+
+  .user-avatar-circle {
+    width: 48px !important;
+    height: 48px !important;
+    font-size: 1.3rem !important;
+    flex-shrink: 0 !important;
+  }
+
+  .user-text-details h2 {
+    font-size: 1.15rem !important;
+  }
+
+  .dashboard-header-actions {
+    width: 100% !important;
+    justify-content: space-between !important;
+    padding-top: 0.5rem !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.15) !important;
+  }
+
+  .dashboard-nav-tabs {
+    padding: 0 0.5rem !important;
+    gap: 0.25rem !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+  }
+  .dashboard-nav-tabs::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .dash-tab-btn {
+    padding: 0.8rem 0.85rem !important;
+    font-size: 0.82rem !important;
+    flex-shrink: 0 !important;
+  }
+
+  .dashboard-content-body {
+    padding: 1rem 0.75rem !important;
+  }
+
+  .dash-card {
+    padding: 1.15rem 1rem !important;
+    margin-bottom: 1rem !important;
+  }
+
+  .admin-profile-cards-grid,
+  .mgmt-profile-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+  }
+
+  .mgmt-profile-grid .col-span-2 {
+    grid-column: 1 !important;
+  }
+
+  .mgmt-calc-summary-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.65rem !important;
+    padding: 0.75rem !important;
+  }
+
+  .detail-items-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  .metallic-card-3d-container {
+    max-width: 100% !important;
+    padding: 0 0.25rem !important;
+  }
+
+  .metallic-card-3d {
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 260px !important;
+  }
+
+  .table-responsive,
+  .portal-table-container,
+  .ledger-table-wrap,
+  .student-table-wrap {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    width: 100% !important;
+    display: block !important;
+  }
+
+  .admin-actions-bar,
+  .filter-toolbar-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.65rem !important;
+  }
+
+  .admin-actions-bar .btn,
+  .filter-toolbar-row .btn,
+  .filter-toolbar-row select,
+  .filter-toolbar-row input {
+    width: 100% !important;
+  }
+}
