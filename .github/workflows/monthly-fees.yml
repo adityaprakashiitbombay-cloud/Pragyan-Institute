@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 name: Monthly Fee Billing & Reminders Automation
 # Runs on the 1st-10th of each month (staggered billing days 1-6 + reminder
 # days 7-10) and the 15th for mid-month follow-up at 6 AM IST (00:30 UTC).
@@ -14,12 +15,41 @@ on:
     inputs:
       force_day:
         description: 'Override day of month (1-10 or 15) for manual testing'
+=======
+name: Monthly Fee Billing (manual backstop)
+
+# NOTE ON SCHEDULING
+# ------------------
+# This workflow no longer runs on a cron. The scheduler is Vercel:
+# vercel.json runs /api/cron-monthly-fees at 04:00 UTC on the 1st-10th, which is
+# the 10-day rolling calendar in api/_lib/academic-config.js.
+#
+# The cron entries that used to live here fired on days 1-4 and 15-18 against a
+# separate billing engine in .github/scripts/. That was not merely redundant:
+#
+#   * Charges are idempotent (fee_billing_ledger has a unique idempotency_key),
+#     but whichever engine reached a student FIRST decided the amount, and this
+#     side's fee table under-billed Class 11th and 12th by 500/month.
+#   * Statement emails are claim-gated, so a duplicate run cannot re-send one.
+#     Reminders are deduplicated per recipient per IST day by the quota ledger,
+#     so a same-day duplicate run is now safe too — but two schedulers still
+#     means two chances to diverge, and no benefit.
+#
+# So this workflow is now a manual re-run button: use it when a Vercel cron
+# invocation fails or is missed. Replaying a day cannot bill anyone twice.
+
+on:
+  workflow_dispatch:
+    inputs:
+      force_day:
+        description: 'Billing calendar day to run (1-10). Blank = today.'
+>>>>>>> claude/admiring-kepler-50a04f
         required: false
         type: string
 
 jobs:
   billing:
-    name: Generate Monthly Fees & Reminders
+    name: Trigger monthly fee run
     runs-on: ubuntu-latest
 
     steps:
@@ -31,14 +61,12 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install dependencies
-        run: npm install @supabase/supabase-js
-
-      - name: Run fee billing script
+      # No `npm install` step: the script is a fetch() call against the API, so it
+      # needs no dependencies. The API holds the Supabase service-role key and the
+      # Resend key; Actions only needs the shared cron secret.
+      - name: Trigger monthly fee run
         run: node .github/scripts/monthly-fees.js
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://ujcmmcaervgskpkcfekm.supabase.co' }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL || 'Pragyan Institute <noreply@pragyaninstitute.com>' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          API_BASE_URL: ${{ vars.API_BASE_URL || 'https://pragyaninstitute.com' }}
           FORCE_DAY: ${{ inputs.force_day }}

@@ -1,16 +1,24 @@
 #!/usr/bin/env node
-// GitHub Actions Script: Monthly Fee Billing & Reminders
-// Runs via .github/workflows/monthly-fees.yml
-// Dispatches emails via Resend with 100% verified sender pragyaninstitute.com
+// GitHub Actions: nightly billing trigger for the 1st-10th of the month.
+//
+// This file used to be a second, independent billing engine running alongside
+// the Vercel cron on /api/cron-monthly-fees. The ledger's unique constraint
+// stopped it double-charging, but whichever engine reached a student first set
+// the AMOUNT — and this script's fee ladder ended in `: 700`, so a Class 12th
+// student billed from here was charged 700 instead of 1500. It also billed
+// non-atomically (ledger insert, then a separate students update, with no
+// FOR UPDATE lock) and sent email with no quota accounting at all.
+//
+// It is now a trigger. /api/cron-monthly-fees owns the calendar, the canonical
+// fee table, the atomic apply_monthly_fee call and the 100/day quota gate.
 
-import { createClient } from '@supabase/supabase-js';
-import https from 'https';
+import { callApi } from './_call-api.js';
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://ujcmmcaervgskpkcfekm.supabase.co';
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const resendKey = process.env.RESEND_API_KEY;
-const fromEmail = process.env.RESEND_FROM_EMAIL || 'Pragyan Institute <noreply@pragyaninstitute.com>';
+const forceDayRaw = (process.env.FORCE_DAY || '').trim();
+const forceDay = Number(forceDayRaw);
+const body = {};
 
+<<<<<<< HEAD
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 function sendEmailViaResend({ from, to, subject, html, text }) {
@@ -269,56 +277,22 @@ try {
 } catch (err) {
   console.error('❌ Fatal cron error:', err);
   process.exit(1);
+=======
+if (forceDayRaw) {
+  if (!Number.isInteger(forceDay) || forceDay < 1 || forceDay > 31) {
+    console.error(`FORCE_DAY must be a day of the month between 1 and 31 (got "${forceDayRaw}")`);
+    process.exit(1);
+  }
+  body.forceDay = forceDay;
+  console.log(`Replaying billing calendar day ${forceDay}.`);
+>>>>>>> claude/admiring-kepler-50a04f
 }
 
-function generateFeeEmail(student, monthlyRate, prevPending, updatedPending, monthYear) {
-  const upiLink = `upi://pay?pa=chandankr1501998@ybl&pn=Chandan%20Kumar&am=${updatedPending}&cu=INR&tn=Fee%20${student.student_id}`;
-  return `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 2px solid #064E3B; border-radius: 12px; overflow: hidden; background: #ffffff;">
-      <div style="background: linear-gradient(135deg, #064E3B 0%, #02241b 100%); color: #ffffff; padding: 24px; text-align: center;">
-        <h1 style="margin: 0; font-size: 24px; color: #ffffff;">PRAGYAN INSTITUTE LALGANJ</h1>
-        <p style="margin: 6px 0 0 0; opacity: 0.9; font-size: 15px; color: #E0E7FF;">Monthly Fee Statement — ${monthYear}</p>
-      </div>
-      <div style="padding: 24px; background: #FAF9F6; color: #1F2937;">
-        <p style="font-size: 16px; margin-top: 0;">Dear <strong>${student.name}</strong> (Roll: #${student.roll_no}, ID: <code>${student.student_id}</code>),</p>
-        <p>Your monthly tuition fee statement for <strong>${student.class_name}</strong>:</p>
-        <table style="width: 100%; border-collapse: collapse; margin: 20px 0; background: #ffffff; border-radius: 8px; border: 1px solid #E5E7EB;">
-          <tr style="background: #F3F4F6;"><th style="padding: 10px; text-align: left;">Description</th><th style="padding: 10px; text-align: right;">Amount (₹)</th></tr>
-          <tr><td style="padding: 10px; border-bottom: 1px solid #E5E7EB;">Previous Carryover Due:</td><td style="padding: 10px; text-align: right; border-bottom: 1px solid #E5E7EB; font-weight: bold;">₹${prevPending.toLocaleString('en-IN')}</td></tr>
-          <tr><td style="padding: 10px; border-bottom: 1px solid #E5E7EB;">Current Month Tuition (${monthYear}):</td><td style="padding: 10px; text-align: right; border-bottom: 1px solid #E5E7EB; font-weight: bold; color: #0284C7;">+ ₹${monthlyRate.toLocaleString('en-IN')}</td></tr>
-          <tr style="background: #FEF2F2;"><td style="padding: 12px; font-weight: bold; color: #991B1B;">Total Updated Pending Due:</td><td style="padding: 12px; text-align: right; font-weight: bold; color: #DC2626; font-size: 16px;">₹${updatedPending.toLocaleString('en-IN')}</td></tr>
-        </table>
-        <div style="background: #ECFDF5; border: 1px solid #A7F3D0; padding: 14px; border-radius: 8px; font-size: 13px; color: #065F46; text-align: center;">
-          <a href="${upiLink}" style="display: inline-block; background: #059669; color: #ffffff; font-weight: bold; text-decoration: none; padding: 10px 24px; border-radius: 6px; font-size: 14px; margin-bottom: 6px;">Pay ₹${updatedPending.toLocaleString('en-IN')} Now via UPI</a>
-          <p style="margin: 4px 0 0 0; font-size: 12px;">UPI ID: <strong>chandankr1501998@ybl</strong> (Chandan Kumar)</p>
-        </div>
-      </div>
-      <div style="background: #F3F4F6; padding: 15px; text-align: center; font-size: 12px; color: #6B7280; border-top: 1px solid #E5E7EB;">
-        Pragyan Institute &bull; Near Main Chowk, Lalganj, Vaishali, Bihar &bull; Contact: +91 73698 91858
-      </div>
-    </div>
-  `;
-}
+const result = await callApi('/api/cron-monthly-fees', body);
 
-function generateReminderEmail(student, pendingDue, monthYear) {
-  const upiLink = `upi://pay?pa=chandankr1501998@ybl&pn=Chandan%20Kumar&am=${pendingDue}&cu=INR&tn=Fee%20Reminder%20${student.student_id}`;
-  return `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 2px solid #D97706; border-radius: 12px; overflow: hidden; background: #ffffff;">
-      <div style="background: linear-gradient(135deg, #B45309 0%, #78350F 100%); color: #ffffff; padding: 24px; text-align: center;">
-        <h1 style="margin: 0; font-size: 24px; color: #ffffff;">PRAGYAN INSTITUTE LALGANJ</h1>
-        <p style="margin: 6px 0 0 0; opacity: 0.9; font-size: 15px; color: #FEF3C7;">Urgent Fee Reminder Notice — ${monthYear}</p>
-      </div>
-      <div style="padding: 24px; background: #FFFDF5; color: #1F2937;">
-        <p style="font-size: 16px; margin-top: 0;">Dear <strong>${student.name}</strong> (Roll: #${student.roll_no}, ID: <code>${student.student_id}</code>),</p>
-        <p>This is a reminder that your tuition fee balance of <strong style="color: #DC2626; font-size: 18px;">₹${pendingDue.toLocaleString('en-IN')}</strong> for <strong>${student.class_name}</strong> is currently pending.</p>
-        <div style="background: #F0FDF4; border: 1px solid #BBF7D0; padding: 14px; border-radius: 8px; font-size: 13px; color: #166534; text-align: center; margin-top: 16px;">
-          <a href="${upiLink}" style="display: inline-block; background: #16A34A; color: #ffffff; font-weight: bold; text-decoration: none; padding: 10px 24px; border-radius: 6px; font-size: 14px; margin-bottom: 6px;">Pay ₹${pendingDue.toLocaleString('en-IN')} via UPI</a>
-          <p style="margin: 4px 0 0 0; font-size: 12px;">UPI ID: <strong>chandankr1501998@ybl</strong> (Chandan Kumar)</p>
-        </div>
-      </div>
-      <div style="background: #F3F4F6; padding: 15px; text-align: center; font-size: 12px; color: #6B7280; border-top: 1px solid #E5E7EB;">
-        Pragyan Institute &bull; Near Main Chowk, Lalganj, Vaishali, Bihar &bull; Contact: +91 73698 91858
-      </div>
-    </div>
-  `;
+if (result?.restState) {
+  console.log(`Day ${result.day} is a rest day — no batch is billed. Retry sweep ran.`);
+} else {
+  console.log(`Day ${result?.day}: ${result?.type} run for ${result?.batch}.`);
 }
+console.log('Summary:', JSON.stringify(result?.summary || {}));

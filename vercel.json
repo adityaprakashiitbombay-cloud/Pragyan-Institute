@@ -52,23 +52,20 @@
       ]
     },
     {
-      "source": "/api/(.*)",
+      "source": "/manifest.json",
       "headers": [
         {
-          "key": "Access-Control-Allow-Origin",
-          "value": "https://pragyaninstitute.com"
-        },
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)\\.html",
+      "headers": [
         {
-          "key": "Access-Control-Allow-Methods",
-          "value": "GET, POST, OPTIONS"
-        },
-        {
-          "key": "Access-Control-Allow-Headers",
-          "value": "Content-Type, Authorization, apikey"
-        },
-        {
-          "key": "Vary",
-          "value": "Origin"
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
         }
       ]
     }
@@ -76,7 +73,11 @@
   "crons": [
     {
       "path": "/api/cron-monthly-fees",
+<<<<<<< HEAD
       "schedule": "0 4 1,2,3,4,5,6,7,8,9,10,15 * *"
+=======
+      "schedule": "0 4 1-10 * *"
+>>>>>>> claude/admiring-kepler-50a04f
     }
   ]
 }

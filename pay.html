@@ -4,7 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Online Fee Payment — Pragyan Institute Lalganj</title>
-  <meta name="description" content="💳 Official online fee payment gateway for Pragyan Institute Lalganj. Scan PhonePe QR or tap 1-click UPI to clear student fees instantly.">
+  <meta name="description" content="Official online fee payment gateway for Pragyan Institute Lalganj. Scan the PhonePe QR or tap a 1-click UPI link to clear student fees.">
+  <meta name="theme-color" content="#064E3B">
+  <!-- The portal links here with ?name=&roll=&amount= in the query string. Letting
+       a crawler index those URLs would publish a student's name and outstanding
+       balance, so this page is deliberately kept out of the index. -->
+  <meta name="robots" content="noindex, nofollow">
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="192x192" href="/assets/images/logo.png">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/images/logo.png">
@@ -21,26 +26,87 @@
     :root {
       --primary: #064E3B;
       --primary-dark: #022C22;
-      --primary-light: #059669;
-      --accent: #D97706;
+      --primary-light: #047857;
+      --accent: #B45309;
       --bg: #FAF9F6;
       --card-bg: #FFFFFF;
       --text: #1E293B;
-      --text-muted: #64748B;
+      /* Was #64748B, which sits at 4.6:1 on the near-white card — nominally a
+         pass, but every use here is 11-12px text where it reads as grey mush.
+         Slate-600 clears 7:1 and still looks secondary. */
+      --text-muted: #475569;
       --border: #E2E8F0;
       --radius: 16px;
+      --focus-ring: #1D4ED8;
+      /* Emerald-600 (#059669) fails AA as text on white (3.2:1). Emerald-700
+         is the darkest shade that still reads as the brand green. */
+      --money-in: #047857;
+      --danger: #B91C1C;
+      /* 44px is the WCAG 2.5.8 enhanced target size and the size a thumb
+         actually hits on a 5-inch phone held one-handed. */
+      --tap-target: 2.75rem;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { -webkit-text-size-adjust: 100%; }
+
     body {
       font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
       background: var(--bg);
       color: var(--text);
+      /* 100vh overshoots by the height of the address bar on mobile Safari and
+         Chrome, which added a phantom scroll to a page that already fitted. */
       min-height: 100vh;
+      min-height: 100dvh;
       display: flex;
       flex-direction: column;
       align-items: center;
       padding: 1.25rem 1rem 3rem;
+      line-height: 1.45;
     }
+
+    /* --- Accessibility primitives ------------------------------------------ */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      clip-path: inset(50%);
+      white-space: nowrap;
+      border: 0;
+    }
+    .skip-link {
+      position: absolute;
+      left: 0.5rem;
+      top: -3.5rem;
+      z-index: 20;
+      background: var(--primary);
+      color: #FFFFFF;
+      font-size: 0.85rem;
+      font-weight: 800;
+      padding: 0.65rem 1rem;
+      border-radius: 0 0 10px 10px;
+      text-decoration: none;
+      transition: top 0.15s ease;
+    }
+    .skip-link:focus { top: 0; }
+
+    /* Every interactive control gets the same visible ring. The custom
+       backgrounds below cancelled out the UA default outline on several of
+       them, so keyboard focus was invisible on the mode pills and the chips. */
+    a:focus-visible,
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    [tabindex]:focus-visible {
+      outline: 3px solid var(--focus-ring);
+      outline-offset: 2px;
+      border-radius: 6px;
+    }
+
     .pay-container {
       width: 100%;
       max-width: 540px;
@@ -55,7 +121,6 @@
       color: #FFFFFF;
       padding: 1.75rem 1.5rem;
       text-align: center;
-      position: relative;
     }
     .logo-img {
       width: 64px;
@@ -75,9 +140,11 @@
       line-height: 1.2;
     }
     .inst-sub {
+      display: block;
+      font-family: 'Plus Jakarta Sans', sans-serif;
       font-size: 0.78rem;
       font-weight: 700;
-      color: #6EE7B7;
+      color: #A7F3D0;
       text-transform: uppercase;
       letter-spacing: 1.5px;
       margin-top: 0.2rem;
@@ -85,29 +152,74 @@
     .badge-pill {
       display: inline-block;
       margin-top: 0.75rem;
-      background: rgba(52, 211, 153, 0.2);
+      background: rgba(6, 95, 70, 0.55);
       border: 1px solid #34D399;
-      color: #A7F3D0;
+      color: #D1FAE5;
       font-size: 0.78rem;
       font-weight: 800;
       padding: 0.3rem 0.9rem;
       border-radius: 99px;
       letter-spacing: 0.5px;
     }
-    .content-body {
-      padding: 1.5rem;
+    .content-body { padding: 1.5rem; }
+    .content-body > * + * { margin-top: 1.35rem; }
+
+    .section-heading {
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 800;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.7rem;
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
     }
+
+    /* --- Notices and live regions ------------------------------------------ */
+    .notice {
+      display: flex;
+      gap: 0.6rem;
+      background: #FFFBEB;
+      border: 1.5px solid #FCD34D;
+      border-radius: 10px;
+      padding: 0.8rem 0.9rem;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #78350F;
+    }
+    .notice:empty { display: none; }
+    .pay-status {
+      border-radius: 10px;
+      padding: 0.8rem 0.9rem;
+      font-size: 0.85rem;
+      font-weight: 700;
+      line-height: 1.5;
+      border: 1.5px solid var(--border);
+      background: #F8FAFC;
+      color: var(--text);
+      overflow-wrap: anywhere;
+    }
+    /* Kept in the DOM at all times so the live region is registered before the
+       first announcement; collapsed only while it has nothing to say. */
+    .pay-status:empty { display: none; }
+    .pay-status.is-ok { background: #ECFDF5; border-color: #34D399; color: #065F46; }
+    .pay-status.is-error { background: #FEF2F2; border-color: #FCA5A5; color: var(--danger); }
+    .pay-status.is-warn { background: #FFFBEB; border-color: #FCD34D; color: #78350F; }
+
+    /* --- Student identity --------------------------------------------------- */
     .student-meta-card {
       background: #F8FAFC;
       border: 1.5px solid var(--border);
       border-radius: 12px;
       padding: 1rem 1.25rem;
-      margin-bottom: 1.25rem;
       display: grid;
       grid-template-columns: 1fr auto;
-      gap: 0.75rem;
+      gap: 0.75rem 1rem;
     }
     .meta-label {
+      display: block;
       font-size: 0.72rem;
       font-weight: 700;
       color: var(--text-muted);
@@ -115,27 +227,31 @@
       letter-spacing: 0.5px;
     }
     .meta-val {
+      display: block;
       font-size: 1.05rem;
       font-weight: 800;
       color: var(--text);
       margin-top: 2px;
+      overflow-wrap: anywhere;
     }
+    .meta-batch { display: block; font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
     .meta-roll {
       font-family: 'JetBrains Mono', monospace;
       color: var(--primary-light);
     }
-    
-    /* Hero Amount Card */
+    .meta-right { text-align: right; }
+
+    /* --- Hero amount ------------------------------------------------------- */
     .amount-hero {
       background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%);
       border: 2.5px solid #10B981;
       border-radius: 14px;
       padding: 1.35rem 1.25rem;
       text-align: center;
-      margin-bottom: 1.35rem;
       box-shadow: 0 6px 20px rgba(16, 185, 129, 0.12);
     }
     .amount-hero-label {
+      font-family: 'Outfit', sans-serif;
       font-size: 0.78rem;
       font-weight: 800;
       color: #065F46;
@@ -144,41 +260,86 @@
     }
     .amount-hero-val {
       font-family: 'Outfit', sans-serif;
-      font-size: 2.75rem;
+      /* Fixed 2.75rem overflowed the card at ₹1,00,000 on a 320px screen. */
+      font-size: clamp(2rem, 11vw, 2.75rem);
       font-weight: 900;
       color: #064E3B;
       line-height: 1.1;
       margin: 0.4rem 0;
+      overflow-wrap: anywhere;
     }
+    .amount-hero-sub {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #065F46;
+    }
+    .amount-hero-sub.is-partial { color: #78350F; }
 
-    /* Breakdown Table */
+    /* --- Itemised statement ------------------------------------------------ */
     .breakdown-card {
       background: #FFFFFF;
       border: 1.5px solid var(--border);
       border-radius: 12px;
       overflow: hidden;
-      margin-bottom: 1.35rem;
     }
     .breakdown-header {
       background: #F1F5F9;
       padding: 0.6rem 1rem;
-      font-size: 0.78rem;
-      font-weight: 800;
-      color: #475569;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
     }
-    .breakdown-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 0.75rem 1rem;
-      border-bottom: 1px solid #F1F5F9;
+    .breakdown-header .section-heading { margin: 0; font-size: 0.78rem; color: #334155; }
+    .badge-payment-type {
+      font-size: 0.75rem;
+      font-weight: 800;
+      color: var(--money-in);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .badge-payment-type.is-partial { color: #92400E; }
+    /* A real <table>: the fee statement is tabular data, and applying
+       display:flex to <tr> — as this card used to — strips the row and cell
+       roles in Chrome and Safari, leaving a screen reader with a flat run of
+       numbers and no idea which label owns which amount. */
+    .breakdown-table {
+      width: 100%;
+      border-collapse: collapse;
       font-size: 0.88rem;
     }
-    .breakdown-row.total {
+    .breakdown-table th,
+    .breakdown-table td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid #F1F5F9;
+      vertical-align: top;
+    }
+    .breakdown-table th {
+      text-align: left;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .breakdown-table td {
+      text-align: right;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .row-note {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .row-note.is-current { color: var(--money-in); }
+    .amount-in { color: var(--money-in); font-weight: 800; }
+    .breakdown-table tr.is-remaining { background: #FFFBEB; }
+    .breakdown-table tr.is-remaining th { color: #92400E; }
+    .breakdown-table tr.is-remaining td { color: #B45309; font-weight: 800; }
+    .breakdown-table tfoot th,
+    .breakdown-table tfoot td {
       background: #ECFDF5;
       border-top: 2px solid #10B981;
       border-bottom: none;
@@ -187,176 +348,13 @@
       font-size: 0.95rem;
     }
 
-    /* 1-Tap UPI Launch Buttons */
-    .upi-btn-main {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.6rem;
-      width: 100%;
-      background: linear-gradient(135deg, #059669 0%, #047857 100%);
-      color: #FFFFFF;
-      font-size: 1.05rem;
-      font-weight: 800;
-      padding: 1rem 1.5rem;
-      border-radius: 12px;
-      text-decoration: none;
-      border: none;
-      cursor: pointer;
-      box-shadow: 0 6px 20px rgba(5, 150, 105, 0.35);
-      margin-bottom: 0.85rem;
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
-    }
-    .upi-btn-main:active {
-      transform: scale(0.98);
-    }
-    .app-buttons-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 0.5rem;
-      margin-bottom: 1.35rem;
-    }
-    .app-btn {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 0.6rem 0.4rem;
-      background: #FFFFFF;
-      border: 1.5px solid var(--border);
-      border-radius: 10px;
-      text-decoration: none;
-      color: var(--text);
-      font-size: 0.72rem;
-      font-weight: 700;
-      transition: all 0.15s ease;
-    }
-    .app-btn:hover {
-      border-color: #10B981;
-      background: #F0FDF4;
-    }
-    .app-btn i {
-      font-size: 1.25rem;
-      margin-bottom: 0.25rem;
-    }
-
-    /* QR Code Showcase */
-    .qr-card {
-      background: #FFFFFF;
-      border: 2px solid #10B981;
-      border-radius: 14px;
-      padding: 1.35rem 1rem;
-      text-align: center;
-      margin-bottom: 1.35rem;
-      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.08);
-    }
-    .qr-img-frame {
-      display: inline-block;
-      background: #FFFFFF;
-      padding: 8px;
-      border-radius: 12px;
-      border: 2px solid var(--border);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
-    }
-    .qr-img-frame img {
-      width: 170px;
-      height: 220px;
-      object-fit: contain;
-      border-radius: 6px;
-      display: block;
-    }
-    .upi-pill {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.95rem;
-      font-weight: 800;
-      background: #ECFDF5;
-      border: 1px solid #A7F3D0;
-      color: #065F46;
-      padding: 0.5rem 1rem;
-      border-radius: 8px;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      margin: 0.85rem 0 0.4rem;
-      cursor: pointer;
-    }
-
-    /* UTR Submission Form */
-    .utr-form-card {
-      background: #F8FAFC;
-      border: 1.5px solid var(--border);
-      border-radius: 12px;
-      padding: 1.25rem;
-      margin-bottom: 1rem;
-    }
-    .form-title {
-      font-size: 0.92rem;
-      font-weight: 800;
-      color: var(--primary);
-      margin-bottom: 0.75rem;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    .form-group {
-      margin-bottom: 0.85rem;
-    }
-    .form-group label {
-      display: block;
-      font-size: 0.78rem;
-      font-weight: 700;
-      color: var(--text-muted);
-      margin-bottom: 0.3rem;
-    }
-    .form-input {
-      width: 100%;
-      padding: 0.65rem 0.85rem;
-      font-size: 0.92rem;
-      border: 1.5px solid var(--border);
-      border-radius: 8px;
-      background: #FFFFFF;
-      font-family: inherit;
-    }
-    .form-input:focus {
-      outline: none;
-      border-color: var(--primary-light);
-      box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15);
-    }
-    .btn-submit-utr {
-      width: 100%;
-      background: #1E293B;
-      color: #FFFFFF;
-      font-size: 0.92rem;
-      font-weight: 700;
-      padding: 0.75rem;
-      border-radius: 8px;
-      border: none;
-      cursor: pointer;
-      transition: background 0.15s ease;
-    }
-    .btn-submit-utr:hover {
-      background: #0F172A;
-    }
-
-    /* Payment Mode Selector */
+    /* --- Payment mode selector --------------------------------------------- */
     .payment-mode-selector {
       background: #FFFFFF;
       border: 1.5px solid var(--border);
       border-radius: 14px;
       padding: 1.15rem;
-      margin-bottom: 1.25rem;
       box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
-    }
-    .mode-selector-header {
-      font-size: 0.82rem;
-      font-weight: 800;
-      color: var(--primary);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 0.75rem;
-      display: flex;
-      align-items: center;
-      gap: 0.45rem;
     }
     .mode-pills-wrap {
       display: grid;
@@ -367,6 +365,7 @@
       display: flex;
       align-items: center;
       gap: 0.65rem;
+      min-height: var(--tap-target);
       padding: 0.75rem 0.9rem;
       background: #F8FAFC;
       border: 2px solid var(--border);
@@ -374,39 +373,39 @@
       cursor: pointer;
       text-align: left;
       font-family: inherit;
-      transition: all 0.2s ease;
+      color: var(--text);
+      transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
     }
     .mode-pill i {
+      flex: none;
       font-size: 1.25rem;
       color: var(--text-muted);
       transition: color 0.2s ease;
     }
     .mode-pill-title {
+      display: block;
       font-size: 0.88rem;
       font-weight: 800;
-      color: var(--text);
     }
     .mode-pill-sub {
+      display: block;
       font-size: 0.74rem;
       font-weight: 600;
       color: var(--text-muted);
       margin-top: 2px;
     }
-    .mode-pill.active {
+    /* Selection is styled off aria-checked rather than a parallel .active
+       class, so the pill cannot look chosen while announcing "not checked". */
+    .mode-pill[aria-checked="true"] {
       background: #ECFDF5;
       border-color: #10B981;
       box-shadow: 0 4px 12px rgba(16, 185, 129, 0.18);
     }
-    .mode-pill.active i {
-      color: #059669;
-    }
-    .mode-pill.active .mode-pill-title {
-      color: #064E3B;
-    }
-    .mode-pill.active .mode-pill-sub {
-      color: #047857;
-      font-weight: 700;
-    }
+    .mode-pill[aria-checked="true"] i { color: var(--money-in); }
+    .mode-pill[aria-checked="true"] .mode-pill-title { color: #064E3B; }
+    .mode-pill[aria-checked="true"] .mode-pill-sub { color: var(--money-in); font-weight: 700; }
+    .mode-pill[disabled] { opacity: 0.55; cursor: not-allowed; }
+
     .partial-input-tray {
       margin-top: 1rem;
       padding-top: 0.9rem;
@@ -420,16 +419,21 @@
     .partial-label {
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: baseline;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.4rem;
+    }
+    .partial-label label {
       font-size: 0.78rem;
       font-weight: 700;
       color: var(--text-muted);
-      margin-bottom: 0.4rem;
     }
-    .partial-min-hint {
+    .partial-range-hint {
       font-size: 0.72rem;
-      color: #059669;
-      font-weight: 600;
+      /* Was #059669 on a near-white tray: 3.2:1, unreadable at 11.5px. */
+      color: #065F46;
+      font-weight: 700;
     }
     .partial-input-group {
       position: relative;
@@ -442,9 +446,11 @@
       font-size: 1.1rem;
       font-weight: 800;
       color: var(--primary);
+      pointer-events: none;
     }
     .partial-input {
       width: 100%;
+      min-height: var(--tap-target);
       padding: 0.75rem 1rem 0.75rem 2.2rem;
       font-size: 1.15rem;
       font-weight: 800;
@@ -454,10 +460,7 @@
       background: #FFFFFF;
       font-family: inherit;
     }
-    .partial-input:focus {
-      outline: none;
-      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
-    }
+    .partial-input[aria-invalid="true"] { border-color: var(--danger); }
     .quick-amount-chips {
       display: flex;
       gap: 0.4rem;
@@ -465,265 +468,518 @@
       margin-top: 0.6rem;
     }
     .amount-chip {
+      /* 26px tall before: below both the 24px WCAG 2.5.8 floor and anything a
+         thumb can hit reliably next to two sibling chips. */
+      min-height: var(--tap-target);
+      display: inline-flex;
+      align-items: center;
       background: #F1F5F9;
       border: 1px solid var(--border);
       border-radius: 99px;
-      padding: 0.35rem 0.8rem;
+      padding: 0.35rem 0.9rem;
       font-size: 0.75rem;
       font-weight: 700;
       color: #334155;
       cursor: pointer;
-      transition: all 0.15s ease;
+      transition: background 0.15s ease, border-color 0.15s ease;
       font-family: inherit;
     }
-    .amount-chip:hover {
-      background: #E2E8F0;
-      border-color: #CBD5E1;
-    }
-    .amount-chip.active {
+    .amount-chip:hover { background: #E2E8F0; border-color: #CBD5E1; }
+    .amount-chip[aria-pressed="true"] {
       background: #064E3B;
       color: #FFFFFF;
       border-color: #064E3B;
     }
 
+    /* --- UPI launch -------------------------------------------------------- */
+    .upi-btn-main {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      width: 100%;
+      min-height: 3.25rem;
+      background: linear-gradient(135deg, #047857 0%, #065F46 100%);
+      color: #FFFFFF;
+      font-size: 1.05rem;
+      font-weight: 800;
+      padding: 1rem 1.5rem;
+      border-radius: 12px;
+      text-decoration: none;
+      text-align: center;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(5, 150, 105, 0.35);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .upi-btn-main:active { transform: scale(0.98); }
+    .app-buttons-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.5rem;
+      margin-top: 0.85rem;
+    }
+    .app-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 3.5rem;
+      padding: 0.6rem 0.4rem;
+      background: #FFFFFF;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      text-decoration: none;
+      color: var(--text);
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-align: center;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    .app-btn:hover { border-color: #10B981; background: #F0FDF4; }
+    .app-btn i { font-size: 1.25rem; margin-bottom: 0.25rem; }
+    .upi-hint {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-top: 0.7rem;
+      text-align: center;
+    }
+
+    /* --- QR ---------------------------------------------------------------- */
+    .qr-card {
+      background: #FFFFFF;
+      border: 2px solid #10B981;
+      border-radius: 14px;
+      padding: 1.35rem 1rem;
+      text-align: center;
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.08);
+    }
+    .qr-card .section-heading { justify-content: center; }
+    .qr-img-frame {
+      display: inline-block;
+      background: #FFFFFF;
+      padding: 8px;
+      border-radius: 12px;
+      border: 2px solid var(--border);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+      max-width: 100%;
+    }
+    .qr-img-frame img {
+      /* Was a fixed 170x220 box with object-fit:contain, which letterboxed the
+         QR into a strip on a narrow phone. Intrinsic ratio, capped width. */
+      width: min(15rem, 62vw);
+      height: auto;
+      border-radius: 6px;
+      display: block;
+    }
+    .upi-pill {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.95rem;
+      font-weight: 800;
+      background: #ECFDF5;
+      border: 1px solid #A7F3D0;
+      color: #065F46;
+      min-height: var(--tap-target);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      margin: 0.85rem 0 0.4rem;
+      cursor: pointer;
+      overflow-wrap: anywhere;
+    }
+    .upi-pill:hover { background: #D1FAE5; }
+    .payee-line {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    /* --- UTR form ---------------------------------------------------------- */
+    .utr-form-card {
+      background: #F8FAFC;
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+    }
+    .form-group { margin-bottom: 0.85rem; }
+    .form-group label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 0.3rem;
+    }
+    .req { color: var(--danger); font-weight: 800; }
+    .form-input {
+      width: 100%;
+      min-height: var(--tap-target);
+      padding: 0.65rem 0.85rem;
+      /* Below 16px, iOS Safari zooms the whole page in on focus and never zooms
+         back out, which left the card clipped off-screen mid-form. */
+      font-size: 1rem;
+      color: var(--text);
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      background: #FFFFFF;
+      font-family: inherit;
+    }
+    .form-input:focus {
+      border-color: var(--primary-light);
+      box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15);
+    }
+    .form-input[aria-invalid="true"] { border-color: var(--danger); }
+    .form-hint {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-top: 0.3rem;
+    }
+    .form-error {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--danger);
+      margin-top: 0.3rem;
+    }
+    .form-error:empty { display: none; }
+    .btn-submit-utr {
+      width: 100%;
+      min-height: var(--tap-target);
+      background: #1E293B;
+      color: #FFFFFF;
+      font-size: 0.95rem;
+      font-weight: 700;
+      padding: 0.75rem;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s ease;
+    }
+    .btn-submit-utr:hover { background: #0F172A; }
+    .btn-submit-utr[disabled] { background: #64748B; cursor: progress; }
+
+    .back-link-wrap { text-align: center; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      min-height: var(--tap-target);
+      padding: 0.5rem 0.75rem;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--primary);
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+
     .footer-note {
       text-align: center;
       font-size: 0.75rem;
       color: var(--text-muted);
-      line-height: 1.5;
-      padding: 1rem 0;
+      line-height: 1.6;
+      padding: 1rem;
+      border-top: 1px solid var(--border);
     }
+    /* The helpline is the escape hatch when a payment goes wrong, and it is dialled
+       from a phone. As 12px inline text it was a 15px-tall tap target. */
+    .helpline-row {
+      display: flex;
+      justify-content: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-top: 0.5rem;
+    }
+    .helpline-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      min-height: var(--tap-target);
+      padding: 0.5rem 0.9rem;
+      background: #F1F5F9;
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--primary);
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .helpline-link:hover { background: #E2E8F0; }
 
-    @media (max-width: 480px) {
-      body {
-        padding: 0.75rem 0.5rem 2.5rem;
-      }
-      .pay-container {
-        border-radius: 12px;
-        box-shadow: 0 4px 18px rgba(0,0,0,0.06);
-      }
-      .header-banner {
-        padding: 1.35rem 1rem;
-      }
-      .inst-title {
-        font-size: 1.2rem;
-      }
-      .content-body {
-        padding: 1rem;
-      }
-      .amount-hero-val {
-        font-size: 2.25rem;
-      }
-      .app-buttons-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 0.45rem;
-      }
-      .mode-pills-wrap {
-        grid-template-columns: 1fr;
-        gap: 0.5rem;
-      }
-      .breakdown-row {
-        padding: 0.65rem 0.75rem;
-        font-size: 0.82rem;
-      }
-      .qr-img-frame img {
-        width: 140px;
-        height: 180px;
-      }
-      .upi-pill {
-        font-size: 0.85rem;
-        padding: 0.45rem 0.75rem;
-      }
+    @media (max-width: 30rem) {
+      body { padding: 0.75rem 0.5rem 2.5rem; }
+      .pay-container { border-radius: 12px; box-shadow: 0 4px 18px rgba(0,0,0,0.06); }
+      .header-banner { padding: 1.35rem 1rem; }
+      .inst-title { font-size: 1.2rem; }
+      .content-body { padding: 1rem; }
+      .app-buttons-grid { grid-template-columns: repeat(2, 1fr); gap: 0.45rem; }
+      .mode-pills-wrap { grid-template-columns: 1fr; gap: 0.5rem; }
+      .breakdown-table { font-size: 0.82rem; }
+      .breakdown-table th, .breakdown-table td { padding: 0.65rem 0.75rem; }
+      .upi-pill { font-size: 0.85rem; padding: 0.45rem 0.75rem; }
       .student-meta-card {
+        /* Two columns at 320px squeezed a long name into four wrapped lines
+           while the roll number sat in a 90px gutter. */
+        grid-template-columns: 1fr;
         padding: 0.85rem 1rem;
       }
+      .meta-right { text-align: left; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+      }
+      .upi-btn-main:active { transform: none; }
+    }
+
+    @media print {
+      body { background: #FFFFFF; padding: 0; }
+      .pay-container { border: 1px solid #94A3B8; box-shadow: none; max-width: none; }
+      .skip-link, .upi-btn-main, .app-buttons-grid, .utr-form-card,
+      .payment-mode-selector, .back-link-wrap, .upi-hint { display: none !important; }
+      .breakdown-card, .amount-hero, .qr-card, .student-meta-card { break-inside: avoid; }
     }
   </style>
 </head>
 <body>
 
+  <a class="skip-link" href="#payMain">Skip to payment details</a>
+
   <div class="pay-container">
-    <!-- Header -->
-    <div class="header-banner">
-      <img src="assets/images/logo.png" alt="Pragyan Institute Logo" class="logo-img">
-      <div class="inst-title">PRAGYAN INSTITUTE</div>
-      <div class="inst-sub">Lalganj, Vaishali • Bihar</div>
-      <div class="badge-pill">⚡ OFFICIAL SECURE PAYMENT GATEWAY</div>
-    </div>
+    <header class="header-banner">
+      <img src="assets/images/logo.png" alt="Pragyan Institute Lalganj logo" class="logo-img" width="64" height="64">
+      <h1 class="inst-title">
+        PRAGYAN INSTITUTE
+        <span class="inst-sub">Lalganj, Vaishali &bull; Bihar</span>
+      </h1>
+      <p class="badge-pill"><span aria-hidden="true">⚡</span> Official secure payment gateway</p>
+    </header>
 
-    <!-- Body -->
-    <div class="content-body">
-      <!-- Student Info -->
-      <div class="student-meta-card">
-        <div>
-          <div class="meta-label">Student Name</div>
-          <div class="meta-val" id="studentNameText">Student Profile</div>
-          <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;" id="batchNameText">Batch</div>
-        </div>
-        <div style="text-align: right;">
-          <div class="meta-label">Roll Number / Student ID</div>
-          <div class="meta-val meta-roll" id="rollNoText">#261001</div>
-        </div>
-      </div>
+    <main class="content-body" id="payMain" tabindex="-1">
 
-      <!-- Payment Option Selection: Full vs Partial -->
-      <div class="payment-mode-selector">
-        <div class="mode-selector-header">
-          <i class="fa-solid fa-hand-holding-dollar"></i> Choose Payment Option / भुगतान विकल्प
+      <!-- Populated only when the incoming link carries no usable fee figures. -->
+      <p class="notice" id="linkNotice"></p>
+
+      <section aria-labelledby="studentHeading">
+        <h2 class="sr-only" id="studentHeading">Student</h2>
+        <div class="student-meta-card">
+          <div>
+            <span class="meta-label">Student name</span>
+            <span class="meta-val" id="studentNameText">Student profile</span>
+            <span class="meta-batch" id="batchNameText">Academic batch</span>
+          </div>
+          <div class="meta-right">
+            <span class="meta-label">Roll number / student ID</span>
+            <span class="meta-val meta-roll" id="rollNoText">—</span>
+          </div>
         </div>
-        <div class="mode-pills-wrap">
-          <button type="button" class="mode-pill active" id="btnPayFull">
-            <i class="fa-solid fa-circle-check"></i>
-            <div>
-              <div class="mode-pill-title">Pay in Full (100%)</div>
-              <div class="mode-pill-sub" id="pillFullSub">Full Due: ₹0</div>
-            </div>
+      </section>
+
+      <section class="payment-mode-selector" aria-labelledby="modeHeading">
+        <h2 class="section-heading" id="modeHeading">
+          <i class="fa-solid fa-hand-holding-dollar" aria-hidden="true"></i>
+          Choose payment option / भुगतान विकल्प
+        </h2>
+
+        <div class="mode-pills-wrap" role="radiogroup" aria-labelledby="modeHeading" id="modePillGroup">
+          <button type="button" class="mode-pill" id="btnPayFull" role="radio" aria-checked="true" tabindex="0">
+            <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+            <span>
+              <span class="mode-pill-title">Pay in full (100%)</span>
+              <span class="mode-pill-sub" id="pillFullSub">Full due</span>
+            </span>
           </button>
-          <button type="button" class="mode-pill" id="btnPayPartial">
-            <i class="fa-solid fa-chart-pie"></i>
-            <div>
-              <div class="mode-pill-title">Pay in Partial</div>
-              <div class="mode-pill-sub" id="pillPartialSub">Custom / 1-Month</div>
-            </div>
+          <button type="button" class="mode-pill" id="btnPayPartial" role="radio" aria-checked="false" tabindex="-1" aria-controls="partialInputTray">
+            <i class="fa-solid fa-chart-pie" aria-hidden="true"></i>
+            <span>
+              <span class="mode-pill-title">Pay in part</span>
+              <span class="mode-pill-sub" id="pillPartialSub">Custom amount</span>
+            </span>
           </button>
         </div>
 
-        <!-- Partial Amount Input Tray (Shown when Partial is active) -->
-        <div class="partial-input-tray" id="partialInputTray" style="display: none;">
-          <label class="partial-label" for="partialAmountInput">
-            <span>Enter Partial Amount to Pay (₹)</span>
-            <span class="partial-min-hint">Min: ₹100 • Total Due: <span id="partialMaxDueText">₹0</span></span>
-          </label>
+        <div class="partial-input-tray" id="partialInputTray" hidden>
+          <div class="partial-label">
+            <label for="partialAmountInput">Amount to pay now (₹)</label>
+            <span class="partial-range-hint" id="partialRangeHint"></span>
+          </div>
           <div class="partial-input-group">
-            <span class="currency-prefix">₹</span>
-            <input type="number" id="partialAmountInput" class="partial-input" min="1" placeholder="Enter custom amount">
+            <span class="currency-prefix" aria-hidden="true">₹</span>
+            <input
+              type="number"
+              id="partialAmountInput"
+              class="partial-input"
+              inputmode="numeric"
+              step="1"
+              min="100"
+              autocomplete="off"
+              placeholder="Enter amount"
+              aria-describedby="partialRangeHint partialAmountError">
           </div>
-          <div class="quick-amount-chips">
-            <button type="button" class="amount-chip" id="chipOneMonth">1-Month Fee (₹1,000)</button>
-            <button type="button" class="amount-chip" id="chipHalfDue">50% Balance</button>
-            <button type="button" class="amount-chip" id="chipFullDue">Full Clearance</button>
+          <p class="form-error" id="partialAmountError" role="alert"></p>
+          <div class="quick-amount-chips" role="group" aria-label="Quick amount presets">
+            <button type="button" class="amount-chip" id="chipOneMonth" aria-pressed="false">One month</button>
+            <button type="button" class="amount-chip" id="chipHalfDue" aria-pressed="false">50% of balance</button>
+            <button type="button" class="amount-chip" id="chipFullDue" aria-pressed="false">Full clearance</button>
           </div>
         </div>
-      </div>
+      </section>
 
-      <!-- Hero Due Amount -->
-      <div class="amount-hero">
-        <div class="amount-hero-label" id="amountHeroTitle">Amount Being Paid Now / भुगतान राशि</div>
-        <div class="amount-hero-val" id="totalAmountText">₹0</div>
-        <div style="font-size: 0.78rem; font-weight: 700; color: #047857;" id="amountHeroSub">Instant Computerized Receipt Issued on Payment</div>
-      </div>
+      <section class="amount-hero" aria-labelledby="amountHeading">
+        <h2 class="amount-hero-label" id="amountHeading">Amount being paid now / भुगतान राशि</h2>
+        <p class="amount-hero-val" id="totalAmountText">₹0</p>
+        <p class="amount-hero-sub" id="amountHeroSub">A computerized receipt is issued once the administration verifies your payment.</p>
+      </section>
 
-      <!-- Itemized Breakdown -->
-      <div class="breakdown-card">
+      <section class="breakdown-card" aria-labelledby="breakdownHeading">
         <div class="breakdown-header">
-          <span>📊 Detailed Statement / शुल्क विवरण</span>
-          <span style="color: #059669;" id="badgePaymentType">Full Payment</span>
+          <h2 class="section-heading" id="breakdownHeading">
+            <span aria-hidden="true">📊</span> Detailed statement / शुल्क विवरण
+          </h2>
+          <span class="badge-payment-type" id="badgePaymentType">Full payment</span>
         </div>
-        <div class="breakdown-row">
-          <div>
-            <strong>1. Previous Carried Over Balance / पिछला बकाया</strong><br>
-            <span style="font-size: 0.75rem; color: var(--text-muted);">Unpaid dues before current billing</span>
-          </div>
-          <div style="font-weight: 700; font-family: monospace;" id="prevDueText">₹0</div>
-        </div>
-        <div class="breakdown-row">
-          <div>
-            <strong>2. Current Month Tuition Fee / इस माह का शुल्क</strong><br>
-            <span style="font-size: 0.75rem; color: #059669;">Academic batch tuition charges</span>
-          </div>
-          <div style="font-weight: 800; color: #059669; font-family: monospace;" id="currFeeText">+ ₹0</div>
-        </div>
-        <div class="breakdown-row" id="rowRemainingDue" style="display: none; background: #FFFBEB;">
-          <div>
-            <strong style="color: #B45309;">3. Remaining Due After This Payment</strong><br>
-            <span style="font-size: 0.75rem; color: var(--text-muted);">Balance carryforward for next installment</span>
-          </div>
-          <div style="font-weight: 800; color: #D97706; font-family: monospace;" id="remainingDueText">₹0</div>
-        </div>
-        <div class="breakdown-row total">
-          <div id="breakdownTotalLabel">AMOUNT BEING PAID / भुगतान राशि</div>
-          <div id="breakdownTotalText">₹0</div>
-        </div>
-      </div>
+        <table class="breakdown-table">
+          <caption class="sr-only">Itemised fee statement and the amount being paid now</caption>
+          <tbody>
+            <tr>
+              <th scope="row">
+                1. Previous carried-over balance / पिछला बकाया
+                <span class="row-note">Unpaid dues from before the current billing month</span>
+              </th>
+              <td id="prevDueText">₹0</td>
+            </tr>
+            <tr>
+              <th scope="row">
+                2. Current month tuition fee / इस माह का शुल्क
+                <span class="row-note is-current">Academic batch tuition charge</span>
+              </th>
+              <td class="amount-in" id="currFeeText">₹0</td>
+            </tr>
+            <tr class="is-remaining" id="rowRemainingDue" hidden>
+              <th scope="row">
+                3. Remaining due after this payment
+                <span class="row-note">Balance carried forward to your next installment</span>
+              </th>
+              <td id="remainingDueText">₹0</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <th scope="row" id="breakdownTotalLabel">Amount being paid / भुगतान राशि</th>
+              <td id="breakdownTotalText">₹0</td>
+            </tr>
+          </tfoot>
+        </table>
+      </section>
 
-      <!-- 1-Tap Auto-UPI Button -->
-      <a href="#" id="mainUpiBtn" class="upi-btn-main">
-        <i class="fa-solid fa-bolt"></i> <span id="mainUpiBtnText">Tap to Pay via Any UPI App</span>
-      </a>
-
-      <!-- Quick App Grid -->
-      <div class="app-buttons-grid">
-        <a href="#" id="phonepeBtn" class="app-btn">
-          <i class="fa-solid fa-mobile-screen" style="color: #5F259F;"></i>
-          <span>PhonePe</span>
+      <section aria-labelledby="upiHeading">
+        <h2 class="sr-only" id="upiHeading">Pay by UPI</h2>
+        <a href="#" id="mainUpiBtn" class="upi-btn-main">
+          <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+          <span id="mainUpiBtnText">Tap to pay via any UPI app</span>
         </a>
-        <a href="#" id="gpayBtn" class="app-btn">
-          <i class="fa-brands fa-google" style="color: #4285F4;"></i>
-          <span>GPay</span>
-        </a>
-        <a href="#" id="paytmBtn" class="app-btn">
-          <i class="fa-solid fa-wallet" style="color: #00BAF2;"></i>
-          <span>Paytm</span>
-        </a>
-        <a href="#" id="bhimBtn" class="app-btn">
-          <i class="fa-solid fa-qrcode" style="color: #059669;"></i>
-          <span>BHIM / Other</span>
-        </a>
-      </div>
-
-      <!-- Official QR Code Showcase -->
-      <div class="qr-card">
-        <div style="font-size: 0.88rem; font-weight: 800; color: #065F46; margin-bottom: 0.6rem;">
-          📱 SCAN PHONEPE QR WITH ANY APP
+        <div class="app-buttons-grid" role="group" aria-label="Open a specific UPI app with the amount pre-filled">
+          <a href="#" id="phonepeBtn" class="app-btn">
+            <i class="fa-solid fa-mobile-screen" style="color: #5F259F;" aria-hidden="true"></i>
+            <span>PhonePe</span>
+          </a>
+          <a href="#" id="gpayBtn" class="app-btn">
+            <i class="fa-brands fa-google" style="color: #1A56DB;" aria-hidden="true"></i>
+            <span>GPay</span>
+          </a>
+          <a href="#" id="paytmBtn" class="app-btn">
+            <i class="fa-solid fa-wallet" style="color: #0369A1;" aria-hidden="true"></i>
+            <span>Paytm</span>
+          </a>
+          <a href="#" id="bhimBtn" class="app-btn">
+            <i class="fa-solid fa-qrcode" style="color: var(--money-in);" aria-hidden="true"></i>
+            <span>BHIM / other</span>
+          </a>
         </div>
-        <div class="qr-img-frame">
-          <img src="assets/images/chandan_upi_qr.png" alt="PhonePe QR Code - Chandan Kumar Pragyan Institute">
-        </div>
+        <p class="upi-hint">
+          These buttons open a UPI app, so they only work on a phone. On a computer,
+          scan the QR code below with your phone instead.
+        </p>
+      </section>
+
+      <section class="qr-card" aria-labelledby="qrHeading">
+        <h2 class="section-heading" id="qrHeading">
+          <span aria-hidden="true">📱</span> Scan this QR with any UPI app
+        </h2>
+        <span class="qr-img-frame">
+          <img src="assets/images/chandan_upi_qr.png" decoding="async"
+               alt="PhonePe payment QR code for Chandan Kumar, Pragyan Institute Lalganj">
+        </span>
         <br>
-        <div class="upi-pill" onclick="copyUpiId()" title="Click to copy UPI ID">
-          <span>chandankr1501998@ybl</span>
-          <i class="fa-regular fa-copy" style="color: #059669;"></i>
-        </div>
-        <div style="font-size: 0.78rem; color: var(--text-muted);">
-          Verified Payee: <strong>Chandan Kumar</strong> (Director, Pragyan Institute)
-        </div>
-      </div>
+        <button type="button" class="upi-pill" id="copyUpiBtn">
+          <span class="sr-only">Copy UPI ID </span>
+          <span id="upiIdText">chandankr1501998@ybl</span>
+          <i class="fa-regular fa-copy" style="color: var(--money-in);" aria-hidden="true"></i>
+        </button>
+        <p class="payee-line">
+          Verified payee: <strong id="payeeNameText">Chandan Kumar</strong>
+          (<span id="payeeRoleText">Managing Director, Pragyan Institute</span>)
+        </p>
+      </section>
 
-      <!-- UTR Verification Form -->
-      <div class="utr-form-card">
-        <div class="form-title">
-          <i class="fa-solid fa-receipt"></i> Submit Payment UTR for Digital Receipt
-        </div>
-        <form id="utrSubmissionForm">
+      <section class="utr-form-card" aria-labelledby="utrHeading">
+        <h2 class="section-heading" id="utrHeading">
+          <i class="fa-solid fa-receipt" aria-hidden="true"></i>
+          Submit your payment reference
+        </h2>
+        <form id="utrSubmissionForm" novalidate>
           <div class="form-group">
-            <label for="utrInput">12-Digit Bank Transaction Reference / UTR Number *</label>
-            <input type="text" id="utrInput" class="form-input" placeholder="e.g. 423156789012" required pattern="[0-9A-Za-z]{6,22}">
+            <label for="utrInput">Bank transaction reference / UTR number <span class="req" aria-hidden="true">*</span><span class="sr-only">(required)</span></label>
+            <input
+              type="text"
+              id="utrInput"
+              class="form-input"
+              inputmode="numeric"
+              autocomplete="off"
+              spellcheck="false"
+              minlength="6"
+              maxlength="22"
+              placeholder="e.g. 423156789012"
+              aria-describedby="utrHint utrError"
+              required>
+            <p class="form-hint" id="utrHint">6 to 22 letters or digits, copied exactly from the transaction receipt in your UPI app. Most banks issue a 12-digit UTR.</p>
+            <p class="form-error" id="utrError" role="alert"></p>
           </div>
           <div class="form-group">
-            <label for="payModeSelect">Payment Method Used</label>
+            <label for="payModeSelect">Payment method used</label>
             <select id="payModeSelect" class="form-input">
               <option value="PhonePe">PhonePe</option>
               <option value="Google Pay">Google Pay (GPay)</option>
               <option value="Paytm">Paytm</option>
               <option value="BHIM UPI">BHIM UPI</option>
-              <option value="Bank / Other">Other UPI App</option>
+              <option value="Bank / Other">Other UPI app or bank transfer</option>
             </select>
           </div>
           <button type="submit" class="btn-submit-utr" id="submitUtrBtn">
-            <i class="fa-solid fa-paper-plane"></i> Submit Verification & Request Receipt
+            <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
+            Submit for verification
           </button>
         </form>
-      </div>
+        <p class="pay-status" id="payStatus" role="status" aria-live="polite"></p>
+      </section>
 
-      <!-- Return Button -->
-      <div style="text-align: center; margin-top: 1rem;">
-        <a href="index.html" style="font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none;">
-          <i class="fa-solid fa-arrow-left"></i> Go to Student & Admin Portal
+      <p class="back-link-wrap">
+        <a href="index.html" class="back-link">
+          <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+          Go to the student &amp; admin portal
         </a>
-      </div>
+      </p>
 
-    </div>
+    </main>
 
+<<<<<<< HEAD
     <!-- Footer -->
     <div class="footer-note">
       <strong>PRAGYAN INSTITUTE LALGANJ</strong> • At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj, Bihar<br>
@@ -733,16 +989,59 @@
 
   <script src="js/config.js?v=90.0.41b75292"></script>
   <script src="js/supabase-sync.js?v=90.0.41b75292"></script>
-  <script>
-    const params = new URLSearchParams(window.location.search);
-    const totalDueAmount = Math.max(0, parseInt(params.get('amount') || '0', 10));
-    const roll = params.get('roll') || 'N/A';
-    const name = params.get('name') || 'Student';
-    const batch = params.get('batch') || 'Academic Batch';
-    
-    let prev = parseInt(params.get('prev') || '0', 10);
-    let curr = parseInt(params.get('curr') || '0', 10);
+=======
+    <footer class="footer-note">
+      <strong>PRAGYAN INSTITUTE LALGANJ</strong> &bull; Near Gandhi Chowk, Lalganj, Vaishali, Bihar
+      <span class="helpline-row">
+        <a class="helpline-link" href="tel:+919110024683">
+          <i class="fa-solid fa-phone" aria-hidden="true"></i>
+          <span><span class="sr-only">Director helpline </span>+91 91100 24683</span>
+        </a>
+        <a class="helpline-link" href="tel:+917992247589">
+          <i class="fa-solid fa-phone" aria-hidden="true"></i>
+          <span><span class="sr-only">Alternate helpline </span>+91 79922 47589</span>
+        </a>
+      </span>
+    </footer>
+  </div>
 
+  <script src="js/academic-config.js?v=90.0.4dc3a91d"></script>
+  <script src="js/config.js?v=90.0.4dc3a91d"></script>
+  <script src="js/supabase-sync.js?v=90.0.4dc3a91d"></script>
+>>>>>>> claude/admiring-kepler-50a04f
+  <script>
+  /* ==========================================================================
+   * PAYMENT GATEWAY PAGE LOGIC
+   * --------------------------------------------------------------------------
+   * Corrections made here, each of which shipped:
+   *
+   *   1. The current-month fee fell back to a hardcoded ₹1,000 and the quick
+   *      chip was literally labelled "1-Month Fee (₹1,000)". Eight of the
+   *      twelve canonical batches do not cost ₹1,000, so a Class 8th student
+   *      arriving with only ?amount= was shown someone else's fee. The rate now
+   *      comes from PRAGYAN_ACADEMIC.resolveBatch(batch).monthlyFee.
+   *
+   *   2. parseInt('abc') is NaN and Math.max(0, NaN) is NaN, so a malformed
+   *      ?amount= rendered "₹NaN" across the hero card and the statement.
+   *
+   *   3. The partial-amount field clamped on every keystroke: typing "150"
+   *      produced 1 → rewritten to 100 → "1005". The value was un-typeable on a
+   *      phone. Validation now runs on blur and submit, never mid-keystroke.
+   *
+   *   4. SupabaseSync.mutate() resolves with { success: false } on failure — it
+   *      does not throw — so the try/catch never fired and every submission,
+   *      including ones the database rejected, showed "submitted successfully".
+   *      The result is now inspected and a failure is reported as a failure.
+   *
+   *   5. The over-payment ceiling was a magic 100000. It is now the total due,
+   *      or, when the link carries no dues, twelve months of the priciest
+   *      canonical batch — a figure derived from the config and disclosed to
+   *      the student rather than silently clamping their input.
+   * ======================================================================== */
+  (function () {
+    'use strict';
+
+<<<<<<< HEAD
     // Guaranteed Mathematical Consistency & Batch Fee Rate Resolution.
     // Canonical 12-batch resolver — keep in sync with api/cron-monthly-fees.js
     // getStudentDefaultMonthlyFee(). Special English is tested FIRST because
@@ -782,229 +1081,528 @@
     const defaultMonthlyRate = curr > 0 ? curr : defaultMonthly;
     let paymentMode = 'full'; // 'full' or 'partial'
     let activePayAmount = totalDueAmount > 0 ? totalDueAmount : defaultMonthlyRate;
+=======
+    var ACADEMIC = window.PRAGYAN_ACADEMIC || null;
+    var PAYEE = (ACADEMIC && ACADEMIC.PAYEE) ||
+      { upiId: 'chandankr1501998@ybl', name: 'CHANDAN KUMAR', displayName: 'Chandan Kumar', role: 'Managing Director, Pragyan Institute' };
 
-    // Populate Initial Static Meta
-    document.getElementById('studentNameText').textContent = name;
-    document.getElementById('batchNameText').textContent = batch;
-    document.getElementById('rollNoText').textContent = roll.startsWith('#') ? roll : `#${roll}`;
-    document.getElementById('prevDueText').textContent = `₹${prev.toLocaleString('en-IN')}`;
-    document.getElementById('currFeeText').textContent = `+ ₹${curr.toLocaleString('en-IN')}`;
-    document.getElementById('pillFullSub').textContent = `Full Due: ₹${totalDueAmount.toLocaleString('en-IN')}`;
-    document.getElementById('partialMaxDueText').textContent = `₹${totalDueAmount.toLocaleString('en-IN')}`;
-    document.getElementById('chipOneMonth').textContent = `1-Month Fee (₹${defaultMonthlyRate.toLocaleString('en-IN')})`;
+    var MIN_PAYMENT = 100;
+    var LOCAL_REQUESTS_KEY = 'pragyan_db_requests_master';
+    var UNDELIVERED_KEY = 'pragyan_undelivered_payment_submissions';
+    var DELIVERED_UTR_KEY = 'pragyan_delivered_payment_utrs';
+    var UTR_PATTERN = /^[0-9A-Za-z]{6,22}$/;
 
-    // Recompute and refresh all UI elements, UPI deep-links, and UTR payloads
-    function refreshPaymentState() {
-      const isFull = paymentMode === 'full';
-      const paying = Math.max(1, activePayAmount);
-      const remaining = Math.max(0, totalDueAmount - paying);
+    var el = function (id) { return document.getElementById(id); };
 
-      // Hero Card
-      document.getElementById('totalAmountText').textContent = `₹${paying.toLocaleString('en-IN')}`;
-      document.getElementById('breakdownTotalText').textContent = `₹${paying.toLocaleString('en-IN')}`;
-      document.getElementById('badgePaymentType').textContent = isFull ? 'Full Payment' : 'Partial Payment';
-      document.getElementById('badgePaymentType').style.color = isFull ? '#059669' : '#D97706';
-
-      // Remaining Due row in Breakdown
-      const rowRemaining = document.getElementById('rowRemainingDue');
-      if (rowRemaining) {
-        if (!isFull && remaining > 0) {
-          rowRemaining.style.display = 'flex';
-          document.getElementById('remainingDueText').textContent = `₹${remaining.toLocaleString('en-IN')}`;
-        } else {
-          rowRemaining.style.display = 'none';
-        }
-      }
-
-      // Hero text note
-      const heroSub = document.getElementById('amountHeroSub');
-      if (heroSub) {
-        if (isFull) {
-          heroSub.textContent = '100% Fee Clearance • Instant Computerized Receipt Issued';
-          heroSub.style.color = '#047857';
-        } else {
-          heroSub.textContent = `Partial Payment of ₹${paying.toLocaleString('en-IN')} (Remaining Due: ₹${remaining.toLocaleString('en-IN')})`;
-          heroSub.style.color = '#B45309';
-        }
-      }
-
-      // 1-Tap UPI Button Label
-      const mainBtnText = document.getElementById('mainUpiBtnText');
-      if (mainBtnText) {
-        mainBtnText.textContent = `Tap to Pay ₹${paying.toLocaleString('en-IN')} via Any UPI App`;
-      }
-
-      // Refresh UPI URIs
-      const upiId = 'chandankr1501998@ybl';
-      const payeeName = 'CHANDAN KUMAR';
-      const note = encodeURIComponent(`FEES ${roll} ${isFull ? 'FULL' : 'PARTIAL'}`);
-      const genericUpi = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${paying}&cu=INR&tn=${note}`;
-      const phonepeUpi = `phonepe://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${paying}&cu=INR&tn=${note}`;
-      const gpayUpi    = `tez://upi/pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${paying}&cu=INR&tn=${note}`;
-      const paytmUpi   = `paytmmp://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${paying}&cu=INR&tn=${note}`;
-
-      document.getElementById('mainUpiBtn').href = genericUpi;
-      document.getElementById('phonepeBtn').href = phonepeUpi;
-      document.getElementById('gpayBtn').href = gpayUpi;
-      document.getElementById('paytmBtn').href = paytmUpi;
-      document.getElementById('bhimBtn').href = genericUpi;
+    function inr(amount) {
+      if (ACADEMIC && typeof ACADEMIC.formatINR === 'function') return ACADEMIC.formatINR(amount);
+      return '₹' + (Math.round(Number(amount)) || 0).toLocaleString('en-IN');
     }
 
-    // Toggle: Pay in Full
-    document.getElementById('btnPayFull')?.addEventListener('click', () => {
-      paymentMode = 'full';
-      activePayAmount = totalDueAmount > 0 ? totalDueAmount : defaultMonthlyRate;
-      document.getElementById('btnPayFull').classList.add('active');
-      document.getElementById('btnPayPartial').classList.remove('active');
-      document.getElementById('partialInputTray').style.display = 'none';
-      refreshPaymentState();
-    });
+    /** Query-string money: never NaN, never negative, never fractional paise. */
+    function toAmount(raw) {
+      var n = Math.floor(Number(String(raw == null ? '' : raw).replace(/[^0-9.]/g, '')));
+      return Number.isFinite(n) && n > 0 ? n : 0;
+    }
 
-    // Toggle: Pay in Partial
-    document.getElementById('btnPayPartial')?.addEventListener('click', () => {
-      paymentMode = 'partial';
-      const partialInput = document.getElementById('partialAmountInput');
-      if (!partialInput.value) {
-        activePayAmount = Math.min(defaultMonthlyRate, totalDueAmount > 0 ? totalDueAmount : defaultMonthlyRate);
-        partialInput.value = activePayAmount;
-      } else {
-        activePayAmount = parseFloat(partialInput.value) || defaultMonthlyRate;
+    /** Field money: NaN is preserved so "abc" reads as invalid, not as zero. */
+    function toFieldAmount(raw) {
+      var text = String(raw == null ? '' : raw).trim();
+      if (!text) return NaN;
+      var n = Number(text);
+      return Number.isFinite(n) ? Math.floor(n) : NaN;
+    }
+
+    function readJsonArray(key) {
+      try {
+        var parsed = JSON.parse(localStorage.getItem(key) || '[]');
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (err) {
+        return [];
       }
-      document.getElementById('btnPayFull').classList.remove('active');
-      document.getElementById('btnPayPartial').classList.add('active');
-      document.getElementById('partialInputTray').style.display = 'block';
-      refreshPaymentState();
-    });
+    }
 
-    // Input: Custom Partial Amount with validation
-    document.getElementById('partialAmountInput')?.addEventListener('input', (e) => {
-      const val = parseFloat(e.target.value) || 0;
-      // Validation: Ensure amount is between minimum ₹100 and maximum total due
-      const minAmount = 100;
-      const maxAmount = totalDueAmount > 0 ? totalDueAmount : 100000;
-
-      if (val > 0 && val < minAmount) {
-        activePayAmount = minAmount;
-        e.target.value = minAmount;
-      } else if (val > maxAmount) {
-        activePayAmount = maxAmount;
-        e.target.value = maxAmount;
-      } else {
-        activePayAmount = Math.max(1, val);
+    function writeJson(key, value) {
+      try {
+        localStorage.setItem(key, JSON.stringify(value));
+        return true;
+      } catch (err) {
+        // A full quota or Safari private mode must not swallow the message the
+        // student needs to read; log and carry on.
+        console.warn('[pay] localStorage write failed for ' + key + ':', err.message);
+        return false;
       }
+    }
+>>>>>>> claude/admiring-kepler-50a04f
+
+    // ---- Incoming link ----------------------------------------------------
+    var params = new URLSearchParams(window.location.search);
+    var roll = (params.get('roll') || '').trim();
+    var studentName = (params.get('name') || '').trim() || 'Student';
+    var batchName = (params.get('batch') || '').trim();
+
+    var resolvedBatch = (ACADEMIC && batchName) ? ACADEMIC.resolveBatch(batchName) : null;
+    var monthlyFee = resolvedBatch ? resolvedBatch.monthlyFee : 0;
+
+    var totalDue = toAmount(params.get('amount'));
+    var prevDue = toAmount(params.get('prev'));
+    var currFee = toAmount(params.get('curr'));
+
+    // Reconcile the three figures so the statement always adds up. When the
+    // batch is unknown the whole balance is shown as carried-over rather than
+    // invented as "one month at some default rate".
+    if (prevDue + currFee !== totalDue) {
+      if (totalDue === 0) {
+        prevDue = 0;
+        currFee = 0;
+      } else if (monthlyFee > 0 && totalDue > monthlyFee) {
+        currFee = monthlyFee;
+        prevDue = totalDue - monthlyFee;
+      } else if (monthlyFee > 0) {
+        prevDue = 0;
+        currFee = totalDue;
+      } else {
+        prevDue = totalDue;
+        currFee = 0;
+      }
+    }
+
+    var oneMonthAmount = currFee > 0 ? currFee : monthlyFee;
+
+    // A ceiling exists only to catch a typo like an extra zero. Deriving it
+    // from the config keeps it explainable, and it is printed in the hint.
+    var CONFIG_CEILING = 18000;
+    if (ACADEMIC && Array.isArray(ACADEMIC.BATCHES) && ACADEMIC.BATCHES.length) {
+      CONFIG_CEILING = ACADEMIC.BATCHES.reduce(function (max, b) {
+        return Math.max(max, Number(b.monthlyFee) * 12);
+      }, 0);
+    }
+    var maxPayable = totalDue > 0 ? totalDue : Math.max(oneMonthAmount, CONFIG_CEILING);
+    // No balance came through on the link, so anything paid is an unverified
+    // advance rather than a clearance. Every label below has to say so.
+    var isAdvance = totalDue <= 0;
+
+    var paymentMode = 'full';
+    var activePayAmount = totalDue > 0 ? totalDue : oneMonthAmount;
+
+    // ---- Static content ---------------------------------------------------
+    el('studentNameText').textContent = studentName;
+    el('batchNameText').textContent = resolvedBatch ? resolvedBatch.name : (batchName || 'Academic batch');
+    el('rollNoText').textContent = roll ? (roll.charAt(0) === '#' ? roll : '#' + roll) : 'Not supplied';
+    el('prevDueText').textContent = inr(prevDue);
+    el('currFeeText').textContent = '+ ' + inr(currFee);
+    el('upiIdText').textContent = PAYEE.upiId;
+    el('payeeNameText').textContent = PAYEE.displayName || PAYEE.name;
+    el('payeeRoleText').textContent = PAYEE.role || 'Pragyan Institute';
+    el('pillFullSub').textContent = totalDue > 0 ? 'Full due: ' + inr(totalDue) : 'Nothing outstanding';
+
+    if (oneMonthAmount > 0) {
+      el('chipOneMonth').textContent = 'One month (' + inr(oneMonthAmount) + ')';
+      el('pillPartialSub').textContent = 'Custom / ' + inr(oneMonthAmount);
+    } else {
+      el('chipOneMonth').hidden = true;
+      el('pillPartialSub').textContent = 'Custom amount';
+    }
+
+    if (isAdvance) {
+      // "Pay in full" is meaningless with no recorded balance, and the 50% /
+      // full-clearance chips would divide by nothing.
+      el('chipHalfDue').hidden = true;
+      el('chipFullDue').hidden = true;
+
+      var noticeBody = oneMonthAmount > 0
+        ? 'This link did not carry your outstanding balance, so one month of your batch fee (' + inr(oneMonthAmount) +
+          ') has been filled in as a starting point. Check it against your fee statement before paying.'
+        : 'This link did not carry your fee figures, so nothing is pre-filled. Enter the amount you are paying below.';
+      el('linkNotice').innerHTML =
+        '<span aria-hidden="true">⚠️</span> <span>' + noticeBody +
+        ' Opening this page from your student portal fills the figures in for you.</span>';
+    }
+
+    // ---- Live status ------------------------------------------------------
+    function setStatus(message, kind) {
+      var node = el('payStatus');
+      node.className = 'pay-status' + (kind ? ' is-' + kind : '');
+      node.textContent = message || '';
+    }
+
+    function setFieldError(input, errorNode, message) {
+      errorNode.textContent = message || '';
+      if (message) {
+        input.setAttribute('aria-invalid', 'true');
+      } else {
+        input.removeAttribute('aria-invalid');
+      }
+    }
+
+    // ---- Render -----------------------------------------------------------
+    function payableNow() {
+      var value = Math.floor(Number(activePayAmount));
+      return Number.isFinite(value) && value > 0 ? value : 0;
+    }
+
+    function syncChipPressedState(amount) {
+      el('chipOneMonth').setAttribute('aria-pressed', String(oneMonthAmount > 0 && amount === oneMonthAmount));
+      el('chipHalfDue').setAttribute('aria-pressed', String(totalDue > 0 && amount === Math.max(MIN_PAYMENT, Math.round(totalDue / 2))));
+      el('chipFullDue').setAttribute('aria-pressed', String(totalDue > 0 && amount === totalDue));
+    }
+
+    function refreshPaymentState() {
+      var paying = payableNow();
+      var remaining = Math.max(0, totalDue - paying);
+      // Keyed off the amount, not the selected mode: typing the whole balance
+      // into the partial field is a full payment, and labelling that "Partial
+      // payment" right next to "this clears your balance in full" contradicted
+      // itself on screen and in the announcement.
+      var clearsAll = !isAdvance && paying >= totalDue;
+
+      el('totalAmountText').textContent = inr(paying);
+      el('breakdownTotalText').textContent = inr(paying);
+
+      var badge = el('badgePaymentType');
+      badge.textContent = isAdvance ? 'Advance payment' : (clearsAll ? 'Full payment' : 'Partial payment');
+      badge.classList.toggle('is-partial', isAdvance || !clearsAll);
+      el('breakdownTotalLabel').textContent = isAdvance
+        ? 'Advance amount being paid / अग्रिम राशि'
+        : 'Amount being paid / भुगतान राशि';
+
+      var remainingRow = el('rowRemainingDue');
+      remainingRow.hidden = remaining <= 0;
+      el('remainingDueText').textContent = inr(remaining);
+
+      var heroSub = el('amountHeroSub');
+      heroSub.classList.toggle('is-partial', isAdvance || !clearsAll);
+      if (paying <= 0) {
+        heroSub.textContent = 'Enter the amount you want to pay to continue.';
+      } else if (isAdvance) {
+        heroSub.textContent = 'No dues are recorded against this link, so ' + inr(paying) +
+          ' will be credited as an advance against your next monthly bill.';
+      } else if (clearsAll) {
+        heroSub.textContent = '100% clearance — a computerized receipt is issued once the administration verifies this payment.';
+      } else {
+        heroSub.textContent = 'Part payment of ' + inr(paying) + '. ' + inr(remaining) + ' will remain outstanding.';
+      }
+
+      el('mainUpiBtnText').textContent = paying > 0
+        ? 'Tap to pay ' + inr(paying) + ' via any UPI app'
+        : 'Tap to pay via any UPI app';
+
+      el('partialRangeHint').textContent = totalDue > 0
+        ? 'Minimum ' + inr(MIN_PAYMENT) + ' • total due ' + inr(totalDue)
+        : 'Minimum ' + inr(MIN_PAYMENT) + ' • maximum ' + inr(maxPayable);
+
+      syncChipPressedState(paying);
+      refreshUpiLinks(paying, clearsAll);
+    }
+
+    function refreshUpiLinks(paying, isFull) {
+      var query =
+        'pa=' + encodeURIComponent(PAYEE.upiId) +
+        '&pn=' + encodeURIComponent(PAYEE.name) +
+        (paying > 0 ? '&am=' + paying : '') +
+        '&cu=INR' +
+        '&tn=' + encodeURIComponent('FEES ' + (roll || studentName) + ' ' + (isFull ? 'FULL' : 'PARTIAL'));
+
+      el('mainUpiBtn').href = 'upi://pay?' + query;
+      el('phonepeBtn').href = 'phonepe://pay?' + query;
+      el('gpayBtn').href = 'tez://upi/pay?' + query;
+      el('paytmBtn').href = 'paytmmp://pay?' + query;
+      el('bhimBtn').href = 'upi://pay?' + query;
+    }
+
+    // ---- Mode selection (ARIA radio group) --------------------------------
+    var modeButtons = [el('btnPayFull'), el('btnPayPartial')];
+
+    function selectableModes() {
+      return modeButtons.filter(function (b) { return !b.disabled; });
+    }
+
+    function selectMode(mode, moveFocus) {
+      paymentMode = mode;
+      var isFull = mode === 'full';
+
+      el('btnPayFull').setAttribute('aria-checked', String(isFull));
+      el('btnPayPartial').setAttribute('aria-checked', String(!isFull));
+      el('btnPayFull').tabIndex = isFull ? 0 : -1;
+      el('btnPayPartial').tabIndex = isFull ? -1 : 0;
+      el('partialInputTray').hidden = isFull;
+
+      if (isFull) {
+        activePayAmount = totalDue > 0 ? totalDue : oneMonthAmount;
+      } else {
+        var field = el('partialAmountInput');
+        var typed = toFieldAmount(field.value);
+        if (Number.isFinite(typed) && typed > 0) {
+          activePayAmount = typed;
+        } else if (oneMonthAmount > 0) {
+          activePayAmount = Math.min(oneMonthAmount, maxPayable);
+          field.value = String(activePayAmount);
+        } else {
+          // Nothing is known about this student's fee. Seeding the field with a
+          // made-up figure just invites them to pay it by accident.
+          activePayAmount = 0;
+          field.value = '';
+        }
+        field.max = String(maxPayable);
+      }
+
+      if (moveFocus) (isFull ? el('btnPayFull') : el('btnPayPartial')).focus();
+      refreshPaymentState();
+    }
+
+    el('btnPayFull').addEventListener('click', function () { selectMode('full', false); });
+    el('btnPayPartial').addEventListener('click', function () { selectMode('partial', false); });
+
+    // Arrow keys must move selection within a radio group; without this the
+    // pills were reachable only by Tab and behaved like two unrelated buttons.
+    el('modePillGroup').addEventListener('keydown', function (event) {
+      var choices = selectableModes();
+      var index = choices.indexOf(document.activeElement);
+      if (index === -1 || choices.length < 2) return;
+      var next = null;
+      if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = (index + 1) % choices.length;
+      else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') next = (index + choices.length - 1) % choices.length;
+      else if (event.key === 'Home') next = 0;
+      else if (event.key === 'End') next = choices.length - 1;
+      if (next === null) return;
+      event.preventDefault();
+      selectMode(choices[next] === el('btnPayFull') ? 'full' : 'partial', true);
+    });
+
+    if (isAdvance) {
+      // Offering "Pay in full (100%)" against a balance of nothing is a lie, so
+      // the pill is removed from the group rather than left as a dead choice.
+      el('btnPayFull').disabled = true;
+      el('btnPayFull').setAttribute('aria-disabled', 'true');
+      selectMode('partial', false);
+    }
+
+    // ---- Partial amount field --------------------------------------------
+    var partialField = el('partialAmountInput');
+    var partialError = el('partialAmountError');
+    partialField.max = String(maxPayable);
+
+    // Track the value as it is typed, but never rewrite the field mid-entry.
+    partialField.addEventListener('input', function () {
+      var typed = toFieldAmount(partialField.value);
+      activePayAmount = Number.isFinite(typed) && typed > 0 ? typed : 0;
+
+      // Only the ceiling is worth flagging mid-entry. Every partially-typed
+      // figure is momentarily under the minimum — "1" on the way to "150" — so
+      // announcing that from a role="alert" on each keystroke would interrupt
+      // the student repeatedly over an error they are already fixing. The floor
+      // is checked on blur and again on submit instead.
+      if (Number.isFinite(typed) && typed > maxPayable) {
+        setFieldError(partialField, partialError, 'Maximum ' + inr(maxPayable) + '. For a larger amount, please contact the institute.');
+      } else {
+        setFieldError(partialField, partialError, '');
+      }
+
       refreshPaymentState();
     });
 
-    // Quick Chips: 1-Month Fee
-    document.getElementById('chipOneMonth')?.addEventListener('click', () => {
-      activePayAmount = Math.min(defaultMonthlyRate, totalDueAmount > 0 ? totalDueAmount : defaultMonthlyRate);
-      document.getElementById('partialAmountInput').value = activePayAmount;
+    /** Clamp into range once the student has finished typing. */
+    function commitPartialAmount() {
+      var typed = toFieldAmount(partialField.value);
+      if (!Number.isFinite(typed) || typed <= 0) {
+        activePayAmount = 0;
+        refreshPaymentState();
+        return 0;
+      }
+      var clamped = Math.min(Math.max(typed, MIN_PAYMENT), maxPayable);
+      if (clamped !== typed) {
+        setFieldError(partialField, partialError, 'Adjusted to ' + inr(clamped) + ', the closest amount we can accept.');
+      } else {
+        setFieldError(partialField, partialError, '');
+      }
+      partialField.value = String(clamped);
+      activePayAmount = clamped;
       refreshPaymentState();
+      return clamped;
+    }
+
+    partialField.addEventListener('blur', commitPartialAmount);
+
+    function applyChip(amount) {
+      activePayAmount = Math.min(Math.max(amount, MIN_PAYMENT), maxPayable);
+      partialField.value = String(activePayAmount);
+      setFieldError(partialField, partialError, '');
+      refreshPaymentState();
+    }
+
+    el('chipOneMonth').addEventListener('click', function () { applyChip(oneMonthAmount || MIN_PAYMENT); });
+    el('chipHalfDue').addEventListener('click', function () { applyChip(Math.round(totalDue / 2)); });
+    el('chipFullDue').addEventListener('click', function () { applyChip(totalDue); });
+
+    // ---- Copy the UPI ID --------------------------------------------------
+    el('copyUpiBtn').addEventListener('click', function () {
+      var value = PAYEE.upiId;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(value).then(function () {
+          setStatus('UPI ID copied: ' + value, 'ok');
+        }).catch(function () {
+          setStatus('Could not copy automatically. The UPI ID is ' + value, 'warn');
+        });
+      } else {
+        // No clipboard API on an insecure origin or an older WebView.
+        setStatus('Copy is unavailable in this browser. The UPI ID is ' + value, 'warn');
+      }
     });
 
-    // Quick Chips: 50% Balance
-    document.getElementById('chipHalfDue')?.addEventListener('click', () => {
-      activePayAmount = Math.max(1, Math.round(totalDueAmount / 2));
-      document.getElementById('partialAmountInput').value = activePayAmount;
-      refreshPaymentState();
+    // Tapping a UPI link leaves the page; the reference number is what brings
+    // the student back, so say so before they go.
+    ['mainUpiBtn', 'phonepeBtn', 'gpayBtn', 'paytmBtn', 'bhimBtn'].forEach(function (id) {
+      el(id).addEventListener('click', function () {
+        setStatus('Once your UPI app confirms the payment, come back and enter the transaction reference below.', null);
+      });
     });
 
-    // Quick Chips: Full Due in partial view
-    document.getElementById('chipFullDue')?.addEventListener('click', () => {
-      activePayAmount = totalDueAmount > 0 ? totalDueAmount : defaultMonthlyRate;
-      document.getElementById('partialAmountInput').value = activePayAmount;
-      refreshPaymentState();
-    });
+    // ---- Submission -------------------------------------------------------
+    var form = el('utrSubmissionForm');
+    var utrInput = el('utrInput');
+    var utrError = el('utrError');
+    var submitBtn = el('submitUtrBtn');
+    var SUBMIT_LABEL = '<i class="fa-solid fa-paper-plane" aria-hidden="true"></i> Submit for verification';
 
-    // Initialize State
-    refreshPaymentState();
-
-    function copyUpiId() {
-      navigator.clipboard.writeText('chandankr1501998@ybl').then(() => {
-        alert('✅ UPI ID copied: chandankr1501998@ybl');
-      }).catch(() => {
-        alert('UPI ID: chandankr1501998@ybl');
+    function isDuplicateUtr(utr) {
+      var needle = utr.toUpperCase();
+      if (readJsonArray(DELIVERED_UTR_KEY).some(function (u) { return String(u).toUpperCase() === needle; })) return true;
+      return readJsonArray(LOCAL_REQUESTS_KEY).some(function (entry) {
+        var details = (entry && ((entry.newData && entry.newData.paymentDetails) ||
+                                (entry.new_data && entry.new_data.paymentDetails) ||
+                                entry.paymentDetails)) || null;
+        return !!details && String(details.utr || '').toUpperCase() === needle;
       });
     }
 
-    // UTR Submit Handler
-    document.getElementById('utrSubmissionForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const utr = document.getElementById('utrInput').value.trim();
-      const mode = document.getElementById('payModeSelect').value;
-      const submitBtn = document.getElementById('submitUtrBtn');
-      const paying = activePayAmount;
-      const isFull = paymentMode === 'full';
+    function rememberUndelivered(payload, reason) {
+      var queued = readJsonArray(UNDELIVERED_KEY);
+      queued.push({ payload: payload, reason: reason, queuedAt: new Date().toISOString() });
+      writeJson(UNDELIVERED_KEY, queued.slice(-25));
+    }
 
-      // Validation: Check UTR format (6-22 alphanumeric characters)
-      if (!utr || utr.length < 6 || utr.length > 22 || !/^[0-9A-Za-z]+$/.test(utr)) {
-        alert('⚠️ Please enter a valid bank UTR / Reference number (6-22 alphanumeric characters only).');
+    form.addEventListener('submit', function (event) {
+      event.preventDefault();
+      setStatus('', null);
+      setFieldError(utrInput, utrError, '');
+
+      var utr = utrInput.value.trim().toUpperCase();
+      if (!UTR_PATTERN.test(utr)) {
+        setFieldError(utrInput, utrError, 'Enter the reference exactly as your UPI app shows it — 6 to 22 letters or digits, no spaces.');
+        utrInput.focus();
         return;
       }
 
-      // Validation: Check amount is reasonable (between ₹100 and ₹100,000)
-      if (paying < 100 || paying > 100000) {
-        alert('⚠️ Invalid payment amount. Please enter an amount between ₹100 and ₹100,000.');
+      var paying = paymentMode === 'partial' ? commitPartialAmount() : payableNow();
+      if (!Number.isFinite(paying) || paying < MIN_PAYMENT) {
+        setStatus('Enter an amount of at least ' + inr(MIN_PAYMENT) + ' before submitting.', 'error');
+        if (paymentMode === 'partial') partialField.focus();
+        return;
+      }
+      if (paying > maxPayable) {
+        setStatus('The maximum we can accept online is ' + inr(maxPayable) + '. Please contact the institute for a larger payment.', 'error');
+        if (paymentMode === 'partial') partialField.focus();
         return;
       }
 
-      // Check for duplicate UTR submission (prevent double submission)
-      const existingRequests = JSON.parse(localStorage.getItem('pragyan_db_requests_master') || '[]');
-      const isDuplicate = existingRequests.some(req =>
-        req.newData?.paymentDetails?.utr?.toUpperCase() === utr.toUpperCase() ||
-        req.new_data?.paymentDetails?.utr?.toUpperCase() === utr.toUpperCase()
-      );
-
-      if (isDuplicate) {
-        alert('⚠️ This UTR number has already been submitted. If this is a new payment, please check your transaction history or contact the administration.');
+      if (isDuplicateUtr(utr)) {
+        setFieldError(utrInput, utrError, 'This reference has already been submitted from this device. Check the portal for its status, or contact the office if you paid twice.');
+        utrInput.focus();
         return;
       }
 
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting...';
-
-      const reqId = `REQ-PAY-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,5)}`.toUpperCase();
-      const payload = {
-        request_id: reqId,
-        student_id: roll,
-        student_name: name,
+      // Classified by amount, not by which pill was pressed, so that typing the
+      // whole balance into the partial field reaches the admin queue as the full
+      // payment it is.
+      var isFull = !isAdvance && paying >= totalDue;
+      var requestId = ('REQ-PAY-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 5)).toUpperCase();
+      var payload = {
+        request_id: requestId,
+        student_id: roll || studentName,
+        student_name: studentName,
         roll_no: roll,
-        class_name: batch,
+        class_name: resolvedBatch ? resolvedBatch.className : batchName,
         req_type: 'PAYMENT_VERIFICATION',
         status: 'Pending',
-        request_date: new Date().toISOString().split('T')[0],
+        request_date: ACADEMIC && ACADEMIC.istDateKey ? ACADEMIC.istDateKey(new Date()) : new Date().toISOString().slice(0, 10),
         new_data: {
           paymentDetails: {
             amount: paying,
             paymentType: isFull ? 'FULL_PAYMENT' : 'PARTIAL_PAYMENT',
-            totalDueBefore: totalDueAmount,
-            remainingDueAfter: Math.max(0, totalDueAmount - paying),
-            utr: utr.toUpperCase(),
-            mode: mode,
+            // Named "claimed" because these come from the query string, which
+            // the student controls. The admin approval screen is the authority.
+            claimedTotalDueBefore: totalDue,
+            totalDueBefore: totalDue,
+            remainingDueAfter: Math.max(0, totalDue - paying),
+            batchId: resolvedBatch ? resolvedBatch.batchId : null,
+            utr: utr,
+            mode: el('payModeSelect').value,
             submittedAt: new Date().toISOString(),
-            note: `Online ${isFull ? 'full' : 'partial'} payment of ₹${paying.toLocaleString('en-IN')} submitted via Payment Gateway for ${name} (${roll})`
+            note: 'Online ' + (isAdvance ? 'advance' : (isFull ? 'full' : 'partial')) + ' payment of ' + inr(paying) +
+                  ' submitted via the payment gateway for ' + studentName + (roll ? ' (' + roll + ')' : '')
           }
         }
       };
 
-      try {
-        if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
-          await SupabaseSync.mutate('student_requests', 'insert', payload, { conflict: 'request_id' });
-        }
-        alert(`✅ Payment verification submitted successfully!\n\nAmount: ₹${paying.toLocaleString('en-IN')}\nUTR: ${utr}\nRequest ID: ${reqId}\n\nThe administration will verify and credit your student fee statement within 24 hours.`);
-        submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> Verification Submitted';
-        setTimeout(() => {
-          document.getElementById('utrInput').value = '';
-          submitBtn.disabled = false;
-          submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Verification & Request Receipt';
-        }, 3000);
-      } catch (err) {
-        console.warn('Direct submit note:', err.message);
-        alert(`✅ Payment verification details recorded!\n\nAmount: ₹${paying.toLocaleString('en-IN')}\nUTR: ${utr}\nRequest ID: ${reqId}\n\nYou can also view status on the Student Portal.`);
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Submitting…';
+      setStatus('Sending your payment reference to the institute…', null);
+
+      function finishFailure(reason) {
+        rememberUndelivered(payload, reason);
+        setStatus(
+          'We could not deliver this to the institute. ' + reason +
+          ' Your details are saved on this device only — nothing has reached the office yet.' +
+          ' Please press Submit again when you are back online, or call the helpline and quote UTR ' + utr + '.',
+          'error'
+        );
         submitBtn.disabled = false;
-        submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Verification';
+        submitBtn.innerHTML = '<i class="fa-solid fa-rotate-right" aria-hidden="true"></i> Retry submission';
       }
+
+      function finishSuccess() {
+        // Record the UTR so a second tap on Submit is caught locally, and drop
+        // any copy queued by an earlier failed attempt now that it has landed.
+        writeJson(DELIVERED_UTR_KEY, readJsonArray(DELIVERED_UTR_KEY).concat([utr]).slice(-50));
+        writeJson(UNDELIVERED_KEY, readJsonArray(UNDELIVERED_KEY).filter(function (queued) {
+          var details = queued && queued.payload && queued.payload.new_data && queued.payload.new_data.paymentDetails;
+          return !details || String(details.utr || '').toUpperCase() !== utr;
+        }));
+
+        setStatus(
+          'Payment reference received. Amount ' + inr(paying) + ', UTR ' + utr + ', request ID ' + requestId + '.' +
+          ' The administration will verify it and update your fee statement, usually within 24 hours.',
+          'ok'
+        );
+        submitBtn.innerHTML = '<i class="fa-solid fa-check" aria-hidden="true"></i> Submitted';
+        utrInput.value = '';
+        window.setTimeout(function () {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = SUBMIT_LABEL;
+        }, 3000);
+      }
+
+      // mutate() resolves with { success: false, error } instead of throwing, so
+      // the result has to be inspected. The old code only had a catch block and
+      // therefore reported every rejected write as a success.
+      if (!window.SupabaseSync || typeof window.SupabaseSync.mutate !== 'function') {
+        finishFailure('The sync service did not load.');
+        return;
+      }
+
+      window.SupabaseSync.mutate('student_requests', 'insert', payload, { conflict: 'request_id' })
+        .then(function (result) {
+          if (result && result.success) finishSuccess();
+          else finishFailure(result && result.error ? 'The database reported: ' + result.error + '.' : 'The database rejected the request.');
+        })
+        .catch(function (err) {
+          finishFailure('Network error: ' + (err && err.message ? err.message : 'unknown') + '.');
+        });
     });
+
+    // ---- Boot -------------------------------------------------------------
+    refreshPaymentState();
+  })();
   </script>
 </body>
 </html>

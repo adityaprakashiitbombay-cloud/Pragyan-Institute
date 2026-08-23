@@ -88,36 +88,98 @@
       this.isInitialized = true;
       this.sessionToken = sessionStorage.getItem('pragyan_portal_token') || localStorage.getItem('pragyan_portal_token') || null;
       this.sessionRole = sessionStorage.getItem('pragyan_portal_role') || localStorage.getItem('pragyan_portal_role') || null;
+      this._bindLifecycle();
       this._listenForConnectivity();
-
-      // Register cleanup on page unload
-      if (typeof window !== 'undefined') {
-        window.addEventListener('beforeunload', () => {
-          console.log('🔌 Page unloading - cleaning up Supabase connections...');
-          this.destroy();
-        });
-
-        // Also handle visibility change (tab switch)
-        document.addEventListener('visibilitychange', () => {
-          if (document.hidden) {
-            console.log('👁️ Tab hidden - pausing realtime sync');
-            // Don't destroy, just pause polling
-            if (this.pollTimer) {
-              clearInterval(this.pollTimer);
-              this.pollTimer = null;
-            }
-          } else {
-            console.log('👁️ Tab visible - resuming realtime sync');
-            this._listenForConnectivity();
-          }
-        });
-      }
 
       return this.pullAll();
     },
 
+    // ── Page lifecycle ───────────────────────────────────────────────────────
+    /**
+     * Binds the unload/restore handlers exactly once.
+     *
+     * The previous version registered a `visibilitychange` handler here in
+     * init() while _listenForConnectivity() registered a second one, and the
+     * "tab visible" branch called _listenForConnectivity() again — so every
+     * hide/show cycle added another copy of the online + focus +
+     * visibilitychange trio and another BroadcastChannel. On a phone, where
+     * backgrounding the browser fires visibilitychange constantly, the handler
+     * count grew without bound for as long as the portal stayed open.
+     */
+    _bindLifecycle() {
+      if (this._lifecycleBound || typeof window === 'undefined') return;
+      this._lifecycleBound = true;
+
+      // pagehide rather than beforeunload: mobile Safari and Chrome for
+      // Android routinely discard a backgrounded tab without ever firing
+      // beforeunload, which left the WebSocket to time out server-side.
+      // beforeunload also makes a page ineligible for the back/forward cache.
+      window.addEventListener('pagehide', (event) => {
+        if (event.persisted) {
+          // Bound for the back/forward cache, so the page can come back.
+          // Release the socket and timers but keep the registered subscribers:
+          // onChange() is called once at DOMContentLoaded and nothing
+          // re-registers it, so dropping them here would leave a restored page
+          // rendering permanently stale data.
+          this._suspend();
+        } else {
+          this.destroy();
+        }
+      });
+
+      window.addEventListener('pageshow', (event) => {
+        if (event.persisted) this._resume();
+      });
+    },
+
+    /** Release network resources without forgetting who is listening. */
+    _suspend() {
+      this._teardownInProgress = true;
+      if (this.pollTimer) {
+        clearInterval(this.pollTimer);
+        this.pollTimer = null;
+      }
+      if (this._pullDebounceTimer) {
+        clearTimeout(this._pullDebounceTimer);
+        this._pullDebounceTimer = null;
+      }
+      this._closeRealtimeChannel();
+      this._teardownInProgress = false;
+    },
+
+    /** Re-arm after a back/forward-cache restore. */
+    _resume() {
+      if (!this.isInitialized) return;
+      this._connectRealtime();
+      this._resetPollTimer();
+      this._schedulePull(150);
+    },
+
+    /**
+     * Unsubscribe and drop the realtime channel. Callers set
+     * _teardownInProgress first so the resulting CLOSED status is recognised
+     * as our own doing rather than logged as a connection failure.
+     */
+    _closeRealtimeChannel() {
+      if (!this._realtimeChannel || !this._supabaseClient) return;
+      try {
+        this._realtimeChannel.unsubscribe();
+        this._supabaseClient.removeChannel(this._realtimeChannel);
+      } catch (e) {
+        console.warn('[SupabaseSync] Realtime channel cleanup note:', e.message);
+        try {
+          this._supabaseClient.removeAllChannels();
+        } catch (forceErr) {
+          console.warn('[SupabaseSync] Force channel removal note:', forceErr.message);
+        }
+      }
+      this._realtimeChannel = null;
+      this._realtimeSubscribed = false;
+    },
+
     // ── S1: Clear poll timer and tear down connections ───────────────────────
     destroy() {
+      this._teardownInProgress = true;
       if (this.pollTimer) {
         clearInterval(this.pollTimer);
         this.pollTimer = null;
@@ -130,29 +192,16 @@
         try { this._pullAbort.abort(); } catch(e) {}
         this._pullAbort = null;
       }
-      if (this._realtimeChannel && this._supabaseClient) {
-        try {
-          // CORRECT: Unsubscribe first, then remove
-          this._realtimeChannel.unsubscribe();
-          this._supabaseClient.removeChannel(this._realtimeChannel);
-          console.log('✅ Realtime channel unsubscribed and removed');
-        } catch(e) {
-          console.error('❌ Realtime channel cleanup failed:', e.message);
-          // Force disconnect as fallback
-          try {
-            this._supabaseClient.removeAllChannels();
-          } catch(forceErr) {
-            console.error('❌ Force channel removal failed:', forceErr.message);
-          }
-        }
-        this._realtimeChannel = null;
-        this._realtimeSubscribed = false;
-      }
+      this._closeRealtimeChannel();
       if (this._bc) {
         try { this._bc.close(); } catch(e) {}
         this._bc = null;
       }
-      this.callbacks.clear();
+      // Subscribers registered through onChange() are deliberately kept. This
+      // is called on logout, and onChange() is only ever called once, from
+      // DOMContentLoaded — clearing the set here meant that logging out and
+      // back in without reloading the page left the dashboard unable to
+      // re-render on any subsequent database change.
       this.isInitialized = false;
       this.isSyncing = false;
       this._pullPromise = null;
@@ -165,6 +214,7 @@
       }
       this.sessionToken = null;
       this.sessionRole = null;
+      this._teardownInProgress = false;
     },
 
     // Debounced pull trigger: coalesces rapid events into a single execution
@@ -193,77 +243,39 @@
     },
 
     _listenForConnectivity() {
-      window.addEventListener('online', () => this._schedulePull(100));
-      window.addEventListener('focus', () => this._schedulePull(150));
-      document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) {
-          this._schedulePull(150);
-          this._resetPollTimer();
-        } else if (this.pollTimer) {
-          clearInterval(this.pollTimer);
-          this.pollTimer = null;
-        }
-      });
+      // Bound once for the life of the page. These are window/document
+      // listeners with no removal path, so re-registering them on every
+      // reconnect is a leak, not a refresh.
+      if (!this._connectivityBound) {
+        this._connectivityBound = true;
+        window.addEventListener('online', () => this._schedulePull(100));
+        window.addEventListener('focus', () => this._schedulePull(150));
+        document.addEventListener('visibilitychange', () => {
+          if (!document.hidden) {
+            // Coming back to the foreground. A backgrounded phone often has
+            // its socket killed by the OS without a status callback, so the
+            // channel is re-established rather than assumed alive.
+            if (!this._realtimeSubscribed) this._connectRealtime();
+            this._schedulePull(150);
+            this._resetPollTimer();
+          } else if (this.pollTimer) {
+            clearInterval(this.pollTimer);
+            this.pollTimer = null;
+          }
+        });
+      }
 
       // 1. Instant Realtime WebSocket Subscription via Supabase Client
-      if (typeof window !== 'undefined' && window.supabase && !this._realtimeSubscribed) {
-        try {
-          // Reuse global client to prevent connection leaks
-          if (!window._pragyanSupabaseClient) {
-            console.log('🔌 Creating new Supabase client instance');
-            window._pragyanSupabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-              auth: {
-                persistSession: false,
-                autoRefreshToken: false,
-                detectSessionInUrl: false
-              },
-              realtime: {
-                params: {
-                  eventsPerSecond: 5 // Rate limit realtime events
-                }
-              },
-              db: {
-                schema: 'public'
-              },
-              global: {
-                headers: {
-                  'X-Client-Info': 'pragyan-portal-web'
-                }
-              }
-            });
-          }
-
-          this._supabaseClient = window._pragyanSupabaseClient;
-
-          this._realtimeChannel = this._supabaseClient.channel('pragyan_realtime_sync_all')
-            .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
-              console.log('⚡ [Supabase Realtime] Change received from database:', payload.table, payload.eventType);
-              this._schedulePull(150);
-            })
-            .subscribe((status) => {
-              console.log('⚡ [Supabase Realtime] Subscription status:', status);
-              if (status === 'SUBSCRIBED') {
-                this._realtimeSubscribed = true;
-                this.updateStatus('synced');
-                this._resetPollTimer();
-              }
-              if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-                console.error(`❌ Realtime connection ${status}`);
-                this._realtimeSubscribed = false;
-                this.updateStatus('local');
-                this._resetPollTimer();
-              }
-            });
-        } catch (rtErr) {
-          console.error('❌ Supabase Realtime setup failed:', rtErr.message);
-        }
-      }
+      this._connectRealtime();
 
       // 2. Start adaptive smart polling
       this._resetPollTimer();
 
-      // Cross-tab sync via BroadcastChannel (with tab echo suppression)
-      if (typeof BroadcastChannel !== 'undefined') {
+      // Cross-tab sync via BroadcastChannel (with tab echo suppression).
+      // Guarded on _bc so a reconnect reuses the open channel instead of
+      // orphaning it; destroy() nulls it out, which lets a fresh login on the
+      // same page open a new one.
+      if (typeof BroadcastChannel !== 'undefined' && !this._bc) {
         try {
           this._bc = new BroadcastChannel('pragyan_realtime_hub');
           this._bc.onmessage = (event) => {
@@ -280,24 +292,69 @@
       }
     },
 
-    updateStatus(status) {
-      if (typeof document === 'undefined') return;
-      const studentBadge = document.getElementById('studentCloudSyncBadge');
-      const adminBadge = document.getElementById('adminCloudSyncBadge');
-      const badges = [studentBadge, adminBadge].filter(Boolean);
-
-      badges.forEach(badge => {
-        badge.classList.remove('syncing', 'offline');
-        if (status === 'syncing') {
-          badge.classList.add('syncing');
-          badge.innerHTML = '<i class="fa-solid fa-arrows-rotate fa-spin" style="color: #F59E0B;"></i> <span>Syncing...</span>';
-        } else if (status === 'synced') {
-          badge.innerHTML = '<i class="fa-solid fa-cloud-arrow-up" style="color: #10B981;"></i> <span>Cloud Live</span>';
-        } else {
-          badge.classList.add('offline');
-          badge.innerHTML = '<i class="fa-solid fa-hard-drive" style="color: #6B7280;"></i> <span>Local Cache</span>';
+    /** Open the postgres_changes channel, unless one is already subscribed. */
+    _connectRealtime() {
+      if (typeof window === 'undefined' || !window.supabase) return;
+      if (this._realtimeSubscribed || this._realtimeChannel) return;
+      try {
+        // Reuse global client to prevent connection leaks
+        if (!window._pragyanSupabaseClient) {
+          window._pragyanSupabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            auth: {
+              persistSession: false,
+              autoRefreshToken: false,
+              detectSessionInUrl: false
+            },
+            realtime: {
+              params: {
+                eventsPerSecond: 5 // Rate limit realtime events
+              }
+            },
+            db: {
+              schema: 'public'
+            },
+            global: {
+              headers: {
+                'X-Client-Info': 'pragyan-portal-web'
+              }
+            }
+          });
         }
-      });
+
+        this._supabaseClient = window._pragyanSupabaseClient;
+
+        this._realtimeChannel = this._supabaseClient.channel('pragyan_realtime_sync_all')
+          .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
+            this._schedulePull(150);
+          })
+          .subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+              this._realtimeSubscribed = true;
+              this.updateStatus('synced');
+              this._resetPollTimer();
+              return;
+            }
+            // CLOSED is also how the server acknowledges our own unsubscribe,
+            // so during a deliberate teardown it is not a fault — logging it
+            // at error level put a red entry in the console on every page
+            // unload and every logout.
+            if (status === 'CLOSED' && this._teardownInProgress) return;
+            // TIMED_OUT was previously unhandled: the socket was gone but
+            // _realtimeSubscribed stayed true, so the badge kept claiming
+            // "Cloud synced" and polling stayed on the slow 60s cadence.
+            if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+              console.warn(`[SupabaseSync] Realtime ${status} — falling back to polling`);
+              this._realtimeSubscribed = false;
+              this._realtimeChannel = null;
+              this.updateStatus('local');
+              this._resetPollTimer();
+            }
+          });
+      } catch (rtErr) {
+        console.warn('[SupabaseSync] Realtime setup note:', rtErr.message);
+        this._realtimeChannel = null;
+        this._realtimeSubscribed = false;
+      }
     },
 
     // ── Direct Real-Time Supabase Authentication ────────────────────────────
@@ -818,9 +875,33 @@
         this.broadcastChange({ table, operation, changedIds, data: rows });
         return { success: true, data: result };
       } catch (error) {
-        console.warn(`Mutation failed [${table}:${operation}]:`, error.message);
+        // console.error, not warn: this function RETURNS its failures rather than
+        // throwing them, and 23 of the 32 call sites in portal.js bare-await it
+        // and discard the result. A caller that wrapped this in
+        // `try { await mutate(...) } catch { console.warn(...) }` has dead code —
+        // the catch never fires — and goes on to report success for a write that
+        // never landed. Until every call site is converted, the log is the only
+        // thing standing between a silent failure and a support call.
+        console.error(`[SupabaseSync] Mutation FAILED [${table}:${operation}] — the local copy and the database now disagree:`, error.message);
         return { success: false, error: error.message };
       }
+    },
+
+    /**
+     * mutate(), but a failure is raised instead of returned.
+     *
+     * For call sites where proceeding on a failed write would be a lie — a request
+     * marked Declined locally while the row is still Pending in the cloud, which
+     * the very next pullAll() will resurrect after the student has already been
+     * told it was declined. There is no outbox in this client: a mutation that
+     * fails is not retried by anything, so it must not be treated as pending.
+     */
+    async mutateOrThrow(table, operation, data, filters = {}) {
+      const result = await this.mutate(table, operation, data, filters);
+      if (!result || result.success !== true) {
+        throw new Error(result?.error || `Database rejected the ${operation} on ${table}`);
+      }
+      return result;
     },
 
     // ── Normalize & Store Pulled Data ────────────────────────────────────────
@@ -1061,29 +1142,44 @@
       return { ...n, id, notice_id: id, targetBatch: n.target_batch || n.targetBatch || 'All Batches', date: n.created_at || n.date || '', attachmentUrl: n.attachment_url || n.attachmentUrl || '' };
     },
 
-    // S4: Normalize receipts with consistent studentId (Only genuine money payments)
+    // Prefixes that mark a ledger entry rather than money that changed hands:
+    // a monthly billing accrual, an opening carryover, a concession, a rate
+    // change, an add-on. Kept in one place so this list and the portal's
+    // isRealCollectedPayment() cannot drift apart.
+    NON_CASH_RECEIPT_PREFIXES: ['REC-BILL-', 'OLD-DUE', 'ADJ-', 'RATE-', 'EDIT-', 'DUE-', 'NTC-', 'DISC-', 'ADDON-'],
+
+    /**
+     * S4: Normalize a receipt row, tagging non-cash entries instead of deleting
+     * them.
+     *
+     * This used to `return null` for every adjustment, carryover and billing
+     * accrual, and updateLocalState() then filtered those nulls out — so a row
+     * that existed in fee_receipts in the cloud was erased from the local cache
+     * on every pullAll(). The student fee history renders those rows with their
+     * own badges (the "Adjusted" and "Pending Due" branches in portal.js), so a
+     * concession the admin recorded was visible until the next sync and then
+     * silently disappeared, leaving a balance nobody could account for.
+     *
+     * The exclusion itself is correct — a concession is not collected revenue —
+     * but it belongs at the point where money is summed, not at the point where
+     * data is cached. Every summing site in portal.js already calls
+     * isRealCollectedPayment(), so the flag below is what those sites need and
+     * the row survives for the history view.
+     */
     normalizeReceipt(r) {
       if (!r) return null;
       const receiptNo = r.receipt_no || r.receiptNo;
       if (!receiptNo) return null;
       const recUpper = String(receiptNo).toUpperCase().trim();
-      if (
-        recUpper.startsWith('REC-BILL-') ||
-        recUpper.startsWith('OLD-DUE') ||
-        recUpper.startsWith('ADJ-') ||
-        recUpper.startsWith('RATE-') ||
-        recUpper.startsWith('EDIT-') ||
-        recUpper.startsWith('DUE-') ||
-        recUpper.startsWith('NTC-') ||
-        recUpper.startsWith('DISC-') ||
-        recUpper.startsWith('ADDON-')
-      ) {
-        return null;
-      }
       const mode = String(r.payment_mode || r.mode || '').toLowerCase();
-      if (mode.includes('non-cash') || mode.includes('carryover') || mode.includes('adjustment') || mode.includes('waiver') || mode.includes('concession')) {
-        return null;
-      }
+      const isNonCash =
+        this.NON_CASH_RECEIPT_PREFIXES.some(p => recUpper.startsWith(p)) ||
+        mode.includes('non-cash') ||
+        mode.includes('carryover') ||
+        mode.includes('adjustment') ||
+        mode.includes('waiver') ||
+        mode.includes('concession');
+
       const studentId = (r.student_id || r.studentId || '').toString().trim();
       return {
         receiptNo,
@@ -1095,7 +1191,11 @@
         amount: Number(r.amount || 0),
         status: r.status || 'Paid',
         by: r.collected_by || r.by || '',
-        note: r.note || ''
+        note: r.note || '',
+        // Both spellings: the portal reads camelCase, a row round-tripped to the
+        // cloud keeps the snake_case copy readable.
+        isNonCash,
+        is_non_cash: isNonCash
       };
     },
 
@@ -1156,31 +1256,52 @@
 
     normalizeBatch(b) {
       if (!b) return null;
-      const id = b.batch_id || b.id || 'BAT-01';
-      const name = b.name || b.className || b.batch_name || b.batchName || 'General Batch';
-      const fee = Number(b.monthly_fee ?? b.monthlyFee ?? 1000);
-      const timing = b.timing || b.timings || b.schedule || 'Mon – Sat: 4:00 PM – 6:30 PM';
-      const room = b.room || b.room_no || 'Hall 1';
-      const teacher = b.teacher || (Array.isArray(b.teachers) ? b.teachers.map(t => t.name || t).join(' & ') : 'Chandan Kumar & Ravi Ranjan');
+      const id = b.batch_id || b.id || '';
+      const name = b.name || b.className || b.batch_name || b.batchName || '';
+
+      // The canonical batch behind this row, matched on id first and then on the
+      // stored class name. Every default below comes from it, because the ones
+      // that used to be hardcoded here were the Class 10th batch's values applied
+      // to all twelve: `?? 1000` re-rated the four ₹1,500 senior batches down by
+      // a third on every pull, the timing claimed "4:00 PM – 6:30 PM" for batches
+      // that sit in the afternoon, and the teacher list named CHANDAN KUMAR &
+      // RAVI RANJAN on the three Special English batches that ADITI SINGH
+      // teaches alone.
+      const cfg = (typeof window !== 'undefined' && window.PRAGYAN_ACADEMIC) || null;
+      const canon = cfg ? (cfg.resolveBatch(id) || cfg.resolveBatch(name)) : null;
+
+      const storedFee = Number(b.monthly_fee ?? b.monthlyFee ?? NaN);
+      // 0, not a guess: an unbillable ₹0 is visible to the admin, a plausible
+      // wrong rate is not.
+      const fee = Number.isFinite(storedFee) && storedFee > 0
+        ? storedFee
+        : (canon ? canon.monthlyFee : 0);
+
+      // Left blank when unknown — every display site already falls back to
+      // "As per timetable" rather than printing a window nobody teaches.
+      const timing = b.timing || b.timings || b.schedule || '';
+      const room = b.room || b.room_no || '';
+
+      const roster = Array.isArray(b.teachers) && b.teachers.length > 0
+        ? b.teachers
+        : (canon ? canon.teachers.map(t => ({ name: t, subject: '' })) : []);
+      const teacher = b.teacher || roster.map(t => t.name || t).join(' & ');
 
       return {
         ...b,
-        id,
-        batch_id: id,
-        name: name,
-        className: name,
-        batchName: name,
-        batch_name: name,
+        id: id || (canon ? canon.batchId : ''),
+        batch_id: id || (canon ? canon.batchId : ''),
+        name: name || (canon ? canon.name : ''),
+        className: name || (canon ? canon.className : ''),
+        batchName: name || (canon ? canon.name : ''),
+        batch_name: name || (canon ? canon.name : ''),
         monthlyFee: fee,
         monthly_fee: fee,
         timing: timing,
         timings: timing,
         room: room,
         teacher: teacher,
-        teachers: Array.isArray(b.teachers) && b.teachers.length > 0 ? b.teachers : [
-          { name: 'CHANDAN KUMAR', subject: 'Science Mentor (Physics & Chemistry)' },
-          { name: 'RAVI RANJAN', subject: 'Maths Mentor (Algebra & Geometry)' }
-        ]
+        teachers: roster
       };
     },
 
@@ -1757,25 +1878,85 @@
     },
 
     // ── UI Status Badge ─────────────────────────────────────────────────────
+    /**
+     * Reflects sync state on the header badge.
+     *
+     * Two versions of this method used to be declared on the object literal;
+     * the later one silently won and it only ever recoloured the icon. The
+     * .syncing / .offline classes that css/portal.css styles the pill with were
+     * therefore never applied, so a badge reading "Offline cache" kept the
+     * green "live" background. The class is the source of truth for the visual
+     * state here, and the icon colour follows from it.
+     *
+     * The badge deliberately is not a live region. It flips syncing -> synced on
+     * every poll, so announcing it would interrupt a screen-reader user roughly
+     * twice a minute while they read a fee table. Only crossing into or out of
+     * the offline state is worth saying out loud, and that goes through the
+     * separate polite announcer below.
+     */
     updateStatus(status) {
       if (typeof document === 'undefined') return;
+      const STATES = {
+        synced:  { icon: 'fa-cloud-arrow-up',        text: 'Cloud synced',  title: 'All data is live from the Supabase database' },
+        syncing: { icon: 'fa-arrows-rotate fa-spin', text: 'Syncing…',      title: 'Downloading the latest data from the cloud…' },
+        local:   { icon: 'fa-cloud-xmark',           text: 'Offline cache', title: 'Could not reach Supabase. Showing cached data.' }
+      };
+      const key = STATES[status] ? status : 'local';
+      const state = STATES[key];
+      const stateClass = key === 'syncing' ? 'syncing' : (key === 'synced' ? '' : 'offline');
+
       document.querySelectorAll('#adminCloudSyncBadge, #studentCloudSyncBadge').forEach(badge => {
-        const icon = badge.querySelector('i');
-        const span = badge.querySelector('span');
-        if (status === 'synced') {
-          if (icon) { icon.className = 'fa-solid fa-cloud-arrow-up'; icon.style.color = '#34D399'; }
-          if (span) span.textContent = 'Cloud synced';
-          badge.title = 'All data is live from Supabase database';
-        } else if (status === 'syncing') {
-          if (icon) { icon.className = 'fa-solid fa-arrows-rotate fa-spin'; icon.style.color = '#FBBF24'; }
-          if (span) span.textContent = 'Syncing…';
-          badge.title = 'Downloading latest data from cloud…';
-        } else {
-          if (icon) { icon.className = 'fa-solid fa-cloud-xmark'; icon.style.color = '#EF4444'; }
-          if (span) span.textContent = 'Offline cache';
-          badge.title = 'Could not reach Supabase. Using cached data.';
+        badge.classList.remove('syncing', 'offline');
+        if (stateClass) badge.classList.add(stateClass);
+
+        // The markup ships with an <i> and a <span>; recreate them if a
+        // previous render or an innerHTML overwrite elsewhere removed them,
+        // otherwise the state change would be silently dropped.
+        let icon = badge.querySelector('i');
+        let span = badge.querySelector('span');
+        if (!icon) {
+          icon = document.createElement('i');
+          badge.insertBefore(icon, badge.firstChild);
         }
+        if (!span) {
+          span = document.createElement('span');
+          badge.appendChild(span);
+        }
+        icon.className = `fa-solid ${state.icon}`;
+        // Decorative: the adjacent <span> already carries the state as text,
+        // and a Font Awesome glyph reads out as noise otherwise.
+        icon.setAttribute('aria-hidden', 'true');
+        span.textContent = state.text;
+        badge.title = state.title;
       });
+
+      this._announceOfflineTransition(key);
+    },
+
+    /** Say something only when the connection is actually lost or restored. */
+    _announceOfflineTransition(key) {
+      // 'syncing' is transient and tells the user nothing new either way.
+      if (key === 'syncing') return;
+      const isOffline = key === 'local';
+      // The badge ships in a connected-looking state, so "was online" is the
+      // right baseline — arriving offline really is a change from what the page
+      // first showed the user.
+      if (isOffline === (this._lastAnnouncedOffline === true)) return;
+      this._lastAnnouncedOffline = isOffline;
+
+      let announcer = document.getElementById('syncAnnouncer');
+      if (!announcer) {
+        if (!document.body) return;
+        announcer = document.createElement('p');
+        announcer.id = 'syncAnnouncer';
+        announcer.className = 'sr-only';
+        announcer.setAttribute('role', 'status');
+        announcer.setAttribute('aria-live', 'polite');
+        document.body.appendChild(announcer);
+      }
+      announcer.textContent = isOffline
+        ? 'Connection lost. Showing saved data — any changes you make will be sent when you are back online.'
+        : 'Connection restored. Showing live data.';
     },
 
     updateRealtimeBadge(connected) { if (connected) this.updateStatus('synced'); }

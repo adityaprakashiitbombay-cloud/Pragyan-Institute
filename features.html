@@ -2,7 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <!-- Without this the page rendered at desktop width on phones and every 7.8pt
+       label shrank to roughly 4px. The A4 typography now lives in @media print
+       and the screen layout is sized in rem. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#064E3B">
+  <meta name="description" content="Official production feature matrix for the Pragyan Institute Lalganj portal — public site, student self-service, admin control centre, billing, email and infrastructure capabilities.">
+  <meta name="robots" content="noindex, follow">
   <title>Pragyan Institute Portal — Complete Feature Guide</title>
+  <link rel="icon" href="./assets/images/favicon.ico">
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Outfit:wght@600;700;800;900&family=JetBrains+Mono:wght@600;700&display=swap');
 
@@ -11,7 +19,7 @@
       margin: 6mm 7mm 6mm 7mm;
     }
 
-    * {
+    *, *::before, *::after {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
@@ -19,42 +27,71 @@
       print-color-adjust: exact !important;
     }
 
+    /* ======================================================================
+       SCREEN LAYOUT (mobile first)
+       ====================================================================== */
     body {
       font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #FFFFFF;
+      background: #F1F5F9;
       color: #0F172A;
-      font-size: 7.8pt;
-      line-height: 1.25;
+      font-size: 1rem;
+      line-height: 1.55;
+      -webkit-text-size-adjust: 100%;
     }
 
     .pdf-container {
       width: 100%;
-      max-width: 800px;
+      max-width: 60rem;
       margin: 0 auto;
+      padding: 1rem 1rem 2.5rem;
+    }
+
+    /* Skip link: the first tab stop, off-screen until focused. */
+    .skip-link {
+      position: absolute;
+      left: 50%;
+      top: 0;
+      transform: translate(-50%, -120%);
+      z-index: 20;
+      padding: 0.7rem 1.25rem;
+      background: #064E3B;
+      color: #FFFFFF;
+      font-weight: 700;
+      border-radius: 0 0 0.5rem 0.5rem;
+      transition: transform 0.18s ease-out;
+    }
+
+    .skip-link:focus,
+    .skip-link:focus-visible {
+      transform: translate(-50%, 0);
+    }
+
+    :focus-visible {
+      outline: 3px solid #047857;
+      outline-offset: 3px;
     }
 
     /* Header Banner */
     .header-banner {
       background: linear-gradient(135deg, #064E3B 0%, #022C22 100%);
       color: #FFFFFF;
-      padding: 10px 14px;
-      border-radius: 8px;
+      padding: 1.1rem 1.15rem;
+      border-radius: 0.75rem;
       display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.85rem;
+      margin-bottom: 0.85rem;
       border: 1.5px solid #047857;
     }
 
     .brand-title-wrap h1 {
       font-family: 'Outfit', sans-serif;
-      font-size: 15pt;
+      font-size: clamp(1.25rem, 5.5vw, 1.65rem);
       font-weight: 900;
       letter-spacing: -0.5px;
+      line-height: 1.15;
       color: #FFFFFF;
-      display: flex;
-      align-items: center;
-      gap: 6px;
     }
 
     .brand-title-wrap h1 span {
@@ -62,468 +99,594 @@
     }
 
     .brand-subtitle {
-      font-size: 7.4pt;
+      font-size: 0.85rem;
       color: #A7F3D0;
       font-weight: 600;
-      margin-top: 1px;
+      margin-top: 0.3rem;
     }
 
     .meta-badges {
-      text-align: right;
       display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 2px;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.4rem;
     }
 
     .badge-pill {
       background: rgba(52, 211, 153, 0.2);
       border: 1px solid #34D399;
-      color: #D1FAE5;
-      padding: 2px 7px;
+      color: #ECFDF5;
+      padding: 0.2rem 0.6rem;
       border-radius: 99px;
-      font-size: 7pt;
+      font-size: 0.75rem;
       font-weight: 700;
     }
 
     .badge-ver {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 6.5pt;
-      color: #93C5FD;
-      background: rgba(30, 58, 138, 0.4);
-      padding: 1px 5px;
-      border-radius: 4px;
-      border: 1px solid #3B82F6;
+      font-size: 0.72rem;
+      /* #93C5FD on the dark banner sat under 4.5:1 — lightened. */
+      color: #DBEAFE;
+      background: rgba(30, 58, 138, 0.6);
+      padding: 0.15rem 0.45rem;
+      border-radius: 0.25rem;
+      border: 1px solid #60A5FA;
+    }
+
+    /* Page actions (screen only) */
+    .page-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      margin-bottom: 0.9rem;
+    }
+
+    .action-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      /* 44px minimum target (WCAG 2.5.8). */
+      min-height: 2.75rem;
+      padding: 0.5rem 1.1rem;
+      border: 1.5px solid #047857;
+      border-radius: 99px;
+      background: #FFFFFF;
+      color: #065F46;
+      font: inherit;
+      font-weight: 700;
+      font-size: 0.9rem;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .action-btn:hover {
+      background: #064E3B;
+      color: #FFFFFF;
     }
 
     /* Category Section */
     .feature-category {
-      margin-bottom: 7px;
+      margin-bottom: 0.85rem;
       background: #FFFFFF;
       border: 1px solid #E2E8F0;
-      border-radius: 7px;
+      border-radius: 0.6rem;
       overflow: hidden;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
     }
 
     .category-header {
-      padding: 4px 8px;
+      padding: 0.6rem 0.75rem;
       font-family: 'Outfit', sans-serif;
-      font-size: 8.8pt;
+      font-size: 1rem;
       font-weight: 800;
+      line-height: 1.3;
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
+      gap: 0.4rem;
       border-bottom: 1px solid #E2E8F0;
     }
 
-    .cat-emerald {
-      background: #F0FDF4;
-      color: #065F46;
-      border-left: 3.5px solid #059669;
-    }
-
-    .cat-blue {
-      background: #EFF6FF;
-      color: #1E40AF;
-      border-left: 3.5px solid #2563EB;
-    }
-
-    .cat-purple {
-      background: #FAF5FF;
-      color: #6B21A8;
-      border-left: 3.5px solid #9333EA;
-    }
-
-    .cat-amber {
-      background: #FFFBEB;
-      color: #92400E;
-      border-left: 3.5px solid #D97706;
-    }
+    .cat-emerald { background: #F0FDF4; color: #065F46; border-left: 3.5px solid #059669; }
+    .cat-blue    { background: #EFF6FF; color: #1E40AF; border-left: 3.5px solid #2563EB; }
+    .cat-purple  { background: #FAF5FF; color: #6B21A8; border-left: 3.5px solid #9333EA; }
+    .cat-amber   { background: #FFFBEB; color: #92400E; border-left: 3.5px solid #D97706; }
 
     .cat-count {
-      font-size: 6.8pt;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 0.75rem;
       font-weight: 700;
       background: rgba(0, 0, 0, 0.06);
-      padding: 1px 5px;
+      padding: 0.1rem 0.45rem;
       border-radius: 99px;
+      white-space: nowrap;
     }
 
     /* Grid of Feature Cards */
     .features-list {
+      list-style: none;
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 4px;
-      padding: 5px;
+      grid-template-columns: 1fr;
+      gap: 0.4rem;
+      padding: 0.5rem;
     }
 
     .feature-item {
       background: #FAFAFA;
       border: 1px solid #E2E8F0;
-      border-radius: 5px;
-      padding: 3.5px 6px;
+      border-radius: 0.35rem;
+      padding: 0.55rem 0.7rem;
       display: flex;
       align-items: flex-start;
-      gap: 5px;
+      gap: 0.45rem;
     }
 
     .feature-icon {
-      font-size: 8pt;
+      font-size: 1rem;
       flex-shrink: 0;
-      margin-top: 1px;
+      line-height: 1.3;
     }
 
     .feature-body {
       flex: 1;
+      min-width: 0;
     }
 
     .feature-title {
       font-weight: 800;
-      font-size: 7.6pt;
+      font-size: 0.92rem;
       color: #0F172A;
       display: inline;
     }
 
     .feature-desc {
-      font-size: 7.2pt;
-      color: #475569;
+      font-size: 0.9rem;
+      /* #475569 -> #3F4C5F for a comfortable 8:1 on #FAFAFA. */
+      color: #3F4C5F;
       display: inline;
-      line-height: 1.25;
+      line-height: 1.5;
     }
 
     .feature-tag {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 6pt;
+      font-size: 0.65rem;
       font-weight: 700;
-      padding: 0.5px 3.5px;
-      border-radius: 3px;
+      padding: 0.05rem 0.3rem;
+      border-radius: 0.2rem;
       float: right;
-      margin-left: 3px;
-      margin-top: 0.5px;
+      margin-left: 0.3rem;
+      white-space: nowrap;
     }
 
-    .tag-live { background: #DCFCE7; color: #166534; border: 1px solid #86EFAC; }
-    .tag-ai { background: #F3E8FF; color: #6B21A8; border: 1px solid #D8B4FE; }
-    .tag-sec { background: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; }
+    .tag-live  { background: #DCFCE7; color: #14532D; border: 1px solid #86EFAC; }
+    .tag-ai    { background: #F3E8FF; color: #581C87; border: 1px solid #D8B4FE; }
+    .tag-sec   { background: #FEF2F2; color: #7F1D1D; border: 1px solid #FECACA; }
     .tag-cloud { background: #E0F2FE; color: #075985; border: 1px solid #7DD3FC; }
 
     /* Footer */
     .pdf-footer {
       border-top: 1px solid #CBD5E1;
-      padding-top: 4px;
-      margin-top: 4px;
+      padding-top: 0.7rem;
+      margin-top: 0.7rem;
       display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 6.8pt;
-      color: #64748B;
+      flex-direction: column;
+      gap: 0.4rem;
+      font-size: 0.8rem;
+      color: #475569;
       font-weight: 600;
     }
 
     .footer-left {
       display: flex;
-      gap: 12px;
+      flex-direction: column;
+      gap: 0.25rem;
     }
 
     .footer-highlight {
       color: #064E3B;
       font-weight: 800;
     }
+
+    /* ======================================================================
+       WIDER SCREENS
+       ====================================================================== */
+    @media screen and (min-width: 48rem) {
+      .header-banner {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .meta-badges {
+        flex-direction: column;
+        align-items: flex-end;
+      }
+
+      .features-list {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .feature-item.span-2 {
+        grid-column: span 2;
+      }
+
+      .pdf-footer {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .footer-left {
+        flex-direction: row;
+        gap: 0.9rem;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { transition-duration: 0.01ms !important; }
+    }
+
+    /* ======================================================================
+       PRINT / PDF — the original single-page A4 density
+       ====================================================================== */
+    @media print {
+      body {
+        background: #FFFFFF;
+        font-size: 7.8pt;
+        line-height: 1.25;
+      }
+
+      .pdf-container { max-width: 800px; padding: 0; }
+      .skip-link, .page-actions { display: none !important; }
+
+      .header-banner {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 14px;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        gap: 8px;
+      }
+
+      .brand-title-wrap h1 { font-size: 15pt; }
+      .brand-subtitle { font-size: 7.4pt; margin-top: 1px; }
+      .meta-badges { flex-direction: column; align-items: flex-end; gap: 2px; }
+      .badge-pill { font-size: 7pt; padding: 2px 7px; }
+      .badge-ver { font-size: 6.5pt; padding: 1px 5px; }
+
+      .feature-category {
+        margin-bottom: 7px;
+        border-radius: 7px;
+        box-shadow: none;
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+
+      .category-header { padding: 4px 8px; font-size: 8.8pt; flex-wrap: nowrap; }
+      .cat-count { font-size: 6.8pt; padding: 1px 5px; }
+      .features-list { grid-template-columns: 1fr 1fr; gap: 4px; padding: 5px; }
+      .feature-item { padding: 3.5px 6px; gap: 5px; border-radius: 5px; break-inside: avoid; }
+      .feature-item.span-2 { grid-column: span 2; }
+      .feature-icon { font-size: 8pt; margin-top: 1px; }
+      .feature-title { font-size: 7.6pt; }
+      .feature-desc { font-size: 7.2pt; color: #475569; line-height: 1.25; }
+      .feature-tag { font-size: 6pt; padding: 0.5px 3.5px; margin-top: 0.5px; }
+
+      .pdf-footer {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 4px;
+        margin-top: 4px;
+        font-size: 6.8pt;
+      }
+
+      .footer-left { flex-direction: row; gap: 12px; }
+      .last-category { margin-bottom: 0; }
+    }
   </style>
 </head>
 <body>
 
+  <a class="skip-link" href="#feature-matrix">Skip to the feature matrix</a>
+
   <div class="pdf-container">
-    
+
     <!-- HEADER -->
-    <div class="header-banner">
+    <header class="header-banner">
       <div class="brand-title-wrap">
         <h1>PRAGYAN INSTITUTE <span>PORTAL</span></h1>
-        <div class="brand-subtitle">Empowering Future Achievers — Official Production Feature Matrix & Capability Guide</div>
+        <p class="brand-subtitle">Empowering Future Achievers — Official Production Feature Matrix &amp; Capability Guide</p>
       </div>
       <div class="meta-badges">
         <span class="badge-pill">✓ 100% Production Verified</span>
         <span class="badge-ver">v90.0 • Supabase Live</span>
       </div>
+    </header>
+
+    <div class="page-actions">
+      <button class="action-btn" id="printGuideBtn" type="button">
+        <span aria-hidden="true">🖨️</span> Print / Save as PDF
+      </button>
+      <a class="action-btn" href="./index.html">
+        <span aria-hidden="true">←</span> Back to the website
+      </a>
     </div>
 
-    <!-- 1. PUBLIC EXPERIENCE & STUDENT DISCOVERY -->
-    <div class="feature-category">
-      <div class="category-header cat-emerald">
-        <span>🏛️ 1. Public Portal & Student Discovery Experience</span>
-        <span class="cat-count">7 Key Features</span>
-      </div>
-      <div class="features-list">
-        <div class="feature-item">
-          <span class="feature-icon">✨</span>
-          <div class="feature-body">
-            <span class="feature-tag tag-live">LIVE</span>
-            <span class="feature-title">3D Concept Visualizer:</span>
-            <span class="feature-desc">Interactive animated 3D board visualizer bringing abstract Science and Math concepts to life in smart classrooms.</span>
-          </div>
-        </div>
+    <main id="feature-matrix">
 
-        <div class="feature-item">
-          <span class="feature-icon">📚</span>
-          <div class="feature-body">
-            <span class="feature-tag tag-live">LIVE</span>
-            <span class="feature-title">Curriculum & Batch Explorer:</span>
-            <span class="feature-desc">Comprehensive batch schedules, subject breakdowns, and transparent monthly fee cards for Class 8th, 9th & 10th.</span>
-          </div>
-        </div>
+      <!-- 1. PUBLIC EXPERIENCE & STUDENT DISCOVERY -->
+      <section class="feature-category" aria-labelledby="category-1">
+        <h2 class="category-header cat-emerald" id="category-1">
+          <span><span aria-hidden="true">🏛️</span> 1. Public Portal &amp; Student Discovery Experience</span>
+          <span class="cat-count">7 Key Features</span>
+        </h2>
+        <ul class="features-list">
+          <li class="feature-item">
+            <span class="feature-icon" aria-hidden="true">✨</span>
+            <div class="feature-body">
+              <span class="feature-tag tag-live">LIVE</span>
+              <span class="feature-title">3D Concept Visualizer:</span>
+              <span class="feature-desc">Interactive animated 3D board visualizer bringing abstract Science and Math concepts to life in smart classrooms.</span>
+            </div>
+          </li>
 
-        <div class="feature-item">
-          <span class="feature-icon">🎁</span>
-          <div class="feature-body">
-            <span class="feature-tag tag-live">LIVE</span>
-            <span class="feature-title">Zero-Risk 3-Day Free Demo:</span>
-            <span class="feature-desc">1-click student registration enabling prospective learners to attend 3 full days of live classes before paying.</span>
-          </div>
-        </div>
+          <li class="feature-item">
+            <span class="feature-icon" aria-hidden="true">📚</span>
+            <div class="feature-body">
+              <span class="feature-tag tag-live">12 BATCHES</span>
+              <span class="feature-title">Curriculum &amp; Batch Explorer:</span>
+              <span class="feature-desc">All 12 canonical batches from Class 1st to 12th — PCM and PCB streams, Achiever, Nurture, Alpha, Pioneer, Junior Foundation and the three Special English tracks — with transparent ₹500–₹1,500 monthly fee cards and a 5% annual-advance concession.</span>
+            </div>
+          </li>
 
-        <div class="feature-item">
-          <span class="feature-icon">👨‍🏫</span>
-          <div class="feature-body">
-            <span class="feature-tag tag-live">LIVE</span>
-            <span class="feature-title">Verified Faculty Showcase:</span>
-            <span class="feature-desc">Transparent educator profiles featuring Science Lead Chandan Kumar and Mathematics Lead Prof. Ravi Ranjan.</span>
-          </div>
-        </div>
+          <li class="feature-item">
+            <span class="feature-icon" aria-hidden="true">🎁</span>
+            <div class="feature-body">
+              <span class="feature-tag tag-live">LIVE</span>
+              <span class="feature-title">Zero-Risk 3-Day Free Demo:</span>
+              <span class="feature-desc">1-click student registration enabling prospective learners to attend 3 full days of live classes before paying.</span>
+            </div>
+          </li>
 
-        <div class="feature-item">
-          <span class="feature-icon">🤖</span>
-          <div class="feature-body">
-            <span class="feature-tag tag-ai">GEMINI 3.6</span>
-            <span class="feature-title">Pragyan AI Academic Mentor:</span>
-            <span class="feature-desc">Integrated multi-turn Gemini 3.6 AI delivering structured, 3–4 bullet answers for both institute & academic queries.</span>
-          </div>
-        </div>
+          <li class="feature-item">
+            <span class="feature-icon" aria-hidden="true">👨‍🏫</span>
+            <div class="feature-body">
+              <span class="feature-tag tag-live">LIVE</span>
+              <span class="feature-title">Verified Faculty Showcase:</span>
+              <span class="feature-desc">Transparent educator profiles — Managing Director &amp; Science Lead Chandan Kumar (10+ years), Higher Mathematics Lead Prof. Ravi Ranjan (15+ years) and English &amp; Grammar Mentor Aditi Singh, M.Com (1,000+ students mentored).</span>
+            </div>
+          </li>
 
-        <div class="feature-item">
-          <span class="feature-icon">📱</span>
-          <div class="feature-body">
-            <span class="feature-tag tag-cloud">PWA</span>
-            <span class="feature-title">PWA & Offline Fast-Load:</span>
-            <span class="feature-desc">Progressive Web App engine with Service Worker precaching for instant loads across all mobile and desktop devices.</span>
-          </div>
-        </div>
+          <li class="feature-item">
+            <span class="feature-icon" aria-hidden="true">🤖</span>
+            <div class="feature-body">
+              <span class="feature-tag tag-ai">GEMINI 3.6</span>
+              <span class="feature-title">Pragyan AI Academic Mentor:</span>
+              <span class="feature-desc">Integrated multi-turn Gemini 3.6 AI delivering structured, 3–4 bullet answers for both institute &amp; academic queries.</span>
+            </div>
+          </li>
 
-        <div class="feature-item" style="grid-column: span 2;">
-          <span class="feature-icon">💬</span>
-          <div class="feature-body">
-            <span class="feature-tag tag-live">WHATSAPP</span>
-            <span class="feature-title">1-Click Director Helpline:</span>
-            <span class="feature-desc">Floating WhatsApp direct hotline (+91 73698 91858) connecting parents and students instantly with directors.</span>
-          </div>
-        </div>
-      </div>
-    </div>
+          <li class="feature-item">
+            <span class="feature-icon" aria-hidden="true">📱</span>
+            <div class="feature-body">
+              <span class="feature-tag tag-cloud">PWA</span>
+              <span class="feature-title">PWA &amp; Offline Fast-Load:</span>
+              <span class="feature-desc">Progressive Web App engine whose Service Worker precaches the whole shell and falls back across build hashes, so an offline reload after a deploy still renders.</span>
+            </div>
+          </li>
 
-    <!-- 2. STUDENT & PARENT SELF-SERVICE PORTAL -->
-    <div class="feature-category">
-      <div class="category-header cat-blue">
-        <span>🎓 2. Student & Parent Self-Service Portal</span>
-        <span class="cat-count">7 Key Features</span>
-      </div>
-      <div class="features-list">
-        <div class="feature-item">
-          <span class="feature-icon">🔐</span>
-          <div class="feature-body">
-            <span class="feature-tag tag-sec">AUTH</span>
-            <span class="feature-title">Dual-Credential Authentication:</span>
-            <span class="feature-desc">Seamless student login using either standard 8-digit DOB (YYYY-MM-DD) or personalized custom security passwords.</span>
-          </div>
-        </div>
+          <li class="feature-item span-2">
+            <span class="feature-icon" aria-hidden="true">💬</span>
+            <div class="feature-body">
+              <span class="feature-tag tag-live">WHATSAPP</span>
+              <span class="feature-title">1-Click Director Helpline:</span>
+              <span class="feature-desc">Floating WhatsApp direct hotline (+91 73698 91858) connecting parents and students instantly with the director.</span>
+            </div>
+          </li>
+        </ul>
+      </section>
 
-        <div class="feature-item">
-          <span class="feature-icon">💳</span>
-          <div class="feature-body">
-            <span class="feature-tag tag-live">UPI</span>
-            <span class="feature-title">Instant UPI & PhonePe QR Gateway:</span>
-            <span class="feature-desc">1-click UPI app launch and dynamic PhonePe QR generator for instant, hassle-free online fee settlement.</span>
-          </div>
-        </div>
+      <!-- 2. STUDENT & PARENT SELF-SERVICE PORTAL -->
+      <section class="feature-category" aria-labelledby="category-2">
+        <h2 class="category-header cat-blue" id="category-2">
+          <span><span aria-hidden="true">🎓</span> 2. Student &amp; Parent Self-Service Portal</span>
+          <span class="cat-count">7 Key Features</span>
+        </h2>
+        <ul class="features-list">
+          <li class="feature-item">
+            <span class="feature-icon" aria-hidden="true">🔐</span>
+            <div class="feature-body">
+              <span class="feature-tag tag-sec">AUTH</span>
+              <span class="feature-title">Dual-Credential Authentication:</span>
+              <span class="feature-desc">Students sign in with their date of birth (accepted as YYYY-MM-DD or DDMMYYYY) or with a personalised password, both verified against a 12-round BCrypt hash.</span>
+            </div>
+          </li>
 
-        <div class="feature-item">
-          <span class="feature-icon">📄</span>
-          <div class="feature-body">
-            <span class="feature-tag tag-live">PDF</span>
-            <span class="feature-title">Official Fee Receipts & PDF Vouchers:</span>
-            <span class="feature-desc">Downloadable, printable fee vouchers with unique receipt numbers and institutional payment acknowledgment.</span>
-          </div>
-        </div>
+          <li class="feature-item">
+            <span class="feature-icon" aria-hidden="true">💳</span>
+            <div class="feature-body">
+              <span class="feature-tag tag-live">UPI</span>
+              <span class="feature-title">Instant UPI &amp; PhonePe QR Gateway:</span>
+              <span class="feature-desc">1-click UPI app launch and dynamic PhonePe QR generator for instant, hassle-free online fee settlement.</span>
+            </div>
+          </li>
 
-        <div class="feature-item">
-          <span class="feature-icon">📊</span>
-          <div class="feature-body">
-            <span class="feature-tag tag-live">METRICS</span>
-            <span class="feature-title">Live Attendance & Due Trackers:</span>
-            <span class="feature-desc">Interactive visual radial meters and metric cards displaying real-time monthly fees, cleared amounts, and attendance.</span>
-          </div>
-        </div>
+          <li class="feature-item">
+            <span class="feature-icon" aria-hidden="true">📄</span>
+            <div class="feature-body">
+              <span class="feature-tag tag-live">PDF</span>
+              <span class="feature-title">Official Fee Receipts &amp; PDF Vouchers:</span>
+              <span class="feature-desc">Downloadable, printable fee vouchers with unique receipt numbers and institutional payment acknowledgment.</span>
+            </div>
+          </li>
 
-        <div class="feature-item">
-          <span class="feature-icon">📢</span>
-          <div class="feature-body">
-            <span class="feature-tag tag-cloud">REALTIME</span>
-            <span class="feature-title">Campus Announcements Feed:</span>
-            <span class="feature-desc">Live bulletin board broadcasting test schedules, holiday updates, and academic alerts with unread badge indicators.</span>
-          </div>
-        </div>
+          <li class="feature-item">
+            <span class="feature-icon" aria-hidden="true">📊</span>
+            <div class="feature-body">
+              <span class="feature-tag tag-live">METRICS</span>
+              <span class="feature-title">Live Attendance &amp; Due Trackers:</span>
+              <span class="feature-desc">Interactive visual radial meters and metric cards displaying real-time monthly fees, cleared amounts, and attendance.</span>
+            </div>
+          </li>
 
-        <div class="feature-item">
-          <span class="feature-icon">✏️</span>
-          <div class="feature-body">
-            <span class="feature-tag tag-live">PROFILE</span>
-            <span class="feature-title">Self-Service Profile Edit Requests:</span>
-            <span class="feature-desc">Interactive form allowing students to submit contact, address, or photo changes for educator verification.</span>
-          </div>
-        </div>
+          <li class="feature-item">
+            <span class="feature-icon" aria-hidden="true">📢</span>
+            <div class="feature-body">
+              <span class="feature-tag tag-cloud">REALTIME</span>
+              <span class="feature-title">Campus Announcements Feed:</span>
+              <span class="feature-desc">Live bulletin board broadcasting test schedules, holiday updates, and academic alerts with unread badge indicators.</span>
+            </div>
+          </li>
 
-        <div class="feature-item" style="grid-column: span 2;">
-          <span class="feature-icon">🛡️</span>
-          <div class="feature-body">
-            <span class="feature-tag tag-sec">BCRYPT</span>
-            <span class="feature-title">Student Password Self-Management:</span>
-            <span class="feature-desc">Students can create custom 4+ character passwords with automatic fallback to DOB upon admin reset.</span>
-          </div>
-        </div>
-      </div>
-    </div>
+          <li class="feature-item">
+            <span class="feature-icon" aria-hidden="true">✏️</span>
+            <div class="feature-body">
+              <span class="feature-tag tag-live">PROFILE</span>
+              <span class="feature-title">Self-Service Profile Edit Requests:</span>
+              <span class="feature-desc">Interactive form allowing students to submit contact, address, or photo changes for educator verification.</span>
+            </div>
+          </li>
 
-    <!-- 3. ADMIN & EDUCATOR MASTER DASHBOARD -->
-    <div class="feature-category">
-      <div class="category-header cat-purple">
-        <span>⚙️ 3. Admin & Educator Master Control Center</span>
-        <span class="cat-count">10 Key Features</span>
-      </div>
-      <div class="features-list">
-        <div class="feature-item">
-          <span class="feature-icon">📈</span>
-          <div class="feature-body">
-            <span class="feature-tag tag-live">STATS</span>
-            <span class="feature-title">Real-Time Executive Summary:</span>
-            <span class="feature-desc">Interactive overview counters tracking active enrollments, monthly revenues, outstanding dues, and attendance.</span>
-          </div>
-        </div>
+          <li class="feature-item span-2">
+            <span class="feature-icon" aria-hidden="true">🛡️</span>
+            <div class="feature-body">
+              <span class="feature-tag tag-sec">BCRYPT</span>
+              <span class="feature-title">Student Password Self-Management:</span>
+              <span class="feature-desc">Students can set their own 4+ character password; nothing is ever stored in plaintext, and an admin reset returns the account to date-of-birth sign-in.</span>
+            </div>
+          </li>
+        </ul>
+      </section>
 
-        <div class="feature-item">
-          <span class="feature-icon">💰</span>
-          <div class="feature-body">
-            <span class="feature-tag tag-live">ANALYTICS</span>
-            <span class="feature-title">Teacher Collection Breakdown:</span>
-            <span class="feature-desc">Separated financial analytics isolating fee collections for Chandan Sir and Ravi Sir across Cash vs. UPI.</span>
-          </div>
-        </div>
+      <!-- 3. ADMIN & EDUCATOR MASTER DASHBOARD -->
+      <section class="feature-category" aria-labelledby="category-3">
+        <h2 class="category-header cat-purple" id="category-3">
+          <span><span aria-hidden="true">⚙️</span> 3. Admin &amp; Educator Master Control Center</span>
+          <span class="cat-count">11 Key Features</span>
+        </h2>
+        <ul class="features-list">
+          <li class="feature-item">
+            <span class="feature-icon" aria-hidden="true">📈</span>
+            <div class="feature-body">
+              <span class="feature-tag tag-live">STATS</span>
+              <span class="feature-title">Real-Time Executive Summary:</span>
+              <span class="feature-desc">Interactive overview counters tracking active enrollments, monthly revenues, outstanding dues, and attendance.</span>
+            </div>
+          </li>
 
-        <div class="feature-item">
-          <span class="feature-icon">📅</span>
-          <div class="feature-body">
-            <span class="feature-tag tag-cloud">AUTO</span>
-            <span class="feature-title">1st-of-Month Unified Billing Engine:</span>
-            <span class="feature-desc">Automated monthly fee accrual across all batches with idempotency guardrails preventing duplicate billing runs.</span>
-          </div>
-        </div>
+          <li class="feature-item">
+            <span class="feature-icon" aria-hidden="true">💰</span>
+            <div class="feature-body">
+              <span class="feature-tag tag-live">ANALYTICS</span>
+              <span class="feature-title">Per-Educator Collection Breakdown:</span>
+              <span class="feature-desc">Separated financial analytics isolating each educator's fee collections across Cash vs. UPI.</span>
+            </div>
+          </li>
 
-        <div class="feature-item">
-          <span class="feature-icon">🏷️</span>
-          <div class="feature-body">
-            <span class="feature-tag tag-live">MODAL</span>
-            <span class="feature-title">Post-Admission Fee Adjustments:</span>
-            <span class="feature-desc">Dedicated vouchers for permanent rate modifications, merit fee concessions, special add-ons, and balance waivers.</span>
-          </div>
-        </div>
+          <li class="feature-item">
+            <span class="feature-icon" aria-hidden="true">📅</span>
+            <div class="feature-body">
+              <span class="feature-tag tag-cloud">AUTO</span>
+              <span class="feature-title">10-Day Staggered Rolling Billing Engine:</span>
+              <span class="feature-desc">Days 1–6 raise invoices batch by batch (10th &amp; 12th, then 9th &amp; 11th, 8th, 6th–7th, 1st–5th, Special English) and days 7–10 chase unpaid balances. Days 11–31 are a deliberate rest state.</span>
+            </div>
+          </li>
 
-        <div class="feature-item">
-          <span class="feature-icon">🆔</span>
-          <div class="feature-body">
-            <span class="feature-tag tag-sec">YYCCSS</span>
-            <span class="feature-title">Sequential Student ID Generator:</span>
-            <span class="feature-desc">Collision-proof YYCCSS format ID generator (Year + Class Code + Sequence) handling concurrent admissions.</span>
-          </div>
-        </div>
+          <li class="feature-item">
+            <span class="feature-icon" aria-hidden="true">🔁</span>
+            <div class="feature-body">
+              <span class="feature-tag tag-sec">IDEMPOTENT</span>
+              <span class="feature-title">Duplicate-Billing Immunity:</span>
+              <span class="feature-desc">Every accrual runs inside apply_monthly_fee with FOR UPDATE row locking and a BILL-STUDENT_ID-YYYY-MM key, so a retried cron — or a mid-month batch transfer — can never charge the same month twice.</span>
+            </div>
+          </li>
 
-        <div class="feature-item">
-          <span class="feature-icon">🔒</span>
-          <div class="feature-body">
-            <span class="feature-tag tag-sec">GUARD</span>
-            <span class="feature-title">Financial Cascade Deletion Guardrails:</span>
-            <span class="feature-desc">Strict security protection blocking accidental deletion of student accounts carrying pending uncleared dues.</span>
-          </div>
-        </div>
+          <li class="feature-item">
+            <span class="feature-icon" aria-hidden="true">✉️</span>
+            <div class="feature-body">
+              <span class="feature-tag tag-live">RESEND</span>
+              <span class="feature-title">Verified-Domain Email Engine:</span>
+              <span class="feature-desc">Billing statements and computerized receipts dispatched from noreply@pragyaninstitute.com over the Resend API.</span>
+            </div>
+          </li>
 
-        <div class="feature-item">
-          <span class="feature-icon">🔑</span>
-          <div class="feature-body">
-            <span class="feature-tag tag-sec">RESET</span>
-            <span class="feature-title">1-Click DOB Password Reset:</span>
-            <span class="feature-desc">Single-click credential restore clearing forgotten student passwords back to standard DOB instantly.</span>
-          </div>
-        </div>
+          <li class="feature-item">
+            <span class="feature-icon" aria-hidden="true">📮</span>
+            <div class="feature-body">
+              <span class="feature-tag tag-sec">QUOTA</span>
+              <span class="feature-title">100-Email/Day Quota Guard:</span>
+              <span class="feature-desc">A live remaining-slot counter on the dashboard, and a hard reservation check that defers the overflow rather than failing a batch run halfway through the free-tier ceiling.</span>
+            </div>
+          </li>
 
-        <div class="feature-item">
-          <span class="feature-icon">✉️</span>
-          <div class="feature-body">
-            <span class="feature-tag tag-live">RESEND</span>
-            <span class="feature-title">Resend Live Email Notification Engine:</span>
-            <span class="feature-desc">Automatic email dispatching verified receipts and fee reminders from @pragyaninstitute.com.</span>
-          </div>
-        </div>
+          <li class="feature-item">
+            <span class="feature-icon" aria-hidden="true">🏷️</span>
+            <div class="feature-body">
+              <span class="feature-tag tag-live">MODAL</span>
+              <span class="feature-title">Post-Admission Fee Adjustments:</span>
+              <span class="feature-desc">Dedicated vouchers for permanent rate modifications, merit fee concessions, special add-ons, and balance waivers.</span>
+            </div>
+          </li>
 
-        <div class="feature-item">
-          <span class="feature-icon">📋</span>
-          <div class="feature-body">
-            <span class="feature-tag tag-sec">AUDIT</span>
-            <span class="feature-title">Searchable Institutional Audit Trail:</span>
-            <span class="feature-desc">Immutable history logging all educator actions with real-time filtering by teacher, date, and event category.</span>
-          </div>
-        </div>
+          <li class="feature-item">
+            <span class="feature-icon" aria-hidden="true">🆔</span>
+            <div class="feature-body">
+              <span class="feature-tag tag-sec">YYCCSS</span>
+              <span class="feature-title">Sequential Student ID Generator:</span>
+              <span class="feature-desc">Collision-proof YYCCSS barcode IDs (2-digit year + class code + serial 01–99) minted under a row lock so concurrent admissions cannot clash.</span>
+            </div>
+          </li>
 
-        <div class="feature-item">
-          <span class="feature-icon">👤</span>
-          <div class="feature-body">
-            <span class="feature-tag tag-live">SETTINGS</span>
-            <span class="feature-title">Admin Profile & VPA Billing Hub:</span>
-            <span class="feature-desc">Redesigned director profile card with photo upload, UPI VPA configuration, and master password security.</span>
-          </div>
-        </div>
-      </div>
-    </div>
+          <li class="feature-item">
+            <span class="feature-icon" aria-hidden="true">🔒</span>
+            <div class="feature-body">
+              <span class="feature-tag tag-sec">GUARD</span>
+              <span class="feature-title">Financial Cascade Deletion Guardrails:</span>
+              <span class="feature-desc">Strict security protection blocking accidental deletion of student accounts carrying pending uncleared dues.</span>
+            </div>
+          </li>
 
-    <!-- 4. SEO & INFRASTRUCTURE -->
-    <div class="feature-category" style="margin-bottom: 0;">
-      <div class="category-header cat-amber">
-        <span>🌐 4. Search Engine Indexing & Cloud Infrastructure</span>
-        <span class="cat-count">4 Key Features</span>
-      </div>
-      <div class="features-list">
-        <div class="feature-item">
-          <span class="feature-icon">🔍</span>
-          <div class="feature-body">
-            <span class="feature-tag tag-cloud">GOOGLE</span>
-            <span class="feature-title">Google Search Console Indexing:</span>
-            <span class="feature-desc">Verified domain property with live XML sitemap (/sitemap.xml) and robots.txt crawler directives.</span>
-          </div>
-        </div>
+          <li class="feature-item">
+            <span class="feature-icon" aria-hidden="true">📋</span>
+            <div class="feature-body">
+              <span class="feature-tag tag-sec">AUDIT</span>
+              <span class="feature-title">Searchable Institutional Audit Trail:</span>
+              <span class="feature-desc">Immutable history of every educator action, filterable by teacher, date and event category. Only Managing Director Chandan Kumar may purge it, and a purge never touches dues, revenue or receipts.</span>
+            </div>
+          </li>
 
-        <div class="feature-item">
-          <span class="feature-icon">🏆</span>
-          <div class="feature-body">
-            <span class="feature-tag tag-live">SCHEMA</span>
-            <span class="feature-title">Google Knowledge Graph Schema:</span>
-            <span class="feature-desc">Rich EducationalOrganization and LocalBusiness JSON-LD markup driving #1 search rankings on Google.</span>
-          </div>
-        </div>
+          <li class="feature-item span-2">
+            <span class="feature-icon" aria-hidden="true">👤</span>
+            <div class="feature-body">
+              <span class="feature-tag tag-live">SETTINGS</span>
+              <span class="feature-title">Admin Profile &amp; VPA Billing Hub:</span>
+              <span class="feature-desc">Director profile card with photo upload, UPI VPA configuration, 1-click date-of-birth password reset for students, and master password security.</span>
+            </div>
+          </li>
+        </ul>
+      </section>
 
-        <div class="feature-item">
-          <span class="feature-icon">⚡</span>
-          <div class="feature-body">
-            <span class="feature-tag tag-live">DEV</span>
-            <span class="feature-title">Build-Time Cache Busting:</span>
-            <span class="feature-desc">Automated SHA-256 asset hash compiler ensuring users always run the latest version with zero stale files.</span>
-          </div>
-        </div>
+      <!-- 4. SEO & INFRASTRUCTURE -->
+      <section class="feature-category last-category" aria-labelledby="category-4">
+        <h2 class="category-header cat-amber" id="category-4">
+          <span><span aria-hidden="true">🌐</span> 4. Search Engine Indexing &amp; Cloud Infrastructure</span>
+          <span class="cat-count">4 Key Features</span>
+        </h2>
+        <ul class="features-list">
+          <li class="feature-item">
+            <span class="feature-icon" aria-hidden="true">🔍</span>
+            <div class="feature-body">
+              <span class="feature-tag tag-cloud">GOOGLE</span>
+              <span class="feature-title">Google Search Console Indexing:</span>
+              <span class="feature-desc">Verified domain property with live XML sitemap (/sitemap.xml) and robots.txt crawler directives.</span>
+            </div>
+          </li>
 
+<<<<<<< HEAD
         <div class="feature-item">
           <span class="feature-icon">🛡️</span>
           <div class="feature-body">
@@ -534,20 +697,63 @@
         </div>
       </div>
     </div>
+=======
+          <li class="feature-item">
+            <span class="feature-icon" aria-hidden="true">🏆</span>
+            <div class="feature-body">
+              <span class="feature-tag tag-live">SCHEMA</span>
+              <span class="feature-title">Knowledge Graph JSON-LD:</span>
+              <span class="feature-desc">Rich EducationalOrganization, LocalBusiness and FAQPage markup carrying the full ₹500–₹1,500 fee schedule.</span>
+            </div>
+          </li>
+
+          <li class="feature-item">
+            <span class="feature-icon" aria-hidden="true">⚡</span>
+            <div class="feature-body">
+              <span class="feature-tag tag-live">DEV</span>
+              <span class="feature-title">Build-Time Cache Busting:</span>
+              <span class="feature-desc">A deterministic SHA-256 of every shipped page, stylesheet and script stamps one build hash across the HTML and the Service Worker cache generation — identical content always yields an identical hash.</span>
+            </div>
+          </li>
+
+          <li class="feature-item">
+            <span class="feature-icon" aria-hidden="true">🛡️</span>
+            <div class="feature-body">
+              <span class="feature-tag tag-sec">TESTS</span>
+              <span class="feature-title">Master Automated Regression Suite:</span>
+              <span class="feature-desc">A green-or-no-deploy CI harness covering authentication, the 12-batch fee schedule, billing idempotency, the IST billing calendar, data-safety guarantees and shipped-markup drift — plus a parse check over every JavaScript file.</span>
+            </div>
+          </li>
+        </ul>
+      </section>
+
+    </main>
+>>>>>>> claude/admiring-kepler-50a04f
 
     <!-- FOOTER -->
-    <div class="pdf-footer">
+    <footer class="pdf-footer">
       <div class="footer-left">
-        <span>🌐 <span class="footer-highlight">pragyaninstitute.com</span></span>
-        <span>📍 Moti Market, Near Jagdamba Sthan, Lalganj</span>
-        <span>📞 Helpline: +91 73698 91858</span>
+        <span><span aria-hidden="true">🌐</span> <span class="footer-highlight">pragyaninstitute.com</span></span>
+        <span><span aria-hidden="true">📍</span> Moti Market, Near Jagdamba Sthan, Lalganj</span>
+        <span><span aria-hidden="true">📞</span> Helpline: <a href="tel:+917369891858">+91 73698 91858</a></span>
       </div>
       <div>
+<<<<<<< HEAD
         <span>Generated for: <strong>Chandan Kumar (Managing Director) & Faculty Mentors</strong></span>
+=======
+        <span>Managing Director &amp; sole administrator: <strong>Chandan Kumar</strong> · Faculty: <strong>Prof. Ravi Ranjan</strong>, <strong>Aditi Singh</strong></span>
+>>>>>>> claude/admiring-kepler-50a04f
       </div>
-    </div>
+    </footer>
 
   </div>
+
+  <script>
+    (function () {
+      var button = document.getElementById('printGuideBtn');
+      if (button) button.addEventListener('click', function () { window.print(); });
+    })();
+  </script>
 
 </body>
 </html>
