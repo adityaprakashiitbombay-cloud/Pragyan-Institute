@@ -13,7 +13,7 @@ The **Pragyan Institute Portal** is a Progressive Web Application (PWA) with zer
 ## 2. User Roles & Capabilities
 
 ### 🎓 Student & Parent Portal
-- **Authentication**: Zero-friction login with `YYCCXX` Student ID (e.g. `261001`) or registered 10-digit mobile number + Date of Birth / Student PIN.
+- **Authentication**: Zero-friction login with `YYCCSS` Student ID (e.g. `261001`) or registered 10-digit mobile number + Date of Birth / Student PIN.
 - **3D VIP Identity Card**: Interactive 3D metallic card with student photo, name, class batch, admission year, QR code, and standard Code-128 logical barcode.
 - **Fee Management & Receipts**:
   - Live view of Total Fee, Paid Fee, and Monthly Pending Due.
@@ -32,7 +32,7 @@ The **Pragyan Institute Portal** is a Progressive Web Application (PWA) with zer
   - **Profile Detail Requests Sub-Tab**: Side-by-side diff of student changes (e.g. `<s>Old Address</s> ➔ New Address`) and photo preview, with 1-click Approval/Decline.
   - **Latest Requests First**: All pending requests automatically sorted to the top (#1 position) in descending chronological order.
 - **Student Management Suite**:
-  - Register new students with automatic `YYCCXX` ID generation.
+  - Register new students with automatic `YYCCSS` ID generation.
   - Live filtering by batch, search by name/roll/phone.
   - CSV bulk student import with automatic carryover balance ledgering.
   - Direct student profile editing, photo upload, fee adjustments, and student deletion.

@@ -2015,7 +2015,7 @@
             role: a.role,
             mobile: a.mobile,
             email: a.email,
-            upi_id: a.upiId || 'pragyanlalganj@upi',
+            upi_id: a.upiId || "",
             photo_url: a.photoUrl || ''
           }));
           if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
@@ -10325,10 +10325,18 @@ function renderStudentDashboard() {
     // Pre-fill with the outstanding balance; if nothing is due, fall back to one
     // month so an advance payment is still possible, and say so in the modal.
     let selectedPayAmount = totalDue > 0 ? totalDue : monthlyFee;
-    const payee = (ACADEMIC && ACADEMIC.PAYEE) || {
-      upiId: 'chandankr1501998@ybl', name: 'CHANDAN KUMAR',
-      displayName: 'Chandan Kumar', role: 'Managing Director, Pragyan Institute'
+    // Effective payee: the admin-configured UPI id (Settings) wins so changing
+    // the institute's VPA actually changes where students pay; the canonical
+    // config value is the fallback when no override has been saved.
+    const adminUpiId = (AppState.getAdmins ? (AppState.getAdmins() || []) : [])
+      .map(a => a.upi_id || a.upiId).find(Boolean);
+    const payee = {
+      ...((ACADEMIC && ACADEMIC.PAYEE) || {
+        upiId: 'chandankr1501998@ybl', name: 'CHANDAN KUMAR',
+        displayName: 'Chandan Kumar', role: 'Managing Director, Pragyan Institute'
+      })
     };
+    if (adminUpiId) payee.upiId = adminUpiId;
     const upiLinkFor = (amt) =>
       `upi://pay?pa=${encodeURIComponent(payee.upiId)}` +
       `&pn=${encodeURIComponent(payee.name + ' Pragyan Institute')}` +

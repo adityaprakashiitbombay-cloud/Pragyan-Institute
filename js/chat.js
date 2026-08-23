@@ -1249,10 +1249,12 @@ ${batchBlock}
     if (apiKey) {
       for (const model of GEMINI_MODELS) {
         try {
-          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+          // Key travels in the header, not the query string — URLs end up in
+          // history and proxy logs; headers do not.
+          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
           const response = await fetch(endpoint, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
             body: JSON.stringify({
               contents,
               system_instruction: { parts: [{ text: systemPrompt() }] }

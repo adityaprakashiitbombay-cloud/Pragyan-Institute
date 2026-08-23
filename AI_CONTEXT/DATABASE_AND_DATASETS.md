@@ -17,7 +17,7 @@ Stores student enrollment records, contact information, class batches, and real-
 | Column | Type | Constraints | Description |
 | :--- | :--- | :--- | :--- |
 | `id` | `uuid` | Primary Key, `default gen_random_uuid()` | Internal PostgreSQL row UUID |
-| `student_id` | `text` | Unique, Not Null | Canonical 6-digit `YYCCXX` ID (e.g. `'261001'`) |
+| `student_id` | `text` | Unique, Not Null | Canonical 6-digit `YYCCSS` ID (e.g. `'261001'`) |
 | `roll_no` | `text` | Not Null | Student Roll Number (matches `student_id`) |
 | `name` | `text` | Not Null | Student full name (e.g. `'Virat Kohli'`) |
 | `mobile` | `text` | Not Null | Student / Primary contact number (10 digits) |
@@ -46,7 +46,7 @@ Stores administrative requests initiated by students (Profile detail updates & P
 | Column | Type | Constraints | Description |
 | :--- | :--- | :--- | :--- |
 | `request_id` | `text` | Primary Key | Unique Request ID (e.g. `'REQ-mstbtz5r-ana'`) |
-| `student_id` | `text` | Not Null | Associated `YYCCXX` Student ID or Table UUID |
+| `student_id` | `text` | Not Null | Associated `YYCCSS` Student ID or Table UUID |
 | `student_name` | `text` | Not Null | Student Name |
 | `roll_no` | `text` | | Student Roll Number |
 | `class_name` | `text` | | Student Class Batch |
@@ -82,7 +82,7 @@ Idempotency table that ensures automated cron billing never charges a student tw
 | Column | Type | Constraints | Description |
 | :--- | :--- | :--- | :--- |
 | `idempotency_key` | `text` | Primary Key | Format: `FEE-{student_id}-{billing_month}` |
-| `student_id` | `text` | Not Null | Student `YYCCXX` ID |
+| `student_id` | `text` | Not Null | Student `YYCCSS` ID |
 | `billing_month` | `text` | Not Null | Month identifier (e.g. `'2026-08'`) |
 | `amount` | `numeric` | Not Null | Billed fee amount |
 | `status` | `text` | Default `'billed'` | Status |

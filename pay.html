@@ -994,9 +994,9 @@
     </footer>
   </div>
 
-  <script src="js/academic-config.js?v=90.0.e3b106a9"></script>
-  <script src="js/config.js?v=90.0.e3b106a9"></script>
-  <script src="js/supabase-sync.js?v=90.0.e3b106a9"></script>
+  <script src="js/academic-config.js?v=90.0.4d4f796b"></script>
+  <script src="js/config.js?v=90.0.4d4f796b"></script>
+  <script src="js/supabase-sync.js?v=90.0.4d4f796b"></script>
   <script>
   /* ==========================================================================
    * PAYMENT GATEWAY PAGE LOGIC
@@ -1090,9 +1090,16 @@
     var resolvedBatch = (ACADEMIC && batchName) ? ACADEMIC.resolveBatch(batchName) : null;
     var monthlyFee = resolvedBatch ? resolvedBatch.monthlyFee : 0;
 
-    var totalDue = toAmount(params.get('amount'));
-    var prevDue = toAmount(params.get('prev'));
-    var currFee = toAmount(params.get('curr'));
+    // A negative amount in the URL is a fabrication, not a typo: toAmount's
+    // digit-stripping would silently flip "-500" into a ₹500 due.
+    function amountFromParam(name) {
+      var raw = params.get(name);
+      if (raw !== null && String(raw).trim().startsWith('-')) return 0;
+      return toAmount(raw);
+    }
+    var totalDue = amountFromParam('amount');
+    var prevDue = amountFromParam('prev');
+    var currFee = amountFromParam('curr');
 
     // Reconcile the three figures so the statement always adds up. When the
     // batch is unknown the whole balance is shown as carried-over rather than
@@ -1440,7 +1447,10 @@
       }
 
       var paying = paymentMode === 'partial' ? commitPartialAmount() : payableNow();
-      if (!Number.isFinite(paying) || paying < MIN_PAYMENT) {
+      // Full mode paying the exact balance is always allowed, even below the
+      // ₹100 floor — otherwise a student owing ₹60 could never clear the dues.
+      var isExactBalance = !isAdvance && totalDue > 0 && paying === totalDue;
+      if (!Number.isFinite(paying) || (paying < MIN_PAYMENT && !isExactBalance)) {
         setStatus('Enter an amount of at least ' + inr(MIN_PAYMENT) + ' before submitting.', 'error');
         if (paymentMode === 'partial') partialField.focus();
         return;

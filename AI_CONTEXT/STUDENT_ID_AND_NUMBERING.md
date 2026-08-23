@@ -2,7 +2,7 @@
 
 ---
 
-## 1. The Canonical `YYCCXX` Student ID Format
+## 1. The Canonical `YYCCSS` Student ID Format
 
 All student records at Pragyan Institute are identified by a standardized 6-digit numeric identifier:
 
@@ -60,5 +60,5 @@ function isStudentRequestMatch(req, student) {
 ## 3. High-Density Code-128 Logical Barcode
 
 The student's 3D VIP ID Card dynamically generates a pure vector SVG barcode (`generateStudentLogicalBarcodeSVG(s)`):
-- Encodes the `YYCCXX` identifier using standard Code-128 / Code-39 binary pattern bitsets.
+- Encodes the `YYCCSS` identifier using standard Code-128 / Code-39 binary pattern bitsets.
 - Applies standard 10x quiet zones on both left and right edges for accurate handheld optical scanner recognition.

@@ -27,14 +27,14 @@
 | **[DATABASE_AND_DATASETS.md](./DATABASE_AND_DATASETS.md)** | Complete PostgreSQL database schemas, 7 master tables, column types, sizes, relationships, and queries. |
 | **[SYSTEM_ARCHITECTURE.md](./SYSTEM_ARCHITECTURE.md)** | Frontend architecture, bidirectional Supabase syncing engine, PWA Service Worker cache-busting, and offline ledger. |
 | **[STORAGE_AND_MEDIA.md](./STORAGE_AND_MEDIA.md)** | Supabase Storage bucket (`pragyan-media`), 2-folder structure, CDN delivery, and automatic photo lifecycle cleanup. |
-| **[STUDENT_ID_AND_NUMBERING.md](./STUDENT_ID_AND_NUMBERING.md)** | Canonical `YYCCXX` format, Code-128 logical barcodes, and multi-identifier student matching logic. |
+| **[STUDENT_ID_AND_NUMBERING.md](./STUDENT_ID_AND_NUMBERING.md)** | Canonical `YYCCSS` format, Code-128 logical barcodes, and multi-identifier student matching logic. |
 | **[DEPLOYMENT_AND_SERVICES.md](./DEPLOYMENT_AND_SERVICES.md)** | All live websites, API endpoints, environment variables, GitHub automation scripts, and deployment steps. |
 
 ---
 
 ## ⚡ 3. Critical Rules for Any AI Modifying This Project
 
-1. **Do NOT Break the Standardized Student ID (`YYCCXX`)**:
+1. **Do NOT Break the Standardized Student ID (`YYCCSS`)**:
    - Every student primary key is strictly 6 digits: `YY` (2-digit Year e.g. `26`), `CC` (2-digit Class code e.g. `10`), `XX` (2-digit Serial e.g. `01`).
    - Example: Class 10th student #1 in 2026 = `261001`.
 

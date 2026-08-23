@@ -1,30 +1,63 @@
-import { getSupabase, applyCors } from './_lib/auth.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { getSupabase, requireSession, applyCors } from './_lib/auth.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+function packageVersion() {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+    return pkg.version || 'unknown';
+  } catch (_) {
+    return 'unknown';
+  }
+}
 
 export default async function handler(req, res) {
   if (applyCors(req, res)) return;
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
 
-  let dbStatus = 'unconfigured';
+  let dbOnline = false;
+  let dbDetail = 'unconfigured';
+  let rawError = null;
   try {
     const supabase = getSupabase();
     if (supabase) {
       const { error } = await supabase.from('batches').select('*').limit(1);
-      dbStatus = error ? `query_error: ${error.message}` : 'connected';
+      if (error) {
+        dbDetail = 'query_error';
+        rawError = error.message;
+      } else {
+        dbDetail = 'connected';
+        dbOnline = true;
+      }
     }
-  } catch (e) {
-    dbStatus = 'connection_exception';
+  } catch (_) {
+    dbDetail = 'connection_exception';
   }
 
+  // Driver-level error text (relation names, RLS hints, DNS failures) is an
+  // oracle for probing the backend — full detail only for admin sessions.
+  let showDetail = false;
+  try {
+    showDetail = Boolean(requireSession(req, res, ['admin']));
+  } catch (_) {
+    showDetail = false;
+  }
+
+  // An unconfigured database is NOT "online" — reporting it as healthy hid
+  // total outages from uptime monitors.
   const now = new Date();
-  const isHealthy = dbStatus === 'connected' || dbStatus === 'unconfigured';
   const uptimePayload = {
-    status: isHealthy ? 'online' : 'degraded',
-    database: dbStatus,
+    status: dbOnline ? 'online' : 'degraded',
+    database: dbDetail,
+    ...(showDetail && rawError ? { databaseError: rawError } : {}),
     timestamp: now.toISOString(),
     service: 'Pragyan Institute Portal Engine',
     location: 'Lalganj, Vaishali, Bihar',
-    heartbeat: 'active',
-    version: '80.1'
+    heartbeat: dbOnline ? 'active' : 'stalled',
+    version: packageVersion()
   };
 
   return res.status(200).json(uptimePayload);

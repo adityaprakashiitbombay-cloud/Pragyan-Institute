@@ -17,7 +17,7 @@
 //      with { ignoreSearch: true }.
 // ============================================================================
 
-const CACHE_NAME = 'pragyan-portal-v90.0.e3b106a9';
+const CACHE_NAME = 'pragyan-portal-v90.0.4d4f796b';
 
 // Static assets to pre-cache for instant loads
 const PRECACHE_ASSETS = [
@@ -26,17 +26,17 @@ const PRECACHE_ASSETS = [
   './pay.html',
   './features.html',
   './manifest.json',
-  './css/variables.css?v=90.0.e3b106a9',
-  './css/main.css?v=90.0.e3b106a9',
-  './css/components.css?v=90.0.e3b106a9',
-  './css/animations.css?v=90.0.e3b106a9',
-  './css/portal.css?v=90.0.e3b106a9',
-  './js/config.js?v=90.0.e3b106a9',
-  './js/academic-config.js?v=90.0.e3b106a9',
-  './js/supabase-sync.js?v=90.0.e3b106a9',
-  './js/chat.js?v=90.0.e3b106a9',
-  './js/app.js?v=90.0.e3b106a9',
-  './js/portal.js?v=90.0.e3b106a9',
+  './css/variables.css?v=90.0.4d4f796b',
+  './css/main.css?v=90.0.4d4f796b',
+  './css/components.css?v=90.0.4d4f796b',
+  './css/animations.css?v=90.0.4d4f796b',
+  './css/portal.css?v=90.0.4d4f796b',
+  './js/config.js?v=90.0.4d4f796b',
+  './js/academic-config.js?v=90.0.4d4f796b',
+  './js/supabase-sync.js?v=90.0.4d4f796b',
+  './js/chat.js?v=90.0.4d4f796b',
+  './js/app.js?v=90.0.4d4f796b',
+  './js/portal.js?v=90.0.4d4f796b',
   './assets/images/favicon.ico',
   './assets/images/logo.png',
   './assets/images/apple-touch-icon.png',
@@ -160,6 +160,13 @@ self.addEventListener('fetch', event => {
     event.respondWith(
       fetch(request)
         .then(response => {
+          // A versioned asset that 404s online means a deploy removed it while
+          // this tab still references the old ?v= — serve the cached copy of
+          // ANY version rather than the error body. Without this, the
+          // ignoreSearch fallback below only fired on network rejection.
+          if (response && response.status === 404 && url.searchParams.has('v')) {
+            return fromCache(request);
+          }
           cachePut(request, response);
           return response;
         })
