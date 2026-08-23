@@ -625,6 +625,11 @@
   gap: 0.875rem;
 }
 
+/* The badge sits on the dark dashboard header gradient. The state class is the
+   single source of truth for the pill's colour — js/supabase-sync.js sets it —
+   so the announced text and the visual state cannot disagree. This rule used to
+   be declared twice in this file (a green treatment here and a neutral white one
+   further down), which left a green glow around a neutral pill. */
 .cloud-sync-badge {
   display: inline-flex;
   align-items: center;
@@ -639,6 +644,7 @@
   letter-spacing: 0.03em;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   box-shadow: 0 0 12px rgba(16, 185, 129, 0.25);
+  backdrop-filter: blur(8px);
 }
 
 .cloud-sync-badge.syncing {
@@ -649,9 +655,9 @@
 }
 
 .cloud-sync-badge.offline {
-  background: rgba(107, 114, 128, 0.18);
-  border-color: rgba(107, 114, 128, 0.4);
-  color: #E5E7EB;
+  background: rgba(107, 114, 128, 0.28);
+  border-color: rgba(156, 163, 175, 0.5);
+  color: #F3F4F6;
   box-shadow: none;
 }
 
@@ -1819,19 +1825,8 @@
   transform: translateX(3px);
 }
 
-.cloud-sync-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.35rem 0.8rem;
-  border-radius: 9999px;
-  font-size: 0.76rem;
-  font-weight: 700;
-  background: rgba(255, 255, 255, 0.18);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  backdrop-filter: blur(8px);
-}
+/* .cloud-sync-badge is defined once, near .dashboard-header-actions. A second
+   declaration lived here and silently overrode the state colours. */
 
 .admin-icon-square {
   width: 52px;
@@ -1971,6 +1966,73 @@
 
 .btn-close-inner:active {
   transform: scale(0.92);
+}
+
+/* The ✕ is a 36px target — under the 44px minimum (WCAG 2.5.5). A transparent
+   ::after enlarges the hit area to 44px without changing the visual size or the
+   surrounding layout, so it stays a small circle but is reliably tappable with
+   a thumb. */
+.btn-close-inner {
+  position: relative;
+}
+
+.btn-close-inner::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+}
+
+/* A visible focus ring on every dialog control. The buttons in these dialogs
+   are styled inline and carry no :focus rule at all, so keyboard users had no
+   indication of where they were — and the UA default outline is invisible
+   against the dark emerald gateway card. */
+.btn-close-inner:focus-visible,
+.btn-pay-option:focus-visible,
+.inner-modal-content .btn:focus-visible,
+.inner-modal-content button:focus-visible,
+.inner-modal-content a:focus-visible,
+.inner-modal-content .portal-input:focus-visible {
+  outline: 3px solid #047857;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* On the dark gradient of the UPI gateway card an emerald ring disappears, so
+   controls inside it get a light ring instead. */
+.upi-gateway-grid :focus-visible,
+#autoUpiPayBtn:focus-visible {
+  outline: 3px solid #A7F3D0;
+  outline-offset: 2px;
+}
+
+/* Official UPI gateway card: QR beside the payee details.
+   This was an inline `grid-template-columns: auto 1fr`, which the mobile
+   grid-collapse rule could not reach — that rule only matches grids inside a
+   <form>, and this card sits above the form. The result on a 375px phone was a
+   130px QR competing with a monospace UPI-id chip and a Copy button in the
+   remaining ~150px, so the chip overflowed the card. */
+.upi-gateway-grid {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: center;
+}
+
+@media (max-width: 560px) {
+  .upi-gateway-grid {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 0.85rem;
+    text-align: center;
+  }
+
+  .upi-gateway-grid > div:last-child > div[style*="display: flex"] {
+    justify-content: center;
+  }
 }
 
 /* Notice & Announcement Filter Chips */
@@ -4263,3 +4325,83 @@ button, a, input, select, textarea {
   }
 }
 
+
+/* ============================================================================
+   TOAST NOTIFICATIONS
+   ----------------------------------------------------------------------------
+   Built by showNotification() in js/portal.js. Two nodes exist — a polite
+   role="status" one and an assertive role="alert" one — and only the one
+   matching the message's urgency is shown, because a live region's politeness
+   cannot be changed reliably after it is created.
+
+   visibility, not just opacity: the previous inline-styled version faded to
+   opacity 0 while staying hit-testable, so a fixed box over the bottom-right
+   of the viewport swallowed taps for the rest of the session. pointer-events
+   stays off even while visible — the toast carries no controls, so it has no
+   business intercepting input at any point.
+   ========================================================================= */
+.pragyan-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(28rem, calc(100vw - 48px));
+  padding: 0.75rem 1.35rem;
+  border-radius: 10px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.4;
+  color: #ffffff;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              visibility 0.3s step-end;
+  transform: translateY(120%);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.pragyan-toast.is-visible {
+  transform: translateY(0);
+  opacity: 1;
+  visibility: visible;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* AA-compliant against white text at this weight and size: #059669 was 3.2:1
+   and #F59E0B about 2.1:1, both under the 4.5:1 floor. */
+.pragyan-toast.is-success { background: #047857; }  /* 5.5:1 */
+.pragyan-toast.is-warning { background: #B45309; }  /* 4.8:1 */
+.pragyan-toast.is-error   { background: #DC2626; }  /* 4.8:1 */
+
+.pragyan-toast i {
+  flex-shrink: 0;
+  font-size: 1rem;
+}
+
+/* On a phone the toast spans the width instead of shrink-wrapping into a tall
+   narrow column, and clears the thumb zone at the bottom edge. */
+@media (max-width: 560px) {
+  .pragyan-toast {
+    left: 12px;
+    right: 12px;
+    bottom: max(16px, env(safe-area-inset-bottom, 0px));
+    max-width: none;
+    font-size: 0.88rem;
+    padding: 0.7rem 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pragyan-toast {
+    transition: opacity 0.15s linear, visibility 0.15s step-end;
+    transform: none;
+  }
+  .pragyan-toast.is-visible {
+    transform: none;
+  }
+}

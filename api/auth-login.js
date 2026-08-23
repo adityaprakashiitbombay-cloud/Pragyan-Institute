@@ -65,7 +65,7 @@ export default async function handler(req, res) {
       return res.status(429).json({ success: false, error: rateLimitCheck.message });
     }
 
-    const supabase = getSupabase({ allowAnon: true });
+    const supabase = getSupabase();
     if (!supabase) {
       return res.status(503).json({ success: false, error: 'Database configuration missing' });
     }

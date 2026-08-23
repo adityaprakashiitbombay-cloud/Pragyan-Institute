@@ -380,14 +380,27 @@
   inset: 0;
   opacity: 0;
   transform: scale(1.05);
-  transition: opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1), transform 1.25s cubic-bezier(0.16, 1, 0.3, 1);
+  /* visibility, not opacity alone. An opacity-0 slide is still in the
+     accessibility tree, so a screen reader read all three slides at once —
+     "Smartboard Interactive Classes… Focused Classroom Sessions… " — as if the
+     carousel were showing everything simultaneously. pointer-events blocks the
+     mouse only. The 0.85s delay lets the cross-fade finish before the outgoing
+     slide is removed from the tree. */
+  visibility: hidden;
+  transition: opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 1.25s cubic-bezier(0.16, 1, 0.3, 1),
+              visibility 0s linear 0.85s;
   pointer-events: none;
 }
 
 .hero-slide.active {
   opacity: 1;
   transform: scale(1);
+  visibility: visible;
   pointer-events: auto;
+  transition: opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 1.25s cubic-bezier(0.16, 1, 0.3, 1),
+              visibility 0s;
 }
 
 .hero-slide img {

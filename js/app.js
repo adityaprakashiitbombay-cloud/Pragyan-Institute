@@ -1,18 +1,164 @@
-/* Complete Web Application Script - Pragyan Institute Lalganj */
+/* ============================================================================
+ * PRAGYAN INSTITUTE — PUBLIC SITE BEHAVIOUR
+ * ----------------------------------------------------------------------------
+ * Classic script (no bundler). Loads after js/academic-config.js, so every fee
+ * shown on the page comes from window.PRAGYAN_ACADEMIC.PRICE_TABLE instead of a
+ * hardcoded copy that drifted from the database.
+ *
+ * Cross-cutting rules applied throughout this file:
+ *   * Nothing animates when the visitor asks for reduced motion.
+ *   * Every interactive control is reachable and operable by keyboard.
+ *   * Pointer-tilt effects are disabled on touch devices, where they fought
+ *     with scrolling instead of adding anything.
+ *   * The body scroll lock is reference counted (window.PragyanUI), because the
+ *     drawer, the lightbox and the portal modal can all be open at once and the
+ *     first one to close used to unlock the page under the others.
+ * ========================================================================= */
 
 (function () {
   'use strict';
 
   if (typeof window !== 'undefined') {
-    window.escapeHtml = window.escapeHtml || function(str) {
+    window.escapeHtml = window.escapeHtml || function (str) {
       if (str == null) return '';
-      return String(str).replace(/[&<>"']/g, function(m) {
+      return String(str).replace(/[&<>"']/g, function (m) {
         return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
       });
     };
   }
 
+  /* --------------------------------------------------------------------------
+   * 0. Shared primitives (exported on window.PragyanUI for portal.js & pay.html)
+   * -------------------------------------------------------------------------- */
+
+  const FOCUSABLE_SELECTOR = [
+    'a[href]', 'button:not([disabled])', 'input:not([disabled]):not([type="hidden"])',
+    'select:not([disabled])', 'textarea:not([disabled])', 'iframe',
+    '[tabindex]:not([tabindex="-1"])'
+  ].join(', ');
+
+  const SUPPORTS_INERT = typeof HTMLElement !== 'undefined' && 'inert' in HTMLElement.prototype;
+
+  function mediaQuery(query) {
+    return typeof window.matchMedia === 'function' ? window.matchMedia(query) : null;
+  }
+
+  const REDUCED_MOTION = mediaQuery('(prefers-reduced-motion: reduce)');
+  const COARSE_POINTER = mediaQuery('(hover: none), (pointer: coarse)');
+
+  function prefersReducedMotion() { return Boolean(REDUCED_MOTION && REDUCED_MOTION.matches); }
+  function isCoarsePointer() { return Boolean(COARSE_POINTER && COARSE_POINTER.matches); }
+
+  /** Listen for a media-query flip across old and new Safari APIs. */
+  function onMediaChange(query, handler) {
+    if (!query) return;
+    if (typeof query.addEventListener === 'function') query.addEventListener('change', handler);
+    else if (typeof query.addListener === 'function') query.addListener(handler);
+  }
+
+  // Reference counted so overlapping overlays cannot unlock each other's scroll.
+  let scrollLockCount = 0;
+  function lockScroll() {
+    scrollLockCount += 1;
+    if (scrollLockCount === 1) document.documentElement.classList.add('scroll-locked');
+  }
+  function unlockScroll() {
+    scrollLockCount = Math.max(0, scrollLockCount - 1);
+    if (scrollLockCount === 0) document.documentElement.classList.remove('scroll-locked');
+  }
+
+  function visibleFocusable(container) {
+    if (!container) return [];
+    return Array.prototype.filter.call(
+      container.querySelectorAll(FOCUSABLE_SELECTOR),
+      node => node.offsetWidth > 0 || node.offsetHeight > 0 || node === document.activeElement
+    );
+  }
+
+  /**
+   * Keep Tab inside an open overlay. Call from a keydown listener.
+   * Returns true when the event was handled.
+   */
+  function trapTabKey(container, event) {
+    if (!container || event.key !== 'Tab') return false;
+    const items = visibleFocusable(container);
+    if (!items.length) {
+      event.preventDefault();
+      if (typeof container.focus === 'function') container.focus();
+      return true;
+    }
+    const first = items[0];
+    const last = items[items.length - 1];
+    const active = document.activeElement;
+    const outside = !container.contains(active);
+
+    if (event.shiftKey && (active === first || outside)) {
+      event.preventDefault();
+      last.focus();
+      return true;
+    }
+    if (!event.shiftKey && (active === last || outside)) {
+      event.preventDefault();
+      first.focus();
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Remove a subtree from the tab order and the accessibility tree.
+   * `inert` does both natively; the fallback path is for older Safari/Firefox,
+   * where an off-screen drawer's links stayed tabbable and focus disappeared.
+   */
+  function setInert(element, inert) {
+    if (!element) return;
+    if (SUPPORTS_INERT) element.inert = inert;
+
+    if (inert) element.setAttribute('aria-hidden', 'true');
+    else element.removeAttribute('aria-hidden');
+
+    if (SUPPORTS_INERT) return;
+    Array.prototype.forEach.call(element.querySelectorAll(FOCUSABLE_SELECTOR), node => {
+      if (inert) {
+        if (node.dataset.prevTabindex === undefined) {
+          node.dataset.prevTabindex = node.getAttribute('tabindex') || '';
+        }
+        node.setAttribute('tabindex', '-1');
+      } else if (node.dataset.prevTabindex !== undefined) {
+        if (node.dataset.prevTabindex) node.setAttribute('tabindex', node.dataset.prevTabindex);
+        else node.removeAttribute('tabindex');
+        delete node.dataset.prevTabindex;
+      }
+    });
+  }
+
+  /** requestAnimationFrame-coalesced callback — at most one run per frame. */
+  function rafThrottle(fn) {
+    let queued = false;
+    let lastArgs = null;
+    return function throttled() {
+      lastArgs = arguments;
+      if (queued) return;
+      queued = true;
+      window.requestAnimationFrame(() => {
+        queued = false;
+        fn.apply(null, lastArgs);
+      });
+    };
+  }
+
+  function academic() {
+    return window.PRAGYAN_ACADEMIC || null;
+  }
+
+  function formatINR(amount) {
+    const config = academic();
+    if (config && typeof config.formatINR === 'function') return config.formatINR(amount);
+    return '₹' + (Math.round(Number(amount) || 0)).toLocaleString('en-IN');
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
+    initSkipLink();
     initNavbar();
     initHeroSlideshow();
     initScrollReveal();
@@ -25,511 +171,938 @@
   });
 
   /* --------------------------------------------------------------------------
-   * 1. Header & Navigation Logic
+   * 1. Skip link — first stop for keyboard and screen-reader users
+   * -------------------------------------------------------------------------- */
+  function initSkipLink() {
+    const target = document.getElementById('hero') || document.querySelector('main, section');
+    if (!target || document.querySelector('.skip-to-content')) return;
+
+    const link = document.createElement('a');
+    link.className = 'skip-to-content';
+    link.href = '#' + (target.id || 'hero');
+    link.textContent = 'Skip to main content';
+    document.body.insertBefore(link, document.body.firstChild);
+
+    // A section is not focusable by default, so the skip target would receive
+    // the hash but not the focus ring.
+    link.addEventListener('click', () => {
+      target.setAttribute('tabindex', '-1');
+      window.setTimeout(() => target.focus({ preventScroll: false }), 0);
+    });
+  }
+
+  /* --------------------------------------------------------------------------
+   * 2. Header, sticky scroll state & mobile drawer
    * -------------------------------------------------------------------------- */
   function initNavbar() {
     const header = document.querySelector('.site-header');
     const hamburgerBtn = document.getElementById('hamburgerBtn');
     const mobileDrawer = document.getElementById('mobileNavDrawer');
     const mobileLinks = document.querySelectorAll('.mobile-nav-links a');
-    const sections = document.querySelectorAll('section[id]');
-    const navLinks = document.querySelectorAll('.nav-links a[href^="#"]');
+    const sections = Array.prototype.slice.call(document.querySelectorAll('section[id]'));
+    const navLinks = Array.prototype.slice.call(document.querySelectorAll('.nav-links a[href^="#"]'));
 
-    // Sticky Scroll Effect
-    window.addEventListener('scroll', () => {
-      if (window.scrollY > 40) {
-        header?.classList.add('scrolled');
-      } else {
-        header?.classList.remove('scrolled');
+    // Section offsets are measured once per layout change instead of on every
+    // scroll event. Reading offsetTop inside the scroll handler forced a synchronous
+    // reflow per frame, which is what made scrolling stutter on mid-range phones.
+    let offsets = [];
+    const measure = () => {
+      offsets = sections.map(section => ({
+        id: section.getAttribute('id') || '',
+        top: section.offsetTop - 130
+      }));
+    };
+
+    let lastActiveId = null;
+    const paint = () => {
+      if (header) header.classList.toggle('scrolled', window.scrollY > 40);
+
+      let currentId = '';
+      for (let i = 0; i < offsets.length; i += 1) {
+        if (window.scrollY >= offsets[i].top) currentId = offsets[i].id;
       }
-
-      // Active Navigation Link Highlight
-      let currentSection = '';
-      sections.forEach(section => {
-        const sectionTop = section.offsetTop - 130;
-        if (window.scrollY >= sectionTop) {
-          currentSection = section.getAttribute('id') || '';
-        }
-      });
+      if (currentId === lastActiveId) return;
+      lastActiveId = currentId;
 
       navLinks.forEach(link => {
-        link.classList.remove('active');
-        if (link.getAttribute('href') === `#${currentSection}`) {
-          link.classList.add('active');
-        }
+        const isActive = link.getAttribute('href') === '#' + currentId;
+        link.classList.toggle('active', isActive);
+        if (isActive) link.setAttribute('aria-current', 'true');
+        else link.removeAttribute('aria-current');
       });
+    };
+
+    const onScroll = rafThrottle(paint);
+    const onResize = rafThrottle(() => { measure(); lastActiveId = null; paint(); });
+
+    measure();
+    paint();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onResize);
+    window.addEventListener('load', onResize);
+
+    if (!hamburgerBtn || !mobileDrawer) return;
+
+    let drawerOpen = false;
+
+    const setDrawerState = (isOpen, options) => {
+      const opts = options || {};
+      if (isOpen === drawerOpen) return;
+      drawerOpen = isOpen;
+
+      mobileDrawer.classList.toggle('open', isOpen);
+      hamburgerBtn.classList.toggle('open', isOpen);
+      hamburgerBtn.setAttribute('aria-expanded', String(isOpen));
+      hamburgerBtn.setAttribute('aria-label', isOpen ? 'Close navigation menu' : 'Open navigation menu');
+      setInert(mobileDrawer, !isOpen);
+
+      if (isOpen) {
+        lockScroll();
+        const first = visibleFocusable(mobileDrawer)[0];
+        if (first) first.focus();
+      } else {
+        unlockScroll();
+        // Focus must come back to the control that opened the drawer, or the
+        // keyboard user is dropped at the top of the document.
+        if (opts.restoreFocus !== false) hamburgerBtn.focus();
+      }
+    };
+
+    // Closed at load: matches the CSS (drawer parked off-canvas) and takes its
+    // links out of the tab order.
+    setInert(mobileDrawer, true);
+    mobileDrawer.setAttribute('role', 'dialog');
+    mobileDrawer.setAttribute('aria-modal', 'true');
+    mobileDrawer.setAttribute('aria-label', 'Site navigation');
+    mobileDrawer.removeAttribute('aria-expanded'); // aria-expanded belongs on the button
+    hamburgerBtn.setAttribute('aria-expanded', 'false');
+
+    hamburgerBtn.addEventListener('click', event => {
+      event.stopPropagation();
+      setDrawerState(!drawerOpen);
     });
 
-    // Mobile Hamburger Menu Toggle with ARIA Accessibility
-    if (hamburgerBtn && mobileDrawer) {
-      const setDrawerState = (isOpen) => {
-        mobileDrawer.classList.toggle('open', isOpen);
-        hamburgerBtn.classList.toggle('open', isOpen);
-        hamburgerBtn.setAttribute('aria-expanded', String(isOpen));
-        mobileDrawer.setAttribute('aria-expanded', String(isOpen));
-        mobileDrawer.setAttribute('aria-hidden', String(!isOpen));
-        document.body.style.overflow = isOpen ? 'hidden' : '';
-      };
+    document.addEventListener('click', event => {
+      if (!drawerOpen) return;
+      if (mobileDrawer.contains(event.target) || hamburgerBtn.contains(event.target)) return;
+      setDrawerState(false, { restoreFocus: false });
+    });
 
-      hamburgerBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const isOpen = !mobileDrawer.classList.contains('open');
-        setDrawerState(isOpen);
-      });
+    document.addEventListener('keydown', event => {
+      if (!drawerOpen) return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setDrawerState(false);
+        return;
+      }
+      trapTabKey(mobileDrawer, event);
+    });
 
-      document.addEventListener('click', (e) => {
-        if (!mobileDrawer.contains(e.target) && !hamburgerBtn.contains(e.target)) {
-          setDrawerState(false);
-        }
-      });
+    mobileLinks.forEach(link => {
+      link.addEventListener('click', () => setDrawerState(false, { restoreFocus: false }));
+    });
 
-      mobileLinks.forEach(link => {
-        link.addEventListener('click', () => {
-          setDrawerState(false);
-        });
-      });
-    }
+    // A drawer left open while the viewport grows into the desktop layout would
+    // keep the scroll locked with no visible way to close it.
+    window.addEventListener('resize', rafThrottle(() => {
+      if (drawerOpen && window.innerWidth > 768) setDrawerState(false, { restoreFocus: false });
+    }));
   }
 
   /* --------------------------------------------------------------------------
-   * 1b. Hero Slideshow Carousel (Auto Play + Navigation)
+   * 3. Hero slideshow — autoplay with a pause control, keyboard and swipe
    * -------------------------------------------------------------------------- */
   function initHeroSlideshow() {
-    const slides = document.querySelectorAll('.hero-slide');
-    const dots = document.querySelectorAll('.hero-slide-dots .dot');
+    const container = document.querySelector('.hero-slideshow-container');
+    const slides = Array.prototype.slice.call(document.querySelectorAll('.hero-slide'));
+    const dots = Array.prototype.slice.call(document.querySelectorAll('.hero-slide-dots .dot'));
     const prevBtn = document.getElementById('heroPrevBtn');
     const nextBtn = document.getElementById('heroNextBtn');
-    const container = document.querySelector('.hero-slideshow-container');
+    const playPauseBtn = document.getElementById('heroPlayPauseBtn');
+    const liveRegion = document.getElementById('heroSlideStatus');
 
     if (!slides.length) return;
 
-    let currentIndex = 0;
-    let autoPlayTimer = null;
+    const AUTOPLAY_MS = 5200;
+    let currentIndex = Math.max(0, slides.findIndex(slide => slide.classList.contains('active')));
+    let timer = null;
+    // WCAG 2.2.2: motion that starts on its own must be pausable, and a visitor
+    // who asked for reduced motion should never see it start at all.
+    let autoplayWanted = !prefersReducedMotion();
 
-    function goToSlide(index) {
-      if (index < 0) index = slides.length - 1;
-      if (index >= slides.length) index = 0;
+    function announce(index) {
+      if (!liveRegion) return;
+      liveRegion.textContent = `Slide ${index + 1} of ${slides.length}`;
+    }
+
+    function goToSlide(index, options) {
+      const opts = options || {};
+      let next = index;
+      if (next < 0) next = slides.length - 1;
+      if (next >= slides.length) next = 0;
 
       slides.forEach((slide, idx) => {
-        slide.classList.toggle('active', idx === index);
+        const isActive = idx === next;
+        slide.classList.toggle('active', isActive);
+        // Slides hold no focusable content, so aria-hidden is safe here and it
+        // keeps three copies of the caption out of the screen-reader buffer.
+        slide.setAttribute('aria-hidden', String(!isActive));
       });
 
       dots.forEach((dot, idx) => {
-        dot.classList.toggle('active', idx === index);
+        const isActive = idx === next;
+        dot.classList.toggle('active', isActive);
+        // aria-current is the right state for "this is the slide you are on";
+        // aria-selected would need a tab/option role the dots do not have.
+        if (isActive) dot.setAttribute('aria-current', 'true');
+        else dot.removeAttribute('aria-current');
       });
 
-      currentIndex = index;
+      currentIndex = next;
+      if (opts.announce !== false) announce(next);
     }
 
-    function nextSlide() {
-      goToSlide(currentIndex + 1);
+    function stopTimer() {
+      if (timer) window.clearInterval(timer);
+      timer = null;
     }
 
-    function prevSlide() {
-      goToSlide(currentIndex - 1);
+    function startTimer() {
+      stopTimer();
+      if (!autoplayWanted || document.hidden) return;
+      timer = window.setInterval(() => goToSlide(currentIndex + 1, { announce: false }), AUTOPLAY_MS);
     }
 
-    function startAutoPlay() {
-      stopAutoPlay();
-      autoPlayTimer = setInterval(nextSlide, 3500);
+    function syncPlayPauseButton() {
+      if (!playPauseBtn) return;
+      const label = autoplayWanted ? 'Pause slideshow' : 'Play slideshow';
+      playPauseBtn.setAttribute('aria-label', label);
+      playPauseBtn.setAttribute('title', label);
+      playPauseBtn.setAttribute('aria-pressed', String(!autoplayWanted));
+      const icon = playPauseBtn.querySelector('i');
+      if (icon) icon.className = autoplayWanted ? 'fa-solid fa-pause' : 'fa-solid fa-play';
     }
 
-    function stopAutoPlay() {
-      if (autoPlayTimer) clearInterval(autoPlayTimer);
+    function step(delta) {
+      goToSlide(currentIndex + delta);
+      if (autoplayWanted) startTimer(); // restart the dwell time after manual input
     }
 
-    if (nextBtn) {
-      nextBtn.addEventListener('click', () => {
-        nextSlide();
-        startAutoPlay();
-      });
-    }
-
-    if (prevBtn) {
-      prevBtn.addEventListener('click', () => {
-        prevSlide();
-        startAutoPlay();
-      });
-    }
+    if (nextBtn) nextBtn.addEventListener('click', () => step(1));
+    if (prevBtn) prevBtn.addEventListener('click', () => step(-1));
 
     dots.forEach((dot, idx) => {
       dot.addEventListener('click', () => {
         goToSlide(idx);
-        startAutoPlay();
+        if (autoplayWanted) startTimer();
       });
     });
 
-    if (container) {
-      container.addEventListener('mouseenter', stopAutoPlay);
-      container.addEventListener('mouseleave', startAutoPlay);
+    if (playPauseBtn) {
+      playPauseBtn.addEventListener('click', () => {
+        autoplayWanted = !autoplayWanted;
+        syncPlayPauseButton();
+        if (autoplayWanted) startTimer();
+        else stopTimer();
+      });
+      syncPlayPauseButton();
     }
 
-    startAutoPlay();
+    if (container) {
+      // Hover pause is a desktop nicety; focus pause is what a keyboard user
+      // needs, and neither existed for touch, hence the explicit button above.
+      container.addEventListener('mouseenter', stopTimer);
+      container.addEventListener('mouseleave', () => { if (autoplayWanted) startTimer(); });
+      container.addEventListener('focusin', stopTimer);
+      container.addEventListener('focusout', event => {
+        if (!container.contains(event.relatedTarget) && autoplayWanted) startTimer();
+      });
+
+      container.addEventListener('keydown', event => {
+        if (event.key === 'ArrowRight') { event.preventDefault(); step(1); }
+        else if (event.key === 'ArrowLeft') { event.preventDefault(); step(-1); }
+      });
+
+      // Swipe. Listeners stay passive and never call preventDefault, so vertical
+      // page scrolling through the carousel keeps working.
+      let touchStartX = 0;
+      let touchStartY = 0;
+      let tracking = false;
+      container.addEventListener('touchstart', event => {
+        if (event.touches.length !== 1) { tracking = false; return; }
+        tracking = true;
+        touchStartX = event.touches[0].clientX;
+        touchStartY = event.touches[0].clientY;
+        stopTimer();
+      }, { passive: true });
+
+      container.addEventListener('touchend', event => {
+        if (!tracking) return;
+        tracking = false;
+        const touch = event.changedTouches && event.changedTouches[0];
+        if (touch) {
+          const dx = touch.clientX - touchStartX;
+          const dy = touch.clientY - touchStartY;
+          if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.4) step(dx < 0 ? 1 : -1);
+        }
+        if (autoplayWanted) startTimer();
+      }, { passive: true });
+    }
+
+    // A slideshow ticking in a background tab burns battery for nobody.
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) stopTimer();
+      else if (autoplayWanted) startTimer();
+    });
+
+    onMediaChange(REDUCED_MOTION, () => {
+      autoplayWanted = !prefersReducedMotion();
+      syncPlayPauseButton();
+      if (autoplayWanted) startTimer();
+      else stopTimer();
+    });
+
+    goToSlide(currentIndex, { announce: false });
+    startTimer();
   }
 
   /* --------------------------------------------------------------------------
-   * 2. Smooth Scroll Reveal (Intersection Observer)
+   * 4. Scroll reveal
    * -------------------------------------------------------------------------- */
   function initScrollReveal() {
-    const elementsToReveal = document.querySelectorAll(
-      '.hero-content, .hero-visual, .teacher-card, .batch-card, .gallery-card, .contact-card, .map-card, .faq-wrap'
-    );
+    const elements = Array.prototype.slice.call(document.querySelectorAll(
+      '.hero-content, .hero-visual, .mentor-compact-card, .teacher-card, .batch-card,' +
+      ' .gallery-card, .contact-card, .map-card, .faq-wrap, .scholarship-policy-card'
+    ));
+    if (!elements.length) return;
 
-    elementsToReveal.forEach((el, idx) => {
+    // Reduced motion: show everything immediately rather than fading it in.
+    // Without this, content stayed at opacity 0 whenever the CSS override
+    // collapsed the transition to 0.01ms before the observer had fired.
+    if (prefersReducedMotion() || !('IntersectionObserver' in window)) {
+      elements.forEach(el => el.classList.add('reveal-on-scroll', 'is-visible'));
+      return;
+    }
+
+    elements.forEach((el, idx) => {
       el.classList.add('reveal-on-scroll');
       if (idx % 3 === 1) el.classList.add('delay-1');
       if (idx % 3 === 2) el.classList.add('delay-2');
     });
 
-    if (!('IntersectionObserver' in window)) {
-      elementsToReveal.forEach(el => el.classList.add('is-visible'));
-      return;
-    }
+    const observer = new IntersectionObserver((entries, obs) => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add('is-visible');
+        obs.unobserve(entry.target);
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -5% 0px' });
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('is-visible');
-          }
-        });
-      },
-      { threshold: 0.15 }
-    );
-
-    elementsToReveal.forEach(el => observer.observe(el));
+    elements.forEach(el => observer.observe(el));
   }
 
   /* --------------------------------------------------------------------------
-   * 3. Animated Stat Counters
+   * 5. Animated stat counters
    * -------------------------------------------------------------------------- */
   function initStatCounters() {
-    const statNumbers = document.querySelectorAll('.stat-number');
+    const statNumbers = Array.prototype.slice.call(document.querySelectorAll('.stat-number'));
     if (!statNumbers.length) return;
 
-    if (!('IntersectionObserver' in window)) {
-      statNumbers.forEach(el => {
-        const target = parseInt(el.getAttribute('data-target') || '0', 10);
-        const prefix = el.getAttribute('data-prefix') || '';
-        const suffix = el.getAttribute('data-suffix') || '';
-        animateCounter(el, target, prefix, suffix);
-      });
+    const run = el => {
+      const target = parseInt(el.getAttribute('data-target') || '0', 10);
+      const prefix = el.getAttribute('data-prefix') || '';
+      const suffix = el.getAttribute('data-suffix') || '';
+      animateCounter(el, target, prefix, suffix);
+    };
+
+    if (prefersReducedMotion() || !('IntersectionObserver' in window)) {
+      statNumbers.forEach(run);
       return;
     }
 
-    const observer = new IntersectionObserver(
-      (entries, obs) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            const el = entry.target;
-            const target = parseInt(el.getAttribute('data-target') || '0', 10);
-            const prefix = el.getAttribute('data-prefix') || '';
-            const suffix = el.getAttribute('data-suffix') || '';
-
-            animateCounter(el, target, prefix, suffix);
-            obs.unobserve(el);
-          }
-        });
-      },
-      { threshold: 0.5 }
-    );
+    const observer = new IntersectionObserver((entries, obs) => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        run(entry.target);
+        obs.unobserve(entry.target);
+      });
+    }, { threshold: 0.5 });
 
     statNumbers.forEach(el => observer.observe(el));
   }
 
-  function animateCounter(element, target, prefix = '', suffix = '') {
-    let current = 0;
-    const duration = 1800;
-    const stepTime = 16;
-    const steps = duration / stepTime;
-    const increment = target / steps;
-
-    const timer = setInterval(() => {
-      current += increment;
-      if (current >= target) {
-        element.textContent = `${prefix}${target}${suffix}`;
-        clearInterval(timer);
-      } else {
-        element.textContent = `${prefix}${Math.floor(current)}${suffix}`;
-      }
-    }, stepTime);
-
-    // Store timer reference for cleanup if needed
-    if (!element._counterTimer) {
-      element._counterTimer = timer;
-    }
+  function formatCount(value) {
+    return Number(value).toLocaleString('en-IN');
   }
 
-  /* --------------------------------------------------------------------------
-   * 4. Batches & Pricing Filter Tabs & Billing Toggle
-   * -------------------------------------------------------------------------- */
-  function initBatchTabs() {
-    const tabButtons = document.querySelectorAll('.tab-btn');
-    const toggleSwitch = document.getElementById('billingToggle');
-    const batchCards = document.querySelectorAll('.batch-card');
+  /**
+   * Count up with requestAnimationFrame. The old setInterval(16ms) version
+   * drifted under load, never cancelled a previous run on the same element, and
+   * left a screen reader reading a hundred intermediate numbers.
+   */
+  function animateCounter(element, target, prefix, prefixSuffix) {
+    const suffix = prefixSuffix || '';
+    const head = prefix || '';
+    const finalText = `${head}${formatCount(target)}${suffix}`;
 
-    const pricingData = {
-      junior:  { monthly: '₹700',   annual: '₹7,980' },
-      class8:  { monthly: '₹800',   annual: '₹9,120' },
-      class9:  { monthly: '₹1,000', annual: '₹11,400' },
-      class10: { monthly: '₹1,000', annual: '₹11,400' }
+    if (prefersReducedMotion() || !window.requestAnimationFrame) {
+      element.textContent = finalText;
+      return;
+    }
+
+    if (element._counterRaf) window.cancelAnimationFrame(element._counterRaf);
+    element.setAttribute('aria-hidden', 'true');
+
+    const duration = 1600;
+    const startedAt = window.performance && window.performance.now
+      ? window.performance.now()
+      : Date.now();
+
+    const tick = now => {
+      const elapsed = (now || Date.now()) - startedAt;
+      const progress = Math.min(1, elapsed / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      element.textContent = `${head}${formatCount(Math.round(target * eased))}${suffix}`;
+
+      if (progress < 1) {
+        element._counterRaf = window.requestAnimationFrame(tick);
+        return;
+      }
+      element._counterRaf = null;
+      element.textContent = finalText;
+      // Announce only the settled figure.
+      element.removeAttribute('aria-hidden');
     };
 
-    let isAnnual = false;
-
-    tabButtons.forEach(btn => {
-      btn.addEventListener('click', () => {
-        tabButtons.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-
-        const selectedClass = btn.getAttribute('data-class');
-
-        batchCards.forEach(card => {
-          const cardClass = card.getAttribute('data-class');
-          if (selectedClass === 'all' || cardClass === selectedClass) {
-            card.style.display = 'flex';
-            card.classList.remove('batch-card-animating');
-            void card.offsetWidth; // trigger reflow
-            card.classList.add('batch-card-animating');
-          } else {
-            card.style.display = 'none';
-          }
-        });
-      });
-    });
-
-    if (toggleSwitch) {
-      toggleSwitch.addEventListener('click', () => {
-        isAnnual = !isAnnual;
-        toggleSwitch.classList.toggle('active', isAnnual);
-        toggleSwitch.setAttribute('aria-checked', String(isAnnual));
-
-        const priceElements = document.querySelectorAll('[data-price-key]');
-        priceElements.forEach(el => {
-          const key = el.getAttribute('data-price-key');
-          if (pricingData[key]) {
-            const priceText = isAnnual ? pricingData[key].annual : pricingData[key].monthly;
-            const periodText = isAnnual ? '/ year (save 5%)' : '/ month';
-
-            el.textContent = priceText;
-            const periodEl = el.nextElementSibling;
-            if (periodEl && periodEl.classList.contains('batch-period')) {
-              periodEl.textContent = periodText;
-            }
-          }
-        });
-      });
-    }
+    element._counterRaf = window.requestAnimationFrame(tick);
   }
 
   /* --------------------------------------------------------------------------
-   * 5. 3D Gallery Interactive Tilt
+   * 6. Batch filters, billing toggle & pricing
    * -------------------------------------------------------------------------- */
-  function init3DGallery() {
-    const galleryCards = document.querySelectorAll('.gallery-card');
+  function initBatchTabs() {
+    const tabButtons = Array.prototype.slice.call(document.querySelectorAll('.tabs-container .tab-btn'));
+    const toggleSwitch = document.getElementById('billingToggle');
+    const batchCards = Array.prototype.slice.call(document.querySelectorAll('.batch-card'));
+    const status = document.getElementById('batchFilterStatus');
 
-    galleryCards.forEach(card => {
-      // Mouse events for desktop
-      card.addEventListener('mousemove', (e) => {
-        const rect = card.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+    let isAnnual = toggleSwitch ? toggleSwitch.getAttribute('aria-checked') === 'true' : false;
 
-        const centerX = rect.width / 2;
-        const centerY = rect.height / 2;
+    function announce(message) {
+      if (status) status.textContent = message;
+    }
 
-        const rotateX = ((y - centerY) / centerY) * -10;
-        const rotateY = ((x - centerX) / centerX) * 10;
+    /* ---- filtering ---- */
+    function applyFilter(selected, options) {
+      const opts = options || {};
+      let shown = 0;
 
-        card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.03, 1.03, 1.03)`;
-      });
-
-      card.addEventListener('mouseleave', () => {
-        card.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
-      });
-
-      // Touch events for mobile devices
-      card.addEventListener('touchmove', (e) => {
-        if (e.touches.length === 1) {
-          const touch = e.touches[0];
-          const rect = card.getBoundingClientRect();
-          const x = touch.clientX - rect.left;
-          const y = touch.clientY - rect.top;
-
-          const centerX = rect.width / 2;
-          const centerY = rect.height / 2;
-
-          const rotateX = ((y - centerY) / centerY) * -10;
-          const rotateY = ((x - centerX) / centerX) * 10;
-
-          card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.03, 1.03, 1.03)`;
+      batchCards.forEach(card => {
+        const group = card.getAttribute('data-class');
+        const match = selected === 'all' || group === selected;
+        // A class, not `style.display = 'flex'`: hardcoding the display mode
+        // overwrote whatever layout the card actually needs.
+        card.classList.toggle('is-filtered-out', !match);
+        card.removeAttribute('aria-hidden'); // filtering removes cards from layout entirely
+        if (!match) return;
+        shown += 1;
+        if (!prefersReducedMotion() && opts.animate !== false) {
+          card.classList.remove('batch-card-animating');
+          void card.offsetWidth; // restart the entry animation
+          card.classList.add('batch-card-animating');
         }
       });
 
-      card.addEventListener('touchend', () => {
-        card.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
+      if (opts.announce !== false) {
+        announce(shown === 1 ? 'Showing 1 batch' : `Showing ${shown} batches`);
+      }
+      return shown;
+    }
+
+    function selectTab(button, options) {
+      const opts = options || {};
+      tabButtons.forEach(other => {
+        const isActive = other === button;
+        other.classList.toggle('active', isActive);
+        other.setAttribute('aria-selected', String(isActive));
+        // Roving tabindex: one stop for the whole tab strip, arrows move within.
+        other.setAttribute('tabindex', isActive ? '0' : '-1');
       });
+      applyFilter(button.getAttribute('data-class') || 'all', opts);
+      if (opts.focus) button.focus();
+    }
+
+    if (tabButtons.length) {
+      const strip = tabButtons[0].parentElement;
+      if (strip && !strip.getAttribute('role')) {
+        strip.setAttribute('role', 'tablist');
+        strip.setAttribute('aria-label', 'Filter batches by class');
+      }
+
+      tabButtons.forEach((button, index) => {
+        button.setAttribute('role', 'tab');
+        button.setAttribute('type', 'button');
+        if (!button.id) button.id = `batchTab-${button.getAttribute('data-class') || index}`;
+        const grid = document.querySelector('.batches-grid');
+        if (grid) {
+          if (!grid.id) grid.id = 'batchesGrid';
+          button.setAttribute('aria-controls', grid.id);
+        }
+
+        button.addEventListener('click', () => selectTab(button));
+
+        button.addEventListener('keydown', event => {
+          const delta = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1
+            : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1
+              : 0;
+          if (delta) {
+            event.preventDefault();
+            const next = tabButtons[(index + delta + tabButtons.length) % tabButtons.length];
+            selectTab(next, { focus: true });
+            return;
+          }
+          if (event.key === 'Home') { event.preventDefault(); selectTab(tabButtons[0], { focus: true }); }
+          if (event.key === 'End') { event.preventDefault(); selectTab(tabButtons[tabButtons.length - 1], { focus: true }); }
+        });
+      });
+
+      const grid = document.querySelector('.batches-grid');
+      if (grid) {
+        grid.setAttribute('role', 'tabpanel');
+        const active = tabButtons.filter(b => b.classList.contains('active'))[0] || tabButtons[0];
+        grid.setAttribute('aria-labelledby', active.id);
+      }
+
+      const initiallyActive = tabButtons.filter(b => b.classList.contains('active'))[0] || tabButtons[0];
+      selectTab(initiallyActive, { animate: false, announce: false });
+    }
+
+    /* ---- pricing ---- */
+    function annualTextFor(monthlyText) {
+      const digits = String(monthlyText || '').replace(/[^\d]/g, '');
+      if (!digits) return monthlyText;
+      const config = academic();
+      const monthly = Number(digits);
+      const annual = config && typeof config.annualPrice === 'function'
+        ? config.annualPrice(monthly)
+        : Math.round(monthly * 12 * 0.95);
+      return formatINR(annual);
+    }
+
+    function applyPricing(annual) {
+      const table = (academic() && academic().PRICE_TABLE) || null;
+
+      Array.prototype.forEach.call(document.querySelectorAll('[data-price-key]'), el => {
+        const key = el.getAttribute('data-price-key');
+        const entry = table ? table[key] : null;
+
+        // The rendered monthly figure is captured once so a key missing from the
+        // canonical table still toggles correctly instead of blanking the card.
+        if (!el.dataset.monthlyText) el.dataset.monthlyText = el.textContent.trim();
+
+        const monthlyText = entry ? entry.monthly : el.dataset.monthlyText;
+        const annualText = entry ? entry.annual : annualTextFor(el.dataset.monthlyText);
+
+        el.textContent = annual ? annualText : monthlyText;
+
+        const row = el.parentElement;
+        const period = (row && row.querySelector('.batch-period'))
+          || (el.nextElementSibling && el.nextElementSibling.classList.contains('batch-period')
+            ? el.nextElementSibling
+            : null);
+        if (period) period.textContent = annual ? '/ year (save 5%)' : '/ month';
+      });
+    }
+
+    function setBilling(annual, options) {
+      const opts = options || {};
+      isAnnual = annual;
+      if (toggleSwitch) {
+        toggleSwitch.classList.toggle('active', annual);
+        toggleSwitch.setAttribute('aria-checked', String(annual));
+        toggleSwitch.setAttribute('aria-label', annual
+          ? 'Annual billing selected. Switch to monthly billing.'
+          : 'Monthly billing selected. Switch to annual billing and save 5%.');
+      }
+      applyPricing(annual);
+      if (opts.announce !== false) {
+        announce(annual
+          ? 'Showing annual session fees with the 5% scholarship applied'
+          : 'Showing standard monthly fees');
+      }
+    }
+
+    if (toggleSwitch) {
+      if (!toggleSwitch.getAttribute('role')) toggleSwitch.setAttribute('role', 'switch');
+      toggleSwitch.setAttribute('type', 'button');
+
+      toggleSwitch.addEventListener('click', () => setBilling(!isAnnual));
+      // role="switch" on a <button> handles Enter and Space natively, but the
+      // markup shipped without a keydown handler and earlier revisions used a
+      // <div>, so both keys are wired explicitly and defensively.
+      toggleSwitch.addEventListener('keydown', event => {
+        if (event.key !== ' ' && event.key !== 'Spacebar' && event.key !== 'Enter') return;
+        event.preventDefault();
+        setBilling(!isAnnual);
+      });
+    }
+
+    setBilling(isAnnual, { announce: false });
+  }
+
+  /* --------------------------------------------------------------------------
+   * 7. Gallery pointer tilt (desktop only)
+   * -------------------------------------------------------------------------- */
+  function init3DGallery() {
+    const galleryCards = Array.prototype.slice.call(document.querySelectorAll('.gallery-card'));
+    if (!galleryCards.length) return;
+
+    const reset = card => {
+      card.style.transform = '';
+    };
+
+    // The old build also tilted on touchmove, which competed with the scroll
+    // gesture: dragging up the page tipped the card instead of scrolling.
+    if (isCoarsePointer() || prefersReducedMotion()) {
+      galleryCards.forEach(reset);
+      return;
+    }
+
+    galleryCards.forEach(card => {
+      const applyTilt = rafThrottle((clientX, clientY) => {
+        const rect = card.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+        const rotateX = ((clientY - rect.top - rect.height / 2) / (rect.height / 2)) * -8;
+        const rotateY = ((clientX - rect.left - rect.width / 2) / (rect.width / 2)) * 8;
+        card.style.transform =
+          `perspective(1000px) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) scale3d(1.02, 1.02, 1.02)`;
+      });
+
+      card.addEventListener('mousemove', event => applyTilt(event.clientX, event.clientY));
+      card.addEventListener('mouseleave', () => reset(card));
+      card.addEventListener('blur', () => reset(card));
     });
   }
 
   /* --------------------------------------------------------------------------
-   * 6. Lightbox Modal Zoom
+   * 8. Lightbox
    * -------------------------------------------------------------------------- */
   function initLightboxModal() {
-    const cards = document.querySelectorAll('.gallery-card');
+    const cards = Array.prototype.slice.call(document.querySelectorAll('.gallery-card'));
     const modal = document.getElementById('lightboxModal');
     const modalImg = document.getElementById('lightboxImg');
     const modalCaption = document.getElementById('lightboxCaption');
     const closeBtn = document.getElementById('lightboxClose');
 
-    cards.forEach(card => {
-      card.addEventListener('click', () => {
-        const img = card.querySelector('img');
-        const title = card.querySelector('.gallery-caption-title')?.textContent || '';
-        const sub = card.querySelector('.gallery-caption-sub')?.textContent || '';
+    if (!modal || !modalImg) return;
 
-        if (img && modal && modalImg) {
-          modalImg.src = img.src;
-          modalImg.alt = img.alt;
-          if (modalCaption) {
-            modalCaption.textContent = `${title} — ${sub}`;
-          }
-          modal.style.display = 'flex';
-          modal.classList.add('active');
-          document.body.style.overflow = 'hidden';
-        }
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'Enlarged institute photo');
+    setInert(modal, true);
+
+    let lastTrigger = null;
+    let isOpen = false;
+
+    function openModal(card) {
+      const img = card.querySelector('img');
+      if (!img) return;
+      const title = (card.querySelector('.gallery-caption-title') || {}).textContent || '';
+      const sub = (card.querySelector('.gallery-caption-sub') || {}).textContent || '';
+
+      modalImg.src = img.currentSrc || img.src;
+      modalImg.alt = img.alt || 'Institute photo';
+      if (modalCaption) modalCaption.textContent = [title, sub].filter(Boolean).join(' — ');
+
+      lastTrigger = card;
+      isOpen = true;
+      setInert(modal, false);
+      modal.style.display = 'flex';
+      modal.classList.add('active');
+      lockScroll();
+      if (closeBtn) closeBtn.focus();
+    }
+
+    function closeModal() {
+      if (!isOpen) return;
+      isOpen = false;
+      modal.classList.remove('active');
+      modal.style.display = 'none';
+      setInert(modal, true);
+      unlockScroll();
+      // Return focus to the thumbnail so the keyboard user keeps their place.
+      if (lastTrigger && typeof lastTrigger.focus === 'function') lastTrigger.focus();
+      lastTrigger = null;
+    }
+
+    cards.forEach(card => {
+      // Gallery cards are <div>s in the markup. Without these they were
+      // click-only: unreachable by keyboard and invisible to assistive tech.
+      if (!card.getAttribute('role')) card.setAttribute('role', 'button');
+      if (!card.hasAttribute('tabindex')) card.setAttribute('tabindex', '0');
+      if (!card.getAttribute('aria-label')) {
+        const title = (card.querySelector('.gallery-caption-title') || {}).textContent || 'photo';
+        card.setAttribute('aria-label', `Enlarge photo: ${title.trim()}`);
+      }
+
+      card.addEventListener('click', () => openModal(card));
+      card.addEventListener('keydown', event => {
+        if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar') return;
+        event.preventDefault(); // Space would otherwise scroll the page
+        openModal(card);
       });
     });
 
-    const closeModal = () => {
-      if (modal) {
-        modal.classList.remove('active');
-        modal.style.display = 'none';
-        document.body.style.overflow = '';
-      }
-    };
-
     if (closeBtn) closeBtn.addEventListener('click', closeModal);
-    if (modal) {
-      modal.addEventListener('click', (e) => {
-        if (e.target === modal) closeModal();
-      });
-    }
+    modal.addEventListener('click', event => {
+      if (event.target === modal) closeModal();
+    });
 
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && modal?.classList.contains('active')) {
+    document.addEventListener('keydown', event => {
+      if (!isOpen) return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
         closeModal();
+        return;
       }
+      trapTabKey(modal, event);
     });
   }
 
   /* --------------------------------------------------------------------------
-   * 7. Contact Inquiry Form Validation & WhatsApp Trigger
+   * 9. Contact inquiry form
    * -------------------------------------------------------------------------- */
+
+  // Letters from any script, plus the spaces, dots, apostrophes and hyphens that
+  // appear in real names. The previous /^[a-zA-Z\s]+$/ rejected "Dr. A.K. Singh",
+  // "D'Souza" and every name written in Devanagari.
+  const NAME_PATTERN = /^[\p{L}\p{M}][\p{L}\p{M}\s.'’-]*$/u;
+
+  /**
+   * Reduce anything a visitor might type into a bare 10-digit Indian mobile
+   * number, or return null. "+91 73698 91858" and "073698 91858" both used to
+   * fail the length check even though they are the same valid number.
+   */
+  function normalizeIndianMobile(raw) {
+    let digits = String(raw || '').replace(/\D/g, '');
+    if (digits.length === 12 && digits.startsWith('91')) digits = digits.slice(2);
+    else if (digits.length === 13 && digits.startsWith('091')) digits = digits.slice(3);
+    else if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1);
+    return /^[6-9]\d{9}$/.test(digits) ? digits : null;
+  }
+
+  function fieldError(input, message) {
+    if (!input) return;
+    const id = `${input.id}Error`;
+    let holder = document.getElementById(id);
+    if (!holder) {
+      holder = document.createElement('p');
+      holder.id = id;
+      holder.className = 'form-error-text';
+      input.insertAdjacentElement('afterend', holder);
+    }
+    holder.textContent = message || '';
+    holder.hidden = !message;
+
+    if (message) {
+      input.setAttribute('aria-invalid', 'true');
+      const described = (input.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean);
+      if (described.indexOf(id) === -1) described.push(id);
+      input.setAttribute('aria-describedby', described.join(' '));
+    } else {
+      input.removeAttribute('aria-invalid');
+    }
+  }
+
   function initContactForm() {
     const form = document.getElementById('inquiryForm');
     if (!form) return;
 
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
+    const nameInput = document.getElementById('studentName');
+    const phoneInput = document.getElementById('studentPhone');
+    const classInput = document.getElementById('studentClass');
+    const queryInput = document.getElementById('studentQuery');
 
-      const name = document.getElementById('studentName')?.value.trim();
-      const phone = document.getElementById('studentPhone')?.value.trim();
-      const studentClass = document.getElementById('studentClass')?.value;
-      const query = document.getElementById('studentQuery')?.value.trim();
+    if (phoneInput) {
+      phoneInput.setAttribute('inputmode', 'tel');
+      phoneInput.setAttribute('autocomplete', 'tel');
+    }
+    if (nameInput) nameInput.setAttribute('autocomplete', 'name');
 
-      // Validation: Check required fields
-      if (!name || !phone) {
-        showToast('Please enter your name and contact phone number.', 'error');
-        return;
+    // Clear a field's error as soon as the visitor starts correcting it.
+    [nameInput, phoneInput].forEach(input => {
+      if (!input) return;
+      input.addEventListener('input', () => fieldError(input, ''));
+    });
+
+    function fail(input, message) {
+      fieldError(input, message);
+      showToast(message, 'error');
+      if (input && typeof input.focus === 'function') input.focus();
+    }
+
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+
+      const name = nameInput ? nameInput.value.trim() : '';
+      const phoneRaw = phoneInput ? phoneInput.value.trim() : '';
+      const studentClass = classInput ? classInput.value : '';
+      const query = queryInput ? queryInput.value.trim() : '';
+
+      if (!name) return fail(nameInput, 'Please enter the student or parent name.');
+      if (name.length < 2 || !NAME_PATTERN.test(name)) {
+        return fail(nameInput, 'Please enter a valid name (at least 2 letters).');
       }
 
-      // Validation: Check name format (at least 2 characters, only letters and spaces)
-      if (name.length < 2 || !/^[a-zA-Z\s]+$/.test(name)) {
-        showToast('Please enter a valid name (letters only, minimum 2 characters).', 'error');
-        return;
+      if (!phoneRaw) return fail(phoneInput, 'Please enter a WhatsApp contact number.');
+      const phone = normalizeIndianMobile(phoneRaw);
+      if (!phone) {
+        return fail(phoneInput, 'Please enter a valid 10-digit Indian mobile number starting 6, 7, 8 or 9.');
       }
 
-      // Validation: Check phone format (10 digits, Indian mobile number)
-      const cleanPhone = phone.replace(/\D/g, '');
-      if (cleanPhone.length !== 10 || !/^[6-9]\d{9}$/.test(cleanPhone)) {
-        showToast('Please enter a valid 10-digit Indian mobile number.', 'error');
-        return;
-      }
+      fieldError(nameInput, '');
+      fieldError(phoneInput, '');
 
-      const text = `Hello Pragyan Institute, I am inquiring about admissions in Lalganj.\n\n*Student Info:*\n• Name: ${name}\n• Phone: ${cleanPhone}\n• Class: ${studentClass}\n• Details: ${query || 'N/A'}`;
-      const encodedText = encodeURIComponent(text);
-      const waUrl = `https://wa.me/917369891858?text=${encodedText}`;
+      const text = `Hello Pragyan Institute, I am inquiring about admissions in Lalganj.\n\n`
+        + `*Student Info:*\n• Name: ${name}\n• Phone: ${phone}\n`
+        + `• Class: ${studentClass || 'Not specified'}\n• Details: ${query || 'N/A'}`;
+      const waUrl = `https://wa.me/917369891858?text=${encodeURIComponent(text)}`;
 
-      showToast('Opening WhatsApp with your inquiry details...', 'success');
+      // Opened inside the submit gesture. Deferring this by a second — as the
+      // previous build did, to let a toast play first — got the tab blocked as
+      // an unsolicited popup on iOS Safari and Android Chrome.
+      const opened = window.open(waUrl, '_blank', 'noopener');
+      if (!opened) window.location.href = waUrl;
 
-      setTimeout(() => {
-        window.open(waUrl, '_blank');
-        form.reset();
-      }, 1000);
+      showToast('Opening WhatsApp with your inquiry details…', 'success');
+      form.reset();
     });
   }
 
   /* --------------------------------------------------------------------------
-   * 8. FAQ Accordion Toggle
+   * 10. FAQ accordion
    * -------------------------------------------------------------------------- */
   function initFAQAccordion() {
-    const faqItems = document.querySelectorAll('.faq-item');
+    const faqItems = Array.prototype.slice.call(document.querySelectorAll('.faq-item'));
+    if (!faqItems.length) return;
 
-    faqItems.forEach(item => {
+    const entries = faqItems.map((item, index) => {
       const header = item.querySelector('.faq-header');
+      const body = item.querySelector('.faq-body');
+      if (!header || !body) return null;
 
-      header?.addEventListener('click', () => {
-        const isOpen = item.classList.contains('open');
+      if (!body.id) body.id = `faqPanel-${index + 1}`;
+      if (!header.id) header.id = `faqHeader-${index + 1}`;
+      header.setAttribute('aria-controls', body.id);
+      body.setAttribute('role', 'region');
+      body.setAttribute('aria-labelledby', header.id);
 
-        // Close all other items for clean single accordion effect
-        faqItems.forEach(otherItem => {
-          if (otherItem !== item) {
-            otherItem.classList.remove('open');
-          }
+      // A <div> header answered neither Enter nor Space and reported no state.
+      // index.html now ships <button class="faq-header">; this keeps working if
+      // any other page still has the old div.
+      if (header.tagName !== 'BUTTON') {
+        header.setAttribute('role', 'button');
+        if (!header.hasAttribute('tabindex')) header.setAttribute('tabindex', '0');
+      }
+
+      return { item, header, body };
+    }).filter(Boolean);
+
+    // max-height is a cap, not a fixed height, so a little slack is invisible —
+    // and it is needed here because padding-bottom is still animating from 0 to
+    // 1.5rem at the moment scrollHeight is read.
+    const PANEL_SLACK = 48;
+
+    function setOpen(entry, open) {
+      entry.item.classList.toggle('open', open);
+      entry.header.setAttribute('aria-expanded', String(open));
+      // Panel #4 holds the UPI block, which is far taller than the 400px cap the
+      // stylesheet used to clip it to. Measuring gives an exact, content-driven
+      // height and still animates.
+      entry.body.style.maxHeight = open ? `${entry.body.scrollHeight + PANEL_SLACK}px` : '';
+      // The collapsed panel contains a real link ("Open UPI App to Pay"), so it
+      // must leave the tab order, not merely be visually clipped.
+      setInert(entry.body, !open);
+    }
+
+    entries.forEach(entry => {
+      const activate = () => {
+        const willOpen = !entry.item.classList.contains('open');
+        entries.forEach(other => {
+          if (other !== entry) setOpen(other, false);
         });
+        setOpen(entry, willOpen);
+      };
 
-        // Toggle current item
-        if (isOpen) {
-          item.classList.remove('open');
-        } else {
-          item.classList.add('open');
-        }
+      entry.header.addEventListener('click', activate);
+      entry.header.addEventListener('keydown', event => {
+        if (entry.header.tagName === 'BUTTON') return; // native activation
+        if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar') return;
+        event.preventDefault();
+        activate();
       });
+
+      setOpen(entry, entry.item.classList.contains('open'));
     });
+
+    // An open panel's measured height goes stale when the text rewraps, which is
+    // exactly what happens when a phone is rotated.
+    window.addEventListener('resize', rafThrottle(() => {
+      entries.forEach(entry => {
+        if (!entry.item.classList.contains('open')) return;
+        entry.body.style.maxHeight = 'none';
+        const height = entry.body.scrollHeight;
+        entry.body.style.maxHeight = `${height + PANEL_SLACK}px`;
+      });
+    }));
   }
 
+  /* --------------------------------------------------------------------------
+   * 11. Toast
+   * -------------------------------------------------------------------------- */
+  let toastTimer = null;
 
-  /* Helper: Toast Notifications */
-  function showToast(message, type = 'success') {
+  function showToast(message, type) {
     let toast = document.getElementById('toastNotification');
     if (!toast) {
       toast = document.createElement('div');
       toast.id = 'toastNotification';
-      toast.style.cssText = `
-        position: fixed;
-        bottom: 6rem;
-        left: 50%;
-        transform: translateX(-50%);
-        padding: 0.9rem 1.85rem;
-        border-radius: 9999px;
-        font-weight: 700;
-        font-size: 0.925rem;
-        z-index: 2500;
-        color: #fff;
-        box-shadow: 0 10px 28px rgba(0,0,0,0.22);
-        transition: opacity 0.35s ease, transform 0.35s ease;
-        opacity: 0;
-      `;
+      toast.className = 'site-toast';
+      // role="status" + polite live region: without these the toast was purely
+      // visual and a screen-reader user got no confirmation at all.
+      toast.setAttribute('role', 'status');
+      toast.setAttribute('aria-live', 'polite');
+      toast.setAttribute('aria-atomic', 'true');
       document.body.appendChild(toast);
     }
 
-    toast.style.backgroundColor = type === 'success' ? '#6F7F5F' : '#B5543A';
+    toast.classList.toggle('is-error', type === 'error');
     toast.textContent = message;
-    toast.style.opacity = '1';
+    toast.classList.add('is-visible');
 
-    setTimeout(() => {
-      toast.style.opacity = '0';
-    }, 4000);
+    // Rapid successive toasts used to leave stacked timers, so the second one
+    // vanished on the first one's schedule.
+    if (toastTimer) window.clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => {
+      toast.classList.remove('is-visible');
+      toastTimer = null;
+    }, 4500);
   }
+
+  /* --------------------------------------------------------------------------
+   * 12. Exports for the portal and payment pages
+   * -------------------------------------------------------------------------- */
+  window.PragyanUI = Object.assign(window.PragyanUI || {}, {
+    lockScroll,
+    unlockScroll,
+    trapTabKey,
+    setInert,
+    visibleFocusable,
+    showToast,
+    prefersReducedMotion,
+    isCoarsePointer,
+    rafThrottle,
+    normalizeIndianMobile,
+    NAME_PATTERN
+  });
 })();

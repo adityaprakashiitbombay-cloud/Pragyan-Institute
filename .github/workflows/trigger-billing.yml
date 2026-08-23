@@ -1,20 +1,26 @@
-name: On-Demand Instant Fee Billing & Email Trigger
+name: On-Demand Fee Billing & Email Trigger
+
+# A button for the admin: bill a batch, chase a batch, or send one test email.
+# The work happens in /api/admin-trigger-billing — this workflow only supplies the
+# inputs and the cron secret. It used to run its own billing engine, which meant a
+# committed Supabase anon key in the script, a divergent fee table that
+# under-billed Class 11th and 12th, and email that bypassed the 100/day quota gate.
 
 on:
   workflow_dispatch:
     inputs:
       batch:
-        description: 'Target Batch (all, 10th, 9th, 8th, junio)'
+        description: 'Target batch: a batch id (BAT-12PCM), a class name (Class 12th PCM), or all'
         required: false
         default: 'all'
         type: string
       student_id:
-        description: 'Target Student ID (all or specific ID like 261001)'
+        description: 'Target Student ID (all, or one barcode ID such as 261001)'
         required: false
         default: 'all'
         type: string
       action:
-        description: 'Action (invoice, reminder, test)'
+        description: 'invoice = bill + statement, reminder = chase dues, test = one probe email'
         required: false
         default: 'invoice'
         type: choice
@@ -23,35 +29,33 @@ on:
           - reminder
           - test
       to_email:
-        description: 'Direct email recipient (for test action)'
+        description: 'Recipient for the test action'
         required: false
         default: ''
         type: string
 
 jobs:
   trigger_billing:
-    name: Instant Billing & Email Dispatcher
+    name: Trigger billing run
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 22
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
 
-      - name: Install Dependencies
-        run: npm install @supabase/supabase-js
-
-      - name: Run Real-Time Billing & Email Dispatch
+      # No dependency install: the script is one fetch() call. The Supabase
+      # service-role key and the Resend key stay in the API's environment and are
+      # no longer exposed to Actions at all.
+      - name: Trigger billing run
         run: node .github/scripts/trigger-billing.js
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://ujcmmcaervgskpkcfekm.supabase.co' }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL || 'Pragyan Institute <noreply@pragyaninstitute.com>' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          API_BASE_URL: ${{ vars.API_BASE_URL || 'https://pragyaninstitute.com' }}
           BATCH: ${{ inputs.batch }}
           STUDENT_ID: ${{ inputs.student_id }}
           ACTION: ${{ inputs.action }}

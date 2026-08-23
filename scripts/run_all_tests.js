@@ -3,6 +3,13 @@ import path from 'path';
 import { _normalizeDob, normalizeDob, _dobMatches, generateStudentId } from '../tests/auth.test.js';
 import { calculateEstimate } from '../js/fee-calculator.js';
 import { generateConcurrentStudentId } from '../tests/concurrency.test.js';
+import { runAcademicConfigTests } from '../tests/academic-config.test.js';
+import { runMarkupTests } from '../tests/markup.test.js';
+import { runBatchDriftTests } from '../tests/batch-drift.test.js';
+import { runStaticA11yTests } from '../tests/a11y-static.test.js';
+import { runEmailQuotaTests } from '../tests/email-quota.test.js';
+import { runPaymentApprovalTests } from '../tests/payment-approval.test.js';
+import { runClientMoneyAndTouchTests } from '../tests/client-money-and-touch.test.js';
 
 console.log('================================================================');
 console.log('   PRAGYAN INSTITUTE — T1 TO T6 MASTER TEST RUNNER & AUDIT      ');
@@ -767,6 +774,68 @@ assert(mockMasterAdminRoster[0].username === 'chandan', 'T17.11: Sole Admin is C
 
 const mockAditiFaculty = { name: 'Aditi Singh', role: 'English & Grammar Mentor', exp: '5+ Years', studentsMentored: 1000 };
 assert(mockAditiFaculty.studentsMentored === 1000, 'T17.12: [Faculty Metric] Aditi Singh students mentored metric is accurately set to 1000+');
+
+// -----------------------------------------------------------------------------
+// T18: Academic Config Parity — 12 Canonical Batches, Fees, Codes & Calendar
+// -----------------------------------------------------------------------------
+console.log('\n--- [T18] Academic Config Parity & Batch Resolution Tests ---');
+runAcademicConfigTests(assert);
+
+// -----------------------------------------------------------------------------
+// T19: Shipped Markup Drift Guard — batch cards, cache busting, offline, a11y
+// -----------------------------------------------------------------------------
+console.log('\n--- [T19] Shipped Markup Drift Guard ---');
+runMarkupTests(assert);
+
+// -----------------------------------------------------------------------------
+// T20: Canonical Batch Drift Guard — JS sources, fee fallbacks, attribution
+// -----------------------------------------------------------------------------
+console.log('\n--- [T20] Canonical Batch Drift Guard (JS) ---');
+runBatchDriftTests(assert);
+
+// -----------------------------------------------------------------------------
+// T21: Static Accessibility & Mobile Guard — names, icons, touch, motion
+// tests/a11y.test.js needs Playwright and axe, neither of which is installed, so
+// it never runs. This is the browserless half, and it holds the defects that
+// actually shipped: unlabelled controls, unnamed icon-only buttons, decorative
+// glyphs in the accessibility tree, sub-16px fields that zoom iOS, and panels
+// hidden by opacity alone that stayed in the tab order.
+// -----------------------------------------------------------------------------
+console.log('\n--- [T21] Static Accessibility & Mobile Guard ---');
+runStaticA11yTests(assert);
+
+// -----------------------------------------------------------------------------
+// T22: Email Quota Layer — the 100/day gate and its bypasses
+// The failures here were never bad arithmetic; they were senders that skipped the
+// arithmetic. Most of this block is therefore structural: it asserts that every
+// sender reserves a slot first, that only one module owns the Resend transport,
+// that no call passes more than one address, and that a timeout keeps its slot.
+// -----------------------------------------------------------------------------
+console.log('\n--- [T22] Email Quota Gate & Sender Bypass Guard ---');
+await runEmailQuotaTests(assert);
+
+// -----------------------------------------------------------------------------
+// T23: Payment Approval — the one path where money moves on an admin's click
+// The atomic RPC existed and had no callers: approvals ran in the browser off a
+// localStorage cache, with a random receipt number that made a retry credit the
+// payment twice. This block asserts the browser only reports what the database
+// committed.
+// -----------------------------------------------------------------------------
+console.log('\n--- [T23] Payment Approval Atomicity ---');
+await runPaymentApprovalTests(assert);
+
+// -----------------------------------------------------------------------------
+// T24: Client-Side Money & Touch Targets
+// The portal ran a second billing engine from DOMContentLoaded — on the student
+// dashboard too — keyed on 'fee_<SID>_<YYYY-MM>' where the server uses
+// 'BILL-<SID>-<YYYY-MM>'. The two keys never collide, so every student who
+// opened the portal after the cron ran was billed twice. This block asserts the
+// browser reads billing state and never writes it, that non-cash ledger rows
+// survive a sync, and that the coarse-pointer 44px floor still covers the
+// controls whose inline height it has to beat.
+// -----------------------------------------------------------------------------
+console.log('\n--- [T24] Client-Side Money Paths, Sync Fidelity & Touch Targets ---');
+runClientMoneyAndTouchTests(assert);
 
 console.log('\n================================================================');
 console.log(`MASTER TEST RESULTS: ${pass} Passed, ${fail} Failed`);

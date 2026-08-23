@@ -5,27 +5,80 @@
 (function () {
   'use strict';
   // Universal Floating Notification & Toast Engine
-  function showNotification(message, type = 'success') {
-    if (typeof document === 'undefined') return;
-    let toast = document.getElementById('toastNotification');
-    if (!toast) {
-      toast = document.createElement('div');
-      toast.id = 'toastNotification';
-      toast.style.cssText = 'position:fixed;bottom:24px;right:24px;padding:12px 24px;border-radius:10px;font-weight:700;font-size:0.92rem;z-index:999999;box-shadow:0 12px 30px rgba(0,0,0,0.25);display:flex;align-items:center;gap:10px;transition:all 0.3s cubic-bezier(0.4,0,0.2,1);transform:translateY(100px);opacity:0;';
-      document.body.appendChild(toast);
+  // ── Toast notifications ─────────────────────────────────────────────────────
+  // This is the portal's only feedback channel for fee approvals, registrations,
+  // deletions and failures. Four things were wrong with the original:
+  //
+  //   1. It had no ARIA role, so none of it reached a screen reader. An admin
+  //      approving a payment got no confirmation at all.
+  //   2. Hiding it only set opacity to 0. The element stayed in the layout as a
+  //      fixed, hit-testable ~350x45px box pinned to the bottom-right corner, so
+  //      after the first toast of a session every tap that landed there was
+  //      swallowed. On a 375px-wide phone that is a large dead zone over the
+  //      bottom of the content.
+  //   3. White text on #059669 is 3.2:1 and on #F59E0B about 2.1:1 — both below
+  //      the 4.5:1 WCAG AA floor for text this size. Darkened to #047857 (5.5:1),
+  //      #B45309 (4.8:1) and #DC2626 (4.8:1).
+  //   4. The slide-in transform ignored prefers-reduced-motion.
+  //
+  // Politeness cannot be flipped on a live region after the fact, so successes
+  // and warnings go to a polite region and failures to an assertive one; only
+  // one is ever visible.
+  const TOAST_VARIANTS = {
+    success: { cls: 'is-success', icon: 'fa-circle-check',         assertive: false },
+    warning: { cls: 'is-warning', icon: 'fa-triangle-exclamation', assertive: false },
+    error:   { cls: 'is-error',   icon: 'fa-circle-xmark',         assertive: true }
+  };
+
+  function getToastNode(assertive) {
+    // Deliberately not #toastNotification: js/app.js owns that id for the
+    // public site's .site-toast, and both scripts load on index.html. Whichever
+    // fired first created the element and the other then reused it with the
+    // wrong class — a .site-toast styled node being fed this function's
+    // icon+span markup, or app.js's textContent assignment wiping that markup
+    // out. Separate ids keep the two toasts from clobbering each other.
+    const id = assertive ? 'portalToastAlert' : 'portalToast';
+    let toast = document.getElementById(id);
+    if (toast) return toast;
+    toast = document.createElement('div');
+    toast.id = id;
+    toast.className = 'pragyan-toast';
+    // A live region has to be in the DOM and empty before the text lands in it,
+    // otherwise assistive tech treats the whole node as new and may skip it.
+    if (assertive) {
+      toast.setAttribute('role', 'alert');
+    } else {
+      toast.setAttribute('role', 'status');
+      toast.setAttribute('aria-live', 'polite');
     }
-    const bg = type === 'error' ? '#EF4444' : type === 'warning' ? '#F59E0B' : '#059669';
-    const icon = type === 'error' ? 'fa-circle-xmark' : type === 'warning' ? 'fa-triangle-exclamation' : 'fa-circle-check';
-    toast.style.background = bg;
-    toast.style.color = '#ffffff';
-    const esc = (typeof escapeHtml === 'function') ? escapeHtml(message) : message;
-    toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${esc}</span>`;
-    toast.style.transform = 'translateY(0)';
-    toast.style.opacity = '1';
+    toast.setAttribute('aria-atomic', 'true');
+    toast.innerHTML = '<i class="fa-solid" aria-hidden="true"></i><span></span>';
+    document.body.appendChild(toast);
+    return toast;
+  }
+
+  function showNotification(message, type = 'success') {
+    if (typeof document === 'undefined' || !document.body) return;
+    const variant = TOAST_VARIANTS[type] || TOAST_VARIANTS.success;
+    const toast = getToastNode(variant.assertive);
+    const other = document.getElementById(variant.assertive ? 'portalToast' : 'portalToastAlert');
+    if (other) other.classList.remove('is-visible');
+
+    toast.classList.remove('is-success', 'is-warning', 'is-error');
+    toast.classList.add(variant.cls);
+    const icon = toast.querySelector('i');
+    if (icon) icon.className = `fa-solid ${variant.icon}`;
+    // textContent, not innerHTML: nothing here needs markup, so the message can
+    // never carry it either.
+    const span = toast.querySelector('span');
+    if (span) span.textContent = String(message == null ? '' : message);
+
+    toast.classList.add('is-visible');
     if (toast._timer) clearTimeout(toast._timer);
     toast._timer = setTimeout(() => {
-      toast.style.transform = 'translateY(100px)';
-      toast.style.opacity = '0';
+      // Dropping .is-visible restores visibility:hidden so the faded toast
+      // stops occupying a hit-testable strip across the bottom of the screen.
+      toast.classList.remove('is-visible');
     }, 4000);
   }
   window.showNotification = showNotification;
@@ -89,6 +142,207 @@
     };
   }
 
+  // ── Modal accessibility ─────────────────────────────────────────────────────
+  // Every one of the eleven `.inner-modal-backdrop` dialogs in this file was
+  // built by inserting markup and nothing else, which left four defects that
+  // affect keyboard and screen-reader users on every single one of them:
+  //
+  //   • Escape did nothing. The only way out was to find and click the ✕.
+  //   • Focus stayed on whatever button opened the dialog, so a screen reader
+  //     went on announcing the page behind the overlay and never announced the
+  //     dialog at all.
+  //   • Tab walked straight out of the dialog into the page underneath — which
+  //     is still visible through the backdrop but not operable.
+  //   • Closing left focus on a detached node, so the next Tab restarted from
+  //     the top of the document.
+  //
+  // wireModalA11y() fixes all four for any dialog that passes through it. It is
+  // deliberately a wrapper rather than a base class: the dialogs are plain HTML
+  // strings, so the only shared seam is "after you insert it, call this".
+  const FOCUSABLE_SELECTOR = [
+    'a[href]', 'button:not([disabled])', 'input:not([disabled]):not([type="hidden"])',
+    'select:not([disabled])', 'textarea:not([disabled])', '[tabindex]:not([tabindex="-1"])'
+  ].join(',');
+  let focusSeq = 0;
+
+  // Reference-counted background-scroll lock shared by every wired dialog.
+  let scrollLockDepth = 0;
+  let scrollLockPrev = '';
+  function lockBodyScroll() {
+    if (scrollLockDepth === 0) scrollLockPrev = document.body.style.overflow || '';
+    scrollLockDepth++;
+    document.body.style.overflow = 'hidden';
+  }
+  function unlockBodyScroll() {
+    scrollLockDepth = Math.max(0, scrollLockDepth - 1);
+    if (scrollLockDepth === 0) document.body.style.overflow = scrollLockPrev;
+  }
+
+  function focusableWithin(root) {
+    if (!root) return [];
+    return Array.from(root.querySelectorAll(FOCUSABLE_SELECTOR))
+      .filter(el => el.offsetWidth > 0 || el.offsetHeight > 0 || el === document.activeElement);
+  }
+
+  /**
+   * Make an already-inserted modal keyboard-accessible.
+   *
+   * @param {HTMLElement|string} modal    The backdrop element, or its id.
+   * @param {object}  [opts]
+   * @param {boolean} [opts.closeOnBackdrop=true]  Click outside the panel closes.
+   * @param {boolean} [opts.closeOnEscape=true]
+   * @param {string}  [opts.initialFocus]  Selector for the element to focus first.
+   * @param {Function}[opts.onClose]       Runs before the element is removed.
+   * @returns {{close: Function}}
+   */
+  function wireModalA11y(modal, opts = {}) {
+    const el = typeof modal === 'string' ? document.getElementById(modal) : modal;
+    if (!el) return { close() {} };
+
+    const panel = el.querySelector('.inner-modal-content') || el.firstElementChild || el;
+    // A dialog needs a role and a name; several of these panels had neither, so
+    // assistive tech announced an unlabelled group.
+    if (!panel.getAttribute('role')) panel.setAttribute('role', 'dialog');
+    if (!panel.hasAttribute('aria-modal')) panel.setAttribute('aria-modal', 'true');
+    if (!panel.hasAttribute('tabindex')) panel.setAttribute('tabindex', '-1');
+    if (!panel.hasAttribute('aria-label') && !panel.hasAttribute('aria-labelledby')) {
+      const heading = panel.querySelector('h1, h2, h3, h4');
+      if (heading) {
+        if (!heading.id) heading.id = `modalTitle-${el.id || 'dlg'}-${focusSeq++}`;
+        panel.setAttribute('aria-labelledby', heading.id);
+      } else {
+        panel.setAttribute('aria-label', 'Dialog');
+      }
+    }
+
+    // Content behind an aria-modal dialog is hidden from AT by the modal
+    // semantics, but the background scroll is locked too: on a phone, scrolling
+    // the page under an open sheet is how a form half-fills and the user loses
+    // their place. The lock is reference-counted and the pre-lock value is
+    // captured only for the outermost dialog, so a nested or re-opened dialog
+    // cannot capture 'hidden' as the value to restore and strand the page
+    // permanently unscrollable.
+    lockBodyScroll();
+
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    let closed = false;
+
+    // Detach without removing the node — for when something else already
+    // removed it, so the listener and the scroll lock must not leak.
+    function detach() {
+      if (closed) return;
+      closed = true;
+      document.removeEventListener('keydown', onKeydown, true);
+      clearInterval(gonePoll);
+      unlockBodyScroll();
+    }
+
+    function close() {
+      if (closed) return;
+      detach();
+      try { if (typeof opts.onClose === 'function') opts.onClose(); } catch (err) { console.error(err); }
+      el.remove();
+      // Restoring focus is what keeps Tab order sane after the node is gone.
+      if (previouslyFocused && document.contains(previouslyFocused)) {
+        try { previouslyFocused.focus({ preventScroll: true }); } catch (_) { previouslyFocused.focus(); }
+      }
+    }
+
+    // Several dialogs in this file are still dismissed by inline
+    // `onclick="…remove()"` handlers and by re-opening the same dialog, neither
+    // of which routes through close(). A cheap liveness poll releases the scroll
+    // lock in those cases; without it, one such dismissal froze page scrolling
+    // for the rest of the session — worst on a phone, where there is no
+    // keyboard event to piggyback the cleanup onto.
+    const gonePoll = setInterval(() => {
+      if (!document.contains(el)) detach();
+    }, 400);
+
+    function onKeydown(e) {
+      if (!document.contains(el)) {
+        detach();
+        return;
+      }
+      if (e.key === 'Escape' && opts.closeOnEscape !== false) {
+        e.preventDefault();
+        e.stopPropagation();
+        close();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const items = focusableWithin(panel);
+      if (items.length === 0) {
+        e.preventDefault();
+        panel.focus();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && (document.activeElement === first || !panel.contains(document.activeElement))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener('keydown', onKeydown, true);
+
+    if (opts.closeOnBackdrop !== false) {
+      el.addEventListener('mousedown', (e) => { if (e.target === el) close(); });
+    }
+
+    // Route the dialog's own dismiss controls through close(). Nine of the eleven
+    // dialogs in this file dismiss themselves with an inline
+    // `onclick="document.getElementById('…').remove()"`, which detaches the node
+    // without restoring focus — so after closing, focus sat on <body> and the
+    // next Tab restarted from the top of a very long dashboard. Rerouting here
+    // fixes every one of them at once, and is deliberately conservative: the
+    // attribute is only replaced when it does nothing but remove this dialog.
+    const bareRemove = new RegExp(
+      `^document\\.getElementById\\((['"])${el.id}\\1\\)\\??\\.remove\\(\\);?$`
+    );
+    panel.querySelectorAll('[onclick]').forEach(node => {
+      const code = (node.getAttribute('onclick') || '').trim();
+      if (!bareRemove.test(code)) return;
+      node.removeAttribute('onclick');
+      node.addEventListener('click', (e) => { e.preventDefault(); close(); });
+    });
+
+    // Give the ✕ an accessible name and a non-submitting type. These buttons
+    // contain only a Font Awesome <i>, which has no text, so every one of them
+    // announced as an unnamed "button" — and one sitting inside a <form> would
+    // have submitted it, since a <button> with no type defaults to submit.
+    panel.querySelectorAll('.btn-close-inner').forEach(btn => {
+      if (!btn.getAttribute('type')) btn.setAttribute('type', 'button');
+      if (!btn.getAttribute('aria-label') && !btn.textContent.trim()) {
+        btn.setAttribute('aria-label', 'Close dialog');
+      }
+      btn.querySelectorAll('i, svg').forEach(icon => {
+        if (!icon.hasAttribute('aria-hidden')) icon.setAttribute('aria-hidden', 'true');
+      });
+      if (!btn.getAttribute('onclick') && !btn.dataset.a11yClose) {
+        btn.dataset.a11yClose = '1';
+        btn.addEventListener('click', (e) => { e.preventDefault(); close(); });
+      }
+    });
+
+    // Focus the requested control, else the first real control, else the panel.
+    // The close button is skipped when something better exists, so the dialog
+    // does not open with "Close" as the announced element.
+    const wanted = opts.initialFocus ? panel.querySelector(opts.initialFocus) : null;
+    const target = wanted
+      || focusableWithin(panel).find(c => !c.classList.contains('btn-close-inner'))
+      || panel;
+    setTimeout(() => {
+      if (!document.contains(el)) return;
+      try { target.focus({ preventScroll: true }); } catch (_) { target.focus(); }
+    }, 0);
+
+    return { close };
+  }
+
   // Date Formatter Helper (canonical version - see also formatDate at bottom of file)
   // NOTE: The definitive formatDate() function is declared at the end of the IIFE (line ~6028)
   // This top-level version is kept for any early-loading references only.
@@ -116,15 +370,439 @@
     return `${base}${cleanPath}`;
   }
 
-  // Canonical Batch Category Normalizer (Global Top-Level Helper)
+  /**
+   * POST JSON to one of our own serverless endpoints with the current session.
+   *
+   * Returns `{ ok, status, payload }` and never throws: callers on the money path
+   * need to distinguish "the server said no" from "the network died", because the
+   * safe response to the second one is to leave local state alone and let the
+   * next pullAll() reconcile, not to guess.
+   *
+   * A token beginning with `token_` is a locally-minted offline placeholder, not
+   * a signed JWT. Sending it would just collect a 401, so it is reported as an
+   * offline condition up front.
+   */
+  async function postToApi(path, body) {
+    const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pragyan_portal_token')) || '';
+    if (!token || token.startsWith('token_')) {
+      return { ok: false, status: 0, offline: true, payload: { error: 'A live signed-in session is required for this action. Please sign out and sign in again.' } };
+    }
+    try {
+      const res = await fetch(getApiUrl(path), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(body || {})
+      });
+      const contentType = res.headers.get('content-type') || '';
+      const payload = contentType.includes('application/json')
+        ? await res.json().catch(() => ({}))
+        : { error: (await res.text().catch(() => '')).slice(0, 300) };
+      return { ok: res.ok, status: res.status, offline: false, payload };
+    } catch (err) {
+      // Genuine transport failure: no response at all, so the request may or may
+      // not have reached the server.
+      return { ok: false, status: 0, offline: true, payload: { error: err?.message || 'Network request failed' } };
+    }
+  }
+
+  // ── Canonical batch resolution ──────────────────────────────────────────────
+  // Every batch key in this file is a canonical batch id from
+  // js/academic-config.js (window.PRAGYAN_ACADEMIC). The previous version of
+  // getBatchCategoryKey() recognised only four keys — '10th', '9th', '8th' and
+  // 'junio' — which broke the portal in ways that quietly lost money:
+  //
+  //   • "Class 12th PCM" / "Class 11th PCB" matched no rule and fell through to
+  //     `return s`, so each senior student became their own singleton category.
+  //     The ₹1,500 batches never appeared in the Fee Collections or Pending Dues
+  //     breakdowns and no email campaign could target them.
+  //   • "Special English 9th to 12th" hit the includes('9th') test and was
+  //     counted as a NURTURE student, folding Aditi Singh's batches into Class
+  //     9th and putting them on the wrong reminder day.
+  //   • "Class 1st to 5th (Junior Foundation)" (₹500) and "Class 6th & 7th"
+  //     (₹700) shared one 'junio' key, so one of the two was always billed and
+  //     reported at the other's rate.
+  //   • The /\b(10|10th|x)\b/ alternative classified any string containing a
+  //     standalone "x" as Class 10th.
+  //
+  // resolveBatch() in the shared config covers all twelve, is ordered so English
+  // and stream-qualified names win over the bare numeric rules, and is asserted
+  // against a corpus of real class-name strings by tests/academic-config.test.js.
+  const ACADEMIC = (typeof window !== 'undefined' && window.PRAGYAN_ACADEMIC) || null;
+  let _academicWarned = false;
+
+  function academicConfig() {
+    if (ACADEMIC) return ACADEMIC;
+    if (!_academicWarned) {
+      _academicWarned = true;
+      console.error('[Portal] js/academic-config.js did not load — batch fees and filters are unavailable.');
+    }
+    return null;
+  }
+
+  // Batch ids written by earlier builds. resolveBatch() already understands the
+  // old short keys ('10th', 'junio', …) and 'BAT-JUNIO', but BAT-01..BAT-04 are
+  // opaque sequence numbers it cannot interpret, so they are mapped here.
+  const LEGACY_BATCH_IDS = {
+    'BAT-01': 'BAT-10',
+    'BAT-02': 'BAT-09',
+    'BAT-03': 'BAT-08',
+    'BAT-04': 'BAT-67'
+  };
+
+  /** Class name, batch name or batch id -> canonical batch id ('' if unknown). */
   function getBatchCategoryKey(str) {
     if (!str) return '';
-    const s = String(str).toLowerCase().trim();
-    if (s.includes('10th') || s.includes('achiever') || s.includes('class 10') || s.includes('bat-01') || s.includes('bat-10') || /\b(10|10th|x)\b/.test(s)) return '10th';
-    if (s.includes('9th') || s.includes('nurture') || s.includes('class 9') || s.includes('bat-02') || s.includes('bat-09') || /\b(9|9th|ix)\b/.test(s)) return '9th';
-    if (s.includes('8th') || s.includes('alpha') || s.includes('class 8') || s.includes('bat-03') || s.includes('bat-08') || /\b(8|8th|viii)\b/.test(s)) return '8th';
-    if (s.includes('junior') || s.includes('junio') || s.includes('bat-04') || s.includes('7th') || s.includes('6th') || s.includes('class 7') || s.includes('class 6') || /\b(junior|junio|7|6)\b/.test(s)) return 'junio';
-    return s;
+    const raw = String(str).trim();
+    const legacy = LEGACY_BATCH_IDS[raw.toUpperCase()];
+    if (legacy) return legacy;
+    const cfg = academicConfig();
+    if (!cfg) return raw.toUpperCase();
+    const batch = cfg.resolveBatch(raw);
+    return batch ? batch.batchId : '';
+  }
+
+  // Display-only metadata. Fees, names, billing days and resolution all live in
+  // the shared config; the emoji is purely a portal concern. `timing` and `room`
+  // are first-run seed fallbacks for an empty database and are editable from the
+  // Batches tab — only the four batches that already carried a timetable in this
+  // codebase have one here, rather than inventing eight more.
+  const BATCH_UI = {
+    'BAT-12PCM':   { icon: '🎓' },
+    'BAT-12PCB':   { icon: '🧬' },
+    'BAT-11PCM':   { icon: '📐' },
+    'BAT-11PCB':   { icon: '🔬' },
+    'BAT-10':      { icon: '🎯', timing: 'Mon – Sat: 4:00 PM – 6:30 PM', room: 'Hall A (1st Floor)' },
+    'BAT-09':      { icon: '🌱', timing: 'Mon – Sat: 2:30 PM – 4:30 PM', room: 'Hall B (Ground Floor)' },
+    'BAT-08':      { icon: '⚡', timing: 'Mon – Sat: 3:00 PM – 5:00 PM', room: 'Classroom 3' },
+    'BAT-67':      { icon: '🚀', timing: 'Mon – Sat: 3:30 PM – 5:00 PM', room: 'Classroom 1' },
+    'BAT-15':      { icon: '🧸' },
+    'BAT-ENG-912': { icon: '📖' },
+    'BAT-ENG-68':  { icon: '✍️' },
+    'BAT-ENG-15':  { icon: '🔤' }
+  };
+
+  function batchIcon(batchId) {
+    return (BATCH_UI[batchId] && BATCH_UI[batchId].icon) || '📚';
+  }
+
+  // Badge pill per batch for the Batch-Wise Financial Breakdown. Every
+  // foreground/background pair here clears 4.5:1, unlike the previous
+  // #92400E-on-#FEF3C7 set which was only assigned to four batches anyway.
+  const BATCH_BADGE = {
+    'BAT-12PCM':   { text: '🎓 Board Final — PCM',   color: '#7C2D12', bg: '#FFEDD5' },
+    'BAT-12PCB':   { text: '🧬 Board Final — PCB',   color: '#7C2D12', bg: '#FFEDD5' },
+    'BAT-11PCM':   { text: '📐 Senior Prep — PCM',   color: '#1E3A8A', bg: '#DBEAFE' },
+    'BAT-11PCB':   { text: '🔬 Senior Prep — PCB',   color: '#1E3A8A', bg: '#DBEAFE' },
+    'BAT-10':      { text: '🎯 Board Special',       color: '#78350F', bg: '#FEF3C7' },
+    'BAT-09':      { text: '🌱 Foundation Prep',     color: '#065F46', bg: '#D1FAE5' },
+    'BAT-08':      { text: '⚡ Middle Prep',          color: '#1E40AF', bg: '#DBEAFE' },
+    'BAT-67':      { text: '🚀 Pioneer Foundation',  color: '#6B21A8', bg: '#F3E8FF' },
+    'BAT-15':      { text: '🧸 Junior Foundation',   color: '#9D174D', bg: '#FCE7F3' },
+    'BAT-ENG-912': { text: '📖 Special English',     color: '#155E75', bg: '#CFFAFE' },
+    'BAT-ENG-68':  { text: '✍️ Special English',     color: '#155E75', bg: '#CFFAFE' },
+    'BAT-ENG-15':  { text: '🔤 Special English',     color: '#155E75', bg: '#CFFAFE' }
+  };
+
+  /** 'PROF. RAVI RANJAN' -> 'Prof. Ravi Ranjan'. */
+  function titleCaseName(name) {
+    return String(name || '').toLowerCase().replace(/\b[a-z]/g, c => c.toUpperCase());
+  }
+
+  // Daily subject rows for the student's "My Batch" timetable, per batch.
+  // The four-way ladder this replaces tested `studentBatchKey === '10th'`, which
+  // no longer matches anything now that batch keys are canonical ids — so every
+  // student in the portal was shown the same fallback timetable, and that
+  // fallback taught "Integrated Science" to the three Special English batches,
+  // which do not study science at all.
+  const BATCH_SUBJECTS = {
+    'BAT-12PCM':   ['Physics (Board + Competitive)', 'Chemistry (Physical & Organic)', 'Mathematics (Board Mastery)'],
+    'BAT-12PCB':   ['Physics (Board Level)', 'Chemistry (Physical & Organic)', 'Biology (Botany & Zoology)'],
+    'BAT-11PCM':   ['Physics (Mechanics & Waves)', 'Chemistry (Fundamentals)', 'Mathematics (Sets to Calculus)'],
+    'BAT-11PCB':   ['Physics (Mechanics & Waves)', 'Chemistry (Fundamentals)', 'Biology (Cell & Diversity)'],
+    'BAT-10':      ['Mathematics (Board Mastery)', 'Science (Physics & Chemistry)', 'Biology & English'],
+    'BAT-09':      ['Mathematics (Foundation)', 'Science (Concepts & Lab)', 'Social Studies & English'],
+    'BAT-08':      ['Mathematics (Alpha Level)', 'General Science', 'English Grammar & Composition'],
+    'BAT-67':      ['Mathematics & Mental Ability', 'Integrated Science', 'English & Language Skills'],
+    'BAT-15':      ['Mathematics (Junior Level)', 'Environmental Science (EVS)', 'English Reading & Writing'],
+    'BAT-ENG-912': ['English Grammar & Usage', 'Comprehension & Literature', 'Writing & Spoken English'],
+    'BAT-ENG-68':  ['English Grammar Foundations', 'Reading & Vocabulary Building', 'Creative Writing & Conversation'],
+    'BAT-ENG-15':  ['Phonics & Reading Readiness', 'Basic Grammar & Vocabulary', 'Handwriting & Spoken English']
+  };
+
+  // Clock slots exist only for the four batches whose sitting is actually
+  // recorded in BATCH_UI, and each set divides that batch's own recorded window.
+  // The other eight show their subjects against the batch timing instead of a
+  // fabricated slot — an invented "02:30 PM – 03:30 PM" that nobody teaches is
+  // worse than a student being told to check the batch timing.
+  const BATCH_SLOTS = {
+    'BAT-10': ['04:00 PM – 05:00 PM', '05:00 PM – 06:00 PM', '06:00 PM – 06:30 PM'],
+    'BAT-09': ['02:30 PM – 03:10 PM', '03:10 PM – 03:50 PM', '03:50 PM – 04:30 PM'],
+    'BAT-08': ['03:00 PM – 03:40 PM', '03:40 PM – 04:20 PM', '04:20 PM – 05:00 PM'],
+    'BAT-67': ['03:30 PM – 04:00 PM', '04:00 PM – 04:30 PM', '04:30 PM – 05:00 PM']
+  };
+
+  /** All twelve batches in canonical order, shaped for cards and selects. */
+  function canonicalBatchCards() {
+    const cfg = academicConfig();
+    if (!cfg) return [];
+    return cfg.BATCHES.map(b => ({
+      key: b.batchId,
+      id: b.batchId,
+      name: b.name,
+      icon: batchIcon(b.batchId),
+      rate: b.monthlyFee
+    }));
+  }
+
+  /**
+   * <option> markup for the faculty-lead filter, built from the canonical
+   * roster. The two hand-written options this replaces claimed Chandan Kumar
+   * taught "Class 10th & 9th" and Prof. Ravi Ranjan "Class 8th & Junior";
+   * per the config both of them teach all seven mainstream batches, Aditi
+   * Singh had no option at all, and the filter that read them compared
+   * against the retired `'10th'`/`'9th'` keys so it matched nobody.
+   */
+  function facultyFilterOptions() {
+    const cfg = academicConfig();
+    const roster = (cfg && cfg.FACULTY) || [];
+    const opts = ['<option value="all">All Faculty Leads</option>'];
+    roster.forEach(f => {
+      const taught = (cfg.BATCHES || []).filter(b => b.teachers.includes(f.name)).length;
+      opts.push(
+        `<option value="${f.name}">👨‍🏫 ${titleCaseName(f.name)} (${taught} batch${taught === 1 ? '' : 'es'})</option>`
+      );
+    });
+    return opts.join('\n                    ');
+  }
+
+  /**
+   * <option> markup for the fee-collector filter. Same roster, but labelled by
+   * role rather than batch count — this filter asks who *took* the money, not
+   * who teaches. The previous pair of options also billed Prof. Ravi Ranjan as
+   * "Director", a title that belongs to Chandan Kumar alone.
+   */
+  function facultyCollectorOptions() {
+    const cfg = academicConfig();
+    const roster = (cfg && cfg.FACULTY) || [];
+    const opts = ['<option value="all">All Faculty Collectors</option>'];
+    roster.forEach(f => {
+      opts.push(`<option value="${f.name}">👨‍🏫 ${titleCaseName(f.name)} (${f.role})</option>`);
+    });
+    return opts.join('\n                    ');
+  }
+
+  /** Canonical teacher roster for a batch id, uppercase as stored in the config. */
+  function batchTeachers(batchId) {
+    const cfg = academicConfig();
+    const b = cfg && cfg.BATCH_BY_ID[batchId];
+    return b ? b.teachers : [];
+  }
+
+  /**
+   * Does a payment record name this faculty member as its collector?
+   *
+   * Records are written by hand over years, so the collector field holds
+   * anything from 'CHANDAN KUMAR' to 'Chandan' to 'Prof. Ravi Ranjan'. Titles
+   * are stripped and the first real name token is the discriminator — it is
+   * unique across the three-person roster. Payments that arrived through the
+   * institute's own UPI handle count as the primary admin's collections,
+   * because that VPA is registered to him.
+   *
+   * The test this replaces classified every record as either "Chandan" or
+   * "not Chandan", so a fee collected by Aditi Singh was reported under
+   * Prof. Ravi Ranjan's name.
+   */
+  function collectorMatchesFaculty(record, facultyName) {
+    const wanted = String(facultyName || '')
+      .toLowerCase()
+      .replace(/\b(prof|dr|mr|mrs|ms|smt|shri)\b\.?/g, '')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)[0];
+    if (!wanted) return false;
+
+    const collector = String(record.collector || record.collected_by || record.by || '').toLowerCase();
+    if (collector.includes(wanted)) return true;
+
+    // Unattributed digital receipts settle to the account holder.
+    const cfg = academicConfig();
+    const primary = String((cfg && cfg.PRIMARY_ADMIN && cfg.PRIMARY_ADMIN.name) || 'CHANDAN KUMAR').toLowerCase();
+    if (!primary.includes(wanted)) return false;
+    const mode = String(record.mode || '').toLowerCase();
+    return !collector && (mode.includes('upi') || mode.includes('phonepe') || mode.includes('gpay') || mode.includes('online'));
+  }
+
+  /**
+   * How a collector name should be shown in a receipts table.
+   *
+   * Returns the name that was actually recorded. The call site this replaces
+   * rendered `isChandan ? 'Chandan Kumar' : 'Prof. Ravi Ranjan'` regardless of
+   * what the receipt said, so every fee Aditi Singh collected appeared in the
+   * admin's books under Prof. Ravi Ranjan's name, and a receipt with no
+   * recorded collector at all was credited to him too.
+   */
+  function collectorDisplay(rawName) {
+    const raw = String(rawName || '').trim();
+    if (!raw) return { label: '— Not recorded —', color: '#78350F', known: false };
+    const cfg = academicConfig();
+    const match = ((cfg && cfg.FACULTY) || []).find(f => collectorMatchesFaculty({ collector: raw }, f.name));
+    if (!match) return { label: raw, color: '#334155', known: false };
+    const palette = { 'CHANDAN KUMAR': '#065F46', 'PROF. RAVI RANJAN': '#1E40AF', 'ADITI SINGH': '#155E75' };
+    return { label: `👨‍🏫 ${titleCaseName(match.name)}`, color: palette[match.name] || '#334155', known: true };
+  }
+
+  /** Human label for a canonical batch id, for filter subtext and headings. */
+  function batchLabel(batchId) {
+    const cfg = academicConfig();
+    const b = cfg && cfg.BATCH_BY_ID[batchId];
+    return b ? b.name : (batchId ? String(batchId) : 'All Batches');
+  }
+
+  /**
+   * <option> markup for a class/batch filter, generated from the shared config.
+   * Five separate filters in this file each carried their own hand-written copy
+   * of the same four batches, so adding a batch meant remembering all five —
+   * which is how eight of the twelve came to be missing from every dropdown.
+   */
+  function batchFilterOptions(selected, allLabel) {
+    const sel = String(selected == null ? 'all' : selected);
+    const label = allLabel || '📚 All Batches';
+    const opts = [`<option value="all"${sel === 'all' ? ' selected' : ''}>${label}</option>`];
+    canonicalBatchCards().forEach(b => {
+      opts.push(
+        `<option value="${b.key}"${sel === b.key ? ' selected' : ''}>` +
+        `${b.icon} ${b.name} — ₹${b.rate}/mo</option>`
+      );
+    });
+    return opts.join('\n                    ');
+  }
+
+  /**
+   * <option> markup for a class/batch *assignment* select — the ones that write
+   * `student.className`, as opposed to the filters above which only read it.
+   *
+   * Values are canonical batch names and each option carries its own monthly
+   * rate, so the fee field can follow the selection without a second lookup.
+   *
+   * Both assignment selects in this file were hand-written and wrong in ways
+   * that corrupted records rather than just hiding them:
+   *
+   *   • Add Student offered four batches, one of them ('Junior Batch (JUNIO)')
+   *     not a canonical batch at all, so eight batches could not be enrolled.
+   *   • Edit Student offered three, matched them by substring, and defaulted to
+   *     whichever option came first. 'Class 12th PCM' matched none of '10th',
+   *     '9th' or '8th', so opening a senior student's record and pressing Save
+   *     reassigned them to Class 10th at ₹1,000/mo instead of ₹1,500.
+   *
+   * An unrecognised current value is preserved as its own option so that
+   * opening the editor can never silently move a student between batches.
+   */
+  function batchAssignmentOptions(currentValue) {
+    const current = String(currentValue || '').trim();
+    const currentKey = current ? getBatchCategoryKey(current) : '';
+    const cards = canonicalBatchCards();
+    let matched = false;
+    const opts = cards.map(b => {
+      const isSel = currentKey === b.key;
+      if (isSel) matched = true;
+      const cfg = academicConfig();
+      const canonicalName = (cfg && cfg.BATCH_BY_ID[b.key] && cfg.BATCH_BY_ID[b.key].className) || b.name;
+      return `<option value="${canonicalName}" data-batch-id="${b.key}" data-monthly="${b.rate}"${isSel ? ' selected' : ''}>` +
+             `${b.icon} ${b.name} — ₹${b.rate.toLocaleString('en-IN')}/Month</option>`;
+    });
+    if (current && !matched) {
+      opts.unshift(
+        `<option value="${current.replace(/"/g, '&quot;')}" data-monthly="" selected>` +
+        `⚠️ ${current} (unrecognised — keep as is)</option>`
+      );
+    }
+    return opts.join('\n                  ');
+  }
+
+  /**
+   * Seed rows for the batches cache, built from the canonical config so the two
+   * seed paths in this file cannot disagree. They previously did, and on the ids
+   * themselves: initDatabase() wrote BAT-10 / BAT-09 / BAT-08 / BAT-JUNIO while
+   * AppState.getBatches() wrote BAT-01..BAT-04 for the same four batches, so
+   * whichever ran first decided what every batch_id in the database meant.
+   *
+   * `progress`, and the `teachers` / `schedule` arrays the old seed carried, are
+   * gone: nothing read them, and an array-valued `schedule` was a hazard because
+   * the normaliser below and the student batch card both fall back to
+   * `batch.schedule` as a *string* when no timing is set.
+   */
+  function buildSeedBatches() {
+    const cfg = academicConfig();
+    if (!cfg) return [];
+    return cfg.BATCHES.map(b => batchRow(b, BATCH_UI[b.batchId] || {}));
+  }
+
+  /** Shared shape for a batch row, with every alias its consumers read. */
+  function batchRow(b, extra) {
+    const ui = BATCH_UI[b.batchId] || {};
+    const src = extra || {};
+    const timing = src.timing || src.timings || ui.timing || 'Mon – Sat: As per timetable';
+    return {
+      id: b.batchId,
+      batch_id: b.batchId,
+      name: b.name,
+      className: b.name,
+      batchName: b.name,
+      batch_name: b.name,
+      monthlyFee: b.monthlyFee,
+      monthly_fee: b.monthlyFee,
+      annualFee: cfgAnnual(b.monthlyFee),
+      timing: timing,
+      timings: timing,
+      room: src.room || src.room_no || ui.room || 'As allotted',
+      teacher: src.teacher || b.teachers.map(titleCaseName).join(' & '),
+      badge: src.badge || b.tagline,
+      icon: batchIcon(b.batchId),
+      billingDay: b.billingDay,
+      reminderTier: b.reminderTier,
+      stream: b.stream
+    };
+  }
+
+  function cfgAnnual(monthlyFee) {
+    const cfg = academicConfig();
+    return cfg ? cfg.annualPrice(monthlyFee) : Math.round(Number(monthlyFee) * 12 * 0.95);
+  }
+
+  /** Monthly fee for a class name or batch id; 0 when it cannot be resolved. */
+  function classMonthlyFee(className) {
+    const cfg = academicConfig();
+    if (!cfg) return 0;
+    const batch = cfg.resolveBatch(className);
+    return batch ? batch.monthlyFee : 0;
+  }
+
+  /**
+   * The monthly fee a student owes. Eight separate copies of a four-batch ladder
+   * used to compute this, all variations on
+   *
+   *   includes('10') ? 1000 : includes('9') ? 1000 : includes('8') ? 800 : 700
+   *
+   * whose final `else` charged every Class 11th and 12th student ₹700 or ₹1,000
+   * instead of ₹1,500, and every Special English 1st-5th student ₹700 instead of
+   * ₹500 — on the invoice, in the reminder email and in the billing ledger.
+   * The bare substring tests were wrong in the other direction too:
+   * includes('10') matches "Class 1st to 5th (2010 intake)", and includes('9')
+   * matches "Class 1st to 5th (1998 syllabus)".
+   *
+   * An explicitly stored fee still wins, so a negotiated or concession rate on
+   * the student record is honoured — the config is the fallback, not an override.
+   * Resolving to 0 rather than a guessed ₹700/₹1,000 is deliberate: an
+   * unbillable ₹0 is visible to the admin, whereas a plausible wrong number is
+   * not.
+   */
+  function studentMonthlyFee(student, fallback) {
+    const s = student || {};
+    const stored = Number(s.monthlyFee ?? s.monthly_fee ?? NaN);
+    if (Number.isFinite(stored) && stored > 0) return stored;
+    const resolved = classMonthlyFee(s.className || s.class_name || s.batchName || s.batch_name || '');
+    if (resolved > 0) return resolved;
+    return Number(fallback) > 0 ? Number(fallback) : 0;
   }
 
   // Financial Audit Helper: Distinguishes Real Money Payments from Administrative Adjustments / Dues
@@ -474,26 +1152,43 @@
   }
 
   // Helper: Extract 2-digit Class Code (CC)
+  /**
+   * The CC half of the YYCCSS student barcode. Delegates to the canonical
+   * classCodeFor(), which is derived from the same resolveBatch() the fee and
+   * billing paths use, so a student's barcode and their batch can never disagree.
+   *
+   * The hand-rolled ladder this replaces got four things wrong, and because the
+   * code is baked into a permanent student id every one of them was unfixable
+   * after enrolment:
+   *
+   *   • It returned '06' for Class 6th. There is no '06' code — 6th and 7th share
+   *     '07' — so those students landed in a serial namespace nothing else reads.
+   *   • It had no '05' at all, so "Class 1st to 5th (Junior Foundation)" matched
+   *     includes('JUNIOR') and was stamped '07', colliding with Class 6th/7th.
+   *   • It had no '01' either, so "Special English 9th to 12th" was stamped '12'
+   *     and shared Class 12th's serial namespace, while "Special English 1st to
+   *     5th" fell through to the default.
+   *   • includes('X') meant any class name containing the letter X returned '10'
+   *     — "Class 6th Extra" minted a Class 10th barcode.
+   *
+   * An unresolvable class name now yields '' rather than defaulting to '10',
+   * which stopped a mis-typed class from silently issuing a Class 10th id.
+   */
   function getClassCode(className = '') {
-    const cStr = String(className || '').toUpperCase();
-    if (cStr.includes('12') || cStr.includes('XII') || cStr.includes('TARGET 12')) {
-      return '12';
-    } else if (cStr.includes('11') || cStr.includes('XI') || cStr.includes('TARGET 11')) {
-      return '11';
-    } else if (cStr.includes('10') || cStr.includes('ACHIEVER') || cStr.includes('X') || cStr.includes('BOARD') || cStr.includes('MATRIC')) {
-      return '10';
-    } else if (cStr.includes('9') || cStr.includes('NURTURE') || cStr.includes('IX')) {
-      return '09';
-    } else if (cStr.includes('8') || cStr.includes('ALPHA') || cStr.includes('VIII')) {
-      return '08';
-    } else if (cStr.includes('7') || cStr.includes('JUNIOR') || cStr.includes('VII')) {
-      return '07';
-    } else if (cStr.includes('6') || cStr.includes('VI')) {
-      return '06';
+    const cfg = academicConfig();
+    if (cfg) {
+      const code = cfg.classCodeFor(className);
+      if (code) return code;
     }
-    const match = cStr.match(/\b([6-9]|1[0-2])\b/);
-    if (match) return match[1].padStart(2, '0');
-    return '10';
+    // Last-resort literal parse for the config-missing case. Deliberately narrow:
+    // a bare ordinal only, no substring matching.
+    const match = String(className || '').match(/\b(1[0-2]|[6-9])(?:st|nd|rd|th)?\b/i);
+    if (match) {
+      const n = Number(match[1]);
+      if (n >= 8) return String(n).padStart(2, '0');
+      return '07';
+    }
+    return '';
   }
 
   // Helper: Auto-Generate YYCCSS Student ID (Year + Class + Serial No.)
@@ -501,6 +1196,10 @@
     const ist = getISTDateParts();
     const currentYear = ist.year.toString().slice(-2); // e.g. "26"
     const classCode = getClassCode(className);
+    // No class code means the class name did not resolve to one of the twelve
+    // batches. Returning '' lets the caller refuse rather than mint a malformed
+    // 4-character barcode whose serial slice would parse as NaN.
+    if (!classCode) return '';
     const prefix = `${currentYear}${classCode}`;
 
     const combinedList = (typeof AppState !== 'undefined' && AppState.getStudents ? AppState.getStudents() : []).concat(existingStudents || []);
@@ -531,9 +1230,14 @@
 
     let maxSerial = 0;
 
-    // 1. Try serverless endpoint /api/student-id first
+    // 1. Try serverless endpoint /api/student-id first. It now requires an admin
+    // session (it used to be public, which let anyone enumerate enrolment counts),
+    // so the token has to go with the request or every allocation would silently
+    // fall through to the unlocked client-side fallbacks below.
     try {
-      const res = await fetch(`/api/student-id?className=${encodeURIComponent(className)}`);
+      const res = await fetch(`/api/student-id?className=${encodeURIComponent(className)}`, {
+        headers: { 'Authorization': `Bearer ${(typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pragyan_portal_token')) || ''}` }
+      });
       if (res.ok && (res.headers.get("content-type") || "").includes("application/json")) {
         const json = await res.json().catch(() => ({}));
         if (json.success && json.studentId) {
@@ -644,73 +1348,7 @@
     }
 
     if (!localStorage.getItem(STORAGE_KEY_BATCHES)) {
-      const initialBatches = [
-        {
-          id: 'BAT-10',
-          className: 'Class 10th (ACHIEVER)',
-          monthlyFee: 1000,
-          timings: 'Mon – Sat: 4:00 PM – 6:30 PM',
-          room: 'Hall A (1st Floor)',
-          progress: 75,
-          teachers: [
-            { name: 'CHANDAN KUMAR', subject: 'Science Mentor (Physics & Chemistry)' },
-            { name: 'RAVI RANJAN', subject: 'Maths Mentor (Algebra & Geometry)' }
-          ],
-          schedule: [
-            { subject: 'Mathematics (Ravi Ranjan Sir)', time: '4:00 PM - 5:15 PM' },
-            { subject: 'Science (Chandan Kumar Sir)', time: '5:15 PM - 6:30 PM' }
-          ]
-        },
-        {
-          id: 'BAT-09',
-          className: 'Class 9th (NURTURE)',
-          monthlyFee: 1000,
-          timings: 'Mon – Sat: 2:30 PM – 4:30 PM',
-          room: 'Hall B (Ground Floor)',
-          progress: 68,
-          teachers: [
-            { name: 'CHANDAN KUMAR', subject: 'Science Mentor' },
-            { name: 'RAVI RANJAN', subject: 'Maths Mentor' }
-          ],
-          schedule: [
-            { subject: 'Mathematics (Ravi Ranjan Sir)', time: '2:30 PM - 3:30 PM' },
-            { subject: 'Science (Chandan Kumar Sir)', time: '3:30 PM - 4:30 PM' }
-          ]
-        },
-        {
-          id: 'BAT-08',
-          className: 'Class 8th (ALPHA)',
-          monthlyFee: 800,
-          timings: 'Mon – Sat: 3:00 PM – 5:00 PM',
-          room: 'Classroom 3',
-          progress: 60,
-          teachers: [
-            { name: 'CHANDAN KUMAR', subject: 'Science Mentor' },
-            { name: 'RAVI RANJAN', subject: 'Maths Mentor' }
-          ],
-          schedule: [
-            { subject: 'Science & Environment (Chandan Sir)', time: '3:00 PM - 4:00 PM' },
-            { subject: 'Mathematics & Logic (Ravi Sir)', time: '4:00 PM - 5:00 PM' }
-          ]
-        },
-        {
-          id: 'BAT-JUNIO',
-          className: 'Junior Batch (JUNIO)',
-          monthlyFee: 700,
-          timings: 'Mon – Sat: 3:30 PM – 5:00 PM',
-          room: 'Classroom 1',
-          progress: 55,
-          teachers: [
-            { name: 'CHANDAN KUMAR', subject: 'Science Mentor' },
-            { name: 'RAVI RANJAN', subject: 'Maths Mentor' }
-          ],
-          schedule: [
-            { subject: 'Basic Numeracy (Ravi Sir)', time: '3:30 PM - 4:15 PM' },
-            { subject: 'Basic Science & Logic (Chandan Sir)', time: '4:15 PM - 5:00 PM' }
-          ]
-        }
-      ];
-      localStorage.setItem(STORAGE_KEY_BATCHES, JSON.stringify(initialBatches));
+      localStorage.setItem(STORAGE_KEY_BATCHES, JSON.stringify(buildSeedBatches()));
     }
 
     if (!localStorage.getItem(STORAGE_KEY_AUDIT_LOGS)) localStorage.setItem(STORAGE_KEY_AUDIT_LOGS, '[]');
@@ -954,7 +1592,7 @@
             const feeAccountsPayload = studentsToSync.map(s => {
               const id = s.student_id || s.id || s.rollNo || s.roll_no || '';
               const totalDue = Math.max(0, Number(s.pendingFee ?? s.pending_fee ?? (Number(s.totalFee || s.total_fee || 0) - Number(s.paidFee || s.paid_fee || 0))));
-              const monthlyFee = Number(s.monthlyFee || s.monthly_fee || 1000);
+              const monthlyFee = studentMonthlyFee(s);
               const prevDue = Math.max(0, totalDue - monthlyFee);
               const currFee = monthlyFee;
               const paidThisMonth = totalDue < monthlyFee ? Math.max(0, monthlyFee - totalDue) : 0;
@@ -1034,56 +1672,65 @@
       const cleanRoll = target.rollNo || target.roll_no || '';
       const cleanUuid = target.db_uuid || (cleanId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanId) ? cleanId : null);
 
-      // 1. Delete student profile photo from Supabase Storage bucket if present
+      // 2. Cascade delete across the child tables, then the student.
+      //
+      // Order matters and so does checking the result. SupabaseSync.mutate RETURNS
+      // its failures rather than throwing, so the `catch` that used to wrap this
+      // block was unreachable: every one of these nine deletes could fail and the
+      // function still fell through to wipe the local copy and report success. The
+      // student then reappeared on the next pullAll() — with their receipts and
+      // requests intact — after the admin had been told the record was deleted.
+      //
+      // The photo delete has also moved to AFTER this block. It is irreversible,
+      // and deleting it first meant a failed cascade left a surviving student row
+      // pointing at a photo that no longer exists.
+      const cascade = [];
+      if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
+        // Children first: a students row removed before its receipts would orphan
+        // them under any FK that is not ON DELETE CASCADE.
+        if (cleanUuid) cascade.push(['fee_receipts', { student_id: cleanUuid }]);
+        if (cleanStuId) cascade.push(['fee_receipts', { student_id: cleanStuId }]);
+        if (cleanStuId) cascade.push(['student_requests', { student_id: cleanStuId }]);
+        if (cleanRoll) cascade.push(['student_requests', { roll_no: cleanRoll }]);
+        if (cleanStuId) cascade.push(['fee_billing_ledger', { student_id: cleanStuId }]);
+        // Parent last, under every identifier the row might carry.
+        if (cleanStuId) cascade.push(['students', { student_id: cleanStuId }]);
+        if (cleanUuid && cleanUuid !== cleanStuId) cascade.push(['students', { id: cleanUuid }]);
+        if (cleanRoll && cleanRoll !== cleanStuId) cascade.push(['students', { roll_no: cleanRoll }]);
+
+        const failures = [];
+        for (const [table, where] of cascade) {
+          const result = await SupabaseSync.mutate(table, 'delete', null, { where });
+          if (!result || result.success !== true) {
+            failures.push(`${table} (${Object.keys(where)[0]}): ${result?.error || 'rejected'}`);
+          }
+        }
+
+        if (failures.length > 0) {
+          // Refuse rather than diverge. Nothing local has been touched yet, so the
+          // admin can retry against a record that is still intact in both places.
+          console.error('[deleteStudent] cascade failed, local copy left intact:', failures.join(' | '));
+          return {
+            success: false,
+            error: `${target.name || cleanStuId} was NOT deleted — the database rejected ${failures.length} of ${cascade.length} deletions. The record is unchanged. Check your connection and try again.`,
+            details: failures
+          };
+        }
+      }
+
+      // 3. The photo, now that the row that referenced it is gone for good.
       const photoUrl = target.photo || target.photoUrl || target.photo_url || '';
       if (photoUrl && (photoUrl.includes('/pragyan-media/') || photoUrl.includes('/profile_pictures/')) && typeof SupabaseSync !== 'undefined' && SupabaseSync.deleteFile) {
         try {
           await SupabaseSync.deleteFile(photoUrl);
         } catch (e) {
+          // A leaked storage object is untidy; a half-deleted student is not. This
+          // one stays non-fatal on purpose.
           console.warn('Storage photo deletion note:', e.message);
         }
       }
 
-      // 2. Cascade Delete across all child tables in Supabase
-      if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
-        try {
-          // Delete child fee_receipts
-          if (cleanUuid) {
-            await SupabaseSync.mutate('fee_receipts', 'delete', null, { where: { student_id: cleanUuid } });
-          }
-          if (cleanStuId) {
-            await SupabaseSync.mutate('fee_receipts', 'delete', null, { where: { student_id: cleanStuId } });
-          }
-
-          // Delete child student_requests
-          if (cleanStuId) {
-            await SupabaseSync.mutate('student_requests', 'delete', null, { where: { student_id: cleanStuId } });
-          }
-          if (cleanRoll) {
-            await SupabaseSync.mutate('student_requests', 'delete', null, { where: { roll_no: cleanRoll } });
-          }
-
-          // Delete child fee_billing_ledger
-          if (cleanStuId) {
-            await SupabaseSync.mutate('fee_billing_ledger', 'delete', null, { where: { student_id: cleanStuId } });
-          }
-
-          // Delete student from students table
-          if (cleanStuId) {
-            await SupabaseSync.mutate('students', 'delete', null, { where: { student_id: cleanStuId } });
-          }
-          if (cleanUuid && cleanUuid !== cleanStuId) {
-            await SupabaseSync.mutate('students', 'delete', null, { where: { id: cleanUuid } });
-          }
-          if (cleanRoll && cleanRoll !== cleanStuId) {
-            await SupabaseSync.mutate('students', 'delete', null, { where: { roll_no: cleanRoll } });
-          }
-        } catch (dbErr) {
-          console.warn('Supabase student cascade deletion note:', dbErr.message);
-        }
-      }
-
-      // 3. Remove from local memory caches and localStorage
+      // 4. Remove from local memory caches and localStorage
       const remainingStudents = students.filter(s => s.id !== target.id && s.student_id !== cleanStuId && s.rollNo !== cleanRoll);
       this._studentsCache = remainingStudents;
       this.safeSetItem(STORAGE_KEY_STUDENTS, remainingStudents);
@@ -1188,55 +1835,12 @@
       } catch (e) { this._billingLedgerCache = []; }
       return this._billingLedgerCache || [];
     },
-    async recordLedgerEntry(entry) {
-      if (!entry) return;
-      const ledger = this.getBillingLedger();
-      const idKey = entry.idempotency_key || entry.idempotencyKey || `fee_${entry.student_id}_${entry.billing_month}`;
-      const existingIdx = ledger.findIndex(l => (l.idempotency_key || l.idempotencyKey) === idKey);
-
-      const cleanEntry = {
-        student_id: entry.student_id || entry.studentId || '',
-        studentId: entry.student_id || entry.studentId || '',
-        billing_month: entry.billing_month || entry.billingMonth || '',
-        billingMonth: entry.billing_month || entry.billingMonth || '',
-        batch_label: entry.batch_label || entry.batchLabel || '',
-        batchLabel: entry.batch_label || entry.batchLabel || '',
-        amount: Number(entry.amount || 0),
-        previous_due: Number(entry.previous_due ?? entry.previousDue ?? 0),
-        previousDue: Number(entry.previous_due ?? entry.previousDue ?? 0),
-        updated_due: Number(entry.updated_due ?? entry.updatedDue ?? 0),
-        updatedDue: Number(entry.updated_due ?? entry.updatedDue ?? 0),
-        idempotency_key: idKey,
-        idempotencyKey: idKey,
-        created_at: entry.created_at || new Date().toISOString()
-      };
-
-      if (existingIdx >= 0) {
-        ledger[existingIdx] = cleanEntry;
-      } else {
-        ledger.unshift(cleanEntry);
-      }
-
-      this._billingLedgerCache = ledger;
-      this.safeSetItem('pragyan_db_fee_ledger_master', ledger);
-      this.markMutation();
-
-      if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
-        try {
-          await SupabaseSync.mutate('fee_billing_ledger', 'upsert', [{
-            student_id: cleanEntry.student_id,
-            billing_month: cleanEntry.billing_month,
-            batch_label: cleanEntry.batch_label,
-            amount: cleanEntry.amount,
-            previous_due: cleanEntry.previous_due,
-            updated_due: cleanEntry.updated_due,
-            idempotency_key: cleanEntry.idempotency_key
-          }], { conflict: 'idempotency_key' });
-        } catch (err) {
-          console.warn('fee_billing_ledger mutate note:', err.message);
-        }
-      }
-    },
+    // recordLedgerEntry() lived here and had zero callers. It wrote a
+    // fee_billing_ledger row from the browser with an idempotency key of
+    // `fee_<SID>_<MONTH>`, where apply_monthly_fee uses `BILL-<SID>-<YYYY-MM>` —
+    // two formats that never collide, so a charge written through it would have
+    // been invisible to the server's duplicate check and billed again. Billing is
+    // server-owned (api/cron-monthly-fees.js, api/admin-trigger-billing.js).
     async recordReceipt(receipt) {
       if (!receipt) return;
       const receipts = this.getFeeReceipts();
@@ -1300,7 +1904,12 @@
         String(s.student_id || s.id || s.rollNo || s.roll_no || '').toLowerCase() === sId
       );
 
-      const monthlyFee = Number(student?.monthlyFee ?? student?.monthly_fee ?? acc?.current_month_fee ?? acc?.currentMonthFee ?? 1000);
+      // Recorded values first — acc.current_month_fee is what was actually
+      // billed, so it outranks the config — then the canonical fee for the
+      // class. The old tail was a flat `?? 1000`, which understated every
+      // senior-batch account by ₹500.
+      const monthlyFee = Number(student?.monthlyFee ?? student?.monthly_fee ?? acc?.current_month_fee ?? acc?.currentMonthFee ?? 0)
+        || classMonthlyFee(student?.className || student?.class_name || acc?.class_name || acc?.className || '');
 
       if (acc) {
         const totalDue = Number(acc.total_due ?? acc.totalDue ?? 0);
@@ -1464,42 +2073,64 @@
         batches = JSON.parse(localStorage.getItem(STORAGE_KEY_BATCHES) || '[]');
       } catch(e) {}
       if (!Array.isArray(batches) || batches.length === 0) {
-        batches = [
-          { id: 'BAT-01', batch_id: 'BAT-01', name: 'Class 10th (ACHIEVER)', className: 'Class 10th (ACHIEVER)', batchName: 'Class 10th (ACHIEVER)', monthlyFee: 1000, monthly_fee: 1000, timing: 'Mon – Sat: 4:00 PM – 6:30 PM', room: 'Hall 1 (Digital Board)', teacher: 'Ravi Ranjan Sir & Chandan Kumar Sir', badge: '🎯 Board Special', icon: 'fa-bullseye' },
-          { id: 'BAT-02', batch_id: 'BAT-02', name: 'Class 9th (NURTURE)', className: 'Class 9th (NURTURE)', batchName: 'Class 9th (NURTURE)', monthlyFee: 1000, monthly_fee: 1000, timing: 'Mon – Sat: 2:30 PM – 4:30 PM', room: 'Hall 2 (Digital Board)', teacher: 'Chandan Kumar Sir & Ravi Ranjan Sir', badge: '🌱 Foundation Prep', icon: 'fa-seedling' },
-          { id: 'BAT-03', batch_id: 'BAT-03', name: 'Class 8th (ALPHA)', className: 'Class 8th (ALPHA)', batchName: 'Class 8th (ALPHA)', monthlyFee: 800, monthly_fee: 800, timing: 'Mon – Sat: 3:00 PM – 5:00 PM', room: 'Room 3', teacher: 'Chandan Kumar Sir & Ravi Ranjan Sir', badge: '⚡ Middle Prep', icon: 'fa-bolt' },
-          { id: 'BAT-04', batch_id: 'BAT-04', name: 'Junior Batch (JUNIO)', className: 'Junior Batch (JUNIO)', batchName: 'Junior Batch (JUNIO)', monthlyFee: 700, monthly_fee: 700, timing: 'Mon – Sat: 3:30 PM – 5:00 PM', room: 'Room 4', teacher: 'Faculty Mentors', badge: '🚀 Primary / Basics', icon: 'fa-rocket' }
-        ];
+        batches = buildSeedBatches();
         localStorage.setItem(STORAGE_KEY_BATCHES, JSON.stringify(batches));
       } else {
-        // Normalize any existing batch entries from Supabase / localStorage
-        batches = batches.map(b => {
-          const name = b.name || b.className || b.batch_name || b.batchName || 'General Batch';
-          let badge = '📚 Batch';
-          let icon = 'fa-graduation-cap';
-          if (name.includes('10th') || name.includes('ACHIEVER')) { badge = '🎯 Board Special'; icon = 'fa-bullseye'; }
-          else if (name.includes('9th') || name.includes('NURTURE')) { badge = '🌱 Foundation Prep'; icon = 'fa-seedling'; }
-          else if (name.includes('8th') || name.includes('ALPHA')) { badge = '⚡ Middle Prep'; icon = 'fa-bolt'; }
-          else if (name.includes('Junior') || name.includes('JUNIO')) { badge = '🚀 Primary / Basics'; icon = 'fa-rocket'; }
-
-          return {
-            ...b,
-            id: b.id || b.batch_id || 'BAT-01',
-            batch_id: b.batch_id || b.id || 'BAT-01',
-            name: name,
-            className: name,
-            batchName: name,
-            batch_name: name,
-            monthlyFee: Number(b.monthlyFee ?? b.monthly_fee ?? (name.includes('8th') ? 800 : (name.includes('Junior') || name.includes('JUNIO') ? 700 : 1000))),
-            monthly_fee: Number(b.monthlyFee ?? b.monthly_fee ?? (name.includes('8th') ? 800 : (name.includes('Junior') || name.includes('JUNIO') ? 700 : 1000))),
-            timing: b.timing || b.timings || b.schedule || 'Mon – Sat: Regular Timings',
-            timings: b.timing || b.timings || b.schedule || 'Mon – Sat: Regular Timings',
-            room: b.room || b.room_no || 'Classroom',
-            teacher: b.teacher || 'Chandan Kumar & Ravi Ranjan',
-            badge: b.badge || badge,
-            icon: b.icon || icon
-          };
+        // Normalise stored / Supabase rows against the canonical config, and
+        // guarantee all twelve batches are present. Three bugs lived here:
+        //
+        //   • The id fell back to a literal 'BAT-01' for any row missing one, so
+        //     unrelated batches collided on a single id.
+        //   • The fee ladder read `name.includes('8th') ? 800 : Junior ? 700 :
+        //     1000`, which billed Class 11th and 12th at ₹1,000 instead of
+        //     ₹1,500 and Special English 1st-5th at ₹1,000 instead of ₹500.
+        //   • `icon` was set to a Font Awesome class ('fa-bullseye'), but the
+        //     three grids that render a batch interpolate it as text — so the
+        //     admin saw the literal string "fa-graduation-cap Class 10th".
+        const byId = new Map();
+        batches.forEach(b => {
+          const rawName = b.name || b.className || b.batch_name || b.batchName || '';
+          const batchId = getBatchCategoryKey(b.batch_id || b.id || rawName);
+          const canonical = ACADEMIC && ACADEMIC.BATCH_BY_ID[batchId];
+          if (!canonical) {
+            // An unrecognised batch is kept rather than dropped — it may be a
+            // real batch the institute added directly in the database — but it
+            // is given a stable id derived from its own name, never 'BAT-01'.
+            const fallbackId = String(b.batch_id || b.id || rawName || 'BAT-UNKNOWN').toUpperCase();
+            byId.set(fallbackId, {
+              ...b,
+              id: fallbackId,
+              batch_id: fallbackId,
+              name: rawName || 'General Batch',
+              className: rawName || 'General Batch',
+              batchName: rawName || 'General Batch',
+              batch_name: rawName || 'General Batch',
+              monthlyFee: Number(b.monthlyFee ?? b.monthly_fee ?? 0),
+              monthly_fee: Number(b.monthlyFee ?? b.monthly_fee ?? 0),
+              timing: b.timing || b.timings || 'Mon – Sat: As per timetable',
+              timings: b.timing || b.timings || 'Mon – Sat: As per timetable',
+              room: b.room || b.room_no || 'As allotted',
+              teacher: b.teacher || 'Faculty Mentors',
+              badge: b.badge || '📚 Batch',
+              icon: '📚'
+            });
+            return;
+          }
+          // Fees come from the config, not the stored row: the fee schedule is
+          // institute policy and a stale cached row must not undercut it.
+          byId.set(canonical.batchId, batchRow(canonical, b));
         });
+        canonicalBatchCards().forEach(card => {
+          if (!byId.has(card.key)) {
+            byId.set(card.key, batchRow(ACADEMIC.BATCH_BY_ID[card.key], {}));
+          }
+        });
+        // Canonical order first, then any extra batches the institute added.
+        const ordered = canonicalBatchCards().map(c => byId.get(c.key)).filter(Boolean);
+        byId.forEach((row, key) => {
+          if (!ACADEMIC || !ACADEMIC.BATCH_BY_ID[key]) ordered.push(row);
+        });
+        batches = ordered;
       }
       this._batchesCache = batches;
       return batches;
@@ -1514,7 +2145,7 @@
           const supaPayload = batches.map(b => ({
             batch_id: b.id,
             name: b.name,
-            monthly_fee: Number(b.monthlyFee) || 1000,
+            monthly_fee: Number(b.monthlyFee ?? b.monthly_fee) || classMonthlyFee(b.id || b.name || ''),
             timing: b.timing || '',
             room: b.room || '',
             teacher: b.teacher || ''
@@ -1797,151 +2428,85 @@
 
       return { success: true, dob: target.dob, message: `Password for ${target.name} has been reset to Date of Birth (${target.dob}).` };
     },
+    /**
+     * Report this month's billing status. Does NOT bill.
+     *
+     * This used to be a full second billing engine running in every browser that
+     * opened the portal, and it carried four defects that each cost a family real
+     * money:
+     *
+     *   1. Its idempotency key was `fee_<SID>_<YYYY-MM>`. The server's is
+     *      `BILL-<SID>-<YYYY-MM>` (apply_monthly_fee, supabase_production_hardening.sql).
+     *      The two keys never collide, so the cron's charge and the browser's charge
+     *      both landed: every student who opened the portal after the cron ran was
+     *      billed twice for the same month.
+     *
+     *   2. `s.pendingFee = prevDue + monthlyFee` read prevDue out of a localStorage
+     *      cache with no lock. Two admins with the dashboard open on the 1st each
+     *      read the same prevDue and each wrote their own sum back.
+     *
+     *   3. It pushed the ledger row, the student balance and the receipt as three
+     *      separate unchecked mutations. SupabaseSync.mutate returns its failures
+     *      rather than throwing, so the `catch` around them was dead code. If the
+     *      ledger upsert landed and the balance update did not, the student was
+     *      marked billed and never charged — permanently, because the ledger row
+     *      then satisfies the alreadyBilled check for that month.
+     *
+     *   4. It ran from DOMContentLoaded on the student dashboard too, so a student
+     *      opening their own portal on the 1st billed themselves.
+     *
+     * Billing is server-owned: api/cron-monthly-fees.js on the staggered day-1-to-10
+     * schedule, and api/admin-trigger-billing.js for a manual run. Both call
+     * apply_monthly_fee, which takes `FOR UPDATE` on the student row and dedupes on
+     * the composite key. What remains here is the read-only half — tell the operator
+     * whether the month has been billed, and never write.
+     */
     async checkAndAccrueMonthlyFees() {
-      // 1. Determine current IST month key
-      const now = new Date();
       const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' })
-        .formatToParts(now)
+        .formatToParts(new Date())
         .reduce((all, part) => ({ ...all, [part.type]: part.value }), {});
       const currentMonthKey = `${parts.year}-${parts.month}`;
-      const currentMonthName = now.toLocaleString('en-IN', { month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' });
 
       const students = this.getStudents();
-      if (!students || students.length === 0) return { checked: 0, accrued: 0 };
+      if (!students || students.length === 0) {
+        return { checked: 0, accrued: 0, billedThisMonth: 0, unbilled: 0, month: currentMonthKey, serverOwned: true };
+      }
 
       const activeStudents = students.filter(s => !s.status || s.status.toLowerCase() === 'active');
-      const ledger = this.getBillingLedger();
-      const receipts = this.getFeeReceipts();
-      const notices = this.getNotices ? this.getNotices() : [];
+      const ledger = this.getBillingLedger() || [];
 
-      let accruedCount = 0;
-      let studentsChanged = false;
+      // Accept either idempotency key so a month billed by the current server path
+      // and a month billed by the retired browser path both read as billed.
+      const billedIds = new Set();
+      ledger.forEach(l => {
+        const month = l.billing_month || l.billingMonth || '';
+        if (month !== currentMonthKey) return;
+        const sid = (l.student_id || l.studentId || '').toString().trim().toLowerCase();
+        if (sid) billedIds.add(sid);
+        const key = (l.idempotency_key || l.idempotencyKey || '').toString().trim().toUpperCase();
+        const match = key.match(/^(?:BILL-|FEE_)(.+?)[-_]\d{4}-\d{2}$/);
+        if (match) billedIds.add(match[1].toLowerCase());
+      });
 
-      for (const s of activeStudents) {
-        const sId = s.student_id || s.id || s.rollNo;
-        const sRoll = s.rollNo || s.roll_no || sId;
-        const idKey = `fee_${sId}_${currentMonthKey}`;
+      let unbilled = 0;
+      activeStudents.forEach(s => {
+        const sId = (s.student_id || s.id || s.rollNo || '').toString().trim().toLowerCase();
+        const sRoll = (s.rollNo || s.roll_no || '').toString().trim().toLowerCase();
+        if (!billedIds.has(sId) && !(sRoll && billedIds.has(sRoll))) unbilled++;
+      });
 
-        // Check if already billed for this month
-        const alreadyBilled = ledger.some(l => 
-          (l.student_id === sId || l.studentId === sId || l.student_id === sRoll || l.idempotency_key === idKey || l.idempotencyKey === idKey) &&
-          (l.billing_month === currentMonthKey || l.billingMonth === currentMonthKey)
-        );
-
-        if (alreadyBilled) continue;
-
-        // Calculate student's monthly fee rate
-        let monthlyFee = Number(s.monthlyFee || s.monthly_fee || 0);
-        if (monthlyFee <= 0) {
-          const cName = String(s.className || s.class_name || '').toLowerCase();
-          if (cName.includes('10')) monthlyFee = 1000;
-          else if (cName.includes('9')) monthlyFee = 1000;
-          else if (cName.includes('8')) monthlyFee = 800;
-          else monthlyFee = 700;
-        }
-
-        const prevDue = Number(s.pendingFee || s.pending_fee || 0);
-        const updatedDue = prevDue + monthlyFee;
-        const receiptNo = `REC-BILL-${sId}-${currentMonthKey}`;
-
-        // 1. Update student object
-        s.pendingFee = updatedDue;
-        s.pending_fee = updatedDue;
-        s.totalFee = Number(s.totalFee || s.total_fee || 0) + monthlyFee;
-        s.total_fee = s.totalFee;
-        s.monthlyFee = monthlyFee;
-        s.monthly_fee = monthlyFee;
-        studentsChanged = true;
-        accruedCount++;
-
-        // 2. Add ledger entry
-        const ledgerEntry = {
-          student_id: sId,
-          studentId: sId,
-          billing_month: currentMonthKey,
-          billingMonth: currentMonthKey,
-          batch_label: s.className || s.class_name || 'General',
-          batchLabel: s.className || s.class_name || 'General',
-          amount: monthlyFee,
-          previous_due: prevDue,
-          previousDue: prevDue,
-          updated_due: updatedDue,
-          updatedDue: updatedDue,
-          idempotency_key: idKey,
-          idempotencyKey: idKey,
-          created_at: new Date().toISOString()
-        };
-        ledger.unshift(ledgerEntry);
-
-        // 3. Add fee receipt voucher
-        const receiptEntry = {
-          receipt_no: receiptNo,
-          receiptNo: receiptNo,
-          student_id: sId,
-          studentId: sId,
-          student_name: s.name,
-          studentName: s.name,
-          roll_no: sRoll,
-          rollNo: sRoll,
-          class_name: s.className || s.class_name,
-          className: s.className || s.class_name,
-          amount: monthlyFee,
-          payment_mode: 'System Monthly Billing',
-          paymentMode: 'System Monthly Billing',
-          status: 'Billed',
-          payment_date: new Date().toISOString().split('T')[0],
-          date: new Date().toISOString().split('T')[0],
-          collected_by: 'System Monthly Engine',
-          note: `Monthly tuition fee for ${currentMonthName}`
-        };
-        receipts.unshift(receiptEntry);
-
-        // 4. Add student notice
-        notices.unshift({
-          id: `NTC-BILL-${currentMonthKey}-${sId}`,
-          title: `📢 ${currentMonthName} Tuition Fee Statement (₹${monthlyFee.toLocaleString('en-IN')})`,
-          category: 'fees',
-          date: new Date().toISOString().split('T')[0],
-          message: `Dear ${s.name}, your monthly tuition fee of ₹${monthlyFee.toLocaleString('en-IN')} for ${currentMonthName} has been applied. Total outstanding balance: ₹${updatedDue.toLocaleString('en-IN')}. Please pay online via UPI (chandankr1501998@ybl) or at the counter.`,
-          targetBatch: s.className || s.class_name || 'All',
-          unread: true
-        });
-
-        // 5. Add audit log
-        await this.addAuditLog(
-          'System Monthly Engine',
-          'MONTHLY_FEE_ACCRUAL',
-          s.name,
-          sRoll,
-          `Accrued monthly tuition fee of ₹${monthlyFee} for ${currentMonthName} (Updated due: ₹${updatedDue})`,
-          { studentId: sId, monthlyFee, prevDue, updatedDue, billingMonth: currentMonthKey }
-        );
-
-        // 6. Direct Supabase sync push
-        if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
-          try {
-            await SupabaseSync.mutate('fee_billing_ledger', 'upsert', [ledgerEntry], { conflict: 'idempotency_key' });
-            await SupabaseSync.mutate('students', 'update', { pending_fee: updatedDue, total_fee: s.totalFee }, { where: { student_id: sId } });
-            await SupabaseSync.mutate('fee_receipts', 'upsert', [receiptEntry], { conflict: 'receipt_no' });
-          } catch (syncErr) {
-            console.warn('[Monthly Accrual] Supabase sync note:', syncErr.message);
-          }
-        }
+      if (unbilled > 0) {
+        console.info(`[Billing] ${unbilled} of ${activeStudents.length} active students have no ${currentMonthKey} ledger row. Billing is server-side — use the dashboard's billing action, which calls apply_monthly_fee.`);
       }
 
-      if (studentsChanged) {
-        this._studentsCache = students;
-        this.safeSetItem('pragyan_db_students_master', students);
-        this._billingLedgerCache = ledger;
-        this.safeSetItem('pragyan_db_fee_ledger_master', ledger);
-        this._receiptsCache = receipts;
-        this.safeSetItem('pragyan_db_fee_receipts_master', receipts);
-        if (this.saveNotices) await this.saveNotices(notices);
-        this.markMutation();
-        console.log(`✅ [Monthly Fee Engine] Successfully accrued monthly fee for ${accruedCount} students for ${currentMonthName}.`);
-      }
-
-      return { checked: activeStudents.length, accrued: accruedCount };
+      return {
+        checked: activeStudents.length,
+        accrued: 0,
+        billedThisMonth: activeStudents.length - unbilled,
+        unbilled,
+        month: currentMonthKey,
+        serverOwned: true
+      };
     }
   };
 
@@ -1970,7 +2535,9 @@
     bindDOMElements();
     setupEventListeners();
     checkExistingSession();
-    AppState.checkAndAccrueMonthlyFees().catch(e => console.warn('[Monthly Accrual Startup]', e));
+    // Read-only billing reconciliation. This used to run a full billing engine in
+    // the browser on every page load — including a student's own dashboard.
+    AppState.checkAndAccrueMonthlyFees().catch(e => console.warn('[Billing status check]', e));
     if (typeof SupabaseSync !== 'undefined' && SupabaseSync.init) {
       SupabaseSync.init();
     }
@@ -2126,6 +2693,35 @@
   /* --------------------------------------------------------------------------
    * Portal Modal Toggle & Session Management
    * -------------------------------------------------------------------------- */
+
+  // The portal modal is the third overlay that used to write
+  // document.body.style.overflow directly — the mobile drawer and the gallery
+  // lightbox did too. Whichever closed first unlocked the page underneath the
+  // others, so a scroll started behind an open modal. All three now share the
+  // reference-counted lock published by js/app.js, and the local flag keeps a
+  // repeated openPortal() call from incrementing the count twice.
+  let portalScrollLocked = false;
+
+  function lockPageScroll() {
+    if (portalScrollLocked) return;
+    portalScrollLocked = true;
+    if (window.PragyanUI && typeof window.PragyanUI.lockScroll === 'function') {
+      window.PragyanUI.lockScroll();
+    } else {
+      document.body.style.overflow = 'hidden';
+    }
+  }
+
+  function unlockPageScroll() {
+    if (!portalScrollLocked) return;
+    portalScrollLocked = false;
+    if (window.PragyanUI && typeof window.PragyanUI.unlockScroll === 'function') {
+      window.PragyanUI.unlockScroll();
+    } else {
+      document.body.style.overflow = '';
+    }
+  }
+
   function openPortal() {
     if (!portalOverlay) portalOverlay = document.getElementById('portalOverlay');
     if (portalOverlay) {
@@ -2134,7 +2730,7 @@
       portalOverlay.style.opacity = '1';
       portalOverlay.style.visibility = 'visible';
     }
-    document.body.style.overflow = 'hidden';
+    lockPageScroll();
     sessionStorage.setItem('pragyan_portal_open', 'true');
     localStorage.setItem('pragyan_portal_open', 'true');
 
@@ -2167,7 +2763,7 @@
       portalOverlay.style.opacity = '0';
       portalOverlay.style.visibility = 'hidden';
     }
-    document.body.style.overflow = '';
+    unlockPageScroll();
     sessionStorage.setItem('pragyan_portal_open', 'false');
     localStorage.setItem('pragyan_portal_open', 'false');
   }
@@ -2271,7 +2867,7 @@
       if (credentialIcon) credentialIcon.className = 'fa-solid fa-lock input-icon-left';
       if (subtitleEl) subtitleEl.textContent = 'Enter your administrator username/email and password.';
       if (helperEl) {
-        helperEl.innerHTML = '<i class="fa-solid fa-shield-halved"></i> <span>Enter your authorized administrator security password.</span>';
+        helperEl.innerHTML = '<i aria-hidden="true" class="fa-solid fa-shield-halved"></i> <span>Enter your authorized administrator security password.</span>';
       }
       if (loginMobileInput) {
         loginMobileInput.type = 'text';
@@ -2289,7 +2885,7 @@
       if (credentialIcon) credentialIcon.className = 'fa-solid fa-lock input-icon-left';
       if (subtitleEl) subtitleEl.textContent = 'Enter your mobile number and password or DOB (DDMMYYYY) below.';
       if (helperEl) {
-        helperEl.innerHTML = '<i class="fa-solid fa-circle-info"></i> <span>Default password is DOB in <strong>DDMMYYYY</strong> format (e.g. <code>15052010</code> for 15-May-2010) or custom password.</span>';
+        helperEl.innerHTML = '<i aria-hidden="true" class="fa-solid fa-circle-info"></i> <span>Default password is DOB in <strong>DDMMYYYY</strong> format (e.g. <code>15052010</code> for 15-May-2010) or custom password.</span>';
       }
       if (loginMobileInput) {
         loginMobileInput.type = 'text';
@@ -2317,11 +2913,11 @@
     }
 
     const submitBtn = loginForm?.querySelector('.login-submit-btn') || loginForm?.querySelector('button[type="submit"]');
-    const originalBtnContent = submitBtn ? submitBtn.innerHTML : '<i class="fa-solid fa-right-to-bracket"></i> Login to Portal';
+    const originalBtnContent = submitBtn ? submitBtn.innerHTML : '<i aria-hidden="true" class="fa-solid fa-right-to-bracket"></i> Login to Portal';
 
     if (submitBtn) {
       submitBtn.disabled = true;
-      submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Authenticating with Database...';
+      submitBtn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-spinner fa-spin"></i> Authenticating with Database...';
     }
     if (loginErrorMsg) loginErrorMsg.style.display = 'none';
 
@@ -2486,7 +3082,7 @@
     if (!isOffline) return '';
     return `
       <div id="offlineFallbackWarningBanner" style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.5); color: #B45309; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 13px; display: flex; align-items: center; gap: 10px; font-weight: 500;">
-        <i class="fa-solid fa-triangle-exclamation" style="color: #D97706; font-size: 16px;"></i>
+        <i aria-hidden="true" class="fa-solid fa-triangle-exclamation" style="color: #D97706; font-size: 16px;"></i>
         <span><strong>Offline Session:</strong> You are viewing locally cached data. Server actions (password updates, live payment approvals, email broadcasts) require an active internet connection.</span>
       </div>
     `;
@@ -2536,7 +3132,7 @@ function renderStudentDashboard() {
 
     const notifBtn = document.querySelector('.student-tab-btn[data-tab="notifications"]');
     if (notifBtn) {
-      notifBtn.innerHTML = `<i class="fa-solid fa-bell"></i> Notification Tab ${count > 0 ? `<span class="badge" style="background:#059669; color:#fff; padding:1px 7px; border-radius:99px; font-size:0.75rem; margin-left:6px; font-weight:700;">${count}</span>` : ''}`;
+      notifBtn.innerHTML = `<i aria-hidden="true" class="fa-solid fa-bell"></i> Notification Tab ${count > 0 ? `<span class="badge" style="background:#059669; color:#fff; padding:1px 7px; border-radius:99px; font-size:0.75rem; margin-left:6px; font-weight:700;">${count}</span>` : ''}`;
     }
 
     // Render Student Tabs
@@ -2659,18 +3255,18 @@ function renderStudentDashboard() {
           <div style="display: flex; align-items: center; gap: 0.75rem;">
             ${(pendingReq.newData?.photoUrl || pendingReq.newData?.photo || pendingReq.newData?.photo_url) ? `
               <img src="${pendingReq.newData?.photoUrl || pendingReq.newData?.photo || pendingReq.newData?.photo_url}" style="width: 44px; height: 44px; border-radius: 8px; object-fit: cover; border: 2px solid #D97706; flex-shrink: 0;" alt="New Photo">
-            ` : `<div style="font-size: 1.4rem;"><i class="fa-solid fa-clock-rotate-left" style="color: #D97706;"></i></div>`}
+            ` : `<div style="font-size: 1.4rem;"><i aria-hidden="true" class="fa-solid fa-clock-rotate-left" style="color: #D97706;"></i></div>`}
             <div>
-              <div style="font-weight: 700; color: #92400E;"><i class="fa-solid fa-hourglass-half"></i> Profile Update Request Pending Review</div>
+              <div style="font-weight: 700; color: #92400E;"><i aria-hidden="true" class="fa-solid fa-hourglass-half"></i> Profile Update Request Pending Review</div>
               <div style="font-size: 0.8rem; color: #B45309; margin-top: 2px;">Your requested updates${(pendingReq.newData?.photoUrl || pendingReq.newData?.photo) ? ' (including new profile photo)' : ''} are under Admin review.</div>
             </div>
           </div>
           <div style="display: flex; gap: 0.5rem; align-items: center;">
             <button class="btn" id="btnEditPendingReq" style="background: #D97706; color: #fff; padding: 0.35rem 0.85rem; border-radius: 6px; font-size: 0.82rem; font-weight: 700; cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 0.35rem;">
-              <i class="fa-solid fa-pen-to-square"></i> Edit
+              <i aria-hidden="true" class="fa-solid fa-pen-to-square"></i> Edit
             </button>
             <button class="btn" id="btnCancelPendingReq" style="background: #DC2626; color: #fff; padding: 0.35rem 0.85rem; border-radius: 6px; font-size: 0.82rem; font-weight: 700; cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 0.35rem;">
-              <i class="fa-solid fa-xmark"></i> Cancel
+              <i aria-hidden="true" class="fa-solid fa-xmark"></i> Cancel
             </button>
           </div>
         </div>
@@ -2679,7 +3275,7 @@ function renderStudentDashboard() {
       <!-- TOP: Interactive 3D Metallic VIP Student ID Pass Card -->
       <div class="metallic-card-3d-container">
         <div class="card-flip-hint" id="cardFlipHintBtn">
-          <i class="fa-solid fa-wand-magic-sparkles"></i> <span>Tap Card to Flip 3D</span> <i class="fa-solid fa-arrows-rotate"></i>
+          <i aria-hidden="true" class="fa-solid fa-wand-magic-sparkles"></i> <span>Tap Card to Flip 3D</span> <i aria-hidden="true" class="fa-solid fa-arrows-rotate"></i>
         </div>
 
         <div class="metallic-card-3d" id="studentIdCard3D">
@@ -2697,7 +3293,7 @@ function renderStudentDashboard() {
                 </div>
               </div>
               <div class="metallic-vip-crest">
-                <i class="fa-solid fa-crown"></i> <span>VIP SCHOLAR</span>
+                <i aria-hidden="true" class="fa-solid fa-crown"></i> <span>VIP SCHOLAR</span>
               </div>
             </div>
 
@@ -2706,7 +3302,7 @@ function renderStudentDashboard() {
                 <div class="avatar-photo-label" style="cursor: default;">
                   ${(s.photoUrl || s.photo_url || s.photo) ? `<img src="${s.photoUrl || s.photo_url || s.photo}" class="student-id-photo-img" alt="Photo">` : `<div class="id-avatar-fallback">${(s.name || 'S').charAt(0).toUpperCase()}</div>`}
                 </div>
-                <div class="photo-verified-mini-dot" title="Biometrically Verified"><i class="fa-solid fa-check"></i></div>
+                <div class="photo-verified-mini-dot" title="Biometrically Verified"><i aria-hidden="true" class="fa-solid fa-check"></i></div>
               </div>
 
               <div class="metallic-id-info">
@@ -2716,19 +3312,19 @@ function renderStudentDashboard() {
                     <span class="chip-line chip-line-2"></span>
                     <span class="chip-line chip-line-3"></span>
                   </div>
-                  <div class="metallic-nfc-wave" title="Contactless NFC Digital ID"><i class="fa-solid fa-wifi"></i></div>
+                  <div class="metallic-nfc-wave" title="Contactless NFC Digital ID"><i aria-hidden="true" class="fa-solid fa-wifi"></i></div>
                 </div>
                 <h3>${s.name}</h3>
                 <div class="metallic-pills-row">
-                  <span class="metallic-id-chip"><i class="fa-solid fa-id-badge"></i> ID: ${s.student_id || s.rollNo || s.id}</span>
-                  <span class="metallic-class-tag"><i class="fa-solid fa-graduation-cap"></i> ${s.className}</span>
+                  <span class="metallic-id-chip"><i aria-hidden="true" class="fa-solid fa-id-badge"></i> ID: ${s.student_id || s.rollNo || s.id}</span>
+                  <span class="metallic-class-tag"><i aria-hidden="true" class="fa-solid fa-graduation-cap"></i> ${s.className}</span>
                 </div>
               </div>
             </div>
 
             <div class="metallic-id-details-row">
               <div><span>Roll:</span> <strong>#${s.rollNo}</strong></div>
-              <div><span>Status:</span> <strong class="fee-status-badge ${s.pendingFee > 0 ? 'status-due' : 'status-cleared'}"><i class="fa-solid ${s.pendingFee > 0 ? 'fa-circle-exclamation' : 'fa-circle-check'}"></i> ${s.pendingFee > 0 ? `₹${s.pendingFee.toLocaleString()} Due` : '🟢 CLEARED'}</strong></div>
+              <div><span>Status:</span> <strong class="fee-status-badge ${s.pendingFee > 0 ? 'status-due' : 'status-cleared'}"><i aria-hidden="true" class="fa-solid ${s.pendingFee > 0 ? 'fa-circle-exclamation' : 'fa-circle-check'}"></i> ${s.pendingFee > 0 ? `₹${s.pendingFee.toLocaleString()} Due` : '🟢 CLEARED'}</strong></div>
               <div><span>Contact:</span> <strong>${s.mobile}</strong></div>
               <div><span>Guardian:</span> <strong>${s.guardianName}</strong></div>
             </div>
@@ -2736,7 +3332,7 @@ function renderStudentDashboard() {
             <div class="metallic-id-barcode-wrap">
               ${generateStudentLogicalBarcodeSVG(s)}
               <div class="metallic-qr-placeholder">
-                <i class="fa-solid fa-shield-halved"></i> <span>SECURE ID</span>
+                <i aria-hidden="true" class="fa-solid fa-shield-halved"></i> <span>SECURE ID</span>
               </div>
             </div>
           </div>
@@ -2754,7 +3350,7 @@ function renderStudentDashboard() {
                 </div>
               </div>
               <div class="metallic-hologram-seal">
-                <i class="fa-solid fa-certificate"></i> AUTHENTIC
+                <i aria-hidden="true" class="fa-solid fa-certificate"></i> AUTHENTIC
               </div>
             </div>
 
@@ -2770,7 +3366,7 @@ function renderStudentDashboard() {
               <div class="back-meta-item highlight-dues-box">
                 <span class="back-label">Tuition Clearance:</span>
                 <span class="back-dues-pill ${s.pendingFee > 0 ? 'has-dues' : 'no-dues'}">
-                  <i class="fa-solid ${s.pendingFee > 0 ? 'fa-triangle-exclamation' : 'fa-circle-check'}"></i>
+                  <i aria-hidden="true" class="fa-solid ${s.pendingFee > 0 ? 'fa-triangle-exclamation' : 'fa-circle-check'}"></i>
                   ${s.pendingFee > 0 ? `₹${s.pendingFee.toLocaleString()} Pending Balance` : '🟢 100% Fee Cleared (No Dues)'}
                 </span>
               </div>
@@ -2786,7 +3382,7 @@ function renderStudentDashboard() {
                 <div class="signature-script">Chandan Kumar • Ravi Ranjan</div>
               </div>
               <div class="back-contact-help">
-                <i class="fa-solid fa-location-dot"></i> At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj
+                <i aria-hidden="true" class="fa-solid fa-location-dot"></i> At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj
               </div>
             </div>
           </div>
@@ -2798,14 +3394,14 @@ function renderStudentDashboard() {
       <div class="dash-card" style="margin-top: 0;">
         <div class="dash-card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
           <div class="dash-card-title">
-            <i class="fa-solid fa-id-card"></i> Student Information & Profile Details
+            <i aria-hidden="true" class="fa-solid fa-id-card"></i> Student Information & Profile Details
           </div>
           <div class="student-header-actions-row" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
             <button class="btn btn-emerald" id="btnStudentChangePassword" style="background-color: #2563EB; color: #fff; padding: 0.45rem 0.85rem; font-size: 0.82rem; font-weight: 600; cursor: pointer; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem;">
-              <i class="fa-solid fa-key"></i> Change Password
+              <i aria-hidden="true" class="fa-solid fa-key"></i> Change Password
             </button>
             <button class="btn btn-emerald" id="btnRequestDetailUpdate" style="background-color: var(--primary-emerald); color: #fff; padding: 0.45rem 0.85rem; font-size: 0.82rem; font-weight: 600; cursor: pointer; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem;">
-              <i class="fa-solid fa-pen-to-square"></i> Request Update
+              <i aria-hidden="true" class="fa-solid fa-pen-to-square"></i> Request Update
             </button>
           </div>
         </div>
@@ -2813,13 +3409,13 @@ function renderStudentDashboard() {
         <div class="detail-items-grid">
           <div class="detail-box" style="display: flex; align-items: center; gap: 0.75rem;">
             <div style="width: 44px; height: 44px; border-radius: 8px; overflow: hidden; border: 1.5px solid var(--primary-emerald); flex-shrink: 0; background: #e5e7eb; display: flex; align-items: center; justify-content: center;">
-              ${(s.photoUrl || s.photo_url || s.photo) ? `<img src="${s.photoUrl || s.photo_url || s.photo}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i class="fa-solid fa-user" style="color: #9ca3af;"></i>`}
+              ${(s.photoUrl || s.photo_url || s.photo) ? `<img src="${s.photoUrl || s.photo_url || s.photo}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i aria-hidden="true" class="fa-solid fa-user" style="color: #9ca3af;"></i>`}
             </div>
             <div>
               <div class="detail-label">Official Profile Photo</div>
               <div class="detail-val" style="font-size: 0.82rem; color: ${(s.photoUrl || s.photo_url || s.photo) ? 'var(--primary-emerald)' : 'var(--text-muted)'}; font-weight: 600;">
                 ${(s.photoUrl || s.photo_url || s.photo) ? '✅ Verified Photo Linked' : '📷 Default Avatar'}
-                ${pendingReq && (pendingReq.newData?.photoUrl || pendingReq.newData?.photo) ? `<span style="display: block; font-size: 0.75rem; color: #D97706; font-weight: 700; margin-top: 2px;"><i class="fa-solid fa-clock-rotate-left"></i> New Photo Pending Review</span>` : ''}
+                ${pendingReq && (pendingReq.newData?.photoUrl || pendingReq.newData?.photo) ? `<span style="display: block; font-size: 0.75rem; color: #D97706; font-weight: 700; margin-top: 2px;"><i aria-hidden="true" class="fa-solid fa-clock-rotate-left"></i> New Photo Pending Review</span>` : ''}
               </div>
             </div>
           </div>
@@ -2874,24 +3470,24 @@ function renderStudentDashboard() {
       <div class="dash-card student-security-card" style="margin-top: 1.25rem; border-left: 4px solid #2563EB;">
         <div class="dash-card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
           <div class="dash-card-title">
-            <i class="fa-solid fa-shield-halved" style="color: #2563EB;"></i> Account Security & Portal Password
+            <i aria-hidden="true" class="fa-solid fa-shield-halved" style="color: #2563EB;"></i> Account Security & Portal Password
           </div>
           <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
             ${hasCustomPassword ? `
               <span class="pill-item" id="studentPasswordStatusPill" style="background: #ECFDF5; color: #065F46; border: 1px solid #10B981; font-size: 0.78rem; font-weight: 700;">
-                <i class="fa-solid fa-circle-check"></i> Custom Password Active
+                <i aria-hidden="true" class="fa-solid fa-circle-check"></i> Custom Password Active
               </span>
             ` : `
               <span class="pill-item" id="studentPasswordStatusPill" style="background: #EFF6FF; color: #1E40AF; border: 1px solid #93C5FD; font-size: 0.78rem; font-weight: 700;">
-                <i class="fa-solid fa-cake-candles"></i> Using Default DOB Password
+                <i aria-hidden="true" class="fa-solid fa-cake-candles"></i> Using Default DOB Password
               </span>
             `}
-            <span class="pill-item pill-emerald" style="font-size: 0.75rem;"><i class="fa-solid fa-bolt"></i> Instant Update</span>
+            <span class="pill-item pill-emerald" style="font-size: 0.75rem;"><i aria-hidden="true" class="fa-solid fa-bolt"></i> Instant Update</span>
           </div>
         </div>
         <div class="student-security-body" style="padding: 0.5rem 0;">
           <div class="student-security-info-box">
-            <i class="fa-solid fa-circle-info" style="color: #2563EB; font-size: 1.15rem; flex-shrink: 0; margin-top: 2px;"></i>
+            <i aria-hidden="true" class="fa-solid fa-circle-info" style="color: #2563EB; font-size: 1.15rem; flex-shrink: 0; margin-top: 2px;"></i>
             <div style="font-size: 0.86rem; color: #374151; line-height: 1.55;">
               You can set or change your custom portal login password anytime. <strong>No verification or OTP is required.</strong> If you haven't set a custom password, you can always sign in using your official Date of Birth (DOB) in <strong>DDMMYYYY</strong> format.
             </div>
@@ -2901,12 +3497,12 @@ function renderStudentDashboard() {
             <div class="student-pw-input-grid">
               <div class="form-group-security">
                 <label for="studentInlineNewPassword" class="security-label">
-                  <i class="fa-solid fa-key"></i> New Password
+                  <i aria-hidden="true" class="fa-solid fa-key"></i> New Password
                 </label>
                 <div class="security-input-wrap">
                   <input type="password" id="studentInlineNewPassword" class="portal-input security-input" placeholder="Enter new password (min. 4 characters)" required minlength="4" autocomplete="new-password">
                   <button type="button" class="btn-toggle-security-pw" data-target="studentInlineNewPassword" aria-label="Toggle password visibility">
-                    <i class="fa-regular fa-eye"></i>
+                    <i aria-hidden="true" class="fa-regular fa-eye"></i>
                   </button>
                 </div>
                 <div class="security-hint">Minimum 4 characters.</div>
@@ -2914,12 +3510,12 @@ function renderStudentDashboard() {
 
               <div class="form-group-security">
                 <label for="studentInlineConfirmPassword" class="security-label">
-                  <i class="fa-solid fa-lock"></i> Confirm New Password
+                  <i aria-hidden="true" class="fa-solid fa-lock"></i> Confirm New Password
                 </label>
                 <div class="security-input-wrap">
                   <input type="password" id="studentInlineConfirmPassword" class="portal-input security-input" placeholder="Re-enter new password to confirm" required minlength="4" autocomplete="new-password">
                   <button type="button" class="btn-toggle-security-pw" data-target="studentInlineConfirmPassword" aria-label="Toggle password visibility">
-                    <i class="fa-regular fa-eye"></i>
+                    <i aria-hidden="true" class="fa-regular fa-eye"></i>
                   </button>
                 </div>
                 <div class="security-hint" id="passwordMatchHint">Must match the new password above.</div>
@@ -2928,13 +3524,13 @@ function renderStudentDashboard() {
 
             <div class="student-pw-submit-row">
               <button type="submit" class="btn btn-save-password" id="btnSaveStudentPassword">
-                <i class="fa-solid fa-floppy-disk"></i> Update Password Instantly
+                <i aria-hidden="true" class="fa-solid fa-floppy-disk"></i> Update Password Instantly
               </button>
             </div>
           </form>
 
           <div id="studentInlinePasswordSuccessMsg" class="student-password-success-banner" style="display: none;">
-            <div class="success-banner-icon"><i class="fa-solid fa-circle-check"></i></div>
+            <div class="success-banner-icon"><i aria-hidden="true" class="fa-solid fa-circle-check"></i></div>
             <div>
               <strong>Password Updated Successfully!</strong>
               <div style="font-size: 0.8rem; margin-top: 2px;">Your new login password is now active. You can use it to sign in immediately without any OTP.</div>
@@ -3137,11 +3733,11 @@ function renderStudentDashboard() {
         matchHint.style.color = '#6B7280';
         p2In.style.borderColor = '#D1D5DB';
       } else if (v1 === v2 && v1.length >= 4) {
-        matchHint.innerHTML = '<i class="fa-solid fa-circle-check" style="color: #10B981;"></i> Passwords match perfectly!';
+        matchHint.innerHTML = '<i aria-hidden="true" class="fa-solid fa-circle-check" style="color: #10B981;"></i> Passwords match perfectly!';
         matchHint.style.color = '#059669';
         p2In.style.borderColor = '#10B981';
       } else {
-        matchHint.innerHTML = '<i class="fa-solid fa-circle-exclamation" style="color: #EF4444;"></i> Passwords do not match.';
+        matchHint.innerHTML = '<i aria-hidden="true" class="fa-solid fa-circle-exclamation" style="color: #EF4444;"></i> Passwords do not match.';
         matchHint.style.color = '#DC2626';
         p2In.style.borderColor = '#EF4444';
       }
@@ -3164,7 +3760,7 @@ function renderStudentDashboard() {
       const submitBtn = e.target.querySelector('button[type="submit"]');
       if (submitBtn) {
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+        submitBtn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-spinner fa-spin"></i> Saving...';
       }
       try {
         await AppState.updateStudentPassword(p1);
@@ -3178,7 +3774,7 @@ function renderStudentDashboard() {
           statusPill.style.background = '#ECFDF5';
           statusPill.style.color = '#065F46';
           statusPill.style.borderColor = '#10B981';
-          statusPill.innerHTML = '<i class="fa-solid fa-circle-check"></i> Custom Password Active';
+          statusPill.innerHTML = '<i aria-hidden="true" class="fa-solid fa-circle-check"></i> Custom Password Active';
         }
         alert('✅ Password updated successfully! No verification was needed. You can now use this password to login.');
         const in1 = document.getElementById('studentInlineNewPassword');
@@ -3197,7 +3793,7 @@ function renderStudentDashboard() {
       } finally {
         if (submitBtn) {
           submitBtn.disabled = false;
-          submitBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Update Password Instantly';
+          submitBtn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-floppy-disk"></i> Update Password Instantly';
         }
       }
     });
@@ -3208,10 +3804,17 @@ function renderStudentDashboard() {
 
     pane.querySelector('#btnCancelPendingReq')?.addEventListener('click', async () => {
       if (confirm('Cancel your pending profile update request?')) {
-        const allReqs = AppState.getRequests().filter(r => !(isStudentRequestMatch(r, s) && String(r.status || '').toLowerCase() === 'pending'));
+        // Cloud delete first, and its result checked: mutate() returns failures
+        // rather than throwing, so discarding it removed the request from this
+        // student's view while it stayed Pending in the admin's queue.
         if (pendingReq?.id && typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
-          await SupabaseSync.mutate('student_requests', 'delete', null, { where: { request_id: pendingReq.id } });
+          const result = await SupabaseSync.mutate('student_requests', 'delete', null, { where: { request_id: pendingReq.id } });
+          if (!result || result.success !== true) {
+            alert(`⚠️ Your request could not be cancelled${result?.error ? `: ${result.error}` : ''}. It is still pending review. Please check your connection and try again.`);
+            return;
+          }
         }
+        const allReqs = AppState.getRequests().filter(r => !(isStudentRequestMatch(r, s) && String(r.status || '').toLowerCase() === 'pending'));
         await AppState.saveRequests(allReqs);
         renderStudentDashboard();
       }
@@ -3224,8 +3827,8 @@ function renderStudentDashboard() {
       <div class="inner-modal-backdrop active" id="studentPasswordModal">
         <div class="inner-modal-content" style="max-width: 480px;">
           <div class="inner-modal-header">
-            <h3><i class="fa-solid fa-key" style="color: #2563EB;"></i> Change Portal Password</h3>
-            <button class="btn-close-inner" onclick="document.getElementById('studentPasswordModal').remove()"><i class="fa-solid fa-xmark"></i></button>
+            <h3><i aria-hidden="true" class="fa-solid fa-key" style="color: #2563EB;"></i> Change Portal Password</h3>
+            <button type="button" aria-label="Close student password dialog" class="btn-close-inner" onclick="document.getElementById('studentPasswordModal').remove()"><i aria-hidden="true" class="fa-solid fa-xmark"></i></button>
           </div>
           <div style="font-size: 0.86rem; color: #4B5563; margin-bottom: 1.1rem; line-height: 1.55;">
             Enter your new login password below. <strong>No verification or OTP is required.</strong> Once saved, you can log in immediately.
@@ -3233,30 +3836,30 @@ function renderStudentDashboard() {
           <form id="studentModalPasswordForm" class="student-password-form">
             <div class="form-group-security" style="margin-bottom: 0.9rem;">
               <label for="stuModalNewPass" class="security-label">
-                <i class="fa-solid fa-key"></i> New Password
+                <i aria-hidden="true" class="fa-solid fa-key"></i> New Password
               </label>
               <div class="security-input-wrap">
                 <input type="password" id="stuModalNewPass" class="portal-input security-input" required minlength="4" placeholder="Enter new password (min. 4 characters)" autocomplete="new-password">
                 <button type="button" class="btn-toggle-security-pw" data-target="stuModalNewPass" aria-label="Toggle password visibility">
-                  <i class="fa-regular fa-eye"></i>
+                  <i aria-hidden="true" class="fa-regular fa-eye"></i>
                 </button>
               </div>
               <div class="security-hint">Minimum 4 characters.</div>
             </div>
             <div class="form-group-security" style="margin-bottom: 1.25rem;">
               <label for="stuModalConfirmPass" class="security-label">
-                <i class="fa-solid fa-lock"></i> Confirm New Password
+                <i aria-hidden="true" class="fa-solid fa-lock"></i> Confirm New Password
               </label>
               <div class="security-input-wrap">
                 <input type="password" id="stuModalConfirmPass" class="portal-input security-input" required minlength="4" placeholder="Re-enter new password to confirm" autocomplete="new-password">
                 <button type="button" class="btn-toggle-security-pw" data-target="stuModalConfirmPass" aria-label="Toggle password visibility">
-                  <i class="fa-regular fa-eye"></i>
+                  <i aria-hidden="true" class="fa-regular fa-eye"></i>
                 </button>
               </div>
               <div class="security-hint" id="modalPasswordMatchHint">Must match the new password above.</div>
             </div>
             <button type="submit" class="btn btn-save-password" style="width: 100%;">
-              <i class="fa-solid fa-check"></i> Update Password Instantly
+              <i aria-hidden="true" class="fa-solid fa-check"></i> Update Password Instantly
             </button>
           </form>
         </div>
@@ -3265,6 +3868,7 @@ function renderStudentDashboard() {
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 
     const modalEl = document.getElementById('studentPasswordModal');
+    wireModalA11y(modalEl);
     modalEl.querySelectorAll('.btn-toggle-security-pw').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
@@ -3294,11 +3898,11 @@ function renderStudentDashboard() {
         mHint.style.color = '#6B7280';
         mP2.style.borderColor = '#D1D5DB';
       } else if (v1 === v2 && v1.length >= 4) {
-        mHint.innerHTML = '<i class="fa-solid fa-circle-check" style="color: #10B981;"></i> Passwords match perfectly!';
+        mHint.innerHTML = '<i aria-hidden="true" class="fa-solid fa-circle-check" style="color: #10B981;"></i> Passwords match perfectly!';
         mHint.style.color = '#059669';
         mP2.style.borderColor = '#10B981';
       } else {
-        mHint.innerHTML = '<i class="fa-solid fa-circle-exclamation" style="color: #EF4444;"></i> Passwords do not match.';
+        mHint.innerHTML = '<i aria-hidden="true" class="fa-solid fa-circle-exclamation" style="color: #EF4444;"></i> Passwords do not match.';
         mHint.style.color = '#DC2626';
         mP2.style.borderColor = '#EF4444';
       }
@@ -3321,7 +3925,7 @@ function renderStudentDashboard() {
       const submitBtn = e.target.querySelector('button[type="submit"]');
       if (submitBtn) {
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Updating...';
+        submitBtn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-spinner fa-spin"></i> Updating...';
       }
       try {
         await AppState.updateStudentPassword(p1);
@@ -3333,7 +3937,7 @@ function renderStudentDashboard() {
       } finally {
         if (submitBtn) {
           submitBtn.disabled = false;
-          submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> Update Password Instantly';
+          submitBtn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-check"></i> Update Password Instantly';
         }
       }
     });
@@ -3411,33 +4015,28 @@ function renderStudentDashboard() {
       return bKey && (bKey === studentBatchKey);
     }) || batches[0] || {};
 
+    const canonicalOwn = ACADEMIC ? ACADEMIC.resolveBatch(myBatch.batch_id || myBatch.id || studentBatch || '') : null;
     const batchName    = myBatch.name || myBatch.batch_name || studentBatch || 'Your Batch';
-    const batchTiming  = myBatch.timing || myBatch.schedule || myBatch.timings || 'Contact Institute';
-    const batchRoom    = myBatch.room || myBatch.room_no || 'Hall 1';
-    const batchFee     = myBatch.monthlyFee || myBatch.monthly_fee || 1000;
-    const batchTeacher = myBatch.teacher || 'Prof. Ravi Ranjan';
+    const batchTiming  = myBatch.timing || myBatch.timings || 'Contact Institute';
+    const batchRoom    = myBatch.room || myBatch.room_no || 'As allotted';
+    const batchFee     = Number(myBatch.monthlyFee ?? myBatch.monthly_fee) || (canonicalOwn ? canonicalOwn.monthlyFee : 0);
+    // Faculty comes from the batch's own roster. The old fallback named
+    // Prof. Ravi Ranjan for every batch, including the three Special English
+    // batches, which Aditi Singh teaches alone.
+    const batchTeacher = myBatch.teacher
+      || (canonicalOwn ? canonicalOwn.teachers.map(titleCaseName).join(' & ') : 'Faculty Mentors');
 
     // Parse teacher string into array for display
     const teacherList = batchTeacher.split(/[&,]/).map(t => t.trim()).filter(Boolean);
 
     // Build distinct daily subject timings from batch grade
-    const scheduleItems = studentBatchKey === '10th' ? [
-      { subject: 'Mathematics (Board Mastery)', time: '04:00 PM - 05:00 PM' },
-      { subject: 'Science (Physics & Chem)',   time: '05:00 PM - 06:00 PM' },
-      { subject: 'Biology & English',          time: '06:00 PM - 07:00 PM' }
-    ] : studentBatchKey === '9th' ? [
-      { subject: 'Mathematics (Foundation)',   time: '03:30 PM - 04:30 PM' },
-      { subject: 'Science (Concepts & Lab)',   time: '04:30 PM - 05:30 PM' },
-      { subject: 'Social Studies & English',   time: '05:30 PM - 06:30 PM' }
-    ] : studentBatchKey === '8th' ? [
-      { subject: 'Mathematics (Junior Alpha)', time: '03:00 PM - 04:00 PM' },
-      { subject: 'General Science',            time: '04:00 PM - 05:00 PM' },
-      { subject: 'English Grammar & Comp.',    time: '05:00 PM - 06:00 PM' }
-    ] : [
-      { subject: 'Maths & Mental Ability',     time: '02:30 PM - 03:30 PM' },
-      { subject: 'Integrated Science',         time: '03:30 PM - 04:30 PM' },
-      { subject: 'Language & Communication',   time: '04:30 PM - 05:30 PM' }
-    ];
+    // Daily subjects for this student's own batch, from the canonical maps.
+    const subjectList = BATCH_SUBJECTS[studentBatchKey] || [];
+    const slotList = BATCH_SLOTS[studentBatchKey] || [];
+    const scheduleItems = subjectList.map((subject, i) => ({
+      subject,
+      time: slotList[i] || batchTiming
+    }));
 
     const enrolledInBatchCount = AppState.getStudents().filter(st => getBatchCategoryKey(st.className || st.batchName || '') === studentBatchKey).length;
 
@@ -3445,14 +4044,14 @@ function renderStudentDashboard() {
       <div class="dash-card batch-overview-card">
         <div class="batch-info-header">
           <div>
-            <span class="section-tag" style="margin-bottom: 0.4rem;"><i class="fa-solid fa-chalkboard-user"></i> Enrolled Batch</span>
+            <span class="section-tag" style="margin-bottom: 0.4rem;"><i aria-hidden="true" class="fa-solid fa-chalkboard-user"></i> Enrolled Batch</span>
             <div class="batch-title-tag">${batchName}</div>
             <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem;">
-              <i class="fa-solid fa-clock" style="color: var(--primary-emerald);"></i> ${batchTiming} &nbsp;|&nbsp; 
-              <i class="fa-solid fa-door-open" style="color: var(--primary-emerald);"></i> Classroom: ${batchRoom}
+              <i aria-hidden="true" class="fa-solid fa-clock" style="color: var(--primary-emerald);"></i> ${batchTiming} &nbsp;|&nbsp; 
+              <i aria-hidden="true" class="fa-solid fa-door-open" style="color: var(--primary-emerald);"></i> Classroom: ${batchRoom}
             </p>
           </div>
-          <span class="pill-item pill-emerald"><i class="fa-solid fa-user-check"></i> Active Session</span>
+          <span class="pill-item pill-emerald"><i aria-hidden="true" class="fa-solid fa-user-check"></i> Active Session</span>
         </div>
 
         <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-top:1rem;">
@@ -3474,13 +4073,20 @@ function renderStudentDashboard() {
       <div class="profile-grid-layout">
         <div class="dash-card">
           <div class="dash-card-header">
-            <div class="dash-card-title"><i class="fa-solid fa-calendar-days"></i> Daily Class Schedule</div>
+            <div class="dash-card-title"><i aria-hidden="true" class="fa-solid fa-calendar-days"></i> Daily Class Schedule</div>
           </div>
           <div class="schedule-list">
-            ${scheduleItems.map(item => `
+            ${scheduleItems.length === 0 ? `
               <div class="schedule-row">
                 <div class="schedule-subject">
-                  <i class="fa-solid fa-book-bookmark"></i> ${item.subject}
+                  <i class="fa-solid fa-circle-info" aria-hidden="true"></i> Timetable not published for this batch yet
+                </div>
+                <div class="schedule-time">${batchTiming}</div>
+              </div>
+            ` : scheduleItems.map(item => `
+              <div class="schedule-row">
+                <div class="schedule-subject">
+                  <i class="fa-solid fa-book-bookmark" aria-hidden="true"></i> ${item.subject}
                 </div>
                 <div class="schedule-time">${item.time}</div>
               </div>
@@ -3490,7 +4096,7 @@ function renderStudentDashboard() {
 
         <div class="dash-card">
           <div class="dash-card-header">
-            <div class="dash-card-title"><i class="fa-solid fa-user-tie"></i> Assigned Faculty</div>
+            <div class="dash-card-title"><i aria-hidden="true" class="fa-solid fa-user-tie"></i> Assigned Faculty</div>
           </div>
           <div style="display: flex; flex-direction: column; gap: 1rem;">
             ${teacherList.map(t => `
@@ -3546,7 +4152,7 @@ function renderStudentDashboard() {
     pane.innerHTML = `
       <div class="dash-card">
         <div class="dash-card-header">
-          <div class="dash-card-title"><i class="fa-solid fa-bullhorn" style="color: var(--primary-emerald);"></i> Institute Notice & Announcement Board</div>
+          <div class="dash-card-title"><i aria-hidden="true" class="fa-solid fa-bullhorn" style="color: var(--primary-emerald);"></i> Institute Notice & Announcement Board</div>
           <span class="tab-badge" style="background: rgba(6, 78, 59, 0.1); color: var(--primary-emerald); font-weight: 700; padding: 0.25rem 0.75rem; border-radius: 99px;">${relevantNotices.length} Announcements</span>
         </div>
 
@@ -3560,7 +4166,7 @@ function renderStudentDashboard() {
         <div class="notifications-stream">
           ${filtered.length === 0 ? `
             <div style="text-align: center; color: var(--text-muted); padding: 3rem 1rem;">
-              <i class="fa-solid fa-bell-slash" style="font-size: 2.5rem; color: #9CA3AF; margin-bottom: 0.75rem;"></i>
+              <i aria-hidden="true" class="fa-solid fa-bell-slash" style="font-size: 2.5rem; color: #9CA3AF; margin-bottom: 0.75rem;"></i>
               <p style="font-weight: 600;">No announcements in this category.</p>
             </div>
           ` : `
@@ -3576,7 +4182,7 @@ function renderStudentDashboard() {
                         Target: <strong>${notice.targetBatch || notice.target_batch || 'All Batches'}</strong>
                       </span>
                     </div>
-                    <span class="notice-date" style="font-size: 0.78rem; color: var(--text-muted);"><i class="fa-regular fa-clock"></i> ${formatDate(notice.date)}</span>
+                    <span class="notice-date" style="font-size: 0.78rem; color: var(--text-muted);"><i aria-hidden="true" class="fa-regular fa-clock"></i> ${formatDate(notice.date)}</span>
                   </div>
                   <div class="notice-title" style="font-size: 1.05rem; font-weight: 700; color: var(--text-mahogany); margin-bottom: 0.4rem;">${notice.title}</div>
                   <div class="notice-body" style="font-size: 0.9rem; color: #374151; line-height: 1.6;">${notice.message}</div>
@@ -3585,7 +4191,7 @@ function renderStudentDashboard() {
                       ${(/\.(png|jpe?g|webp|gif)(\?.*)?$/i.test(notice.attachmentUrl || notice.attachment_url) || (notice.attachmentUrl || notice.attachment_url).startsWith('data:image/'))
                         ? `<img src="${notice.attachmentUrl || notice.attachment_url}" style="max-width:100%; max-height:280px; border-radius:8px; border:1px solid #E5E7EB; object-fit:cover; display:block;" alt="Notice Attachment">`
                         : `<a href="${notice.attachmentUrl || notice.attachment_url}" target="_blank" style="display:inline-flex; align-items:center; gap:0.5rem; background:#065F46; color:#fff; padding:0.45rem 1rem; border-radius:6px; font-weight:700; font-size:0.82rem; text-decoration:none;">
-                            <i class="fa-solid fa-file-pdf"></i> View / Download Attached Document
+                            <i aria-hidden="true" class="fa-solid fa-file-pdf"></i> View / Download Attached Document
                           </a>`
                       }
                     </div>
@@ -3648,7 +4254,7 @@ function renderStudentDashboard() {
         <div style="background: #FEF3C7; border: 1px solid #F59E0B; border-radius: 8px; padding: 0.9rem 1.15rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
           <div>
             <div style="font-weight: 700; color: #92400E; font-size: 0.95rem;">
-              <i class="fa-solid fa-hourglass-half"></i> Online Payment Verification Request Pending
+              <i aria-hidden="true" class="fa-solid fa-hourglass-half"></i> Online Payment Verification Request Pending
             </div>
             <div style="font-size: 0.82rem; color: #78350F; margin-top: 0.2rem;">
               Submitted ₹${(pendingPayReq.paymentDetails?.amount || 0).toLocaleString()} via ${pendingPayReq.paymentDetails?.mode || 'Online'} (UTR: <strong>${pendingPayReq.paymentDetails?.utr}</strong>). Admin verification in progress.
@@ -3662,7 +4268,7 @@ function renderStudentDashboard() {
         <div style="background: linear-gradient(135deg, #FAF5FF 0%, #F3E8FF 100%); border: 1.5px solid #C4B5FD; border-left: 5px solid #7C3AED; border-radius: 10px; padding: 0.95rem 1.25rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.65rem; box-shadow: 0 3px 10px rgba(124, 58, 237, 0.08);">
           <div style="display: flex; align-items: center; gap: 0.85rem;">
             <div style="width: 40px; height: 40px; border-radius: 50%; background: #EDE9FE; color: #7C3AED; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; box-shadow: 0 2px 6px rgba(124, 58, 237, 0.15);">
-              <i class="fa-solid fa-scale-balanced"></i>
+              <i aria-hidden="true" class="fa-solid fa-scale-balanced"></i>
             </div>
             <div>
               <div style="font-weight: 800; color: #581C87; font-size: 0.94rem;">
@@ -3722,12 +4328,12 @@ function renderStudentDashboard() {
 
       <div class="dash-card">
         <div class="dash-card-header">
-          <div class="dash-card-title"><i class="fa-solid fa-file-invoice-dollar"></i> Audited Fee Statement & Transaction History</div>
+          <div class="dash-card-title"><i aria-hidden="true" class="fa-solid fa-file-invoice-dollar"></i> Audited Fee Statement & Transaction History</div>
           ${s.pendingFee > 0 ? `
             <a href="pay.html?amount=${s.pendingFee}&roll=${encodeURIComponent(s.rollNo || s.roll_no || s.student_id)}&name=${encodeURIComponent(s.name)}&batch=${encodeURIComponent(s.className || s.class_name || '')}&prev=${feeAcc.previousDue}&curr=${feeAcc.currentMonthFee}" target="_blank" class="btn btn-emerald" style="padding: 0.45rem 1.15rem; font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.45rem;">
-              <i class="fa-solid fa-bolt"></i> Click Here to Pay Online
+              <i aria-hidden="true" class="fa-solid fa-bolt"></i> Click Here to Pay Online
             </a>
-          ` : '<span class="status-badge status-paid"><i class="fa-solid fa-check-double"></i> All Fees Cleared</span>'}
+          ` : '<span class="status-badge status-paid"><i aria-hidden="true" class="fa-solid fa-check-double"></i> All Fees Cleared</span>'}
         </div>
 
         <div class="table-responsive">
@@ -3757,27 +4363,27 @@ function renderStudentDashboard() {
 
                 if (isDiscount) {
                   rowBg = 'background: #FAF5FF;';
-                  statusPillHtml = `<span class="status-badge" style="background: linear-gradient(135deg, #EDE9FE, #DDD6FE); color: #5B21B6; border: 1.5px solid #C4B5FD; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.3rem;"><i class="fa-solid fa-tags"></i> 💜 CONCESSION / DISCOUNT</span>`;
+                  statusPillHtml = `<span class="status-badge" style="background: linear-gradient(135deg, #EDE9FE, #DDD6FE); color: #5B21B6; border: 1.5px solid #C4B5FD; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.3rem;"><i aria-hidden="true" class="fa-solid fa-tags"></i> 💜 CONCESSION / DISCOUNT</span>`;
                   amtDisplayHtml = `<strong style="color: #7C3AED; font-weight: 800;">- ₹${Math.abs(item.amount).toLocaleString()} <span style="font-size: 0.72rem; color: #8B5CF6;">(Waived)</span></strong>`;
                 } else if (isPenalty) {
                   rowBg = 'background: #FFFBEB;';
-                  statusPillHtml = `<span class="status-badge" style="background: #FEF3C7; color: #92400E; border: 1.5px solid #FCD34D; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.3rem;"><i class="fa-solid fa-circle-plus"></i> 🧡 FEE ADD-ON</span>`;
+                  statusPillHtml = `<span class="status-badge" style="background: #FEF3C7; color: #92400E; border: 1.5px solid #FCD34D; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.3rem;"><i aria-hidden="true" class="fa-solid fa-circle-plus"></i> 🧡 FEE ADD-ON</span>`;
                   amtDisplayHtml = `<strong style="color: #D97706; font-weight: 800;">+ ₹${item.amount.toLocaleString()} <span style="font-size: 0.72rem; color: #B45309;">(Added)</span></strong>`;
                 } else if (isRate) {
                   rowBg = 'background: #F0FDF4;';
-                  statusPillHtml = `<span class="status-badge" style="background: #DCFCE7; color: #166534; border: 1.5px solid #86EFAC; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.3rem;"><i class="fa-solid fa-gem"></i> 💎 RATE ADJUSTED</span>`;
+                  statusPillHtml = `<span class="status-badge" style="background: #DCFCE7; color: #166534; border: 1.5px solid #86EFAC; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.3rem;"><i aria-hidden="true" class="fa-solid fa-gem"></i> 💎 RATE ADJUSTED</span>`;
                   amtDisplayHtml = `<strong style="color: #059669; font-weight: 800;">₹${item.amount.toLocaleString()}/mo</strong>`;
                 } else if (isAdjustment) {
                   rowBg = 'background: #F0F9FF;';
-                  statusPillHtml = `<span class="status-badge" style="background: #E0F2FE; color: #075985; border: 1.5px solid #7DD3FC; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.3rem;"><i class="fa-solid fa-scale-balanced"></i> ⚖️ BALANCE ADJUSTED</span>`;
+                  statusPillHtml = `<span class="status-badge" style="background: #E0F2FE; color: #075985; border: 1.5px solid #7DD3FC; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.3rem;"><i aria-hidden="true" class="fa-solid fa-scale-balanced"></i> ⚖️ BALANCE ADJUSTED</span>`;
                   amtDisplayHtml = `<strong style="color: #0284C7; font-weight: 800;">${item.amount < 0 ? `- ₹${Math.abs(item.amount).toLocaleString()}` : `₹${item.amount.toLocaleString()}`}</strong>`;
                 } else if (isOldDue) {
                   rowBg = 'background: #FEF2F2;';
-                  statusPillHtml = `<span class="status-badge" style="background: #FEE2E2; color: #991B1B; border: 1.5px solid #FCA5A5; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.3rem;"><i class="fa-solid fa-clock-rotate-left"></i> 🔴 OLD DUE</span>`;
+                  statusPillHtml = `<span class="status-badge" style="background: #FEE2E2; color: #991B1B; border: 1.5px solid #FCA5A5; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.3rem;"><i aria-hidden="true" class="fa-solid fa-clock-rotate-left"></i> 🔴 OLD DUE</span>`;
                   amtDisplayHtml = `<strong style="color: #DC2626; font-weight: 800;">₹${item.amount.toLocaleString()}</strong>`;
                 } else {
                   rowBg = '';
-                  statusPillHtml = `<span class="status-badge" style="background: #D1FAE5; color: #065F46; border: 1.5px solid #6EE7B7; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.3rem;"><i class="fa-solid fa-circle-check"></i> 🟢 PAID</span>`;
+                  statusPillHtml = `<span class="status-badge" style="background: #D1FAE5; color: #065F46; border: 1.5px solid #6EE7B7; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.3rem;"><i aria-hidden="true" class="fa-solid fa-circle-check"></i> 🟢 PAID</span>`;
                   amtDisplayHtml = `<strong style="color: #059669; font-weight: 800;">₹${item.amount.toLocaleString()}</strong>`;
                 }
 
@@ -3786,7 +4392,7 @@ function renderStudentDashboard() {
                     <td><strong>${item.receiptNo}</strong></td>
                     <td>${item.date}</td>
                     <td>${amtDisplayHtml}</td>
-                    <td><span style="font-size: 0.82rem; font-weight: 600; color: var(--text-mahogany);"><i class="fa-solid fa-user-tie"></i> ${item.by || 'CHANDAN KUMAR (Director & Science Lead)'}</span></td>
+                    <td><span style="font-size: 0.82rem; font-weight: 600; color: var(--text-mahogany);"><i aria-hidden="true" class="fa-solid fa-user-tie"></i> ${item.by || 'CHANDAN KUMAR (Director & Science Lead)'}</span></td>
                     <td>
                       <div><strong>${item.mode}</strong></div>
                       ${item.note ? `<div style="font-size: 0.78rem; color: var(--text-muted);">${item.note}</div>` : ''}
@@ -3794,7 +4400,7 @@ function renderStudentDashboard() {
                     <td>${statusPillHtml}</td>
                     <td>
                       <button class="btn btn-download-receipt" data-receipt="${item.receiptNo}" style="background: ${isAdjustment ? '#6D28D9' : '#064E3B'}; color: #fff; border: none; padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.78rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                        <i class="fa-solid fa-file-arrow-down"></i> ${isAdjustment ? 'Download Voucher' : 'Download Receipt'}
+                        <i aria-hidden="true" class="fa-solid fa-file-arrow-down"></i> ${isAdjustment ? 'Download Voucher' : 'Download Receipt'}
                       </button>
                     </td>
                   </tr>
@@ -3802,7 +4408,7 @@ function renderStudentDashboard() {
               }).join('') : `
                 <tr>
                   <td colspan="7" style="text-align: center; padding: 2.75rem 1rem; color: var(--text-muted);">
-                    <div style="font-size: 2.2rem; margin-bottom: 0.6rem; color: var(--primary-emerald);"><i class="fa-solid fa-receipt"></i></div>
+                    <div style="font-size: 2.2rem; margin-bottom: 0.6rem; color: var(--primary-emerald);"><i aria-hidden="true" class="fa-solid fa-receipt"></i></div>
                     <div style="font-weight: 800; font-size: 1rem; color: var(--text-mahogany); margin-bottom: 0.35rem;">No Recorded Transactions Yet</div>
                     <div style="font-size: 0.85rem; max-width: 450px; margin: 0 auto 1.25rem; line-height: 1.5; color: var(--text-charcoal);">
                       ${s.pendingFee > 0 
@@ -3811,7 +4417,7 @@ function renderStudentDashboard() {
                     </div>
                     ${s.pendingFee > 0 ? `
                       <button class="btn btn-emerald" id="btnEmptyPayOnline" style="padding: 0.5rem 1.2rem; font-size: 0.85rem; font-weight: 700; border-radius: 6px; display: inline-flex; align-items: center; gap: 0.4rem;">
-                        <i class="fa-solid fa-credit-card"></i> Submit Online Payment Proof
+                        <i aria-hidden="true" class="fa-solid fa-credit-card"></i> Submit Online Payment Proof
                       </button>
                     ` : ''}
                   </td>
@@ -3895,35 +4501,35 @@ function renderStudentDashboard() {
     if (statsContainer) {
       statsContainer.innerHTML = `
         <div class="admin-stat-card" id="statCardStudents" title="Click to view full Student Directory">
-          <div class="admin-icon-square"><i class="fa-solid fa-users-line"></i></div>
+          <div class="admin-icon-square"><i aria-hidden="true" class="fa-solid fa-users-line"></i></div>
           <div class="admin-stat-info">
             <h3>${students.length}</h3>
             <p>Total Active Students</p>
-            <div class="stat-click-hint"><i class="fa-solid fa-arrow-right"></i> View Directory</div>
+            <div class="stat-click-hint"><i aria-hidden="true" class="fa-solid fa-arrow-right"></i> View Directory</div>
           </div>
         </div>
         <div class="admin-stat-card" id="statCardCollected" title="Click to view Collection Breakdown & Receipts">
-          <div class="admin-icon-square"><i class="fa-solid fa-indian-rupee-sign"></i></div>
+          <div class="admin-icon-square"><i aria-hidden="true" class="fa-solid fa-indian-rupee-sign"></i></div>
           <div class="admin-stat-info">
             <h3>₹${(totalCollected / 1000).toFixed(1)}k</h3>
             <p>Total Fee Collected</p>
-            <div class="stat-click-hint"><i class="fa-solid fa-arrow-right"></i> View Collections</div>
+            <div class="stat-click-hint"><i aria-hidden="true" class="fa-solid fa-arrow-right"></i> View Collections</div>
           </div>
         </div>
         <div class="admin-stat-card" id="statCardPending" title="Click to view Pending Dues & Send Reminders">
-          <div class="admin-icon-square" style="background-color: #FEE2E2; color: #DC2626;"><i class="fa-solid fa-clock-rotate-left"></i></div>
+          <div class="admin-icon-square" style="background-color: #FEE2E2; color: #DC2626;"><i aria-hidden="true" class="fa-solid fa-clock-rotate-left"></i></div>
           <div class="admin-stat-info">
             <h3 style="color: #DC2626;">₹${(totalPending / 1000).toFixed(1)}k</h3>
             <p>Pending Fees</p>
-            <div class="stat-click-hint" style="color: #DC2626;"><i class="fa-solid fa-arrow-right"></i> Manage Dues</div>
+            <div class="stat-click-hint" style="color: #DC2626;"><i aria-hidden="true" class="fa-solid fa-arrow-right"></i> Manage Dues</div>
           </div>
         </div>
         <div class="admin-stat-card" id="statCardNotices" title="Click to view & post Announcements">
-          <div class="admin-icon-square"><i class="fa-solid fa-bullhorn"></i></div>
+          <div class="admin-icon-square"><i aria-hidden="true" class="fa-solid fa-bullhorn"></i></div>
           <div class="admin-stat-info">
             <h3>${notices.length}</h3>
             <p>Active Announcements</p>
-            <div class="stat-click-hint"><i class="fa-solid fa-arrow-right"></i> Post Notices</div>
+            <div class="stat-click-hint"><i aria-hidden="true" class="fa-solid fa-arrow-right"></i> Post Notices</div>
           </div>
         </div>
       `;
@@ -4007,12 +4613,12 @@ function renderStudentDashboard() {
           <div class="inner-modal-header" style="background: #064E3B; color: #fff; padding: 1rem 1.25rem; display: flex; justify-content: space-between; align-items: center;">
             <div>
               <h3 style="margin: 0; font-size: 1.15rem; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
-                <i class="fa-solid fa-indian-rupee-sign" style="color: #34D399;"></i> Fee Collection & Revenue Breakdown
+                <i aria-hidden="true" class="fa-solid fa-indian-rupee-sign" style="color: #34D399;"></i> Fee Collection & Revenue Breakdown
               </h3>
               <div style="font-size: 0.75rem; color: #A7F3D0; margin-top: 0.15rem;">Interactive filterable view across months, academic batches & faculty collectors</div>
             </div>
-            <button class="btn-close-inner" onclick="document.getElementById('feeCollectionModal').remove()" style="background: none; border: none; color: #fff; font-size: 1.2rem; cursor: pointer;">
-              <i class="fa-solid fa-xmark"></i>
+            <button type="button" aria-label="Close fee collection dialog" class="btn-close-inner" onclick="document.getElementById('feeCollectionModal').remove()" style="background: none; border: none; color: #fff; font-size: 1.2rem; cursor: pointer;">
+              <i aria-hidden="true" class="fa-solid fa-xmark"></i>
             </button>
           </div>
 
@@ -4033,14 +4639,14 @@ function renderStudentDashboard() {
                 </div>
               </div>
               <button type="button" class="btn" onclick="document.getElementById('feeCollectionModal').remove(); switchAdminTab('analytics');" style="background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.35); font-size: 0.82rem; font-weight: 700; padding: 0.45rem 0.85rem; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;">
-                <i class="fa-solid fa-chart-pie"></i> Detailed Fee Analytics →
+                <i aria-hidden="true" class="fa-solid fa-chart-pie"></i> Detailed Fee Analytics →
               </button>
             </div>
 
             <!-- Multi-Filter Toolbar -->
             <div style="background: #ffffff; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 0.85rem; display: flex; flex-direction: column; gap: 0.65rem;">
               <div style="font-weight: 700; font-size: 0.82rem; color: var(--text-mahogany); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
-                <span><i class="fa-solid fa-filter" style="color: var(--primary-emerald);"></i> Filter Collection Data:</span>
+                <span><i aria-hidden="true" class="fa-solid fa-filter" style="color: var(--primary-emerald);"></i> Filter Collection Data:</span>
                 <button type="button" id="btnResetFeeModalFilters" style="background: none; border: none; font-size: 0.76rem; color: #059669; font-weight: 700; cursor: pointer; text-decoration: underline;">
                   Reset All Filters
                 </button>
@@ -4049,7 +4655,7 @@ function renderStudentDashboard() {
               <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.6rem;">
                 <!-- 1. Month Filter -->
                 <div>
-                  <label style="display: block; font-size: 0.74rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">🗓️ Month</label>
+                  <label for="feeModalMonthSelect" style="display: block; font-size: 0.74rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">🗓️ Month</label>
                   <select id="feeModalMonthSelect" class="portal-input" style="width: 100%; font-size: 0.8rem; height: 36px; padding: 0.35rem 0.6rem;">
                     <option value="all">All Months (All-Time)</option>
                   </select>
@@ -4057,29 +4663,23 @@ function renderStudentDashboard() {
 
                 <!-- 2. Class / Batch Filter -->
                 <div>
-                  <label style="display: block; font-size: 0.74rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">🎯 Class / Batch</label>
+                  <label for="feeModalClassSelect" style="display: block; font-size: 0.74rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">🎯 Class / Batch</label>
                   <select id="feeModalClassSelect" class="portal-input" style="width: 100%; font-size: 0.8rem; height: 36px; padding: 0.35rem 0.6rem;">
-                    <option value="all">All Batches</option>
-                    <option value="10th">🎯 Class 10th (ACHIEVER)</option>
-                    <option value="9th">🌱 Class 9th (NURTURE)</option>
-                    <option value="8th">⚡ Class 8th (ALPHA)</option>
-                    <option value="junio">🚀 Junior Batch (JUNIO)</option>
+                    ${batchFilterOptions('all', 'All Batches')}
                   </select>
                 </div>
 
                 <!-- 3. Admin / Collector Filter -->
                 <div>
-                  <label style="display: block; font-size: 0.74rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">👨‍🏫 Faculty / Admin</label>
+                  <label for="feeModalAdminSelect" style="display: block; font-size: 0.74rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">👨‍🏫 Faculty / Admin</label>
                   <select id="feeModalAdminSelect" class="portal-input" style="width: 100%; font-size: 0.8rem; height: 36px; padding: 0.35rem 0.6rem;">
-                    <option value="all">All Faculty Collectors</option>
-                    <option value="chandan">👨‍🏫 Chandan Kumar (Science Lead & Admin)</option>
-                    <option value="ravi">👨‍🏫 Prof. Ravi Ranjan (Director)</option>
+                    ${facultyCollectorOptions()}
                   </select>
                 </div>
 
                 <!-- 4. Payment Mode Filter -->
                 <div>
-                  <label style="display: block; font-size: 0.74rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">💳 Payment Mode</label>
+                  <label for="feeModalModeSelect" style="display: block; font-size: 0.74rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">💳 Payment Mode</label>
                   <select id="feeModalModeSelect" class="portal-input" style="width: 100%; font-size: 0.8rem; height: 36px; padding: 0.35rem 0.6rem;">
                     <option value="all">All Payment Modes</option>
                     <option value="cash">💵 Cash at Counter</option>
@@ -4090,8 +4690,8 @@ function renderStudentDashboard() {
 
               <!-- Search Input inside modal -->
               <div style="position: relative; margin-top: 0.2rem;">
-                <input type="text" id="feeModalSearchInput" class="portal-input" placeholder="🔍 Search by student name, roll number, or receipt #..." style="width: 100%; font-size: 0.8rem; height: 36px; padding-left: 2.2rem;">
-                <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 0.8rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.8rem;"></i>
+                <input type="text" id="feeModalSearchInput" aria-label="Search fee collections by student name, roll number or receipt number" class="portal-input" placeholder="🔍 Search by student name, roll number, or receipt #..." style="width: 100%; font-size: 0.8rem; height: 36px; padding-left: 2.2rem;">
+                <i aria-hidden="true" class="fa-solid fa-magnifying-glass" style="position: absolute; left: 0.8rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.8rem;"></i>
               </div>
             </div>
 
@@ -4099,9 +4699,9 @@ function renderStudentDashboard() {
             <div>
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                 <h4 style="font-size: 0.95rem; font-weight: 800; color: var(--text-mahogany); margin: 0; display: flex; align-items: center; gap: 0.4rem;">
-                  <i class="fa-solid fa-layer-group" style="color: var(--primary-emerald);"></i> Batch-Wise Collection Summary
+                  <i aria-hidden="true" class="fa-solid fa-layer-group" style="color: var(--primary-emerald);"></i> Batch-Wise Collection Summary
                 </h4>
-                <span style="font-size: 0.75rem; color: var(--text-muted);" id="feeModalBatchCountLabel">4 Institutional Batches</span>
+                <span style="font-size: 0.75rem; color: var(--text-muted);" id="feeModalBatchCountLabel">${canonicalBatchCards().length} Institutional Batches</span>
               </div>
               <div id="feeModalBatchGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem;">
                 <!-- Populated dynamically by updateFeeModalContent() -->
@@ -4112,7 +4712,7 @@ function renderStudentDashboard() {
             <div>
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                 <h4 style="font-size: 0.95rem; font-weight: 800; color: var(--text-mahogany); margin: 0; display: flex; align-items: center; gap: 0.4rem;">
-                  <i class="fa-solid fa-receipt" style="color: var(--primary-emerald);"></i> Verified Payment Receipts
+                  <i aria-hidden="true" class="fa-solid fa-receipt" style="color: var(--primary-emerald);"></i> Verified Payment Receipts
                 </h4>
                 <span id="feeModalReceiptCountBadge" style="background: #ECFDF5; color: #065F46; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 700; font-size: 0.76rem;">
                   0 Receipts
@@ -4144,6 +4744,7 @@ function renderStudentDashboard() {
       </div>
     `;
     document.body.insertAdjacentHTML('beforeend', modalHtml);
+    wireModalA11y('feeCollectionModal');
 
     // Build Master Monetary Transactions Pool for the Modal
     const students = AppState.getStudents() || [];
@@ -4175,7 +4776,13 @@ function renderStudentDashboard() {
               className: sClass,
               amount: amt,
               mode: h.mode || h.payment_mode || 'Cash at Counter',
-              collector: h.by || h.collected_by || (sClass.includes('10th') ? 'CHANDAN KUMAR' : 'Prof. Ravi Ranjan'),
+              // Collector is left blank when the record does not name one. The
+              // fallback here used to invent `sClass.includes('10th') ?
+              // 'CHANDAN KUMAR' : 'Prof. Ravi Ranjan'`, which wrote a faculty
+              // name into the admin's own cash book for a payment nobody had
+              // recorded taking — and credited every non-10th receipt,
+              // including Aditi Singh's, to Prof. Ravi Ranjan.
+              collector: h.by || h.collected_by || '',
               date: h.date || h.payment_date || new Date().toISOString().split('T')[0]
             });
           }
@@ -4200,7 +4807,7 @@ function renderStudentDashboard() {
               className: sClass,
               amount: amt,
               mode: r.payment_mode || r.mode || 'Cash at Counter',
-              collector: r.collected_by || r.by || (sClass.includes('10th') ? 'CHANDAN KUMAR' : 'Prof. Ravi Ranjan'),
+              collector: r.collected_by || r.by || '',
               date: r.payment_date || r.date || new Date().toISOString().split('T')[0]
             });
           }
@@ -4213,13 +4820,13 @@ function renderStudentDashboard() {
         const initRecNo = `REC-${sRoll || sId || 'ADM'}-INIT`;
         if (!processedNos.has(initRecNo)) {
           processedNos.add(initRecNo);
-          const defaultAdmCollector = (sClass.includes('10th') || sClass.includes('Science'))
-            ? 'CHANDAN KUMAR (Science Lead & Admin)'
-            : 'Prof. Ravi Ranjan (Director)';
-          const defaultAdmMode = (sClass.includes('10th') || sClass.includes('Online'))
-            ? 'UPI (PhonePe)'
-            : 'Cash at Counter';
-
+          // Neither the collector nor the mode is guessed from the class name.
+          // The two ladders here read `sClass.includes('10th') || sClass
+          // .includes('Science')` and `… || sClass.includes('Online')` — no
+          // canonical class name contains "Science" or "Online", so those arms
+          // were dead, and the live arm stamped an admission payment as
+          // "Prof. Ravi Ranjan (Director)" in "Cash at Counter" on evidence
+          // that did not exist. Ravi Ranjan is not the Director either.
           allCollectedPayments.push({
             receiptNo: initRecNo,
             studentId: s.id,
@@ -4227,8 +4834,8 @@ function renderStudentDashboard() {
             rollNo: s.rollNo || s.roll_no || s.student_id || '',
             className: sClass,
             amount: diff,
-            mode: s.paymentMode || s.payment_mode || defaultAdmMode,
-            collector: s.admittedBy || defaultAdmCollector,
+            mode: s.paymentMode || s.payment_mode || 'Not recorded',
+            collector: s.admittedBy || '',
             date: s.joiningMonth || (s.created_at ? new Date(s.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0])
           });
         }
@@ -4290,13 +4897,7 @@ function renderStudentDashboard() {
         }
 
         // Admin / Collector filter
-        if (selectedAdmin !== 'all') {
-          const colStr = String(p.collector || '').toLowerCase();
-          const modeStr = String(p.mode || '').toLowerCase();
-          const isChandan = colStr.includes('chandan') || modeStr.includes('phonepe') || modeStr.includes('gpay') || modeStr.includes('chandankr');
-          if (selectedAdmin === 'chandan' && !isChandan) return false;
-          if (selectedAdmin === 'ravi' && isChandan) return false;
-        }
+        if (selectedAdmin !== 'all' && !collectorMatchesFaculty(p, selectedAdmin)) return false;
 
         // Payment Mode filter
         if (selectedMode !== 'all') {
@@ -4328,27 +4929,24 @@ function renderStudentDashboard() {
         const parts = [];
         if (selectedMonth !== 'all') parts.push(monthMap.get(selectedMonth) || selectedMonth);
         if (selectedClass !== 'all') {
-          parts.push(selectedClass === '10th' ? 'Class 10th' : selectedClass === '9th' ? 'Class 9th' : selectedClass === '8th' ? 'Class 8th' : 'Junior Batch');
+          parts.push(batchLabel(selectedClass));
         }
-        if (selectedAdmin !== 'all') parts.push(selectedAdmin === 'chandan' ? 'Chandan Kumar' : 'Prof. Ravi Ranjan');
+        if (selectedAdmin !== 'all') parts.push(titleCaseName(selectedAdmin));
         if (selectedMode !== 'all') parts.push(selectedMode === 'cash' ? 'Cash' : 'UPI / Online');
-        
+
         kpiSubtextEl.textContent = parts.length > 0
           ? `Filtered by: ${parts.join(' • ')} (${filteredPayments.length} transactions)`
           : `Showing total verified collections (${filteredPayments.length} transactions)`;
       }
 
-      // 2. Update Batch Cards Summary
-      const canonicalBatches = [
-        { key: '10th', name: 'Class 10th (ACHIEVER)', icon: '🎯', rate: 1000 },
-        { key: '9th', name: 'Class 9th (NURTURE)', icon: '🌱', rate: 1000 },
-        { key: '8th', name: 'Class 8th (ALPHA)', icon: '⚡', rate: 800 },
-        { key: 'junio', name: 'Junior Batch (JUNIO)', icon: '🚀', rate: 700 }
-      ];
-
+      // 2. Update Batch Cards Summary — all twelve batches, from the shared
+      // config. The four-entry literal this replaces meant Class 11th, Class
+      // 12th and the three Special English batches had no card here at all, so
+      // the collections they generated were counted in the header total but
+      // appeared under no batch, and the ₹500 junior tier was reported at ₹700.
       const visibleBatches = selectedClass === 'all'
-        ? canonicalBatches
-        : canonicalBatches.filter(b => b.key === selectedClass);
+        ? canonicalBatchCards()
+        : canonicalBatchCards().filter(b => b.key === selectedClass);
 
       const batchGridEl = document.getElementById('feeModalBatchGrid');
       if (batchGridEl) {
@@ -4384,7 +4982,7 @@ function renderStudentDashboard() {
           tbody.innerHTML = `
             <tr>
               <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">
-                <i class="fa-solid fa-receipt" style="font-size: 1.8rem; color: #CBD5E1; margin-bottom: 0.5rem; display: block;"></i>
+                <i aria-hidden="true" class="fa-solid fa-receipt" style="font-size: 1.8rem; color: #CBD5E1; margin-bottom: 0.5rem; display: block;"></i>
                 No payments found matching the selected filters.
               </td>
             </tr>
@@ -4392,7 +4990,7 @@ function renderStudentDashboard() {
         } else {
           tbody.innerHTML = filteredPayments.map(r => {
             const isCash = String(r.mode || '').toLowerCase().includes('cash');
-            const isChandan = String(r.collector || '').toLowerCase().includes('chandan');
+            const col = collectorDisplay(r.collector);
             return `
               <tr>
                 <td style="font-family: monospace; font-weight: 700; color: var(--text-mahogany); font-size: 0.78rem;">
@@ -4407,17 +5005,17 @@ function renderStudentDashboard() {
                     ${r.className}
                   </span>
                 </td>
-                <td style="font-weight: 800; color: #059669; font-size: 0.92rem;">
+                <td style="font-weight: 800; color: #047857; font-size: 0.92rem;">
                   ₹${r.amount.toLocaleString()}
                 </td>
                 <td>
-                  <span style="background: ${isCash ? '#FEF3C7; color: #92400E;' : '#D1FAE5; color: #065F46;'} padding: 0.15rem 0.45rem; border-radius: 99px; font-size: 0.72rem; font-weight: 700;">
-                    <i class="${isCash ? 'fa-solid fa-money-bill-wave' : 'fa-solid fa-mobile-screen'}"></i> ${r.mode}
+                  <span style="background: ${isCash ? '#FEF3C7; color: #78350F;' : '#D1FAE5; color: #065F46;'} padding: 0.15rem 0.45rem; border-radius: 99px; font-size: 0.72rem; font-weight: 700;">
+                    <i class="${isCash ? 'fa-solid fa-money-bill-wave' : 'fa-solid fa-mobile-screen'}" aria-hidden="true"></i> ${r.mode}
                   </span>
                 </td>
                 <td>
-                  <div style="font-weight: 700; font-size: 0.76rem; color: ${isChandan ? '#065F46' : '#0369A1'};">
-                    ${isChandan ? '👨‍🏫 Chandan Kumar' : '👨‍🏫 Prof. Ravi Ranjan'}
+                  <div style="font-weight: 700; font-size: 0.76rem; color: ${col.color};">
+                    ${col.label}
                   </div>
                 </td>
                 <td style="font-size: 0.76rem; color: var(--text-muted); white-space: nowrap;">
@@ -4491,12 +5089,12 @@ function renderStudentDashboard() {
           <div class="inner-modal-header" style="background: #991B1B; color: #fff; padding: 1rem 1.25rem; display: flex; justify-content: space-between; align-items: center;">
             <div>
               <h3 style="margin: 0; font-size: 1.15rem; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
-                <i class="fa-solid fa-clock-rotate-left" style="color: #FCA5A5;"></i> Outstanding Fee Dues & Reminder Manager
+                <i aria-hidden="true" class="fa-solid fa-clock-rotate-left" style="color: #FCA5A5;"></i> Outstanding Fee Dues & Reminder Manager
               </h3>
               <div style="font-size: 0.75rem; color: #FECACA; margin-top: 0.15rem;">Filter student dues by batch, educator lead, amount range, and dispatch instant reminders</div>
             </div>
-            <button class="btn-close-inner" onclick="document.getElementById('pendingFeesModal').remove()" style="background: none; border: none; color: #fff; font-size: 1.2rem; cursor: pointer;">
-              <i class="fa-solid fa-xmark"></i>
+            <button type="button" aria-label="Close pending fees dialog" class="btn-close-inner" onclick="document.getElementById('pendingFeesModal').remove()" style="background: none; border: none; color: #fff; font-size: 1.2rem; cursor: pointer;">
+              <i aria-hidden="true" class="fa-solid fa-xmark"></i>
             </button>
           </div>
 
@@ -4518,7 +5116,7 @@ function renderStudentDashboard() {
               </div>
               <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                 <button type="button" class="btn" onclick="document.getElementById('pendingFeesModal').remove(); switchAdminTab('email');" style="background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.35); font-size: 0.82rem; font-weight: 700; padding: 0.45rem 0.85rem; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;">
-                  <i class="fa-solid fa-paper-plane"></i> Email Fee Reminders →
+                  <i aria-hidden="true" class="fa-solid fa-paper-plane"></i> Email Fee Reminders →
                 </button>
               </div>
             </div>
@@ -4526,7 +5124,7 @@ function renderStudentDashboard() {
             <!-- Multi-Filter Toolbar -->
             <div style="background: #ffffff; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 0.85rem; display: flex; flex-direction: column; gap: 0.65rem;">
               <div style="font-weight: 700; font-size: 0.82rem; color: var(--text-mahogany); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
-                <span><i class="fa-solid fa-filter" style="color: #DC2626;"></i> Filter Outstanding Dues:</span>
+                <span><i aria-hidden="true" class="fa-solid fa-filter" style="color: #DC2626;"></i> Filter Outstanding Dues:</span>
                 <button type="button" id="btnResetPendingModalFilters" style="background: none; border: none; font-size: 0.76rem; color: #DC2626; font-weight: 700; cursor: pointer; text-decoration: underline;">
                   Reset All Filters
                 </button>
@@ -4535,29 +5133,23 @@ function renderStudentDashboard() {
               <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.6rem;">
                 <!-- 1. Class / Batch Filter -->
                 <div>
-                  <label style="display: block; font-size: 0.74rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">🎯 Class / Batch</label>
+                  <label for="pendingModalClassSelect" style="display: block; font-size: 0.74rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">🎯 Class / Batch</label>
                   <select id="pendingModalClassSelect" class="portal-input" style="width: 100%; font-size: 0.8rem; height: 36px; padding: 0.35rem 0.6rem;">
-                    <option value="all">All Batches</option>
-                    <option value="10th">🎯 Class 10th (ACHIEVER)</option>
-                    <option value="9th">🌱 Class 9th (NURTURE)</option>
-                    <option value="8th">⚡ Class 8th (ALPHA)</option>
-                    <option value="junio">🚀 Junior Batch (JUNIO)</option>
+                    ${batchFilterOptions('all', 'All Batches')}
                   </select>
                 </div>
 
                 <!-- 2. Faculty / Admin Lead Filter -->
                 <div>
-                  <label style="display: block; font-size: 0.74rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">👨‍🏫 Faculty Lead</label>
+                  <label for="pendingModalAdminSelect" style="display: block; font-size: 0.74rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">👨‍🏫 Faculty Lead</label>
                   <select id="pendingModalAdminSelect" class="portal-input" style="width: 100%; font-size: 0.8rem; height: 36px; padding: 0.35rem 0.6rem;">
-                    <option value="all">All Faculty Leads</option>
-                    <option value="chandan">👨‍🏫 Chandan Kumar (Class 10th & 9th)</option>
-                    <option value="ravi">👨‍🏫 Prof. Ravi Ranjan (Class 8th & Junior)</option>
+                    ${facultyFilterOptions()}
                   </select>
                 </div>
 
                 <!-- 3. Due Amount Range Filter -->
                 <div>
-                  <label style="display: block; font-size: 0.74rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">💰 Due Amount</label>
+                  <label for="pendingModalDueRangeSelect" style="display: block; font-size: 0.74rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">💰 Due Amount</label>
                   <select id="pendingModalDueRangeSelect" class="portal-input" style="width: 100%; font-size: 0.8rem; height: 36px; padding: 0.35rem 0.6rem;">
                     <option value="all">All Pending Amounts (> ₹0)</option>
                     <option value="high">🚨 High Dues (> ₹2,000)</option>
@@ -4569,8 +5161,8 @@ function renderStudentDashboard() {
 
               <!-- Search Input inside modal -->
               <div style="position: relative; margin-top: 0.2rem;">
-                <input type="text" id="pendingModalSearchInput" class="portal-input" placeholder="🔍 Search by student name, roll number, guardian, mobile..." style="width: 100%; font-size: 0.8rem; height: 36px; padding-left: 2.2rem;">
-                <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 0.8rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.8rem;"></i>
+                <input type="text" id="pendingModalSearchInput" aria-label="Search pending dues by student name, roll number, guardian or mobile" class="portal-input" placeholder="🔍 Search by student name, roll number, guardian, mobile..." style="width: 100%; font-size: 0.8rem; height: 36px; padding-left: 2.2rem;">
+                <i aria-hidden="true" class="fa-solid fa-magnifying-glass" style="position: absolute; left: 0.8rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.8rem;"></i>
               </div>
             </div>
 
@@ -4578,9 +5170,9 @@ function renderStudentDashboard() {
             <div>
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                 <h4 style="font-size: 0.95rem; font-weight: 800; color: var(--text-mahogany); margin: 0; display: flex; align-items: center; gap: 0.4rem;">
-                  <i class="fa-solid fa-layer-group" style="color: #DC2626;"></i> Batch-Wise Outstanding Dues
+                  <i aria-hidden="true" class="fa-solid fa-layer-group" style="color: #DC2626;"></i> Batch-Wise Outstanding Dues
                 </h4>
-                <span style="font-size: 0.75rem; color: var(--text-muted);" id="pendingModalBatchLabel">4 Institutional Batches</span>
+                <span style="font-size: 0.75rem; color: var(--text-muted);" id="pendingModalBatchLabel">${canonicalBatchCards().length} Institutional Batches</span>
               </div>
               <div id="pendingModalBatchGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem;">
                 <!-- Populated dynamically -->
@@ -4591,7 +5183,7 @@ function renderStudentDashboard() {
             <div>
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                 <h4 style="font-size: 0.95rem; font-weight: 800; color: var(--text-mahogany); margin: 0; display: flex; align-items: center; gap: 0.4rem;">
-                  <i class="fa-solid fa-users" style="color: #DC2626;"></i> Students with Pending Balance
+                  <i aria-hidden="true" class="fa-solid fa-users" style="color: #DC2626;"></i> Students with Pending Balance
                 </h4>
                 <span id="pendingModalStudentCountBadge" style="background: #FEE2E2; color: #991B1B; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 700; font-size: 0.76rem;">
                   0 Students
@@ -4621,6 +5213,7 @@ function renderStudentDashboard() {
       </div>
     `;
     document.body.insertAdjacentHTML('beforeend', modalHtml);
+    wireModalA11y('pendingFeesModal');
 
     const students = AppState.getStudents() || [];
 
@@ -4642,10 +5235,12 @@ function renderStudentDashboard() {
         if (selectedClass !== 'all' && bKey !== selectedClass) return false;
 
         // 2. Admin / Faculty Lead Filter
+        // Matches the batch's canonical roster. The test this replaces was
+        // `bKey === '10th' || bKey === '9th'`, which since the switch to
+        // canonical ids was false for every student — so picking "Chandan
+        // Kumar" emptied the list and picking "Ravi Ranjan" ignored the filter.
         if (selectedAdmin !== 'all') {
-          const isChandanLead = (bKey === '10th' || bKey === '9th');
-          if (selectedAdmin === 'chandan' && !isChandanLead) return false;
-          if (selectedAdmin === 'ravi' && isChandanLead) return false;
+          if (!batchTeachers(bKey).includes(selectedAdmin)) return false;
         }
 
         // 3. Due Range Filter
@@ -4679,26 +5274,21 @@ function renderStudentDashboard() {
       const kpiSubtextEl = document.getElementById('pendingModalKpiSubtext');
       if (kpiSubtextEl) {
         const parts = [];
-        if (selectedClass !== 'all') parts.push(selectedClass === '10th' ? 'Class 10th' : selectedClass === '9th' ? 'Class 9th' : selectedClass === '8th' ? 'Class 8th' : 'Junior Batch');
-        if (selectedAdmin !== 'all') parts.push(selectedAdmin === 'chandan' ? 'Chandan Kumar Leads' : 'Prof. Ravi Ranjan Leads');
+        if (selectedClass !== 'all') parts.push(batchLabel(selectedClass));
+        if (selectedAdmin !== 'all') parts.push(`${titleCaseName(selectedAdmin)} Leads`);
         if (selectedRange !== 'all') parts.push(selectedRange === 'high' ? 'High Dues (> ₹2,000)' : selectedRange === 'mid' ? 'Medium Dues' : 'Minor Dues');
-        
+
         kpiSubtextEl.textContent = parts.length > 0
           ? `Filtered by: ${parts.join(' • ')}`
           : 'Showing all students with outstanding balances across all batches';
       }
 
-      // 2. Update Batch Cards Summary
-      const canonicalBatches = [
-        { key: '10th', name: 'Class 10th (ACHIEVER)', icon: '🎯', rate: 1000 },
-        { key: '9th', name: 'Class 9th (NURTURE)', icon: '🌱', rate: 1000 },
-        { key: '8th', name: 'Class 8th (ALPHA)', icon: '⚡', rate: 800 },
-        { key: 'junio', name: 'Junior Batch (JUNIO)', icon: '🚀', rate: 700 }
-      ];
-
+      // 2. Update Batch Cards Summary — see the note on the identical grid in
+      // the Fee Collections modal: five of the twelve batches had no card, so
+      // their outstanding dues were invisible in this breakdown.
       const visibleBatches = selectedClass === 'all'
-        ? canonicalBatches
-        : canonicalBatches.filter(b => b.key === selectedClass);
+        ? canonicalBatchCards()
+        : canonicalBatchCards().filter(b => b.key === selectedClass);
 
       const batchGridEl = document.getElementById('pendingModalBatchGrid');
       if (batchGridEl) {
@@ -4733,7 +5323,7 @@ function renderStudentDashboard() {
           tbody.innerHTML = `
             <tr>
               <td colspan="5" style="text-align: center; padding: 2.5rem 1rem; color: #059669;">
-                <i class="fa-solid fa-circle-check" style="font-size: 2rem; color: #10B981; margin-bottom: 0.5rem; display: block;"></i>
+                <i aria-hidden="true" class="fa-solid fa-circle-check" style="font-size: 2rem; color: #10B981; margin-bottom: 0.5rem; display: block;"></i>
                 <div style="font-weight: 700; font-size: 0.95rem;">🎉 Zero Pending Dues in Selected Filter!</div>
                 <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem;">All students matching this criteria have cleared their tuition fees 100%.</div>
               </td>
@@ -4771,11 +5361,11 @@ function renderStudentDashboard() {
                   <div style="display: inline-flex; gap: 0.35rem; align-items: center; justify-content: flex-end;">
                     ${waPhone ? `
                       <a href="https://wa.me/${waPhone}?text=${waMsg}" target="_blank" class="btn" style="background-color: #25D366; color: #fff; padding: 0.3rem 0.6rem; font-size: 0.75rem; font-weight: 700; border-radius: 6px; text-decoration: none; display: inline-flex; align-items: center; gap: 0.3rem;" title="Send WhatsApp Reminder">
-                        <i class="fa-brands fa-whatsapp"></i> Remind
+                        <i aria-hidden="true" class="fa-brands fa-whatsapp"></i> Remind
                       </a>
                     ` : ''}
                     <button class="btn btn-pending-pay-modal" data-id="${s.id}" style="background-color: #059669; color: #fff; padding: 0.3rem 0.65rem; font-size: 0.75rem; font-weight: 700; border: none; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;" title="Record Fee Payment">
-                      <i class="fa-solid fa-hand-holding-dollar"></i> Collect Fee
+                      <i aria-hidden="true" class="fa-solid fa-hand-holding-dollar"></i> Collect Fee
                     </button>
                   </div>
                 </td>
@@ -4906,7 +5496,7 @@ function renderStudentDashboard() {
           <div class="admin-profile-header-wrap">
             <div class="admin-profile-header-left">
               <div class="admin-profile-icon-badge">
-                <i class="fa-solid fa-user-shield"></i>
+                <i aria-hidden="true" class="fa-solid fa-user-shield"></i>
               </div>
               <div>
                 <h3 class="admin-profile-title">
@@ -4916,7 +5506,7 @@ function renderStudentDashboard() {
               </div>
             </div>
             <span class="admin-profile-secure-badge">
-              <i class="fa-solid fa-shield-halved"></i> Cloud Synced & Encrypted
+              <i aria-hidden="true" class="fa-solid fa-shield-halved"></i> Cloud Synced & Encrypted
             </span>
           </div>
 
@@ -4927,7 +5517,7 @@ function renderStudentDashboard() {
               <div class="admin-profile-card">
                 <div class="admin-card-head">
                   <div class="admin-card-head-icon" style="background: rgba(6, 78, 59, 0.1); color: var(--primary-emerald);">
-                    <i class="fa-solid fa-user-tie"></i>
+                    <i aria-hidden="true" class="fa-solid fa-user-tie"></i>
                   </div>
                   <div>
                     <div class="admin-card-head-title">1. Director Identity & Profile</div>
@@ -4942,7 +5532,7 @@ function renderStudentDashboard() {
                   </div>
                   <div class="admin-avatar-ctrls">
                     <label class="btn-change-photo" for="adminPhotoFileInput">
-                      <i class="fa-solid fa-camera"></i> Change Photo
+                      <i aria-hidden="true" class="fa-solid fa-camera"></i> Change Photo
                       <input type="file" id="adminPhotoFileInput" accept="image/*" capture="environment" style="display: none;">
                     </label>
                     <div class="admin-avatar-hint">JPG or PNG (Auto-compressed & Cloud Live)</div>
@@ -4954,7 +5544,7 @@ function renderStudentDashboard() {
                   <label for="adminSettingName">Director / Educator Full Name <span class="req-star">*</span></label>
                   <div class="input-icon-wrap">
                     <input type="text" id="adminSettingName" class="portal-input" value="${(admin.name || '').replace(/"/g, '&quot;')}" required placeholder="e.g. CHANDAN KUMAR / Prof. Ravi Ranjan">
-                    <i class="fa-solid fa-user-tie input-left-icon"></i>
+                    <i aria-hidden="true" class="fa-solid fa-user-tie input-left-icon"></i>
                   </div>
                 </div>
 
@@ -4963,7 +5553,7 @@ function renderStudentDashboard() {
                   <label for="adminSettingRole">Designation / Role Title <span class="req-star">*</span></label>
                   <div class="input-icon-wrap">
                     <input type="text" id="adminSettingRole" class="portal-input" value="${(admin.role || '').replace(/"/g, '&quot;')}" required placeholder="e.g. Managing Director & Science Lead">
-                    <i class="fa-solid fa-award input-left-icon"></i>
+                    <i aria-hidden="true" class="fa-solid fa-award input-left-icon"></i>
                   </div>
                 </div>
 
@@ -4972,7 +5562,7 @@ function renderStudentDashboard() {
                   <label for="adminSettingMobile">Mobile / WhatsApp <span class="req-star">*</span></label>
                   <div class="input-icon-wrap">
                     <input type="tel" id="adminSettingMobile" class="portal-input" value="${(admin.mobile || '').replace(/"/g, '&quot;')}" required placeholder="e.g. 7369891858">
-                    <i class="fa-solid fa-phone input-left-icon"></i>
+                    <i aria-hidden="true" class="fa-solid fa-phone input-left-icon"></i>
                   </div>
                 </div>
 
@@ -4981,7 +5571,7 @@ function renderStudentDashboard() {
                   <label for="adminSettingEmail">Official Email Address <span class="req-star">*</span></label>
                   <div class="input-icon-wrap">
                     <input type="email" id="adminSettingEmail" class="portal-input" value="${(admin.email || '').replace(/"/g, '&quot;')}" required placeholder="e.g. chandan@pragyaninstitute.com">
-                    <i class="fa-solid fa-envelope input-left-icon"></i>
+                    <i aria-hidden="true" class="fa-solid fa-envelope input-left-icon"></i>
                   </div>
                 </div>
 
@@ -4990,7 +5580,7 @@ function renderStudentDashboard() {
                   <label for="adminSettingUpi">Institute Official UPI ID (VPA) <span class="req-star">*</span></label>
                   <div class="input-icon-wrap">
                     <input type="text" id="adminSettingUpi" class="portal-input" value="${(admin.upiId || 'chandankr1501998@ybl').replace(/"/g, '&quot;')}" required placeholder="e.g. chandankr1501998@ybl">
-                    <i class="fa-solid fa-building-columns input-left-icon"></i>
+                    <i aria-hidden="true" class="fa-solid fa-building-columns input-left-icon"></i>
                   </div>
                   <div class="admin-field-hint">Printed on fee receipts, student payment vouchers & QR codes</div>
                 </div>
@@ -5003,7 +5593,7 @@ function renderStudentDashboard() {
               <div class="admin-profile-card">
                 <div class="admin-card-head">
                   <div class="admin-card-head-icon" style="background: rgba(217, 119, 6, 0.1); color: #D97706;">
-                    <i class="fa-solid fa-shield-halved"></i>
+                    <i aria-hidden="true" class="fa-solid fa-shield-halved"></i>
                   </div>
                   <div>
                     <div class="admin-card-head-title">2. Admin ID & Password Security</div>
@@ -5016,7 +5606,7 @@ function renderStudentDashboard() {
                   <label for="adminSettingUsername">Permanent Admin Username / ID</label>
                   <div class="input-icon-wrap">
                     <input type="text" id="adminSettingUsername" class="portal-input input-readonly" value="${(admin.username || '').replace(/"/g, '&quot;')}" readonly disabled title="Admin username is fixed and cannot be changed">
-                    <i class="fa-solid fa-lock input-left-icon"></i>
+                    <i aria-hidden="true" class="fa-solid fa-lock input-left-icon"></i>
                   </div>
                   <div class="admin-field-hint">Permanent institutional admin identifier (read-only)</div>
                 </div>
@@ -5026,9 +5616,9 @@ function renderStudentDashboard() {
                   <label for="adminSettingNewPass">New Password (Optional)</label>
                   <div class="input-icon-wrap">
                     <input type="password" id="adminSettingNewPass" class="portal-input" placeholder="Leave blank to keep current password" autocomplete="new-password">
-                    <i class="fa-solid fa-key input-left-icon"></i>
+                    <i aria-hidden="true" class="fa-solid fa-key input-left-icon"></i>
                     <button type="button" class="btn-toggle-admin-pw" data-target="adminSettingNewPass" aria-label="Toggle password visibility">
-                      <i class="fa-regular fa-eye"></i>
+                      <i aria-hidden="true" class="fa-regular fa-eye"></i>
                     </button>
                   </div>
                 </div>
@@ -5038,9 +5628,9 @@ function renderStudentDashboard() {
                   <label for="adminSettingConfirmPass">Confirm New Password</label>
                   <div class="input-icon-wrap">
                     <input type="password" id="adminSettingConfirmPass" class="portal-input" placeholder="Re-enter new password to confirm" autocomplete="new-password">
-                    <i class="fa-solid fa-check-double input-left-icon"></i>
+                    <i aria-hidden="true" class="fa-solid fa-check-double input-left-icon"></i>
                     <button type="button" class="btn-toggle-admin-pw" data-target="adminSettingConfirmPass" aria-label="Toggle password visibility">
-                      <i class="fa-regular fa-eye"></i>
+                      <i aria-hidden="true" class="fa-regular fa-eye"></i>
                     </button>
                   </div>
                   <div class="security-hint" id="adminPasswordMatchHint">
@@ -5051,7 +5641,7 @@ function renderStudentDashboard() {
                 <!-- Current Password Verification Alert Box -->
                 <div class="admin-security-alert-box">
                   <div class="security-alert-icon">
-                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <i aria-hidden="true" class="fa-solid fa-triangle-exclamation"></i>
                   </div>
                   <div class="security-alert-body">
                     <label for="adminSettingCurrentPass" class="security-alert-label">
@@ -5059,9 +5649,9 @@ function renderStudentDashboard() {
                     </label>
                     <div class="input-icon-wrap">
                       <input type="password" id="adminSettingCurrentPass" class="portal-input security-auth-input" required placeholder="Enter current password to verify identity">
-                      <i class="fa-solid fa-shield-halved input-left-icon" style="color: #DC2626 !important;"></i>
+                      <i aria-hidden="true" class="fa-solid fa-shield-halved input-left-icon" style="color: #DC2626 !important;"></i>
                       <button type="button" class="btn-toggle-admin-pw" data-target="adminSettingCurrentPass" aria-label="Toggle password visibility">
-                        <i class="fa-regular fa-eye"></i>
+                        <i aria-hidden="true" class="fa-regular fa-eye"></i>
                       </button>
                     </div>
                     <div class="security-alert-hint">Mandatory security verification step for all profile and credential updates.</div>
@@ -5073,7 +5663,7 @@ function renderStudentDashboard() {
 
             <div class="admin-profile-submit-wrap">
               <button type="submit" class="btn btn-emerald btn-admin-settings-submit">
-                <i class="fa-solid fa-floppy-disk"></i> Save & Sync Profile Changes
+                <i aria-hidden="true" class="fa-solid fa-floppy-disk"></i> Save & Sync Profile Changes
               </button>
             </div>
           </form>
@@ -5111,15 +5701,15 @@ function renderStudentDashboard() {
           adminMatchHint.style.color = 'var(--text-muted)';
           adminConfPIn.style.borderColor = '#CBD5E1';
         } else if (v1 && v1.length < 12) {
-          adminMatchHint.innerHTML = '<i class="fa-solid fa-circle-exclamation" style="color: #D97706;"></i> New password must be at least 12 characters long.';
+          adminMatchHint.innerHTML = '<i aria-hidden="true" class="fa-solid fa-circle-exclamation" style="color: #D97706;"></i> New password must be at least 12 characters long.';
           adminMatchHint.style.color = '#B45309';
           adminConfPIn.style.borderColor = '#F59E0B';
         } else if (v1 === v2 && v1.length >= 12) {
-          adminMatchHint.innerHTML = '<i class="fa-solid fa-circle-check" style="color: #10B981;"></i> New passwords match perfectly!';
+          adminMatchHint.innerHTML = '<i aria-hidden="true" class="fa-solid fa-circle-check" style="color: #10B981;"></i> New passwords match perfectly!';
           adminMatchHint.style.color = '#059669';
           adminConfPIn.style.borderColor = '#10B981';
         } else {
-          adminMatchHint.innerHTML = '<i class="fa-solid fa-circle-xmark" style="color: #EF4444;"></i> Passwords do not match.';
+          adminMatchHint.innerHTML = '<i aria-hidden="true" class="fa-solid fa-circle-xmark" style="color: #EF4444;"></i> Passwords do not match.';
           adminMatchHint.style.color = '#DC2626';
           adminConfPIn.style.borderColor = '#EF4444';
         }
@@ -5246,9 +5836,14 @@ function renderStudentDashboard() {
       }
 
       // 2. Class Wise Filter
+      // Compares resolved batch ids, not substrings. The old test was
+      // `s.className.includes(filter)`, which under the four-key filter set
+      // matched "Class 10th" for the '10th' option but also matched
+      // "Class 8th" for a '8th' filter and "Class 1st to 5th (2010)" for
+      // '10th'; with canonical ids it would have matched nothing at all.
       let matchesClass = true;
       if (directoryClassFilter !== 'all') {
-        matchesClass = s.className.toLowerCase().includes(directoryClassFilter.toLowerCase());
+        matchesClass = getBatchCategoryKey(s.className || s.class_name || s.batchName || '') === directoryClassFilter;
       }
 
       // 3. Fee Status Filter
@@ -5290,15 +5885,15 @@ function renderStudentDashboard() {
         <!-- Top Toolbar & Add Student -->
         <div class="admin-toolbar" style="display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between; margin-bottom: 1.1rem;">
           <div class="search-box-portal" style="flex: 1; min-width: 240px;">
-            <i class="fa-solid fa-magnifying-glass"></i>
-            <input type="text" id="adminSearchStudent" class="search-input-field" placeholder="Search 100s of students by name, roll, mobile..." value="${directorySearchQuery}">
+            <i aria-hidden="true" class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="adminSearchStudent" aria-label="Search students by name, roll number or mobile" class="search-input-field" placeholder="Search 100s of students by name, roll, mobile..." value="${directorySearchQuery}">
           </div>
           <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
             <button class="btn btn-emerald" id="btnAddNewStudentModal" style="padding: 0.5rem 0.85rem; font-size: 0.85rem;">
-              <i class="fa-solid fa-user-plus"></i> Add Student
+              <i aria-hidden="true" class="fa-solid fa-user-plus"></i> Add Student
             </button>
-            <label class="btn" style="background-color: var(--secondary-sage); color: #fff; padding: 0.5rem 0.85rem; font-size: 0.85rem; cursor: pointer; margin-bottom: 0;">
-              <i class="fa-solid fa-file-csv"></i> Bulk CSV
+            <label for="bulkCsvFileInput" class="btn" style="background-color: var(--secondary-sage); color: #fff; padding: 0.5rem 0.85rem; font-size: 0.85rem; cursor: pointer; margin-bottom: 0;">
+              <i aria-hidden="true" class="fa-solid fa-file-csv"></i> Bulk CSV
               <input type="file" id="bulkCsvFileInput" accept=".csv" style="display: none;">
             </label>
           </div>
@@ -5308,16 +5903,12 @@ function renderStudentDashboard() {
         <div class="admin-filter-bar" style="display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; justify-content: space-between; background: #FAF9F6; border: 1px solid var(--border-sand); padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1.25rem;">
           <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
             <!-- FILTER 1: CLASS WISE -->
-            <select id="filterClassWise" class="portal-input" style="width: auto; font-size: 0.83rem; padding: 0.45rem 0.75rem;">
-              <option value="all" ${directoryClassFilter === 'all' ? 'selected' : ''}>📚 Class Wise: All Batches</option>
-              <option value="10th" ${directoryClassFilter === '10th' ? 'selected' : ''}>Class 10th (ACHIEVER Batch)</option>
-              <option value="9th" ${directoryClassFilter === '9th' ? 'selected' : ''}>Class 9th (NURTURE Batch)</option>
-              <option value="8th" ${directoryClassFilter === '8th' ? 'selected' : ''}>Class 8th (ALPHA Batch)</option>
-              <option value="junio" ${directoryClassFilter === 'junio' ? 'selected' : ''}>Junior Batch (JUNIO)</option>
+            <select id="filterClassWise" class="portal-input" aria-label="Filter the student directory by class or batch" style="width: auto; font-size: 0.83rem; padding: 0.45rem 0.75rem;">
+              ${batchFilterOptions(directoryClassFilter, '📚 Class Wise: All Batches')}
             </select>
 
             <!-- FILTER 2: FEE STATUS -->
-            <select id="filterFeeStatus" class="portal-input" style="width: auto; font-size: 0.83rem; padding: 0.45rem 0.75rem;">
+            <select id="filterFeeStatus" aria-label="Filter students by fee status" class="portal-input" style="width: auto; font-size: 0.83rem; padding: 0.45rem 0.75rem;">
               <option value="all" ${directoryFeeFilter === 'all' ? 'selected' : ''}>💰 Fee Status: All</option>
               <option value="pending" ${directoryFeeFilter === 'pending' ? 'selected' : ''}>🔴 Pending Dues (> ₹0)</option>
               <option value="cleared" ${directoryFeeFilter === 'cleared' ? 'selected' : ''}>🟢 Cleared / Fee (0)</option>
@@ -5327,7 +5918,7 @@ function renderStudentDashboard() {
 
           <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
             <!-- FILTER 3: SORT ORDER (MAX TO MIN) -->
-            <select id="sortStudentOrder" class="portal-input" style="width: auto; font-size: 0.83rem; padding: 0.45rem 0.75rem; border-color: var(--primary-emerald); font-weight: 700; color: var(--primary-emerald);">
+            <select id="sortStudentOrder" aria-label="Sort the student list" class="portal-input" style="width: auto; font-size: 0.83rem; padding: 0.45rem 0.75rem; border-color: var(--primary-emerald); font-weight: 700; color: var(--primary-emerald);">
               <option value="default" ${directorySortOrder === 'default' ? 'selected' : ''}>↕️ Sort Order (Default)</option>
               <option value="fee_max_to_min" ${directorySortOrder === 'fee_max_to_min' ? 'selected' : ''}>📊 Pending Fee: Max to Min (Highest First)</option>
               <option value="fee_min_to_max" ${directorySortOrder === 'fee_min_to_max' ? 'selected' : ''}>📉 Pending Fee: Min to Max (Lowest First)</option>
@@ -5435,7 +6026,7 @@ function renderStudentDashboard() {
         <td><strong class="font-mono">${s.student_id || s.rollNo || s.id}</strong></td>
         <td>
           <div style="font-weight: 700; color: var(--text-mahogany);">${s.name}</div>
-          <div style="font-size: 0.78rem; color: var(--text-muted);">Roll: #${s.rollNo} | ₹${s.monthlyFee || 1000}/mo</div>
+          <div style="font-size: 0.78rem; color: var(--text-muted);">Roll: #${s.rollNo} | ₹${studentMonthlyFee(s).toLocaleString('en-IN')}/mo</div>
         </td>
         <td>${s.mobile}</td>
         <td>${formatDate(s.dob)}</td>
@@ -5443,22 +6034,22 @@ function renderStudentDashboard() {
         <td>
           <div style="font-weight: 700; color: var(--primary-emerald);">Paid: ₹${s.paidFee.toLocaleString()}</div>
           ${s.pendingFee > 0 
-            ? `<div style="font-size: 0.78rem; color: #DC2626; font-weight:700;"><i class="fa-solid fa-circle"></i> Pending: ₹${s.pendingFee.toLocaleString()}</div>` 
-            : '<div style="font-size: 0.78rem; color: #059669; font-weight:700;"><i class="fa-solid fa-circle"></i> Cleared</div>'}
+            ? `<div style="font-size: 0.78rem; color: #DC2626; font-weight:700;"><i aria-hidden="true" class="fa-solid fa-circle"></i> Pending: ₹${s.pendingFee.toLocaleString()}</div>` 
+            : '<div style="font-size: 0.78rem; color: #059669; font-weight:700;"><i aria-hidden="true" class="fa-solid fa-circle"></i> Cleared</div>'}
           ${(Array.isArray(s.feeHistory) && s.feeHistory.some(h => h.status === 'Adjusted' || (h.receiptNo && (h.receiptNo.startsWith('ADJ-') || h.receiptNo.startsWith('RATE-') || h.receiptNo.startsWith('DISC-'))))) 
-            ? `<div style="margin-top: 0.2rem;"><span style="background: linear-gradient(135deg, #EDE9FE, #DDD6FE); color: #5B21B6; border: 1px solid #C4B5FD; padding: 0.12rem 0.45rem; border-radius: 4px; font-size: 0.7rem; font-weight: 800; display: inline-flex; align-items: center; gap: 0.25rem;"><i class="fa-solid fa-scale-balanced"></i> Adjusted</span></div>`
+            ? `<div style="margin-top: 0.2rem;"><span style="background: linear-gradient(135deg, #EDE9FE, #DDD6FE); color: #5B21B6; border: 1px solid #C4B5FD; padding: 0.12rem 0.45rem; border-radius: 4px; font-size: 0.7rem; font-weight: 800; display: inline-flex; align-items: center; gap: 0.25rem;"><i aria-hidden="true" class="fa-solid fa-scale-balanced"></i> Adjusted</span></div>`
             : ''}
         </td>
         <td>
           <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
             <button class="btn-make-changes" data-id="${s.id}" style="background-color: var(--primary-emerald, #064E3B); color: #fff; border: none; padding: 0.45rem 0.75rem; border-radius: 6px; font-weight: 700; font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem; box-shadow: 0 2px 6px rgba(6, 78, 59, 0.2);" title="Manage student profile, payments & dues">
-              <i class="fa-solid fa-sliders"></i> Make Changes
+              <i aria-hidden="true" class="fa-solid fa-sliders"></i> Make Changes
             </button>
             <button class="btn-reset-pw-dob" data-id="${s.id}" data-name="${s.name}" data-dob="${s.dob}" style="background-color: #FEF3C7; color: #92400E; border: 1px solid #FCD34D; padding: 0.45rem 0.65rem; border-radius: 6px; font-weight: 700; font-size: 0.78rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem;" title="Reset login password to official Date of Birth (${s.dob})">
-              <i class="fa-solid fa-key"></i> Reset to DOB
+              <i aria-hidden="true" class="fa-solid fa-key"></i> Reset to DOB
             </button>
             <button class="btn-delete-student" data-id="${s.id}" style="color: #DC2626; cursor: pointer; border: none; background: transparent; padding: 0.4rem; font-size: 0.95rem;" title="Delete Record">
-              <i class="fa-solid fa-trash-can"></i>
+              <i aria-hidden="true" class="fa-solid fa-trash-can"></i>
             </button>
           </div>
         </td>
@@ -5484,7 +6075,7 @@ function renderStudentDashboard() {
           const origHtml = btn.innerHTML;
           try {
             btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting...';
+            btn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-spinner fa-spin"></i> Resetting...';
             await AppState.resetStudentPasswordToDob(id);
             alert(`✅ Password for ${name} has been reset to Date of Birth (${dob}). The student can now log in using their DOB.`);
           } catch (err) {
@@ -5530,7 +6121,7 @@ function renderStudentDashboard() {
           <div class="inner-modal-header" style="border-bottom: 1px solid #FEE2E2; padding-bottom: 0.85rem;">
             <div style="display: flex; align-items: center; gap: 0.75rem;">
               <div style="width: 44px; height: 44px; border-radius: 50%; background: #FEE2E2; color: #DC2626; display: flex; align-items: center; justify-content: center; font-size: 1.35rem; flex-shrink: 0;">
-                <i class="fa-solid fa-triangle-exclamation"></i>
+                <i aria-hidden="true" class="fa-solid fa-triangle-exclamation"></i>
               </div>
               <div>
                 <h3 style="margin: 0; color: #991B1B; font-size: 1.15rem; font-weight: 800;">Permanent Student Record Deletion</h3>
@@ -5539,14 +6130,14 @@ function renderStudentDashboard() {
                 </div>
               </div>
             </div>
-            <button class="btn-close-inner" onclick="document.getElementById('deleteStudentModal').remove()"><i class="fa-solid fa-xmark"></i></button>
+            <button type="button" aria-label="Close delete student dialog" class="btn-close-inner" onclick="document.getElementById('deleteStudentModal').remove()"><i aria-hidden="true" class="fa-solid fa-xmark"></i></button>
           </div>
 
           <!-- DUES WARNING CALLOUT -->
           ${hasDues ? `
             <div style="background: #FEF2F2; border: 1.5px solid #F87171; border-radius: 8px; padding: 1rem; margin: 1rem 0; box-shadow: 0 2px 8px rgba(220, 38, 38, 0.12);">
               <div style="display: flex; gap: 0.75rem; align-items: flex-start;">
-                <i class="fa-solid fa-circle-exclamation" style="color: #DC2626; font-size: 1.4rem; margin-top: 0.15rem; flex-shrink: 0;"></i>
+                <i aria-hidden="true" class="fa-solid fa-circle-exclamation" style="color: #DC2626; font-size: 1.4rem; margin-top: 0.15rem; flex-shrink: 0;"></i>
                 <div>
                   <div style="color: #991B1B; font-weight: 800; font-size: 0.96rem; margin-bottom: 0.35rem;">
                     🚨 OUTSTANDING DUE WARNING: ₹${duesAmount.toLocaleString()} UNPAID
@@ -5559,7 +6150,7 @@ function renderStudentDashboard() {
             </div>
           ` : `
             <div style="background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 8px; padding: 0.85rem 1rem; margin: 1rem 0; font-size: 0.84rem; color: #065F46; display: flex; align-items: center; gap: 0.6rem;">
-              <i class="fa-solid fa-circle-check" style="font-size: 1.2rem; color: #059669; flex-shrink: 0;"></i>
+              <i aria-hidden="true" class="fa-solid fa-circle-check" style="font-size: 1.2rem; color: #059669; flex-shrink: 0;"></i>
               <div><strong>All Fees Cleared:</strong> This student has ₹0 pending dues. Total paid fee to date: <strong>₹${paidAmount.toLocaleString()}</strong>.</div>
             </div>
           `}
@@ -5582,7 +6173,7 @@ function renderStudentDashboard() {
           <form id="deleteStudentConfirmForm">
             ${hasDues ? `
               <div style="margin-bottom: 1.15rem;">
-                <label style="font-size: 0.84rem; font-weight: 700; color: #991B1B; display: block; margin-bottom: 0.35rem;">
+                <label for="deleteConfirmRollInput" style="font-size: 0.84rem; font-weight: 700; color: #991B1B; display: block; margin-bottom: 0.35rem;">
                   Type student roll number (<span style="font-family: monospace; background: #FEE2E2; color: #991B1B; padding: 2px 6px; border-radius: 4px; font-weight: 800;">${target.rollNo}</span>) to authorize permanent deletion:
                 </label>
                 <input type="text" id="deleteConfirmRollInput" class="portal-input" placeholder="Type ${target.rollNo} here" required style="border: 1.5px solid #F87171; font-weight: 700; font-size: 0.95rem;">
@@ -5594,7 +6185,7 @@ function renderStudentDashboard() {
                 Cancel & Keep Record
               </button>
               <button type="submit" id="btnConfirmStudentDelete" class="btn" style="background: #DC2626; color: #fff; border: none; padding: 0.7rem 1.35rem; font-weight: 700; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.45rem; box-shadow: 0 2px 6px rgba(220, 38, 38, 0.3);">
-                <i class="fa-solid fa-trash-can"></i> Permanently Delete Record
+                <i aria-hidden="true" class="fa-solid fa-trash-can"></i> Permanently Delete Record
               </button>
             </div>
           </form>
@@ -5605,6 +6196,8 @@ function renderStudentDashboard() {
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 
     const modalEl = document.getElementById('deleteStudentModal');
+    // A destructive dialog does not close on a stray backdrop click.
+    wireModalA11y(modalEl, { closeOnBackdrop: false });
     modalEl.querySelector('#deleteStudentConfirmForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (hasDues) {
@@ -5621,7 +6214,7 @@ function renderStudentDashboard() {
       try {
         if (btn) {
           btn.disabled = true;
-          btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Deleting from Database...';
+          btn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-spinner fa-spin"></i> Deleting from Database...';
         }
         const res = await AppState.deleteStudent(target.id);
         if (res && res.success) {
@@ -5654,15 +6247,20 @@ function renderStudentDashboard() {
 
     const teacherName = getActiveTeacherName();
 
+    // This student's own canonical monthly rate, resolved once for every preset
+    // and label in the modal. 0 means the batch could not be resolved, in which
+    // case the rate-dependent chips are omitted rather than shown at a guess.
+    const mgmtMonthlyRate = studentMonthlyFee(target);
+
     const modalHtml = `
       <div class="inner-modal-backdrop active" id="studentManagementModal">
         <div class="inner-modal-content" style="max-width: 680px;">
           <div class="inner-modal-header">
             <div>
-              <h3 style="margin:0;"><i class="fa-solid fa-user-gear" style="color: var(--primary-emerald);"></i> ${target.name}</h3>
+              <h3 style="margin:0;"><i aria-hidden="true" class="fa-solid fa-user-gear" style="color: var(--primary-emerald);"></i> ${target.name}</h3>
               <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.15rem;">ID: <strong>${target.student_id || target.rollNo || target.id}</strong> | Roll: <strong>#${target.rollNo}</strong> | Class: <strong>${target.className}</strong></div>
             </div>
-            <button class="btn-close-inner" onclick="document.getElementById('studentManagementModal').remove()"><i class="fa-solid fa-xmark"></i></button>
+            <button type="button" aria-label="Close student management dialog" class="btn-close-inner" onclick="document.getElementById('studentManagementModal').remove()"><i aria-hidden="true" class="fa-solid fa-xmark"></i></button>
           </div>
 
           <div style="font-size: 0.85rem; background: var(--bg-surface-cream, #FAF9F6); border: 1px solid var(--border-sand, #E5E7EB); color: var(--text-mahogany); padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1.15rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
@@ -5676,19 +6274,19 @@ function renderStudentDashboard() {
           <!-- Section Switcher Sub-Pills -->
           <div class="stu-mgmt-sub-pills-bar">
             <button class="mgmt-sub-pill req-sub-pill ${initialSection === 'pay' ? 'active' : ''}" data-sec="pay">
-              <i class="fa-solid fa-hand-holding-dollar"></i> Partial Payment
+              <i aria-hidden="true" class="fa-solid fa-hand-holding-dollar"></i> Partial Payment
             </button>
             <button class="mgmt-sub-pill req-sub-pill ${initialSection === 'regulate' ? 'active' : ''}" data-sec="regulate">
-              <i class="fa-solid fa-scale-balanced"></i> Fee Adjustment & Correction
+              <i aria-hidden="true" class="fa-solid fa-scale-balanced"></i> Fee Adjustment & Correction
             </button>
             <button class="mgmt-sub-pill req-sub-pill ${initialSection === 'due' ? 'active' : ''}" data-sec="due">
-              <i class="fa-solid fa-clock-rotate-left"></i> Add Old Due
+              <i aria-hidden="true" class="fa-solid fa-clock-rotate-left"></i> Add Old Due
             </button>
             <button class="mgmt-sub-pill req-sub-pill ${initialSection === 'profile' ? 'active' : ''}" data-sec="profile">
-              <i class="fa-solid fa-user-pen"></i> Edit Profile Details
+              <i aria-hidden="true" class="fa-solid fa-user-pen"></i> Edit Profile Details
             </button>
             <button class="mgmt-sub-pill req-sub-pill ${initialSection === 'security' ? 'active' : ''}" data-sec="security">
-              <i class="fa-solid fa-shield-halved"></i> Login & Security
+              <i aria-hidden="true" class="fa-solid fa-shield-halved"></i> Login & Security
             </button>
           </div>
 
@@ -5696,11 +6294,16 @@ function renderStudentDashboard() {
           <div class="stu-mgmt-sec" id="stuMgmtSec-pay" style="display: ${initialSection === 'pay' ? 'block' : 'none'};">
             <form id="mgmtPayForm">
               <div style="background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 8px; padding: 0.75rem 0.95rem; margin-bottom: 0.85rem; font-size: 0.82rem; color: #065F46; line-height: 1.45;">
-                <i class="fa-solid fa-circle-check" style="margin-right: 0.35rem;"></i>
+                <i aria-hidden="true" class="fa-solid fa-circle-check" style="margin-right: 0.35rem;"></i>
                 <strong>Partial Fee Payment:</strong> Enter the exact partial installment or custom amount paid by the student. This increases collected revenue and issues an official receipt.
               </div>
 
               <!-- Quick Presets for Partial Payment -->
+              <!-- The two fixed chips are cash denominations, not fee rates. The
+                   third is this student's own monthly rate. A flat 1,000 default
+                   labelled the button "1-Month: ₹1,000" for a Class 12th student
+                   whose month costs ₹1,500, so one click recorded a ₹500 short
+                   payment as a full month. -->
               <div class="mgmt-quick-presets-grid">
                 <button type="button" class="btn-mgmt-quick-pay btn-quick-partial" data-amt="500">
                   + ₹500
@@ -5708,16 +6311,17 @@ function renderStudentDashboard() {
                 <button type="button" class="btn-mgmt-quick-pay btn-quick-partial" data-amt="1000">
                   + ₹1,000
                 </button>
-                <button type="button" class="btn-mgmt-quick-pay btn-quick-partial" data-amt="${target.monthlyFee || 1000}">
-                  1-Month: ₹${(target.monthlyFee || 1000).toLocaleString()}
-                </button>
+                ${mgmtMonthlyRate > 0 ? `
+                <button type="button" class="btn-mgmt-quick-pay btn-quick-partial" data-amt="${mgmtMonthlyRate}">
+                  1-Month: ₹${mgmtMonthlyRate.toLocaleString('en-IN')}
+                </button>` : ''}
                 <button type="button" class="btn-mgmt-quick-pay btn-quick-partial-clear">
-                  <i class="fa-solid fa-rotate-left"></i> Clear
+                  <i class="fa-solid fa-rotate-left" aria-hidden="true"></i> Clear
                 </button>
               </div>
 
               <div style="margin-bottom: 0.75rem;">
-                <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-mahogany);">Partial Payment Amount Paid (₹) *</label>
+                <label for="mgmtPayAmount" style="font-size: 0.85rem; font-weight: 700; color: var(--text-mahogany);">Partial Payment Amount Paid (₹) *</label>
                 <input type="number" id="mgmtPayAmount" class="portal-input" required placeholder="Enter paid amount (e.g. 500)" min="1" step="1" style="font-size: 1.05rem; font-weight: 700; color: #065F46;">
               </div>
 
@@ -5738,7 +6342,7 @@ function renderStudentDashboard() {
               </div>
 
               <div style="margin-bottom: 0.9rem;">
-                <label style="font-size: 0.85rem; font-weight: 600;">Payment Mode</label>
+                <label for="mgmtPayMode" style="font-size: 0.85rem; font-weight: 600;">Payment Mode</label>
                 <select id="mgmtPayMode" class="portal-input">
                   <option value="Cash at Counter">Cash at Institute Counter</option>
                   <option value="UPI (PhonePe)">UPI (PhonePe)</option>
@@ -5748,12 +6352,12 @@ function renderStudentDashboard() {
               </div>
 
               <div style="margin-bottom: 1.25rem;">
-                <label style="font-size: 0.85rem; font-weight: 600;">Description / Audit Note</label>
+                <label for="mgmtPayNote" style="font-size: 0.85rem; font-weight: 600;">Description / Audit Note</label>
                 <input type="text" id="mgmtPayNote" class="portal-input" placeholder="e.g. Partial tuition installment paid by student">
               </div>
 
               <button type="submit" class="btn btn-emerald" style="width: 100%; padding: 0.85rem; background-color: #059669; font-weight: 700; font-size: 0.92rem; border-radius: 8px;">
-                <i class="fa-solid fa-receipt"></i> Submit Partial Payment & Issue Receipt
+                <i aria-hidden="true" class="fa-solid fa-receipt"></i> Submit Partial Payment & Issue Receipt
               </button>
             </form>
           </div>
@@ -5762,15 +6366,15 @@ function renderStudentDashboard() {
           <div class="stu-mgmt-sec" id="stuMgmtSec-due" style="display: ${initialSection === 'due' ? 'block' : 'none'};">
             <form id="mgmtDueForm">
               <div style="margin-bottom: 0.9rem;">
-                <label style="font-size: 0.85rem; font-weight: 600;">Old / Carryover Unpaid Amount (₹) *</label>
+                <label for="mgmtDueAmount" style="font-size: 0.85rem; font-weight: 600;">Old / Carryover Unpaid Amount (₹) *</label>
                 <input type="number" id="mgmtDueAmount" class="portal-input" required placeholder="e.g. 2000" min="1">
               </div>
               <div style="margin-bottom: 1.25rem;">
-                <label style="font-size: 0.85rem; font-weight: 600;">Reason / Month Description *</label>
+                <label for="mgmtDueNote" style="font-size: 0.85rem; font-weight: 600;">Reason / Month Description *</label>
                 <input type="text" id="mgmtDueNote" class="portal-input" required placeholder="e.g. Unpaid fee carryover for April & May">
               </div>
               <button type="submit" class="btn" style="width: 100%; padding: 0.8rem; background-color: #DC2626; color: #fff; border: none; font-weight: 700; border-radius: 6px; cursor: pointer;">
-                <i class="fa-solid fa-exclamation-triangle"></i> Add Old Due (Mark RED)
+                <i aria-hidden="true" class="fa-solid fa-exclamation-triangle"></i> Add Old Due (Mark RED)
               </button>
             </form>
           </div>
@@ -5779,12 +6383,12 @@ function renderStudentDashboard() {
           <div class="stu-mgmt-sec" id="stuMgmtSec-regulate" style="display: ${initialSection === 'regulate' ? 'block' : 'none'};">
             <form id="mgmtRegulateForm">
               <div style="background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px; padding: 0.75rem 0.95rem; margin-bottom: 0.85rem; font-size: 0.82rem; color: #1E40AF; line-height: 1.45;">
-                <i class="fa-solid fa-circle-info" style="margin-right: 0.35rem;"></i>
+                <i aria-hidden="true" class="fa-solid fa-circle-info" style="margin-right: 0.35rem;"></i>
                 <strong>Non-Cash Correction:</strong> Fee adjustments modify the student's pending balance/dues only. They do <u>not</u> calculate as money collected and have zero impact on the Institute's cash intake.
               </div>
 
               <div style="margin-bottom: 0.9rem;">
-                <label style="font-size: 0.85rem; font-weight: 600;">Correction / Adjustment Type</label>
+                <label for="mgmtAdjActionType" style="font-size: 0.85rem; font-weight: 600;">Correction / Adjustment Type</label>
                 <select id="mgmtAdjActionType" class="portal-input" required>
                   <option value="discount">Fee Waiver / Discount (Deduct from Pending Dues)</option>
                   <option value="penalty">Fee Correction / Extra Charge (Add to Pending Dues)</option>
@@ -5793,7 +6397,7 @@ function renderStudentDashboard() {
               </div>
 
               <div style="margin-bottom: 0.75rem;">
-                <label id="mgmtAdjAmountLabel" style="font-size: 0.85rem; font-weight: 700; color: var(--text-mahogany);">Correction / Adjustment Amount (₹) *</label>
+                <label for="mgmtAdjAmount" id="mgmtAdjAmountLabel" style="font-size: 0.85rem; font-weight: 700; color: var(--text-mahogany);">Correction / Adjustment Amount (₹) *</label>
                 <input type="number" id="mgmtAdjAmount" class="portal-input" required placeholder="e.g. 500" min="0" step="1">
               </div>
 
@@ -5814,12 +6418,12 @@ function renderStudentDashboard() {
               </div>
 
               <div style="margin-bottom: 1.25rem;">
-                <label style="font-size: 0.85rem; font-weight: 600;">Reason / Audit Explanation *</label>
+                <label for="mgmtAdjNote" style="font-size: 0.85rem; font-weight: 600;">Reason / Audit Explanation *</label>
                 <input type="text" id="mgmtAdjNote" class="portal-input" required placeholder="e.g. Fee structure correction / Special concession approved by Director">
               </div>
 
               <button type="submit" class="btn btn-emerald" style="width: 100%; padding: 0.85rem; font-weight: 700; font-size: 0.92rem; border-radius: 8px;">
-                <i class="fa-solid fa-scale-balanced"></i> Apply Fee Adjustment & Log Correction
+                <i aria-hidden="true" class="fa-solid fa-scale-balanced"></i> Apply Fee Adjustment & Log Correction
               </button>
             </form>
           </div>
@@ -5829,43 +6433,41 @@ function renderStudentDashboard() {
             <form id="mgmtEditProfileForm">
               <div class="mgmt-profile-grid">
                 <div>
-                  <label style="font-size: 0.85rem; font-weight: 600;">Student Full Name *</label>
+                  <label for="mgmtStuName" style="font-size: 0.85rem; font-weight: 600;">Student Full Name *</label>
                   <input type="text" id="mgmtStuName" class="portal-input" value="${target.name}" required>
                 </div>
                 <div>
-                  <label style="font-size: 0.85rem; font-weight: 600;">Mobile Number *</label>
+                  <label for="mgmtStuMobile" style="font-size: 0.85rem; font-weight: 600;">Mobile Number *</label>
                   <input type="tel" id="mgmtStuMobile" class="portal-input" value="${target.mobile}" required maxlength="10" pattern="[0-9]{10}" inputmode="numeric" placeholder="10-digit mobile">
                 </div>
                 <div>
-                  <label style="font-size: 0.85rem; font-weight: 600;">Date of Birth (DOB) *</label>
+                  <label for="mgmtStuDob" style="font-size: 0.85rem; font-weight: 600;">Date of Birth (DOB) *</label>
                   <input type="date" id="mgmtStuDob" class="portal-input" value="${target.dob}" required>
                 </div>
                 <div>
-                  <label style="font-size: 0.85rem; font-weight: 600;">Class / Batch Assignment</label>
+                  <label for="mgmtStuClass" style="font-size: 0.85rem; font-weight: 600;">Class / Batch Assignment</label>
                   <select id="mgmtStuClass" class="portal-input">
-                    <option value="Class 10th (Board Batch)" ${target.className.includes('10th') ? 'selected' : ''}>Class 10th (Board Batch)</option>
-                    <option value="Class 9th (Foundation)" ${target.className.includes('9th') ? 'selected' : ''}>Class 9th (Foundation)</option>
-                    <option value="Class 8th (Junior Achievers)" ${target.className.includes('8th') ? 'selected' : ''}>Class 8th (Junior Achievers)</option>
+                    ${batchAssignmentOptions(target.className || target.class_name || '')}
                   </select>
                 </div>
                 <div>
-                  <label style="font-size: 0.85rem; font-weight: 600;">Custom Monthly Fee (₹/mo)</label>
-                  <input type="number" id="mgmtStuMonthlyFee" class="portal-input" value="${target.monthlyFee || 1000}">
+                  <label for="mgmtStuMonthlyFee" style="font-size: 0.85rem; font-weight: 600;">Custom Monthly Fee (₹/mo)</label>
+                  <input type="number" id="mgmtStuMonthlyFee" class="portal-input" min="0" value="${studentMonthlyFee(target)}">
                 </div>
                 <div>
-                  <label style="font-size: 0.85rem; font-weight: 600;">Email Address</label>
+                  <label for="mgmtStuEmail" style="font-size: 0.85rem; font-weight: 600;">Email Address</label>
                   <input type="email" id="mgmtStuEmail" class="portal-input" value="${target.email}">
                 </div>
                 <div>
-                  <label style="font-size: 0.85rem; font-weight: 600;">Father / Guardian Name</label>
+                  <label for="mgmtStuGuardian" style="font-size: 0.85rem; font-weight: 600;">Father / Guardian Name</label>
                   <input type="text" id="mgmtStuGuardian" class="portal-input" value="${target.guardianName}">
                 </div>
                 <div>
-                  <label style="font-size: 0.85rem; font-weight: 600;">Guardian Contact</label>
+                  <label for="mgmtStuGuardianMobile" style="font-size: 0.85rem; font-weight: 600;">Guardian Contact</label>
                   <input type="tel" id="mgmtStuGuardianMobile" class="portal-input" value="${target.guardianMobile || target.mobile}" maxlength="10" pattern="[0-9]{10}" inputmode="numeric" placeholder="10-digit guardian contact">
                 </div>
                 <div>
-                  <label style="font-size: 0.85rem; font-weight: 600;">Blood Group</label>
+                  <label for="mgmtStuBloodGroup" style="font-size: 0.85rem; font-weight: 600;">Blood Group</label>
                   <select id="mgmtStuBloodGroup" class="portal-input">
                     <option value="Not Specified" ${target.bloodGroup === 'Not Specified' ? 'selected' : ''}>Not Specified</option>
                     <option value="A+" ${target.bloodGroup === 'A+' ? 'selected' : ''}>A+</option>
@@ -5879,11 +6481,11 @@ function renderStudentDashboard() {
                   </select>
                 </div>
                 <div>
-                  <label style="font-size: 0.85rem; font-weight: 600;">Joining Session / Month</label>
+                  <label for="mgmtStuJoiningMonth" style="font-size: 0.85rem; font-weight: 600;">Joining Session / Month</label>
                   <input type="text" id="mgmtStuJoiningMonth" class="portal-input" value="${target.joiningMonth || 'April 2026'}">
                 </div>
                 <div class="col-span-2">
-                  <label style="font-size: 0.85rem; font-weight: 600;"><i class="fa-solid fa-camera" style="color: var(--primary-emerald);"></i> Profile Photo (Upload to Cloud Storage)</label>
+                  <label for="mgmtStuPhotoInput" style="font-size: 0.85rem; font-weight: 600;"><i class="fa-solid fa-camera" aria-hidden="true" style="color: var(--primary-emerald);"></i> Profile Photo (Upload to Cloud Storage)</label>
                   <div style="display: flex; gap: 0.75rem; align-items: center; margin-top: 0.35rem;">
                     <div id="mgmtPhotoPreviewContainer" style="width: 50px; height: 50px; border-radius: 8px; overflow: hidden; border: 2px solid var(--primary-emerald); flex-shrink: 0; background: #f3f4f6;">
                       <img id="mgmtPhotoPreviewImg" src="${target.photoUrl || target.photo_url || target.photo || 'assets/images/logo.png'}" style="width: 100%; height: 100%; object-fit: cover;">
@@ -5896,12 +6498,12 @@ function renderStudentDashboard() {
                   </div>
                 </div>
                 <div class="col-span-2">
-                  <label style="font-size: 0.85rem; font-weight: 600;">Residential Address</label>
+                  <label for="mgmtStuAddress" style="font-size: 0.85rem; font-weight: 600;">Residential Address</label>
                   <input type="text" id="mgmtStuAddress" class="portal-input" value="${target.address}">
                 </div>
               </div>
               <button type="submit" class="btn btn-emerald" style="width: 100%; padding: 0.8rem;">
-                <i class="fa-solid fa-floppy-disk"></i> Save & Synchronize Profile Changes
+                <i aria-hidden="true" class="fa-solid fa-floppy-disk"></i> Save & Synchronize Profile Changes
               </button>
             </form>
           </div>
@@ -5911,7 +6513,7 @@ function renderStudentDashboard() {
             <div style="background: var(--bg-surface-cream, #FAF9F6); border: 1.5px solid var(--border-sand, #E5E7EB); border-radius: 10px; padding: 1.25rem; margin-bottom: 1.25rem;">
               <div style="display: flex; gap: 1rem; align-items: flex-start;">
                 <div style="font-size: 2rem; color: var(--primary-emerald, #064E3B); background: rgba(6, 78, 59, 0.08); width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                  <i class="fa-solid fa-user-shield"></i>
+                  <i aria-hidden="true" class="fa-solid fa-user-shield"></i>
                 </div>
                 <div style="flex: 1;">
                   <h4 style="margin: 0 0 0.35rem 0; font-size: 1.02rem; color: var(--text-mahogany);">Student Login & Password Controls</h4>
@@ -5931,23 +6533,23 @@ function renderStudentDashboard() {
                   </div>
 
                   <div style="background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 8px; padding: 0.85rem 1rem; font-size: 0.82rem; color: #92400E; margin-bottom: 1.15rem; line-height: 1.5;">
-                    <i class="fa-solid fa-circle-info" style="margin-right: 0.35rem;"></i> <strong>Instant Admin Reset:</strong> If this student has updated their password and forgot it, click below to instantly reset their portal login credentials back to their Date of Birth.
+                    <i aria-hidden="true" class="fa-solid fa-circle-info" style="margin-right: 0.35rem;"></i> <strong>Instant Admin Reset:</strong> If this student has updated their password and forgot it, click below to instantly reset their portal login credentials back to their Date of Birth.
                   </div>
 
                   <button type="button" id="btnAdminResetStuPasswordToDob" class="btn" style="background-color: #D97706; color: #fff; border: none; padding: 0.75rem 1.25rem; border-radius: 8px; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.45rem; box-shadow: 0 2px 6px rgba(217, 119, 6, 0.25);">
-                    <i class="fa-solid fa-rotate-left"></i> Reset Password to DOB (${target.dob})
+                    <i aria-hidden="true" class="fa-solid fa-rotate-left"></i> Reset Password to DOB (${target.dob})
                   </button>
 
                   <!-- Danger Zone: Permanent Record Deletion -->
                   <div style="background: #FEF2F2; border: 1.5px solid #FCA5A5; border-radius: 8px; padding: 1rem; margin-top: 1.25rem;">
                     <div style="font-weight: 700; color: #991B1B; font-size: 0.88rem; margin-bottom: 0.3rem;">
-                      <i class="fa-solid fa-triangle-exclamation"></i> Danger Zone: Permanent Deletion
+                      <i aria-hidden="true" class="fa-solid fa-triangle-exclamation"></i> Danger Zone: Permanent Deletion
                     </div>
                     <p style="margin: 0 0 0.85rem 0; font-size: 0.8rem; color: #7F1D1D; line-height: 1.45;">
                       Permanently delete this student's master profile, all financial ledgers, receipts, and portal login access.
                     </p>
                     <button type="button" id="btnAdminTriggerDeleteStuModal" class="btn" style="background-color: #DC2626; color: #fff; border: none; padding: 0.65rem 1.15rem; border-radius: 6px; font-weight: 700; font-size: 0.84rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; box-shadow: 0 2px 6px rgba(220, 38, 38, 0.25);">
-                      <i class="fa-solid fa-trash-can"></i> Delete Student Record...
+                      <i aria-hidden="true" class="fa-solid fa-trash-can"></i> Delete Student Record...
                     </button>
                   </div>
                 </div>
@@ -5960,6 +6562,7 @@ function renderStudentDashboard() {
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 
     const modalEl = document.getElementById('studentManagementModal');
+    wireModalA11y(modalEl, { closeOnBackdrop: false });
 
     // Handle Danger Zone Delete Trigger
     modalEl.querySelector('#btnAdminTriggerDeleteStuModal')?.addEventListener('click', () => {
@@ -5974,7 +6577,7 @@ function renderStudentDashboard() {
         const origHtml = btn.innerHTML;
         try {
           btn.disabled = true;
-          btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting Password...';
+          btn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-spinner fa-spin"></i> Resetting Password...';
           await AppState.resetStudentPasswordToDob(target.id);
           alert(`✅ Password for ${target.name} has been reset to Date of Birth (${target.dob}). The student can now log in using their DOB.`);
         } catch (err) {
@@ -6276,6 +6879,23 @@ function renderStudentDashboard() {
       e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10);
     });
 
+    // Moving a student to a different batch re-rates their monthly fee — but
+    // only when the field still holds the old batch's standard rate, so a
+    // deliberate concession or sibling discount is never overwritten. Without
+    // this, promoting a Class 8th student to Class 12th PCM kept them on ₹800
+    // and under-billed them ₹700 every month thereafter.
+    const mgmtClassSelect = modalEl.querySelector('#mgmtStuClass');
+    const mgmtFeeInput = modalEl.querySelector('#mgmtStuMonthlyFee');
+    mgmtClassSelect?.addEventListener('change', () => {
+      if (!mgmtFeeInput) return;
+      const opt = mgmtClassSelect.options[mgmtClassSelect.selectedIndex];
+      const nextRate = Number(opt?.dataset.monthly) || classMonthlyFee(mgmtClassSelect.value);
+      if (!nextRate) return;
+      const currentValue = Number(mgmtFeeInput.value);
+      const wasStandard = !currentValue || currentValue === studentMonthlyFee(target);
+      if (wasStandard) mgmtFeeInput.value = nextRate;
+    });
+
     // Form 4: Edit Profile Submit
     modalEl.querySelector('#mgmtEditProfileForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -6297,8 +6917,12 @@ function renderStudentDashboard() {
         return;
       }
 
-      const oldMonthlyFee = parseFloat(target.monthlyFee) || 1000;
-      const newMonthlyFee = parseFloat(modalEl.querySelector('#mgmtStuMonthlyFee').value) || 1000;
+      // Both sides fall back to the canonical fee for the student's class rather
+      // than a flat ₹1,000, so clearing the field cannot silently re-rate a
+      // ₹1,500 senior student down to ₹1,000.
+      const classFee = studentMonthlyFee(target);
+      const oldMonthlyFee = parseFloat(target.monthlyFee) || classFee;
+      const newMonthlyFee = parseFloat(modalEl.querySelector('#mgmtStuMonthlyFee').value) || classFee;
       const feeRateChanged = (oldMonthlyFee !== newMonthlyFee);
 
       target.name = modalEl.querySelector('#mgmtStuName').value.trim();
@@ -6435,13 +7059,19 @@ function renderStudentDashboard() {
       const allTransactions = [];
       const processedReceiptNos = new Set();
 
-      let chandanTotal = 0;
-      let chandanCash = 0;
-      let chandanUpi = 0;
-
-      let raviTotal = 0;
-      let raviCash = 0;
-      let raviUpi = 0;
+      // Per-collector tallies, one bucket per roster member plus one for
+      // receipts that never recorded who took the money. This replaces six
+      // standalone counters that could only ever split the books two ways, so
+      // every rupee Aditi Singh collected was reported as Prof. Ravi Ranjan's.
+      const facultyRoster = (ACADEMIC && ACADEMIC.FACULTY) || [];
+      const UNATTRIBUTED = '__unattributed__';
+      const collectorTally = new Map();
+      const tallyFor = (key) => {
+        if (!collectorTally.has(key)) collectorTally.set(key, { total: 0, cash: 0, upi: 0, count: 0 });
+        return collectorTally.get(key);
+      };
+      facultyRoster.forEach(f => tallyFor(f.name));
+      tallyFor(UNATTRIBUTED);
 
       let totalAllModes = 0;
 
@@ -6508,13 +7138,10 @@ function renderStudentDashboard() {
           const initRecNo = `REC-${sRoll || sId || 'ADM'}-INIT`;
           if (!processedReceiptNos.has(initRecNo)) {
             processedReceiptNos.add(initRecNo);
-            const defaultAdmCollector = (s.className && (s.className.includes('10th') || s.className.includes('Science')))
-              ? 'CHANDAN KUMAR (Science Lead & Admin)'
-              : 'Prof. Ravi Ranjan (Director)';
-            const defaultAdmMode = (s.className && (s.className.includes('10th') || s.className.includes('Online')))
-              ? 'UPI (PhonePe)'
-              : 'Cash at Counter';
-
+            // Nothing is inferred from the class name. The two ladders removed
+            // here stamped an admission payment with a collector and a payment
+            // mode that were never recorded, putting invented evidence into the
+            // audit ledger the sole administrator signs off on.
             studentTxList.push({
               receiptNo: initRecNo,
               date: s.joiningMonth || (s.created_at ? new Date(s.created_at).toLocaleDateString('en-IN') : 'Admission Session'),
@@ -6522,40 +7149,31 @@ function renderStudentDashboard() {
               rollNo: s.rollNo || s.roll_no || s.student_id,
               className: s.className || s.class_name || 'General',
               amount: diff,
-              mode: s.paymentMode || s.payment_mode || defaultAdmMode,
-              collector: s.admittedBy || defaultAdmCollector,
+              mode: s.paymentMode || s.payment_mode || 'Not recorded',
+              collector: s.admittedBy || '',
               note: 'Initial Course Admission & Tuition Fee'
             });
           }
         }
 
-        // 1.4 Classify transactions to Chandan Kumar vs Prof. Ravi Ranjan
+        // 1.4 Tally each transaction against the collector it actually names
         studentTxList.forEach(t => {
-          const rawCol = String(t.collector || '').toLowerCase();
           const rawMode = String(t.mode || '').toLowerCase();
-
-          const isChandan = rawCol.includes('chandan') || 
-                            rawMode.includes('phonepe') || 
-                            rawMode.includes('gpay') || 
-                            rawMode.includes('google pay') || 
-                            rawMode.includes('chandankr') ||
-                            rawMode.includes('qr') ||
-                            rawMode.includes('online');
-
           const isCash = rawMode.includes('cash') || rawMode.includes('counter');
 
-          let officialCollector = '';
-          if (isChandan) {
-            officialCollector = 'CHANDAN KUMAR (Science Lead & Admin)';
-            chandanTotal += t.amount;
-            if (isCash) chandanCash += t.amount; else chandanUpi += t.amount;
-          } else {
-            officialCollector = 'Prof. Ravi Ranjan (Maths Director)';
-            raviTotal += t.amount;
-            if (isCash) raviCash += t.amount; else raviUpi += t.amount;
-          }
+          // The collector recorded on the receipt is left as written. The block
+          // this replaces overwrote `t.collector` with one of two invented
+          // strings — 'CHANDAN KUMAR (Science Lead & Admin)' or 'Prof. Ravi
+          // Ranjan (Maths Director)' — so the exported audit ledger no longer
+          // matched the receipts it was built from, and the second string
+          // attached a directorship to Prof. Ravi Ranjan that belongs to the
+          // sole administrator.
+          const owner = facultyRoster.find(f => collectorMatchesFaculty(t, f.name));
+          const bucket = tallyFor(owner ? owner.name : UNATTRIBUTED);
+          bucket.total += t.amount;
+          bucket.count += 1;
+          if (isCash) bucket.cash += t.amount; else bucket.upi += t.amount;
 
-          t.collector = officialCollector;
           totalAllModes += t.amount;
           allTransactions.push(t);
         });
@@ -6563,11 +7181,14 @@ function renderStudentDashboard() {
 
       // Filter transactions
       let filteredTx = allTransactions.filter(t => {
+        // Filter value is the roster name, so a third faculty member needs no
+        // new branch. The two-branch version only understood 'chandan' and
+        // 'ravi', and matched on the rewritten label rather than the record.
         let matchesCollector = true;
-        if (auditTxCollectorFilter === 'chandan') {
-          matchesCollector = t.collector.toLowerCase().includes('chandan');
-        } else if (auditTxCollectorFilter === 'ravi') {
-          matchesCollector = t.collector.toLowerCase().includes('ravi') || t.collector.toLowerCase().includes('ranjan');
+        if (auditTxCollectorFilter === UNATTRIBUTED) {
+          matchesCollector = !facultyRoster.some(f => collectorMatchesFaculty(t, f.name));
+        } else if (auditTxCollectorFilter !== 'all') {
+          matchesCollector = collectorMatchesFaculty(t, auditTxCollectorFilter);
         }
 
         let matchesMode = true;
@@ -6604,7 +7225,7 @@ function renderStudentDashboard() {
           <div class="dash-card" style="background: linear-gradient(135deg, #064E3B 0%, #032e23 100%); color: #fff;">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
               <div>
-                <span class="section-tag" style="background: rgba(255,255,255,0.2); color: #fff;"><i class="fa-solid fa-chart-line"></i> Coaching Financial Analytics</span>
+                <span class="section-tag" style="background: rgba(255,255,255,0.2); color: #fff;"><i aria-hidden="true" class="fa-solid fa-chart-line"></i> Coaching Financial Analytics</span>
                 <h3 style="font-size: 1.5rem; font-weight: 800; margin-top: 0.4rem; color: #fff;">100% Monthly Fee Coaching Report</h3>
               </div>
               <div style="text-align: right;">
@@ -6634,7 +7255,7 @@ function renderStudentDashboard() {
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem; border-bottom: 1.5px solid #A7F3D0; padding-bottom: 0.85rem;">
               <div>
                 <span class="section-tag" style="background: #D1FAE5; color: #065F46; font-weight: 800; padding: 0.25rem 0.65rem; border-radius: 99px; font-size: 0.75rem;">
-                  <i class="fa-solid fa-paper-plane"></i> MAIN ADMIN DISPATCH CENTER
+                  <i aria-hidden="true" class="fa-solid fa-paper-plane"></i> MAIN ADMIN DISPATCH CENTER
                 </span>
                 <h3 style="font-size: 1.25rem; font-weight: 800; color: #064E3B; margin-top: 0.35rem;">
                   ⚡ Instant Fee Billing & Email Trigger (Resend Live Data)
@@ -6645,27 +7266,23 @@ function renderStudentDashboard() {
               </div>
               <div style="display: flex; gap: 0.5rem;">
                 <span style="font-size: 0.8rem; background: #ECFDF5; color: #065F46; border: 1px solid #10B981; padding: 0.4rem 0.8rem; border-radius: 99px; font-weight: 700; display: inline-flex; align-items: center; gap: 0.4rem;">
-                  <i class="fa-solid fa-bolt"></i> Verified Domain: noreply@pragyaninstitute.com
+                  <i aria-hidden="true" class="fa-solid fa-bolt"></i> Verified Domain: noreply@pragyaninstitute.com
                 </span>
               </div>
             </div>
 
             <div class="admin-billing-form-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
               <div>
-                <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #374151; margin-bottom: 0.35rem;">
+                <label for="adminBillingTargetClass" style="display: block; font-size: 0.82rem; font-weight: 700; color: #374151; margin-bottom: 0.35rem;">
                   🎯 1. Select Batch / Class:
                 </label>
                 <select id="adminBillingTargetClass" class="portal-input" style="width: 100%; font-weight: 600; padding: 0.6rem 0.85rem; border-radius: 8px; border: 1.5px solid var(--border-sand); background: #fff;">
-                  <option value="all">🌟 All Batches (All Enrolled Students)</option>
-                  <option value="10th" selected>🎯 Class 10th (ACHIEVER Batch)</option>
-                  <option value="9th">🌱 Class 9th (NURTURE Batch)</option>
-                  <option value="8th">⚡ Class 8th (ALPHA Batch)</option>
-                  <option value="junio">🚀 Junior Batch (JUNIO Batch)</option>
+                  ${batchFilterOptions('all', '🌟 All Batches (All Enrolled Students)')}
                 </select>
               </div>
 
               <div>
-                <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #374151; margin-bottom: 0.35rem;">
+                <label for="adminBillingTargetStudent" style="display: block; font-size: 0.82rem; font-weight: 700; color: #374151; margin-bottom: 0.35rem;">
                   👤 2. Target Student (Individual or All):
                 </label>
                 <select id="adminBillingTargetStudent" class="portal-input" style="width: 100%; font-weight: 600; padding: 0.6rem 0.85rem; border-radius: 8px; border: 1.5px solid var(--border-sand); background: #fff;">
@@ -6674,7 +7291,7 @@ function renderStudentDashboard() {
               </div>
 
               <div>
-                <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #374151; margin-bottom: 0.35rem;">
+                <label for="adminBillingAction" style="display: block; font-size: 0.82rem; font-weight: 700; color: #374151; margin-bottom: 0.35rem;">
                   📬 3. Action / Dispatch Mode:
                 </label>
                 <select id="adminBillingAction" class="portal-input" style="width: 100%; font-weight: 600; padding: 0.6rem 0.85rem; border-radius: 8px; border: 1.5px solid var(--border-sand); background: #fff;">
@@ -6686,10 +7303,10 @@ function renderStudentDashboard() {
 
             <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
               <div style="font-size: 0.82rem; color: #6B7280; display: flex; align-items: center; gap: 0.5rem;">
-                <i class="fa-solid fa-shield-halved" style="color: #059669;"></i> Includes official PhonePe QR, <strong>chandankr1501998@ybl</strong>, and auto-UPI pay links.
+                <i aria-hidden="true" class="fa-solid fa-shield-halved" style="color: #059669;"></i> Includes official PhonePe QR, <strong>chandankr1501998@ybl</strong>, and auto-UPI pay links.
               </div>
               <button id="adminTriggerBillingBtn" class="btn btn-emerald" style="padding: 0.65rem 1.4rem; font-size: 0.92rem; font-weight: 800; display: inline-flex; align-items: center; gap: 0.6rem; box-shadow: 0 4px 12px rgba(5,150,105,0.3);">
-                <i class="fa-solid fa-paper-plane"></i> <span>Trigger Real-Time Dispatch</span>
+                <i aria-hidden="true" class="fa-solid fa-paper-plane"></i> <span>Trigger Real-Time Dispatch</span>
               </button>
             </div>
 
@@ -6702,46 +7319,39 @@ function renderStudentDashboard() {
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border-sand); padding-bottom: 0.75rem;">
               <div>
                 <h4 style="font-size: 1.15rem; font-weight: 800; color: var(--text-mahogany); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
-                  <i class="fa-solid fa-layer-group" style="color: var(--primary-emerald);"></i> Batch-Wise Collection & Enrollment Breakdown
+                  <i aria-hidden="true" class="fa-solid fa-layer-group" style="color: var(--primary-emerald);"></i> Batch-Wise Collection & Enrollment Breakdown
                 </h4>
                 <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 0.2rem;">Live revenue, collection efficiency, and dues tracking configured for every academic batch</div>
               </div>
               <span style="background: #ECFDF5; color: #065F46; border: 1px solid #10B981; padding: 0.3rem 0.75rem; border-radius: 99px; font-size: 0.78rem; font-weight: 700;">
-                <i class="fa-solid fa-graduation-cap"></i> 4 Standard Institutional Batches
+                <i class="fa-solid fa-graduation-cap" aria-hidden="true"></i> ${canonicalBatchCards().length} Standard Institutional Batches
               </span>
             </div>
 
             <div style="display: flex; flex-direction: column; gap: 1.15rem;">
               ${batches.map(b => {
                 const bName = b.className || b.name || b.batchName || 'Academic Batch';
-                const bKey = (bName.includes('10th') || bName.includes('ACHIEVER')) ? '10th' :
-                             (bName.includes('9th') || bName.includes('NURTURE')) ? '9th' :
-                             (bName.includes('8th') || bName.includes('ALPHA')) ? '8th' : 'junior';
+                // Canonical id, not a four-way guess. The ladder this replaces
+                // ended in `: 'junior'`, so Class 11th, Class 12th and all three
+                // Special English batches all resolved to 'junior' — and because
+                // the student filter below keyed off bKey, those five cards each
+                // showed the *same* set of 6th/7th/junior students at ₹700/mo.
+                const bKey = getBatchCategoryKey(b.batch_id || b.id || bName);
 
-                const batchStudents = students.filter(s => {
-                  const sClass = (s.className || s.class_name || s.batchName || '').toLowerCase();
-                  if (bKey === '10th') return sClass.includes('10th') || sClass.includes('achiever') || sClass.includes('class 10') || sClass.includes('board');
-                  if (bKey === '9th') return sClass.includes('9th') || sClass.includes('nurture') || sClass.includes('class 9');
-                  if (bKey === '8th') return sClass.includes('8th') || sClass.includes('alpha') || sClass.includes('class 8');
-                  if (bKey === 'junior') return sClass.includes('junior') || sClass.includes('junio') || sClass.includes('7th') || sClass.includes('6th') || sClass.includes('class 7') || sClass.includes('class 6');
-                  return sClass.includes(bName.toLowerCase());
-                });
+                const batchStudents = students.filter(s =>
+                  getBatchCategoryKey(s.className || s.class_name || s.batchName || '') === bKey
+                );
 
-                const bMonthlyRate = Number(b.monthlyFee ?? b.monthly_fee ?? (bKey === '8th' ? 800 : (bKey === 'junior' ? 700 : 1000)));
+                const bMonthlyRate = Number(b.monthlyFee ?? b.monthly_fee) || classMonthlyFee(bKey || bName);
                 const bCollected = batchStudents.reduce((acc, c) => acc + (Number(c.paidFee ?? c.paid_fee ?? 0)), 0);
                 const bPending = batchStudents.reduce((acc, c) => acc + (Number(c.pendingFee ?? c.pending_fee ?? 0)), 0);
                 const bTotal = bCollected + bPending;
-                const bPct = bTotal > 0 ? Math.min(100, Math.round((bCollected / bTotal) * 100)) : (batchStudents.length > 0 ? 0 : 0);
+                const bPct = bTotal > 0 ? Math.min(100, Math.round((bCollected / bTotal) * 100)) : 0;
 
-                let badgeIcon = 'fa-graduation-cap';
-                let badgeText = 'Batch';
-                let badgeColor = '#065F46';
-                let badgeBg = '#D1FAE5';
-
-                if (bKey === '10th') { badgeIcon = 'fa-bullseye'; badgeText = '🎯 Board Special'; badgeColor = '#92400E'; badgeBg = '#FEF3C7'; }
-                else if (bKey === '9th') { badgeIcon = 'fa-seedling'; badgeText = '🌱 Foundation Prep'; badgeColor = '#065F46'; badgeBg = '#D1FAE5'; }
-                else if (bKey === '8th') { badgeIcon = 'fa-bolt'; badgeText = '⚡ Middle Prep'; badgeColor = '#1E40AF'; badgeBg = '#DBEAFE'; }
-                else if (bKey === 'junior') { badgeIcon = 'fa-rocket'; badgeText = '🚀 Primary / Basics'; badgeColor = '#6B21A8'; badgeBg = '#F3E8FF'; }
+                const badge = BATCH_BADGE[bKey] || { text: `${batchIcon(bKey)} Batch`, color: '#065F46', bg: '#D1FAE5' };
+                const badgeText = badge.text;
+                const badgeColor = badge.color;
+                const badgeBg = badge.bg;
 
                 const clearedCount = batchStudents.filter(s => (Number(s.pendingFee ?? s.pending_fee ?? 0)) === 0).length;
 
@@ -6759,15 +7369,15 @@ function renderStudentDashboard() {
                       </div>
                       <div style="text-align: right;">
                         <span style="font-weight: 800; font-size: 1.05rem; color: #059669; background: #ECFDF5; padding: 0.25rem 0.65rem; border-radius: 6px; border: 1px solid #A7F3D0;">
-                          <i class="fa-solid fa-circle-check" style="font-size: 0.85rem;"></i> ₹${bCollected.toLocaleString()} Collected
+                          <i aria-hidden="true" class="fa-solid fa-circle-check" style="font-size: 0.85rem;"></i> ₹${bCollected.toLocaleString()} Collected
                         </span>
                       </div>
                     </div>
 
                     <div style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.6rem; display: flex; align-items: center; flex-wrap: wrap; gap: 1rem;">
-                      <span><i class="fa-regular fa-clock" style="color: #6B7280;"></i> ${b.timing || b.timings || 'Mon – Sat: Regular Timings'}</span>
-                      <span><i class="fa-solid fa-door-open" style="color: #6B7280;"></i> ${b.room || 'Classroom'}</span>
-                      <span><i class="fa-solid fa-chalkboard-user" style="color: #6B7280;"></i> ${b.teacher || 'Chandan Kumar & Ravi Ranjan'}</span>
+                      <span><i aria-hidden="true" class="fa-regular fa-clock" style="color: #6B7280;"></i> ${b.timing || b.timings || 'Mon – Sat: Regular Timings'}</span>
+                      <span><i aria-hidden="true" class="fa-solid fa-door-open" style="color: #6B7280;"></i> ${b.room || 'Classroom'}</span>
+                      <span><i aria-hidden="true" class="fa-solid fa-chalkboard-user" style="color: #6B7280;"></i> ${b.teacher || 'Chandan Kumar & Ravi Ranjan'}</span>
                     </div>
 
                     <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; margin-bottom: 0.4rem;">
@@ -6776,7 +7386,7 @@ function renderStudentDashboard() {
                         <span style="font-size: 0.76rem; color: var(--text-muted); font-weight: 500; margin-left: 0.4rem;">(${clearedCount}/${batchStudents.length} students cleared)</span>
                       </span>
                       <span style="color: #DC2626; font-weight: 700;">
-                        <i class="fa-solid fa-triangle-exclamation"></i> Pending Dues: ₹${bPending.toLocaleString()}
+                        <i aria-hidden="true" class="fa-solid fa-triangle-exclamation"></i> Pending Dues: ₹${bPending.toLocaleString()}
                       </span>
                     </div>
 
@@ -6794,12 +7404,12 @@ function renderStudentDashboard() {
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border-sand); padding-bottom: 0.85rem;">
               <div>
                 <h4 style="font-size: 1.15rem; font-weight: 800; color: var(--text-mahogany); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
-                  <i class="fa-solid fa-receipt" style="color: var(--primary-emerald);"></i> Student Payment Transactions & Collector Audit Log
+                  <i aria-hidden="true" class="fa-solid fa-receipt" style="color: var(--primary-emerald);"></i> Student Payment Transactions & Collector Audit Log
                 </h4>
                 <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 0.2rem;">Detailed log of all student payments across Cash, UPI, and Online transfers with teacher audit breakdown</div>
               </div>
               <span style="background: var(--primary-emerald-light); color: var(--primary-emerald); padding: 0.35rem 0.85rem; border-radius: 99px; font-size: 0.8rem; font-weight: 700;">
-                <i class="fa-solid fa-list-check"></i> ${filteredTx.length} Transactions Found
+                <i aria-hidden="true" class="fa-solid fa-list-check"></i> ${filteredTx.length} Transactions Found
               </span>
             </div>
 
@@ -6807,15 +7417,16 @@ function renderStudentDashboard() {
             <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between; margin-bottom: 1rem; background: #FAF9F6; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border-sand);">
               <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; flex: 1; min-width: 240px;">
                 <div style="position: relative; flex: 1; min-width: 180px;">
-                  <input type="text" id="auditTxSearchInput" class="portal-input" placeholder="Search by student, roll #, receipt..." value="${auditTxSearchQuery}" style="padding-left: 2.2rem; font-size: 0.82rem; height: 38px;">
-                  <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.8rem;"></i>
+                  <input type="text" id="auditTxSearchInput" aria-label="Search transactions by student, roll number or receipt" class="portal-input" placeholder="Search by student, roll #, receipt..." value="${auditTxSearchQuery}" style="padding-left: 2.2rem; font-size: 0.82rem; height: 38px;">
+                  <i aria-hidden="true" class="fa-solid fa-magnifying-glass" style="position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.8rem;"></i>
                 </div>
-                <select id="auditTxCollectorSelect" class="portal-input" style="width: auto; font-size: 0.82rem; height: 38px; padding: 0.4rem 0.6rem;">
+                <select id="auditTxCollectorSelect" class="portal-input" aria-label="Filter by faculty collector" style="width: auto; font-size: 0.82rem; height: 38px; padding: 0.4rem 0.6rem;">
                   <option value="all" ${auditTxCollectorFilter === 'all' ? 'selected' : ''}>All Faculty Collectors</option>
-                  <option value="chandan" ${auditTxCollectorFilter === 'chandan' ? 'selected' : ''}>👨‍🏫 Chandan Kumar</option>
-                  <option value="ravi" ${auditTxCollectorFilter === 'ravi' ? 'selected' : ''}>👨‍🏫 Prof. Ravi Ranjan</option>
+                  ${facultyRoster.map(f => `
+                  <option value="${f.name}" ${auditTxCollectorFilter === f.name ? 'selected' : ''}>👨‍🏫 ${titleCaseName(f.name)}</option>`).join('')}
+                  <option value="${UNATTRIBUTED}" ${auditTxCollectorFilter === UNATTRIBUTED ? 'selected' : ''}>⚠️ Collector Not Recorded (${collectorTally.get(UNATTRIBUTED).count})</option>
                 </select>
-                <select id="auditTxModeSelect" class="portal-input" style="width: auto; font-size: 0.82rem; height: 38px; padding: 0.4rem 0.6rem;">
+                <select id="auditTxModeSelect" class="portal-input" aria-label="Filter by payment mode" style="width: auto; font-size: 0.82rem; height: 38px; padding: 0.4rem 0.6rem;">
                   <option value="all" ${auditTxModeFilter === 'all' ? 'selected' : ''}>All Payment Modes</option>
                   <option value="cash" ${auditTxModeFilter === 'cash' ? 'selected' : ''}>💵 Cash Only</option>
                   <option value="upi" ${auditTxModeFilter === 'upi' ? 'selected' : ''}>📱 UPI / Online Only</option>
@@ -6842,22 +7453,22 @@ function renderStudentDashboard() {
                     pageTx.map(t => `
                       <tr>
                         <td style="white-space: nowrap; color: var(--text-muted); font-size: 0.78rem;">
-                          <i class="fa-regular fa-calendar-days" style="color: var(--primary-emerald);"></i> ${t.date}
+                          <i aria-hidden="true" class="fa-regular fa-calendar-days" style="color: var(--primary-emerald);"></i> ${t.date}
                         </td>
                         <td>
                           <strong>${t.studentName}</strong>
                           <div style="font-size: 0.76rem; color: var(--text-muted);">Roll #${t.rollNo}</div>
                         </td>
                         <td><span style="background: #FAF9F6; padding: 0.2rem 0.5rem; border-radius: 4px; border: 1px solid var(--border-sand); font-size: 0.78rem;">${t.className}</span></td>
-                        <td style="font-weight: 800; color: #059669; font-size: 1rem;">₹${t.amount.toLocaleString()}</td>
+                        <td style="font-weight: 800; color: #047857; font-size: 1rem;">₹${t.amount.toLocaleString()}</td>
                         <td>
-                          <span style="padding: 0.25rem 0.65rem; border-radius: 99px; font-size: 0.76rem; font-weight: 700; background: ${t.mode.toLowerCase().includes('cash') ? '#FEF3C7; color: #92400E;' : '#D1FAE5; color: #065F46;'}">
-                            <i class="${t.mode.toLowerCase().includes('cash') ? 'fa-solid fa-money-bill-wave' : 'fa-solid fa-mobile-screen'}"></i> ${t.mode}
+                          <span style="padding: 0.25rem 0.65rem; border-radius: 99px; font-size: 0.76rem; font-weight: 700; background: ${t.mode.toLowerCase().includes('cash') ? '#FEF3C7; color: #78350F;' : '#D1FAE5; color: #065F46;'}">
+                            <i class="${t.mode.toLowerCase().includes('cash') ? 'fa-solid fa-money-bill-wave' : 'fa-solid fa-mobile-screen'}" aria-hidden="true"></i> ${t.mode}
                           </span>
                         </td>
                         <td style="font-family: monospace; font-size: 0.8rem; font-weight: 700; color: var(--text-mahogany);">${t.receiptNo}</td>
                         <td>
-                          <div style="font-weight: 700; color: var(--text-mahogany); font-size: 0.82rem;">${t.collector}</div>
+                          <div style="font-weight: 700; color: ${collectorDisplay(t.collector).color}; font-size: 0.82rem;">${collectorDisplay(t.collector).label}</div>
                           ${t.note ? `<div style="font-size: 0.72rem; color: var(--text-muted); font-style: italic;">"${t.note}"</div>` : ''}
                         </td>
                       </tr>
@@ -6874,11 +7485,11 @@ function renderStudentDashboard() {
               </div>
               <div style="display: flex; gap: 0.35rem; align-items: center;">
                 <button class="btn" id="btnAuditTxPrev" ${auditTxPage <= 1 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''} style="padding: 0.3rem 0.75rem; font-size: 0.8rem; background: #fff; border: 1px solid var(--border-sand); color: var(--text-mahogany); font-weight: 700;">
-                  <i class="fa-solid fa-chevron-left"></i> Prev
+                  <i aria-hidden="true" class="fa-solid fa-chevron-left"></i> Prev
                 </button>
                 <span style="font-weight: 700; color: var(--text-mahogany); padding: 0 0.5rem;">Page ${auditTxPage} of ${totalPages}</span>
                 <button class="btn" id="btnAuditTxNext" ${auditTxPage >= totalPages ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''} style="padding: 0.3rem 0.75rem; font-size: 0.8rem; background: #fff; border: 1px solid var(--border-sand); color: var(--text-mahogany); font-weight: 700;">
-                  Next <i class="fa-solid fa-chevron-right"></i>
+                  Next <i aria-hidden="true" class="fa-solid fa-chevron-right"></i>
                 </button>
               </div>
             </div>
@@ -6886,50 +7497,67 @@ function renderStudentDashboard() {
             <!-- Unified Teacher Collection Summary Section -->
             <div style="background: #FAF9F6; border: 1.5px solid var(--border-sand); border-radius: 12px; padding: 1.25rem;">
               <h5 style="font-size: 0.98rem; font-weight: 800; color: var(--text-mahogany); margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
-                <span><i class="fa-solid fa-calculator" style="color: var(--primary-emerald);"></i> Total Fee Collection Summary by Teacher / Director</span>
+                <span><i aria-hidden="true" class="fa-solid fa-calculator" style="color: var(--primary-emerald);"></i> Total Fee Collection Summary by Teacher / Director</span>
                 <span style="font-size: 0.85rem; color: var(--primary-emerald); background: #ffffff; padding: 0.3rem 0.75rem; border-radius: 6px; border: 1px solid var(--border-sand);">
                   Grand Total: <strong>₹${totalAllModes.toLocaleString()}</strong>
                 </span>
               </h5>
 
+              <!-- One card per roster member, generated from the canonical
+                   faculty list. The two hardcoded cards this replaces had no
+                   card for Aditi Singh — her collections were folded into
+                   Prof. Ravi Ranjan's total — and titled him "Director" and
+                   "Co-Director", both of which belong to Chandan Kumar alone. -->
               <div class="admin-teacher-summary-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
-                
-                <!-- Chandan Sir Summary -->
-                <div style="background: #ffffff; border: 1.5px solid #059669; border-radius: 10px; padding: 1.1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.03);">
-                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.6rem;">
-                    <div style="font-weight: 800; font-size: 1rem; color: var(--text-mahogany);">👨‍🏫 CHANDAN KUMAR</div>
-                    <span style="font-size: 0.72rem; background: #D1FAE5; color: #065F46; padding: 0.2rem 0.5rem; border-radius: 99px; font-weight: 700;">Head of Institute</span>
+                ${facultyRoster.map((f, i) => {
+                  const t = collectorTally.get(f.name) || { total: 0, cash: 0, upi: 0, count: 0 };
+                  const accents = ['#047857', '#1D4ED8', '#0E7490'];
+                  const chips = [
+                    { bg: '#D1FAE5', fg: '#065F46' },
+                    { bg: '#DBEAFE', fg: '#1E3A8A' },
+                    { bg: '#CFFAFE', fg: '#155E75' }
+                  ];
+                  const accent = accents[i % accents.length];
+                  const chip = chips[i % chips.length];
+                  return `
+                <div style="background: #ffffff; border: 1.5px solid ${accent}; border-radius: 10px; padding: 1.1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.03);">
+                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.6rem;">
+                    <div style="font-weight: 800; font-size: 1rem; color: var(--text-mahogany);">👨‍🏫 ${titleCaseName(f.name)}</div>
+                    <span style="font-size: 0.72rem; background: ${chip.bg}; color: ${chip.fg}; padding: 0.2rem 0.5rem; border-radius: 99px; font-weight: 700;">${t.count} receipt${t.count === 1 ? '' : 's'}</span>
                   </div>
-                  <div style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.75rem;">Science Mentor & Managing Director</div>
-                  
-                  <div style="font-size: 1.5rem; font-weight: 800; color: #059669; margin-bottom: 0.75rem;">
-                    ₹${chandanTotal.toLocaleString()}
+                  <div style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.75rem;">${f.role}</div>
+
+                  <div style="font-size: 1.5rem; font-weight: 800; color: ${accent}; margin-bottom: 0.75rem;">
+                    ₹${t.total.toLocaleString()}
                   </div>
 
-                  <div style="display: flex; gap: 0.75rem; font-size: 0.8rem; border-top: 1px dashed #E5E7EB; padding-top: 0.6rem;">
-                    <div>💵 Cash: <strong>₹${chandanCash.toLocaleString()}</strong></div>
-                    <div>📱 UPI / Online: <strong>₹${chandanUpi.toLocaleString()}</strong></div>
+                  <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; font-size: 0.8rem; border-top: 1px dashed #E5E7EB; padding-top: 0.6rem;">
+                    <div>💵 Cash: <strong>₹${t.cash.toLocaleString()}</strong></div>
+                    <div>📱 UPI / Online: <strong>₹${t.upi.toLocaleString()}</strong></div>
                   </div>
-                </div>
+                </div>`;
+                }).join('')}
 
-                <!-- Ravi Ranjan Sir Summary -->
-                <div style="background: #ffffff; border: 1.5px solid #0284C7; border-radius: 10px; padding: 1.1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.03);">
-                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.6rem;">
-                    <div style="font-weight: 800; font-size: 1rem; color: var(--text-mahogany);">👨‍🏫 Prof. RAVI RANJAN</div>
-                    <span style="font-size: 0.72rem; background: #E0F2FE; color: #0369A1; padding: 0.2rem 0.5rem; border-radius: 99px; font-weight: 700;">Director</span>
+                ${collectorTally.get(UNATTRIBUTED).count > 0 ? `
+                <!-- Shown only when it is non-empty: receipts whose collector was
+                     never recorded. Previously these were silently added to
+                     Prof. Ravi Ranjan's column, which made his total unauditable. -->
+                <div style="background: #FFFBEB; border: 1.5px solid #B45309; border-radius: 10px; padding: 1.1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.03);">
+                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.6rem;">
+                    <div style="font-weight: 800; font-size: 1rem; color: #78350F;">⚠️ Collector Not Recorded</div>
+                    <span style="font-size: 0.72rem; background: #FEF3C7; color: #78350F; padding: 0.2rem 0.5rem; border-radius: 99px; font-weight: 700;">${collectorTally.get(UNATTRIBUTED).count} receipt${collectorTally.get(UNATTRIBUTED).count === 1 ? '' : 's'}</span>
                   </div>
-                  <div style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.75rem;">Mathematics Lead & Co-Director</div>
-                  
-                  <div style="font-size: 1.5rem; font-weight: 800; color: #0284C7; margin-bottom: 0.75rem;">
-                    ₹${raviTotal.toLocaleString()}
+                  <div style="font-size: 0.78rem; color: #92400E; margin-bottom: 0.75rem;">Attributed to nobody — reconcile these against the physical receipt book.</div>
+
+                  <div style="font-size: 1.5rem; font-weight: 800; color: #B45309; margin-bottom: 0.75rem;">
+                    ₹${collectorTally.get(UNATTRIBUTED).total.toLocaleString()}
                   </div>
 
-                  <div style="display: flex; gap: 0.75rem; font-size: 0.8rem; border-top: 1px dashed #E5E7EB; padding-top: 0.6rem;">
-                    <div>💵 Cash: <strong>₹${raviCash.toLocaleString()}</strong></div>
-                    <div>📱 UPI / Online: <strong>₹${raviUpi.toLocaleString()}</strong></div>
+                  <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; font-size: 0.8rem; border-top: 1px dashed #FDE68A; padding-top: 0.6rem;">
+                    <div>💵 Cash: <strong>₹${collectorTally.get(UNATTRIBUTED).cash.toLocaleString()}</strong></div>
+                    <div>📱 UPI / Online: <strong>₹${collectorTally.get(UNATTRIBUTED).upi.toLocaleString()}</strong></div>
                   </div>
-                </div>
-
+                </div>` : ''}
               </div>
             </div>
           </div>
@@ -6970,16 +7598,19 @@ function renderStudentDashboard() {
 
       function populateTargetStudents() {
         if (!studentSelect) return;
-        const selectedClass = classSelect ? classSelect.value : '10th';
+        const selectedClass = classSelect ? classSelect.value : 'all';
         const allStudents = (typeof AppState !== 'undefined' && AppState.getStudents) ? AppState.getStudents() : (students || []);
-        
-        let filtered = allStudents;
-        if (selectedClass !== 'all') {
-          filtered = allStudents.filter(s => {
-            const c = (s.className || s.class_name || '').toLowerCase();
-            return c.includes(selectedClass.toLowerCase());
-          });
-        }
+
+        // Canonical id match, matching the dispatch filter below. The old
+        // `c.includes(selectedClass)` test never matched a batch id, and even
+        // with the old short keys it put Special English students in the Class
+        // 9th list — so the dispatch and this preview disagreed on who was in
+        // scope, and the admin could not see it.
+        const filtered = selectedClass === 'all'
+          ? allStudents
+          : allStudents.filter(s =>
+              getBatchCategoryKey(s.className || s.class_name || s.batchName || '') === selectedClass
+            );
 
         let html = `<option value="all">👥 All Students in Selected Batch (${filtered.length})</option>`;
         filtered.forEach(s => {
@@ -7000,26 +7631,26 @@ function renderStudentDashboard() {
       const triggerBtn = pane.querySelector('#adminTriggerBillingBtn');
       if (triggerBtn) {
         triggerBtn.addEventListener('click', async () => {
-          const targetClass = pane.querySelector('#adminBillingTargetClass')?.value || '10th';
+          const targetClass = pane.querySelector('#adminBillingTargetClass')?.value || 'all';
           const studentId = pane.querySelector('#adminBillingTargetStudent')?.value || 'all';
           const action = pane.querySelector('#adminBillingAction')?.value || 'reminder';
           const resultBox = pane.querySelector('#adminBillingResultBox');
 
           const actionLabel = action === 'invoice' ? 'generate monthly fee invoice & apply tuition' : 'send fee due reminder notice';
-          const targetLabel = studentId !== 'all' ? `Student (${studentId})` : `${targetClass.toUpperCase()} batch`;
+          const targetLabel = studentId !== 'all' ? `Student (${studentId})` : `${batchLabel(targetClass)} batch`;
           
           if (!confirm(`📢 Confirm Live Fee Dispatch?\n\n• Action: ${actionLabel.toUpperCase()}\n• Target: ${targetLabel}\n• Sender: Pragyan Institute <noreply@pragyaninstitute.com>\n\nProceed with live dispatch?`)) {
             return;
           }
 
           triggerBtn.disabled = true;
-          triggerBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Processing Live Real-Time Dispatch...`;
+          triggerBtn.innerHTML = `<i aria-hidden="true" class="fa-solid fa-spinner fa-spin"></i> Processing Live Real-Time Dispatch...`;
           if (resultBox) {
             resultBox.style.display = 'block';
             resultBox.style.background = '#EFF6FF';
             resultBox.style.border = '1.5px solid #3B82F6';
             resultBox.style.color = '#1E40AF';
-            resultBox.innerHTML = `<div><i class="fa-solid fa-spinner fa-spin"></i> Synchronizing with live Supabase database & generating official statements...</div>`;
+            resultBox.innerHTML = `<div><i aria-hidden="true" class="fa-solid fa-spinner fa-spin"></i> Synchronizing with live Supabase database & generating official statements...</div>`;
           }
 
           try {
@@ -7035,19 +7666,21 @@ function renderStudentDashboard() {
                 return sId === q || sRoll === q || sName === q;
               });
             } else {
-              targets = allStudents.filter(s => {
-                const sClass = (s.className || s.class_name || '').toLowerCase();
-                if (targetClass === 'all') return true;
-                if (targetClass === '10th' || targetClass === 'class 10th') return sClass.includes('10');
-                if (targetClass === '9th' || targetClass === 'class 9th') return sClass.includes('9');
-                if (targetClass === '8th' || targetClass === 'class 8th') return sClass.includes('8');
-                if (targetClass === 'junio' || targetClass === 'junior') return sClass.includes('jun') || sClass.includes('foundation');
-                return sClass.includes(targetClass.toLowerCase());
-              });
+              // Canonical id match. The substring ladder this replaces was the
+              // worst offender in the file: `sClass.includes('10')` matched
+              // "Class 1st to 5th (2010)", `includes('9')` matched any class
+              // name containing a 9 including "1998", and `includes('8')`
+              // matched "Class 8th" *and* "Class 1st to 5th (2008 syllabus)" —
+              // so a Class 10th billing run could bill primary-school students.
+              targets = targetClass === 'all'
+                ? allStudents.slice()
+                : allStudents.filter(s =>
+                    getBatchCategoryKey(s.className || s.class_name || s.batchName || '') === targetClass
+                  );
             }
 
             if (targets.length === 0) {
-              throw new Error(`No students found matching target criteria (${targetClass} / ${studentId}).`);
+              throw new Error(`No students found matching target criteria (${batchLabel(targetClass)} / ${studentId}).`);
             }
 
             const currentMonthName = new Date().toLocaleString('en-IN', { month: 'long', year: 'numeric' });
@@ -7061,7 +7694,7 @@ function renderStudentDashboard() {
               const sId = s.id || s.student_id || s.rollNo;
               const sName = s.name || 'Student';
               const sEmail = (s.email || '').trim();
-              const monthlyFee = Number(s.monthlyFee) || 1000;
+              const monthlyFee = studentMonthlyFee(s);
               let pendingFee = Number(s.pendingFee) || 0;
 
               let studentStatus = 'Processed';
@@ -7126,7 +7759,7 @@ function renderStudentDashboard() {
               results.push({ name: sName, studentId: sId, email: sEmail, status: studentStatus });
 
               if (resultBox) {
-                resultBox.innerHTML = `<div><i class="fa-solid fa-spinner fa-spin"></i> Processing ${i + 1} of ${targets.length}: <strong>${escapeHtml(sName)}</strong>...</div>`;
+                resultBox.innerHTML = `<div><i aria-hidden="true" class="fa-solid fa-spinner fa-spin"></i> Processing ${i + 1} of ${targets.length}: <strong>${escapeHtml(sName)}</strong>...</div>`;
               }
             }
 
@@ -7150,7 +7783,7 @@ function renderStudentDashboard() {
               resultBox.style.color = '#065F46';
               resultBox.innerHTML = `
                 <div style="font-weight: bold; font-size: 0.98rem; margin-bottom: 0.45rem; display: flex; align-items: center; gap: 0.5rem;">
-                  <i class="fa-solid fa-circle-check" style="color: #10B981;"></i> Real-Time Fee Billing & Dispatch Successfully Processed!
+                  <i aria-hidden="true" class="fa-solid fa-circle-check" style="color: #10B981;"></i> Real-Time Fee Billing & Dispatch Successfully Processed!
                 </div>
                 <div style="display: flex; gap: 1.25rem; flex-wrap: wrap; margin-bottom: 0.65rem; background: rgba(255,255,255,0.8); padding: 0.6rem 0.85rem; border-radius: 6px; border: 1px solid #A7F3D0;">
                   <span>👥 Target Group: <strong>${escapeHtml(targetLabel)}</strong></span>
@@ -7176,7 +7809,7 @@ function renderStudentDashboard() {
             showNotification(`❌ Error: ${err.message}`, 'error');
           } finally {
             triggerBtn.disabled = false;
-            triggerBtn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> <span>Trigger Real-Time Dispatch</span>`;
+            triggerBtn.innerHTML = `<i aria-hidden="true" class="fa-solid fa-paper-plane"></i> <span>Trigger Real-Time Dispatch</span>`;
           }
         });
       }
@@ -7405,14 +8038,14 @@ function renderStudentDashboard() {
                 ${topPinned.linkUrl ? `
                   <div style="margin-top: 0.35rem;">
                     <a href="${topPinned.linkUrl}" target="_blank" class="btn" style="background: linear-gradient(135deg, #D97706 0%, #B45309 100%); color: #fff; font-size: 0.74rem; padding: 0.2rem 0.55rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 0.3rem; text-decoration: none; font-weight: 800;">
-                      <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Announcement Link
+                      <i aria-hidden="true" class="fa-solid fa-arrow-up-right-from-square"></i> Open Announcement Link
                     </a>
                   </div>
                 ` : ''}
               </div>
               ${isAdmin ? `
                 <button class="btn btn-unpin-top" data-id="${topPinned.id}" style="background: transparent; border: none; color: #B45309; cursor: pointer; font-size: 0.8rem;" title="Unpin Announcement">
-                  <i class="fa-solid fa-xmark"></i> Unpin
+                  <i aria-hidden="true" class="fa-solid fa-xmark"></i> Unpin
                 </button>
               ` : ''}
             </div>
@@ -7454,7 +8087,7 @@ function renderStudentDashboard() {
                       
                       <div style="display: flex; gap: 0.2rem; align-items: center;">
                         ${msg.isHighlighted ? '<span style="background: #F59E0B; color: #fff; font-size: 0.6rem; padding: 0.01rem 0.3rem; border-radius: 3px; font-weight: 800;" class="hg-sparkle-icon">✨ HIGHLIGHTED</span>' : ''}
-                        ${msg.isAdminAlert ? '<span style="background: #DC2626; color: #fff; font-size: 0.6rem; padding: 0.01rem 0.3rem; border-radius: 3px; font-weight: 800;"><i class="fa-solid fa-bell"></i> ADMIN ALERT</span>' : ''}
+                        ${msg.isAdminAlert ? '<span style="background: #DC2626; color: #fff; font-size: 0.6rem; padding: 0.01rem 0.3rem; border-radius: 3px; font-weight: 800;"><i aria-hidden="true" class="fa-solid fa-bell"></i> ADMIN ALERT</span>' : ''}
                         ${!msg.isHighlighted && !msg.isAdminAlert && isMsgAdmin ? '<span style="background: #D1FAE5; color: #065F46; font-size: 0.6rem; padding: 0.01rem 0.25rem; border-radius: 3px; font-weight: 700;">FACULTY</span>' : ''}
                       </div>
                     </div>
@@ -7464,7 +8097,7 @@ function renderStudentDashboard() {
                     ${urlMatch ? `
                       <div style="margin-top: 0.25rem;">
                         <a href="${urlMatch}" target="_blank" class="btn" style="background: linear-gradient(135deg, #059669 0%, #047857 100%); color: #ffffff !important; text-decoration: none; padding: 0.2rem 0.55rem; border-radius: 4px; font-weight: 800; font-size: 0.74rem; display: inline-flex; align-items: center; gap: 0.3rem; box-shadow: 0 2px 6px rgba(5, 150, 105, 0.3);">
-                          <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Link
+                          <i aria-hidden="true" class="fa-solid fa-arrow-up-right-from-square"></i> Open Link
                         </a>
                       </div>
                     ` : ''}
@@ -7493,14 +8126,14 @@ function renderStudentDashboard() {
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.15rem; font-size: 0.64rem; color: #6B7280; gap: 0.4rem;">
                       <div style="display: flex; gap: 0.4rem; align-items: center;">
                         <button class="btn btn-reply-msg" data-id="${msg.id}" style="background: none; border: none; padding: 0; color: #059669; font-size: 0.68rem; font-weight: 700; cursor: pointer;">
-                          <i class="fa-solid fa-reply"></i> Reply
+                          <i aria-hidden="true" class="fa-solid fa-reply"></i> Reply
                         </button>
                         ${isAdmin ? `
                           <button class="btn btn-toggle-pin-msg" data-id="${msg.id}" style="background: none; border: none; padding: 0; color: #D97706; font-size: 0.68rem; font-weight: 700; cursor: pointer;">
-                            <i class="fa-solid fa-thumbtack"></i> ${msg.isPinned ? 'Unpin' : 'Pin'}
+                            <i aria-hidden="true" class="fa-solid fa-thumbtack"></i> ${msg.isPinned ? 'Unpin' : 'Pin'}
                           </button>
                           <button class="btn btn-delete-msg" data-id="${msg.id}" style="background: none; border: none; padding: 0; color: #DC2626; font-size: 0.68rem; font-weight: 700; cursor: pointer;" title="Delete">
-                            <i class="fa-solid fa-trash-can"></i>
+                            <i aria-hidden="true" class="fa-solid fa-trash-can"></i>
                           </button>
                         ` : ''}
                       </div>
@@ -7510,7 +8143,7 @@ function renderStudentDashboard() {
                     ${activeReplyMsgId === msg.id ? `
                       <div style="margin-top: 0.35rem; background: #ffffff; padding: 0.3rem; border-radius: 4px; border: 1px solid var(--primary-emerald);">
                         <div style="display: flex; gap: 0.3rem;">
-                          <input type="text" id="inputReplyText-${msg.id}" class="portal-input" placeholder="Reply to ${msg.senderName}..." style="font-size: 0.74rem; height: 26px; padding: 0.1rem 0.4rem;">
+                          <input type="text" id="inputReplyText-${msg.id}" aria-label="Reply to ${msg.senderName}" class="portal-input" placeholder="Reply to ${msg.senderName}..." style="font-size: 0.74rem; height: 26px; padding: 0.1rem 0.4rem;">
                           <button class="btn btn-emerald btn-submit-reply" data-id="${msg.id}" style="padding: 0.1rem 0.45rem; font-size: 0.7rem;">
                             Post
                           </button>
@@ -7526,18 +8159,18 @@ function renderStudentDashboard() {
           <div style="background: #ffffff; border-top: 1.5px solid var(--border-sand); padding: 0.6rem 0.9rem; flex-shrink: 0;">
             <div id="communityAttachmentPreview" style="display: none; margin-bottom: 0.4rem; background: #ECFDF5; border: 1px solid #059669; color: #065F46; padding: 0.35rem 0.55rem; border-radius: 6px; font-size: 0.76rem; justify-content: space-between; align-items: center;">
               <div style="display: flex; align-items: center; gap: 0.35rem;">
-                <i class="fa-solid fa-paperclip"></i>
+                <i aria-hidden="true" class="fa-solid fa-paperclip"></i>
                 <span id="communityAttachmentName">Attachment.pdf</span>
               </div>
-              <button type="button" id="btnRemoveAttachment" style="background: transparent; border: none; color: #DC2626; cursor: pointer; font-weight: 700;"><i class="fa-solid fa-xmark"></i></button>
+              <button aria-label="Remove the attached file" type="button" id="btnRemoveAttachment" style="background: transparent; border: none; color: #DC2626; cursor: pointer; font-weight: 700;"><i aria-hidden="true" class="fa-solid fa-xmark"></i></button>
             </div>
 
             <form id="communityChatForm" style="display: flex; flex-direction: column; gap: 0.4rem;">
               <div style="display: flex; gap: 0.45rem; align-items: center;">
-                <input type="text" id="communityMessageInput" class="portal-input" placeholder="Type a message... Use /hg for sparkling link/announcement, /ad for Admin Alert" style="flex: 1; font-size: 0.86rem; padding: 0.55rem 0.8rem; border-radius: 20px; border: 1px solid #D1D5DB;">
+                <input type="text" id="communityMessageInput" aria-label="Type a community message" class="portal-input" placeholder="Type a message... Use /hg for sparkling link/announcement, /ad for Admin Alert" style="flex: 1; font-size: 0.86rem; padding: 0.55rem 0.8rem; border-radius: 20px; border: 1px solid #D1D5DB;">
                 
                 <button type="submit" class="btn btn-emerald" style="padding: 0.5rem 1rem; font-size: 0.84rem; font-weight: 700; border-radius: 20px; white-space: nowrap; display: flex; align-items: center; gap: 0.3rem;">
-                  Send <i class="fa-solid fa-paper-plane"></i>
+                  Send <i aria-hidden="true" class="fa-solid fa-paper-plane"></i>
                 </button>
               </div>
 
@@ -7548,8 +8181,8 @@ function renderStudentDashboard() {
                 </div>
 
                 ${isAdmin ? `
-                  <label class="btn" style="background: #FAF9F6; border: 1px dashed var(--primary-emerald); color: var(--primary-emerald); padding: 0.2rem 0.55rem; font-size: 0.72rem; font-weight: 700; border-radius: 6px; cursor: pointer; margin: 0; display: inline-flex; align-items: center; gap: 0.25rem;">
-                    <i class="fa-solid fa-paperclip"></i> Attach File
+                  <label for="communityFileInput" class="btn" style="background: #FAF9F6; border: 1px dashed var(--primary-emerald); color: var(--primary-emerald); padding: 0.2rem 0.55rem; font-size: 0.72rem; font-weight: 700; border-radius: 6px; cursor: pointer; margin: 0; display: inline-flex; align-items: center; gap: 0.25rem;">
+                    <i aria-hidden="true" class="fa-solid fa-paperclip"></i> Attach File
                     <input type="file" id="communityFileInput" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.zip" style="display: none;">
                   </label>
                 ` : ''}
@@ -7797,25 +8430,44 @@ function renderStudentDashboard() {
   async function parseAndImportStudentCSV(csvText) {
     const lines = csvText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     if (lines.length <= 1) {
-      alert('CSV file is empty or missing headers.');
+      showNotification('CSV file is empty or missing its header row.', 'error');
       return;
     }
 
     const students = AppState.getStudents();
     let count = 0;
+    // Every skipped row is reported. Previously each failure was a bare
+    // `continue`, so the closing alert said "imported 12 students" from a
+    // 20-row file and the admin had no way to know which eight were dropped.
+    const skipped = [];
 
     // Skip header line
     for (let i = 1; i < lines.length; i++) {
+      const rowNo = i + 1;
       const parts = lines[i].split(',').map(p => p.trim().replace(/^"|"$/g, ''));
-      if (parts.length < 3) continue;
+      if (parts.length < 3) {
+        skipped.push(`Row ${rowNo}: needs at least Name, Mobile and DOB.`);
+        continue;
+      }
 
       const [name, mobile, rawDob, className, guardianName, oldDueStr, emailStr, guardianMobileStr] = parts;
-      if (!name || !mobile || !rawDob) continue;
+      if (!name || !mobile || !rawDob) {
+        skipped.push(`Row ${rowNo}: Name, Mobile and DOB are all required.`);
+        continue;
+      }
+
+      // A blank or unrecognised class used to fall back to 'Class 10th
+      // (ACHIEVER)' — the most expensive board batch — so a typo enrolled a
+      // primary-school child at ₹1,000/month with a Class 10th barcode.
+      const batch = ACADEMIC ? ACADEMIC.resolveBatch(className || '') : null;
+      if (!batch) {
+        skipped.push(`Row ${rowNo} (${name}): class "${className || '(blank)'}" is not one of the 12 batches.`);
+        continue;
+      }
+      const canonicalClass = batch.name;
 
       const dob = parseDobString(rawDob);
-      const monthlyFee = (className.includes('10th') || className.includes('ACHIEVER')) ? 1000 :
-                         (className.includes('9th') || className.includes('NURTURE')) ? 1000 :
-                         (className.includes('8th') || className.includes('ALPHA')) ? 800 : 700;
+      const monthlyFee = batch.monthlyFee;
       const oldDue = parseFloat(oldDueStr) || 0;
       const email = emailStr || '';
       const guardianMobile = guardianMobileStr || mobile;
@@ -7833,7 +8485,11 @@ function renderStudentDashboard() {
         });
       }
 
-      const sId = generateStudentId(className || 'Class 10th (ACHIEVER)', students);
+      const sId = generateStudentId(canonicalClass, students);
+      if (!sId) {
+        skipped.push(`Row ${rowNo} (${name}): could not allocate a student id for ${canonicalClass}.`);
+        continue;
+      }
       const stuUuid = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : (`stu_csv_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 7)}`);
       students.push({
         id: stuUuid,
@@ -7844,8 +8500,8 @@ function renderStudentDashboard() {
         dob: dob,
         rollNo: sId,
         roll_no: sId,
-        className: className || 'Class 10th (ACHIEVER)',
-        batchName: className || 'Class 10th (ACHIEVER)',
+        className: canonicalClass,
+        batchName: canonicalClass,
         guardianName: guardianName || 'Guardian',
         guardianMobile: guardianMobile,
         email: email,
@@ -7862,17 +8518,47 @@ function renderStudentDashboard() {
       count++;
     }
 
-    await AppState.saveStudents(students);
-    alert(`🎉 Successfully imported ${count} student records! Students can now log in using their DOB and update their Blood Group, Address & Details via the App.`);
+    if (count > 0) await AppState.saveStudents(students);
+
+    let report = count > 0
+      ? `🎉 Imported ${count} student record${count === 1 ? '' : 's'}. Students can log in with their DOB and complete their profile in the app.`
+      : 'No rows could be imported.';
+    if (skipped.length > 0) {
+      report += `\n\n⚠️ ${skipped.length} row${skipped.length === 1 ? '' : 's'} skipped:\n• ` +
+        skipped.slice(0, 12).join('\n• ');
+      if (skipped.length > 12) report += `\n• …and ${skipped.length - 12} more.`;
+    }
+    alert(report);
+    if (skipped.length > 0) {
+      showNotification(
+        `${count} imported, ${skipped.length} skipped — see the details above.`,
+        count > 0 ? 'warning' : 'error'
+      );
+    }
     renderAdminDashboard();
   }
 
   function downloadSampleStudentCSV() {
-    const sampleCSV = `Name,Mobile,DOB,Class,GuardianName,OldDue,Email,GuardianMobile
-Ramesh Kumar,9812345670,12062010,Class 10th (ACHIEVER),Suresh Kumar,2000,ramesh@gmail.com,9812345679
-Priya Kumari,9812345671,18042011,Class 9th (NURTURE),Sunil Roy,0,priya@gmail.com,9812345678
-Aman Verma,9812345672,25012012,Class 8th (ALPHA),Sanjay Verma,1200,aman@gmail.com,9812345677
-Kavita Sharma,9812345673,15092013,Junior Batch (JUNIO),Rajesh Sharma,0,kavita@gmail.com,9812345676`;
+    // One example per canonical batch, so the template itself documents the exact
+    // class strings the importer accepts. It previously listed only four, one of
+    // them under a name ('Junior Batch (JUNIO)') that no longer exists.
+    const rows = [
+      ['Ramesh Kumar',   '9812345670', '12062008', 'Class 12th PCM',              'Suresh Kumar',  '2000', 'ramesh@example.com',  '9812345679'],
+      ['Anjali Verma',   '9812345671', '04072008', 'Class 12th PCB',              'Mahesh Verma',  '0',    'anjali@example.com',  '9812345678'],
+      ['Rohit Singh',    '9812345672', '19092009', 'Class 11th PCM',              'Vinod Singh',   '1500', 'rohit@example.com',   '9812345677'],
+      ['Neha Kumari',    '9812345673', '23112009', 'Class 11th PCB',              'Alok Kumar',    '0',    'neha@example.com',    '9812345676'],
+      ['Priya Kumari',   '9812345674', '18042010', 'Class 10th (ACHIEVER)',       'Sunil Roy',     '0',    'priya@example.com',   '9812345675'],
+      ['Aman Verma',     '9812345675', '25012011', 'Class 9th (NURTURE)',         'Sanjay Verma',  '1200', 'aman@example.com',    '9812345674'],
+      ['Sneha Sharma',   '9812345676', '15092012', 'Class 8th (ALPHA)',           'Rajesh Sharma', '0',    'sneha@example.com',   '9812345673'],
+      ['Karan Yadav',    '9812345677', '02032014', 'Class 6th & 7th (PIONEER)',   'Dinesh Yadav',  '700',  'karan@example.com',   '9812345672'],
+      ['Ishita Raj',     '9812345678', '11082017', 'Class 1st to 5th (Junior Foundation)', 'Manoj Raj', '0', 'ishita@example.com', '9812345671'],
+      ['Ayush Mishra',   '9812345679', '07062009', 'Special English 9th to 12th', 'Vikas Mishra',  '0',    'ayush@example.com',   '9812345670'],
+      ['Kavita Kumari',  '9812345680', '29052012', 'Special English 6th to 8th',  'Ramesh Prasad', '0',    'kavita@example.com',  '9812345669'],
+      ['Aarav Gupta',    '9812345681', '14012018', 'Special English 1st to 5th',  'Sunita Gupta',  '0',    'aarav@example.com',   '9812345668']
+    ];
+    const sampleCSV = ['Name,Mobile,DOB,Class,GuardianName,OldDue,Email,GuardianMobile']
+      .concat(rows.map(r => r.join(',')))
+      .join('\n');
 
     const blob = new Blob([sampleCSV], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -7901,114 +8587,6 @@ Kavita Sharma,9812345673,15092013,Junior Batch (JUNIO),Rajesh Sharma,0,kavita@gm
     return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 
-  async function triggerAutomatedMonthlyFeeEmails(batchOverride = null) {
-    alert('Monthly fee generation runs only on the protected server schedule. Use the deployment logs to verify it.');
-    return;
-    const students = AppState.getStudents();
-    const notices = AppState.getNotices();
-    const today = new Date();
-    const currentDay = today.getDate();
-    let emailLogs = [];
-
-    let targetBatchKey = '';
-    let targetLabel = '';
-
-    if (batchOverride) {
-      targetBatchKey = batchOverride;
-      targetLabel = `Batch Override (${batchOverride})`;
-    } else if (currentDay === 1) {
-      targetBatchKey = '10th';
-      targetLabel = '1st of Month Schedule: Class 10th (ACHIEVER) Batch';
-    } else if (currentDay === 2) {
-      targetBatchKey = '9th';
-      targetLabel = '2nd of Month Schedule: Class 9th (NURTURE) Batch';
-    } else if (currentDay === 3) {
-      targetBatchKey = '8th';
-      targetLabel = '3rd of Month Schedule: Class 8th (ALPHA) Batch';
-    } else if (currentDay === 4) {
-      targetBatchKey = 'junio';
-      targetLabel = '4th of Month Schedule: Junior (JUNIO) Batch';
-    } else {
-      targetBatchKey = 'all';
-      targetLabel = `Staggered Manual Execution (All Batches)`;
-    }
-
-    const targetStudents = targetBatchKey === 'all'
-      ? students
-      : students.filter(s => s.className.toLowerCase().includes(targetBatchKey.toLowerCase()));
-
-    if (targetStudents.length === 0) {
-      alert(`ℹ️ No students found matching schedule: ${targetLabel}`);
-      return;
-    }
-
-    targetStudents.forEach(s => {
-      const monthlyInstallment = s.monthlyFee || (
-        (s.className.includes('10th') || s.className.includes('ACHIEVER')) ? 1000 :
-        (s.className.includes('9th') || s.className.includes('NURTURE')) ? 1000 :
-        (s.className.includes('8th') || s.className.includes('ALPHA')) ? 800 : 700
-      );
-      const previousPending = s.pendingFee || 0;
-      const newTotalDue = previousPending + monthlyInstallment;
-      s.pendingFee = newTotalDue;
-
-      s.feeHistory.push({
-        receiptNo: `BILL-${currentDay}ST-${Date.now().toString(36).slice(-5)}`,
-        date: getFormattedTimestamp(),
-        amount: monthlyInstallment,
-        mode: `Staggered Monthly Fee Bill (${targetLabel})`,
-        status: 'Pending Due',
-        by: 'System Staggered Billing Engine',
-        note: `Monthly tuition fee added for ${s.className}`
-      });
-
-      if (typeof AppState !== 'undefined' && AppState.recordLedgerEntry) {
-        const currentMonthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
-        AppState.recordLedgerEntry({
-          student_id: s.student_id || s.id || s.rollNo,
-          billing_month: currentMonthKey,
-          batch_label: s.className || s.class_name || targetLabel,
-          amount: monthlyInstallment,
-          previous_due: previousPending,
-          updated_due: newTotalDue,
-          idempotency_key: `fee_${s.student_id || s.id || s.rollNo}_${currentMonthKey}`
-        });
-      }
-
-      const emailHtml = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 2px solid #064E3B; border-radius: 12px; overflow: hidden;">
-          <div style="background-color: #064E3B; color: #ffffff; padding: 20px; text-align: center;">
-            <h2 style="margin:0;">PRAGYAN INSTITUTE LALGANJ</h2>
-            <p style="margin:5px 0 0 0;">Official Staggered Monthly Fee Invoice (${targetLabel})</p>
-          </div>
-          <div style="padding: 25px; background-color: #FAF9F6;">
-            <p>Dear <strong>${s.name}</strong> (Roll No: #${s.rollNo}),</p>
-            <p>Your monthly tuition fee statement for <strong>${s.className}</strong> has been generated:</p>
-            <table style="width: 100%; border-collapse: collapse; margin: 20px 0; background: #fff; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
-              <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;">Previous Unpaid Balance:</td><td style="font-weight: bold;">₹${previousPending.toLocaleString()}</td></tr>
-              <tr><td style="padding: 8px; border-bottom: 1px solid #ddd;">Current Month Tuition Fee:</td><td style="color: #0284C7; font-weight: bold;">+ ₹${monthlyInstallment.toLocaleString()}</td></tr>
-              <tr style="background:#FEF2F2;"><td style="padding: 10px; font-weight:bold; color:#991B1B;">Total Updated Pending Due:</td><td style="color: #DC2626; font-weight: bold; font-size: 1.15em;">₹${newTotalDue.toLocaleString()}</td></tr>
-            </table>
-            <p>Payment can be made in cash at counter to Prof. Ravi Ranjan or Chandan Kumar, or paid online in your student portal.</p>
-          </div>
-        </div>
-      `;
-
-      sendLiveResendEmail(s.email, `🗓️ ${targetLabel} - Fee Statement for ${s.name}`, emailHtml);
-      emailLogs.push(`Sent to: ${s.email} (${s.name}) | Batch: ${s.className} | New Due: ₹${newTotalDue}`);
-    });
-
-    await AppState.saveStudents(students);
-
-    alert(`🚀 Staggered Monthly Fee Engine Executed!
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📅 Schedule Target: ${targetLabel}
-✉️ Total Invoices Generated: ${targetStudents.length} Students Processed!
-
-Batch Execution Summary:
-${emailLogs.join('\n')}`);
-  }
-
   /* ==========================================================================
    * 1. DEDICATED IN-PORTAL NOTICEBOARD & ANNOUNCEMENTS MANAGER
    * ========================================================================== */
@@ -8027,15 +8605,20 @@ ${emailLogs.join('\n')}`);
       if (currentNoticeFilter === 'exam') matchesFilter = (n.category === 'exam');
       else if (currentNoticeFilter === 'general') matchesFilter = (n.category === 'general');
       else if (currentNoticeFilter === 'fees') matchesFilter = (n.category === 'fees');
-      else if (currentNoticeFilter === '10th') matchesFilter = (n.targetBatch && n.targetBatch.includes('10th'));
-      else if (currentNoticeFilter === '9th') matchesFilter = (n.targetBatch && n.targetBatch.includes('9th'));
-      else if (currentNoticeFilter === '8th') matchesFilter = (n.targetBatch && n.targetBatch.includes('8th'));
-      else if (currentNoticeFilter === 'junio') matchesFilter = (n.targetBatch && (n.targetBatch.includes('Junior') || n.targetBatch.includes('JUNIO')));
+      else if (currentNoticeFilter !== 'all') {
+        // Batch chips carry a canonical batch id and the notice stores a batch
+        // *name*, so both sides are resolved before comparing. The previous
+        // `targetBatch.includes('10th')` test also matched a notice addressed to
+        // "Special English 9th to 12th", and there were only four chips, so a
+        // notice sent to Class 11th could not be filtered to at all.
+        matchesFilter = !!n.targetBatch &&
+          getBatchCategoryKey(n.targetBatch) === currentNoticeFilter;
+      }
 
       let matchesSearch = true;
       if (currentNoticeSearch) {
         const q = currentNoticeSearch.toLowerCase();
-        matchesSearch = (n.title && n.title.toLowerCase().includes(q)) || 
+        matchesSearch = (n.title && n.title.toLowerCase().includes(q)) ||
                         (n.message && n.message.toLowerCase().includes(q)) ||
                         (n.targetBatch && n.targetBatch.toLowerCase().includes(q));
       }
@@ -8045,12 +8628,7 @@ ${emailLogs.join('\n')}`);
     const draftTitle = pane.querySelector('#noticeTitleInput')?.value || '';
     const draftBody = pane.querySelector('#noticeBodyInput')?.value || '';
 
-    const canonicalBatchList = [
-      { key: '10th', name: 'Class 10th (ACHIEVER)', icon: '🎯' },
-      { key: '9th', name: 'Class 9th (NURTURE)', icon: '🌱' },
-      { key: '8th', name: 'Class 8th (ALPHA)', icon: '⚡' },
-      { key: 'junio', name: 'Junior Batch (JUNIO)', icon: '🚀' }
-    ];
+    const canonicalBatchList = canonicalBatchCards();
 
     pane.innerHTML = `
       ${isMainAdmin() ? `
@@ -8058,7 +8636,7 @@ ${emailLogs.join('\n')}`);
         <div style="margin-bottom: 1.25rem; background: #ECFDF5; border: 1.5px solid #A7F3D0; border-radius: 12px; padding: 0.85rem 1.15rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
           <div style="display: flex; align-items: center; gap: 0.75rem;">
             <div style="width: 38px; height: 38px; border-radius: 50%; background: #064E3B; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">
-              <i class="fa-solid fa-bullhorn"></i>
+              <i aria-hidden="true" class="fa-solid fa-bullhorn"></i>
             </div>
             <div>
               <div style="font-weight: 800; font-size: 0.92rem; color: #064E3B;">In-Portal Noticeboard & Student Feed</div>
@@ -8066,13 +8644,13 @@ ${emailLogs.join('\n')}`);
             </div>
           </div>
           <button type="button" class="btn btn-emerald" onclick="switchAdminTab('email')" style="padding: 0.45rem 1rem; font-size: 0.82rem; font-weight: 700; border-radius: 8px;">
-            <i class="fa-solid fa-envelope-open-text"></i> Go to Email Dispatch & Invoices →
+            <i aria-hidden="true" class="fa-solid fa-envelope-open-text"></i> Go to Email Dispatch & Invoices →
           </button>
         </div>
       ` : `
         <div style="margin-bottom: 1.25rem; background: #F8FAFC; border: 1.5px solid #E2E8F0; border-radius: 12px; padding: 0.85rem 1.15rem; display: flex; align-items: center; gap: 0.75rem;">
           <div style="width: 38px; height: 38px; border-radius: 50%; background: #064E3B; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">
-            <i class="fa-solid fa-bullhorn"></i>
+            <i aria-hidden="true" class="fa-solid fa-bullhorn"></i>
           </div>
           <div>
             <div style="font-weight: 800; font-size: 0.92rem; color: #064E3B;">In-Portal Noticeboard Broadcasts</div>
@@ -8084,17 +8662,17 @@ ${emailLogs.join('\n')}`);
       <!-- TOP: Broadcast New Announcement Form -->
       <div class="dash-card" style="margin-bottom: 1.5rem;">
         <div class="dash-card-header">
-          <div class="dash-card-title"><i class="fa-solid fa-paper-plane" style="color: var(--primary-emerald);"></i> Post Noticeboard Announcement</div>
+          <div class="dash-card-title"><i aria-hidden="true" class="fa-solid fa-paper-plane" style="color: var(--primary-emerald);"></i> Post Noticeboard Announcement</div>
         </div>
 
         <form id="adminPostNoticeForm">
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
             <div>
-              <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.35rem;">Announcement Title *</label>
+              <label for="noticeTitleInput" style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.35rem;">Announcement Title *</label>
               <input type="text" id="noticeTitleInput" class="portal-input" placeholder="e.g. Science Monthly Test & Practical Schedule" value="${draftTitle.replace(/"/g, '&quot;')}" required>
             </div>
             <div>
-              <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.35rem;">Category *</label>
+              <label for="noticeCategorySelect" style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.35rem;">Category *</label>
               <select id="noticeCategorySelect" class="portal-input">
                 <option value="general">📢 General Announcement</option>
                 <option value="holiday">🏖️ Holiday / Class Off</option>
@@ -8110,7 +8688,7 @@ ${emailLogs.join('\n')}`);
           <div style="background: #F8FAFC; border: 1.5px solid #E2E8F0; border-radius: 12px; padding: 1rem 1.15rem; margin-bottom: 1rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
               <label style="font-weight: 700; font-size: 0.88rem; color: var(--text-mahogany);">
-                <i class="fa-solid fa-users-viewfinder" style="color: var(--primary-emerald);"></i> Target Batches for In-Portal Noticeboard *
+                <i aria-hidden="true" class="fa-solid fa-users-viewfinder" style="color: var(--primary-emerald);"></i> Target Batches for In-Portal Noticeboard *
               </label>
               <div style="display: flex; gap: 0.4rem;">
                 <button type="button" id="btnSelectAllBatches" class="btn" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; border-radius: 6px; font-weight: 700; cursor: pointer;">
@@ -8137,16 +8715,16 @@ ${emailLogs.join('\n')}`);
           </div>
 
           <div style="margin-bottom: 1rem;">
-            <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.35rem;">Announcement Details / Message Body *</label>
+            <label for="noticeBodyInput" style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.35rem;">Announcement Details / Message Body *</label>
             <textarea id="noticeBodyInput" class="portal-input" rows="6" placeholder="Write full details, examination timings, schedule, syllabus or notice description here..." required style="resize: vertical; width: 100%; min-height: 180px; font-family: inherit; font-size: 0.92rem; line-height: 1.55; box-sizing: border-box; padding: 0.85rem;">${draftBody.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
           </div>
           <div style="margin-bottom: 1.25rem;">
-            <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.35rem;">Attach Photo or PDF Document (Optional)</label>
+            <label for="noticeAttachmentInput" style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.35rem;">Attach Photo or PDF Document (Optional)</label>
             <input type="file" id="noticeAttachmentInput" class="portal-input" accept="image/*,.pdf,.doc,.docx" style="padding: 0.45rem;">
             <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Stored securely in Supabase Storage bucket. Supports photos & PDF documents.</div>
           </div>
           <button type="submit" class="btn btn-emerald" style="padding: 0.75rem 1.75rem;">
-            <i class="fa-solid fa-bullhorn"></i> Post to Student Noticeboard
+            <i aria-hidden="true" class="fa-solid fa-bullhorn"></i> Post to Student Noticeboard
           </button>
         </form>
       </div>
@@ -8156,49 +8734,49 @@ ${emailLogs.join('\n')}`);
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.25rem;">
           <div>
             <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-mahogany); margin: 0;">
-              <i class="fa-solid fa-bullhorn" style="color: var(--primary-emerald);"></i> Active Noticeboard Announcements (${allNotices.length})
+              <i aria-hidden="true" class="fa-solid fa-bullhorn" style="color: var(--primary-emerald);"></i> Active Noticeboard Announcements (${allNotices.length})
             </h3>
             <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">Live notices visible in student portals and noticeboards</div>
           </div>
           <div style="width: 260px; max-width: 100%;">
-            <input type="text" id="adminNoticeSearchInput" class="portal-input" placeholder="🔍 Search notices..." value="${currentNoticeSearch}" style="font-size: 0.85rem; padding: 0.45rem 0.75rem;">
+            <input type="text" id="adminNoticeSearchInput" aria-label="Search notices" class="portal-input" placeholder="🔍 Search notices..." value="${currentNoticeSearch}" style="font-size: 0.85rem; padding: 0.45rem 0.75rem;">
           </div>
         </div>
 
         <!-- Filter Chips -->
-        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.25rem;">
-          <button class="notice-admin-filter-chip ${currentNoticeFilter === 'all' ? 'active' : ''}" data-filter="all">All (${allNotices.length})</button>
-          <button class="notice-admin-filter-chip ${currentNoticeFilter === 'exam' ? 'active' : ''}" data-filter="exam">📝 Exams</button>
-          <button class="notice-admin-filter-chip ${currentNoticeFilter === 'general' ? 'active' : ''}" data-filter="general">📢 General</button>
-          <button class="notice-admin-filter-chip ${currentNoticeFilter === 'fees' ? 'active' : ''}" data-filter="fees">💳 Fees</button>
-          <button class="notice-admin-filter-chip ${currentNoticeFilter === '10th' ? 'active' : ''}" data-filter="10th">Class 10th</button>
-          <button class="notice-admin-filter-chip ${currentNoticeFilter === '9th' ? 'active' : ''}" data-filter="9th">Class 9th</button>
-          <button class="notice-admin-filter-chip ${currentNoticeFilter === '8th' ? 'active' : ''}" data-filter="8th">Class 8th</button>
-          <button class="notice-admin-filter-chip ${currentNoticeFilter === 'junio' ? 'active' : ''}" data-filter="junio">Junior</button>
+        <!-- role="group" + aria-pressed: these chips are a filter toolbar whose
+             selected state was conveyed by background colour alone. -->
+        <div role="group" aria-label="Filter announcements" style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.25rem;">
+          <button type="button" class="notice-admin-filter-chip ${currentNoticeFilter === 'all' ? 'active' : ''}" aria-pressed="${currentNoticeFilter === 'all'}" data-filter="all">All (${allNotices.length})</button>
+          <button type="button" class="notice-admin-filter-chip ${currentNoticeFilter === 'exam' ? 'active' : ''}" aria-pressed="${currentNoticeFilter === 'exam'}" data-filter="exam">📝 Exams</button>
+          <button type="button" class="notice-admin-filter-chip ${currentNoticeFilter === 'general' ? 'active' : ''}" aria-pressed="${currentNoticeFilter === 'general'}" data-filter="general">📢 General</button>
+          <button type="button" class="notice-admin-filter-chip ${currentNoticeFilter === 'fees' ? 'active' : ''}" aria-pressed="${currentNoticeFilter === 'fees'}" data-filter="fees">💳 Fees</button>
+          ${canonicalBatchList.map(b => `
+          <button type="button" class="notice-admin-filter-chip ${currentNoticeFilter === b.key ? 'active' : ''}" aria-pressed="${currentNoticeFilter === b.key}" data-filter="${b.key}">${b.icon} ${b.name}</button>`).join('')}
         </div>
 
         <!-- Announcements List -->
         ${filteredNotices.length === 0 ? `
           <div style="text-align: center; color: var(--text-muted); padding: 3rem 1rem;">
-            <i class="fa-solid fa-inbox" style="font-size: 2.5rem; color: #9CA3AF; margin-bottom: 0.75rem;"></i>
+            <i aria-hidden="true" class="fa-solid fa-inbox" style="font-size: 2.5rem; color: #9CA3AF; margin-bottom: 0.75rem;"></i>
             <p style="font-weight: 600;">No announcements found matching criteria.</p>
           </div>
         ` : `
           <div style="display: flex; flex-direction: column; gap: 1rem;">
             ${filteredNotices.map(notice => {
               const catBadge = notice.category === 'exam' 
-                ? '<span style="background: #FEF3C7; color: #92400E; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 700; font-size: 0.75rem;"><i class="fa-solid fa-file-pen"></i> Exam & Test</span>'
+                ? '<span style="background: #FEF3C7; color: #92400E; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 700; font-size: 0.75rem;"><i aria-hidden="true" class="fa-solid fa-file-pen"></i> Exam & Test</span>'
                 : notice.category === 'holiday'
-                ? '<span style="background: #E0F2FE; color: #0369A1; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 700; font-size: 0.75rem;"><i class="fa-solid fa-umbrella-beach"></i> Holiday / Off</span>'
+                ? '<span style="background: #E0F2FE; color: #0369A1; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 700; font-size: 0.75rem;"><i aria-hidden="true" class="fa-solid fa-umbrella-beach"></i> Holiday / Off</span>'
                 : notice.category === 'fees'
-                ? '<span style="background: #FEE2E2; color: #991B1B; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 700; font-size: 0.75rem;"><i class="fa-solid fa-receipt"></i> Fee Notice</span>'
+                ? '<span style="background: #FEE2E2; color: #991B1B; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 700; font-size: 0.75rem;"><i aria-hidden="true" class="fa-solid fa-receipt"></i> Fee Notice</span>'
                 : notice.category === 'urgent'
-                ? '<span style="background: #FEE2E2; color: #B91C1C; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 800; font-size: 0.75rem;"><i class="fa-solid fa-triangle-exclamation"></i> Urgent Alert</span>'
-                : '<span style="background: #D1FAE5; color: #065F46; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 700; font-size: 0.75rem;"><i class="fa-solid fa-bullhorn"></i> General</span>';
+                ? '<span style="background: #FEE2E2; color: #B91C1C; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 800; font-size: 0.75rem;"><i aria-hidden="true" class="fa-solid fa-triangle-exclamation"></i> Urgent Alert</span>'
+                : '<span style="background: #D1FAE5; color: #065F46; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 700; font-size: 0.75rem;"><i aria-hidden="true" class="fa-solid fa-bullhorn"></i> General</span>';
 
               const targetBatchBadge = notice.targetBatch 
-                ? `<span style="background: #EEF2FF; color: #4338CA; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 600; font-size: 0.75rem;"><i class="fa-solid fa-users"></i> ${notice.targetBatch}</span>`
-                : '<span style="background: #EEF2FF; color: #4338CA; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 600; font-size: 0.75rem;"><i class="fa-solid fa-users"></i> All Batches</span>';
+                ? `<span style="background: #EEF2FF; color: #4338CA; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 600; font-size: 0.75rem;"><i aria-hidden="true" class="fa-solid fa-users"></i> ${notice.targetBatch}</span>`
+                : '<span style="background: #EEF2FF; color: #4338CA; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 600; font-size: 0.75rem;"><i aria-hidden="true" class="fa-solid fa-users"></i> All Batches</span>';
 
               return `
                 <div style="background: #ffffff; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 1.15rem; transition: transform 0.15s ease, box-shadow 0.15s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
@@ -8210,10 +8788,10 @@ ${emailLogs.join('\n')}`);
                     <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
                       <span style="font-size: 0.78rem; color: var(--text-muted); font-weight: 600;">📅 ${notice.date}</span>
                       <button type="button" class="btn btn-edit-notice" data-id="${notice.id}" style="padding: 0.35rem 0.75rem; font-size: 0.78rem; font-weight: 700; background: #ECFDF5; color: #065F46; border: 1px solid #10B981; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; transition: background 0.15s ease;" title="Edit Notice">
-                        <i class="fa-solid fa-pen-to-square"></i> Edit
+                        <i aria-hidden="true" class="fa-solid fa-pen-to-square"></i> Edit
                       </button>
                       <button type="button" class="btn btn-delete-notice" data-id="${notice.id}" style="padding: 0.35rem 0.75rem; font-size: 0.78rem; font-weight: 700; background: #FEE2E2; color: #DC2626; border: 1px solid #FECACA; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; transition: background 0.15s ease;" title="Delete Notice">
-                        <i class="fa-solid fa-trash-can"></i> Delete
+                        <i aria-hidden="true" class="fa-solid fa-trash-can"></i> Delete
                       </button>
                     </div>
                   </div>
@@ -8224,7 +8802,7 @@ ${emailLogs.join('\n')}`);
                   ${notice.attachmentUrl || notice.attachment_url ? `
                     <div style="margin-top: 0.85rem; padding-top: 0.65rem; border-top: 1px dashed #E2E8F0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
                       <a href="${notice.attachmentUrl || notice.attachment_url}" target="_blank" style="display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; font-weight: 700; color: var(--primary-emerald); text-decoration: underline;">
-                        <i class="fa-solid fa-paperclip"></i> View Attached Document / Photo
+                        <i aria-hidden="true" class="fa-solid fa-paperclip"></i> View Attached Document / Photo
                       </a>
                     </div>
                   ` : ''}
@@ -8252,8 +8830,16 @@ ${emailLogs.join('\n')}`);
       const submitBtn = form.querySelector('button[type="submit"]');
       const title = pane.querySelector('#noticeTitleInput').value.trim();
       const category = pane.querySelector('#noticeCategorySelect').value;
-      const chks = Array.from(pane.querySelectorAll('.notice-batch-chk:checked'));
-      const targetBatch = chks.length === 4 ? 'All Batches' : (chks.map(c => c.dataset.name).join(', ') || 'Custom');
+      const allChks = Array.from(pane.querySelectorAll('.notice-batch-chk'));
+      const chks = allChks.filter(c => c.checked);
+      // Compare against however many batches the grid actually rendered. This
+      // was a hardcoded `chks.length === 4`, which stopped meaning "everything"
+      // the moment the grid grew to all twelve batches — a notice ticked for
+      // every batch was then filed under a 12-name comma list instead of
+      // "All Batches", and the student-side "All Batches" match missed it.
+      const targetBatch = (allChks.length > 0 && chks.length === allChks.length)
+        ? 'All Batches'
+        : (chks.map(c => c.dataset.name).join(', ') || 'Custom');
       const message = pane.querySelector('#noticeBodyInput').value.trim();
       const attachmentFile = pane.querySelector('#noticeAttachmentInput')?.files[0];
 
@@ -8297,7 +8883,7 @@ ${emailLogs.join('\n')}`);
         console.error('Broadcast failed:', err);
         alert('❌ Broadcast failed: ' + err.message);
       } finally {
-        if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fa-solid fa-bullhorn"></i> Post to Student Noticeboard'; }
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-bullhorn"></i> Post to Student Noticeboard'; }
       }
     });
 
@@ -8331,12 +8917,18 @@ ${emailLogs.join('\n')}`);
         if (!target) return;
 
         if (confirm(`🗑️ Delete announcement "${target.title}"?\n\nThis will immediately and permanently remove it from all student dashboards and noticeboards.`)) {
+          // The cloud delete has to land before the local one. mutate() returns its
+          // failures rather than throwing, so this result was previously discarded:
+          // a rejected delete still removed the notice locally and reported success,
+          // and the next pullAll() put it back on every student dashboard — after
+          // the admin had been told it was permanently removed.
           if (target.id && typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
             const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-            if (uuidRegex.test(target.id)) {
-              await SupabaseSync.mutate('notices', 'delete', null, { where: { id: target.id } });
-            } else {
-              await SupabaseSync.mutate('notices', 'delete', null, { where: { title: target.title } });
+            const where = uuidRegex.test(target.id) ? { id: target.id } : { title: target.title };
+            const result = await SupabaseSync.mutate('notices', 'delete', null, { where });
+            if (!result || result.success !== true) {
+              alert(`⚠️ "${target.title}" was NOT deleted — the database rejected the request${result?.error ? `: ${result.error}` : ''}.\n\nThe announcement is still live. Check your connection and try again.`);
+              return;
             }
           }
           const updated = allN.filter(n => n.id !== id);
@@ -8356,21 +8948,23 @@ ${emailLogs.join('\n')}`);
     const target = notices.find(n => n.id === noticeId);
     if (!target) return;
 
+    const canonicalBatchList = canonicalBatchCards();
+
     const modalHtml = `
       <div class="inner-modal-backdrop active" id="editNoticeModal" style="display: flex; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 9999; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(4px);">
         <div class="inner-modal-content" style="max-width: 620px; width: 100%; background: #FAF9F6; border-radius: 12px; border: 1.5px solid var(--border-sand); box-shadow: 0 10px 25px rgba(0,0,0,0.15); overflow: hidden; max-height: 90vh; display: flex; flex-direction: column;">
           <div class="inner-modal-header" style="background: #064E3B; color: #fff; padding: 1rem 1.25rem; display: flex; justify-content: space-between; align-items: center;">
             <h3 style="margin: 0; font-size: 1.15rem; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
-              <i class="fa-solid fa-pen-to-square" style="color: #34D399;"></i> Edit Noticeboard Announcement
+              <i aria-hidden="true" class="fa-solid fa-pen-to-square" style="color: #34D399;"></i> Edit Noticeboard Announcement
             </h3>
-            <button class="btn-close-inner" onclick="document.getElementById('editNoticeModal').remove()" style="background: none; border: none; color: #fff; font-size: 1.2rem; cursor: pointer;">
-              <i class="fa-solid fa-xmark"></i>
+            <button type="button" aria-label="Close edit notice dialog" class="btn-close-inner" onclick="document.getElementById('editNoticeModal').remove()" style="background: none; border: none; color: #fff; font-size: 1.2rem; cursor: pointer;">
+              <i aria-hidden="true" class="fa-solid fa-xmark"></i>
             </button>
           </div>
           
           <form id="editNoticeForm" style="padding: 1.25rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem;">
             <div>
-              <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #374151; margin-bottom: 0.35rem;">
+              <label for="editNoticeTitle" style="display: block; font-size: 0.85rem; font-weight: 700; color: #374151; margin-bottom: 0.35rem;">
                 Announcement Title *
               </label>
               <input type="text" id="editNoticeTitle" class="portal-input" value="${target.title ? target.title.replace(/"/g, '&quot;') : ''}" required style="width: 100%; font-weight: 600;">
@@ -8378,7 +8972,7 @@ ${emailLogs.join('\n')}`);
 
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
               <div>
-                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #374151; margin-bottom: 0.35rem;">
+                <label for="editNoticeCategory" style="display: block; font-size: 0.85rem; font-weight: 700; color: #374151; margin-bottom: 0.35rem;">
                   Category *
                 </label>
                 <select id="editNoticeCategory" class="portal-input" style="width: 100%;">
@@ -8392,21 +8986,42 @@ ${emailLogs.join('\n')}`);
               </div>
 
               <div>
-                <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #374151; margin-bottom: 0.35rem;">
+                <label for="editNoticeBatch" style="display: block; font-size: 0.85rem; font-weight: 700; color: #374151; margin-bottom: 0.35rem;">
                   Target Batch *
                 </label>
                 <select id="editNoticeBatch" class="portal-input" style="width: 100%;">
-                  <option value="All Batches" ${target.targetBatch === 'All Batches' || !target.targetBatch ? 'selected' : ''}>🌟 All Batches</option>
-                  <option value="Class 10th (ACHIEVER)" ${target.targetBatch && target.targetBatch.includes('10th') ? 'selected' : ''}>🎯 Class 10th (ACHIEVER)</option>
-                  <option value="Class 9th (NURTURE)" ${target.targetBatch && target.targetBatch.includes('9th') ? 'selected' : ''}>🌱 Class 9th (NURTURE)</option>
-                  <option value="Class 8th (ALPHA)" ${target.targetBatch && target.targetBatch.includes('8th') ? 'selected' : ''}>⚡ Class 8th (ALPHA)</option>
-                  <option value="Junior Batch (JUNIO)" ${target.targetBatch && (target.targetBatch.includes('Junior') || target.targetBatch.includes('JUNIO')) ? 'selected' : ''}>🚀 Junior Batch (JUNIO)</option>
+                  ${(() => {
+                    // Notices store a batch *name* (or a comma-joined list of
+                    // them), so the options carry names and the stored value is
+                    // resolved to a canonical id to decide what is selected.
+                    // The five hardcoded options this replaces covered four of
+                    // the twelve batches, and matched by substring — so a notice
+                    // targeted at "Special English 9th to 12th" pre-selected
+                    // "Class 9th (NURTURE)" and was silently retargeted on save.
+                    const stored = String(target.targetBatch || target.target_batch || '').trim();
+                    const storedKey = stored ? getBatchCategoryKey(stored) : '';
+                    const isAll = !stored || /^all/i.test(stored);
+                    const opts = [
+                      `<option value="All Batches"${isAll ? ' selected' : ''}>🌟 All Batches</option>`
+                    ];
+                    canonicalBatchList.forEach(b => {
+                      const sel = !isAll && storedKey === b.key ? ' selected' : '';
+                      opts.push(`<option value="${b.name.replace(/"/g, '&quot;')}"${sel}>${b.icon} ${b.name}</option>`);
+                    });
+                    // A multi-batch notice resolves to no single id. Keep its
+                    // exact stored value as an option so opening the editor and
+                    // saving cannot quietly narrow its audience.
+                    if (!isAll && !storedKey) {
+                      opts.push(`<option value="${stored.replace(/"/g, '&quot;')}" selected>👥 ${stored}</option>`);
+                    }
+                    return opts.join('\n                  ');
+                  })()}
                 </select>
               </div>
             </div>
 
             <div>
-              <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #374151; margin-bottom: 0.35rem;">
+              <label for="editNoticeMessage" style="display: block; font-size: 0.85rem; font-weight: 700; color: #374151; margin-bottom: 0.35rem;">
                 Announcement Details / Body Message *
               </label>
               <textarea id="editNoticeMessage" class="portal-input" rows="5" required style="width: 100%; font-family: inherit; font-size: 0.9rem; line-height: 1.55; resize: vertical;">${target.message || ''}</textarea>
@@ -8415,11 +9030,11 @@ ${emailLogs.join('\n')}`);
             ${target.attachmentUrl || target.attachment_url ? `
               <div style="background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 8px; padding: 0.65rem 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap;">
                 <div style="font-size: 0.8rem; color: #334155; display: flex; align-items: center; gap: 0.4rem;">
-                  <i class="fa-solid fa-paperclip" style="color: var(--primary-emerald);"></i> Current Attachment: 
+                  <i aria-hidden="true" class="fa-solid fa-paperclip" style="color: var(--primary-emerald);"></i> Current Attachment: 
                   <a href="${target.attachmentUrl || target.attachment_url}" target="_blank" style="font-weight: 700; color: var(--primary-emerald); text-decoration: underline;">View File</a>
                 </div>
-                <button type="button" id="btnRemoveAttachment" class="btn" style="padding: 0.2rem 0.5rem; font-size: 0.72rem; background: #FEE2E2; color: #DC2626; border: 1px solid #FECACA; border-radius: 4px; cursor: pointer;">
-                  <i class="fa-solid fa-xmark"></i> Remove Attachment
+                <button type="button" id="btnRemoveNoticeAttachment" class="btn" style="padding: 0.2rem 0.5rem; font-size: 0.72rem; background: #FEE2E2; color: #DC2626; border: 1px solid #FECACA; border-radius: 4px; cursor: pointer;">
+                  <i class="fa-solid fa-xmark" aria-hidden="true"></i> Remove Attachment
                 </button>
               </div>
             ` : ''}
@@ -8429,7 +9044,7 @@ ${emailLogs.join('\n')}`);
                 Cancel
               </button>
               <button type="submit" class="btn btn-emerald" style="padding: 0.65rem 1.5rem; font-weight: 800; border-radius: 8px; box-shadow: 0 4px 12px rgba(5,150,105,0.3);">
-                <i class="fa-solid fa-floppy-disk"></i> Save & Synchronize Notice
+                <i aria-hidden="true" class="fa-solid fa-floppy-disk"></i> Save & Synchronize Notice
               </button>
             </div>
           </form>
@@ -8437,12 +9052,17 @@ ${emailLogs.join('\n')}`);
       </div>
     `;
     document.body.insertAdjacentHTML('beforeend', modalHtml);
+    wireModalA11y('editNoticeModal', { closeOnBackdrop: false });
 
-    // Remove attachment handler
-    document.getElementById('btnRemoveAttachment')?.addEventListener('click', () => {
+    // Remove attachment handler. The id is notice-specific: this button and the
+    // one in the compose-notice pane both used to be id="btnRemoveAttachment",
+    // and getElementById returns the FIRST match in the document — so with the
+    // compose pane still mounted, clicking Remove here silently unmounted that
+    // one instead and left this attachment in place.
+    document.getElementById('btnRemoveNoticeAttachment')?.addEventListener('click', (event) => {
       target.attachmentUrl = '';
       target.attachment_url = '';
-      document.getElementById('btnRemoveAttachment').parentElement.remove();
+      event.currentTarget.parentElement?.remove();
     });
 
     document.getElementById('editNoticeForm').addEventListener('submit', async (e) => {
@@ -8494,7 +9114,7 @@ ${emailLogs.join('\n')}`);
   function replaceEmailPlaceholders(text, student) {
     if (!text || !student) return text || '';
     const curMonth = new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
-    const monthlyFee = student.monthlyFee || (student.className && student.className.includes('10') ? 1000 : (student.className && student.className.includes('9') ? 1000 : (student.className && student.className.includes('8') ? 800 : 700)));
+    const monthlyFee = studentMonthlyFee(student);
     const pendingFee = student.pendingFee || 0;
     const prevDue = Math.max(0, pendingFee - monthlyFee);
 
@@ -8513,7 +9133,7 @@ ${emailLogs.join('\n')}`);
   function generateCampaignEmailHtml(student, templateType, subject, bodyText, includePaymentLink, includeSeal) {
     const s = student || {};
     const curMonth = new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
-    const monthlyFee = s.monthlyFee || (s.className && s.className.includes('10') ? 1000 : (s.className && s.className.includes('9') ? 1000 : (s.className && s.className.includes('8') ? 800 : 700)));
+    const monthlyFee = studentMonthlyFee(s);
     const pendingFee = s.pendingFee || 0;
     const prevDue = Math.max(0, pendingFee - monthlyFee);
     const author = getActiveTeacherName();
@@ -8633,9 +9253,9 @@ ${emailLogs.join('\n')}`);
         <div class="inner-modal-content" style="max-width: min(720px, 96vw); width: 96vw; max-height: 92vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; border-radius: 14px;">
           <div class="inner-modal-header" style="background: linear-gradient(135deg, #064E3B 0%, #022C22 100%); color: #fff; padding: 1rem 1.25rem; margin: 0;">
             <h3 style="margin: 0; font-size: 1.05rem; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
-              <i class="fa-solid fa-envelope-open-text"></i> Live HTML Email Preview
+              <i aria-hidden="true" class="fa-solid fa-envelope-open-text"></i> Live HTML Email Preview
             </h3>
-            <button class="btn-close-inner" onclick="document.getElementById('emailPreviewModal').remove()" style="color: #fff;"><i class="fa-solid fa-xmark"></i></button>
+            <button type="button" aria-label="Close email preview dialog" class="btn-close-inner" onclick="document.getElementById('emailPreviewModal').remove()" style="color: #fff;"><i aria-hidden="true" class="fa-solid fa-xmark"></i></button>
           </div>
           <div style="padding: 0.65rem 1rem; background: #F8FAFC; border-bottom: 1px solid #E2E8F0; font-size: 0.82rem; word-break: break-word;">
             <strong>Subject:</strong> <span style="color: #1E293B;">${escapeHtml(subject)}</span>
@@ -8654,6 +9274,7 @@ ${emailLogs.join('\n')}`);
       </div>
     `;
     document.body.insertAdjacentHTML('beforeend', modalHtml);
+    wireModalA11y('emailPreviewModal');
   }
 
   function renderAdminEmailTab() {
@@ -8664,14 +9285,14 @@ ${emailLogs.join('\n')}`);
       pane.innerHTML = `
         <div class="dash-card" style="text-align: center; padding: 3.5rem 1.5rem;">
           <div style="width: 68px; height: 68px; border-radius: 50%; background: #FEF2F2; color: #DC2626; display: inline-flex; align-items: center; justify-content: center; font-size: 1.85rem; margin-bottom: 1.25rem; border: 2px solid #FECACA;">
-            <i class="fa-solid fa-lock"></i>
+            <i aria-hidden="true" class="fa-solid fa-lock"></i>
           </div>
           <h3 style="font-size: 1.35rem; font-weight: 800; color: #1E293B; margin-bottom: 0.5rem;">Access Restricted: Main Administrator Only</h3>
           <p style="font-size: 0.92rem; color: #64748B; max-width: 500px; margin: 0 auto 1.5rem; line-height: 1.6;">
             The Mass Email Dispatch & Official Invoicing Campaign Manager is restricted exclusively to <strong>Chandan Kumar</strong> (Managing Director & Head of Institute).
           </p>
           <button type="button" class="btn btn-emerald" onclick="switchAdminTab('students')" style="padding: 0.65rem 1.5rem; font-weight: 700; border-radius: 8px;">
-            <i class="fa-solid fa-arrow-left"></i> Return to Student Directory
+            <i aria-hidden="true" class="fa-solid fa-arrow-left"></i> Return to Student Directory
           </button>
         </div>
       `;
@@ -8688,18 +9309,6 @@ ${emailLogs.join('\n')}`);
     if (adminEmailAudience === 'all') {
       targetStudents = activeStudents;
       audienceLabel = 'All Enrolled Students';
-    } else if (adminEmailAudience === '10th') {
-      targetStudents = activeStudents.filter(s => getBatchCategoryKey(s.className || s.class_name || s.batchName || '') === '10th');
-      audienceLabel = 'Class 10th (ACHIEVER)';
-    } else if (adminEmailAudience === '9th') {
-      targetStudents = activeStudents.filter(s => getBatchCategoryKey(s.className || s.class_name || s.batchName || '') === '9th');
-      audienceLabel = 'Class 9th (NURTURE)';
-    } else if (adminEmailAudience === '8th') {
-      targetStudents = activeStudents.filter(s => getBatchCategoryKey(s.className || s.class_name || s.batchName || '') === '8th');
-      audienceLabel = 'Class 8th (ALPHA)';
-    } else if (adminEmailAudience === 'junio') {
-      targetStudents = activeStudents.filter(s => getBatchCategoryKey(s.className || s.class_name || s.batchName || '') === 'junio');
-      audienceLabel = 'Junior Batch (JUNIO)';
     } else if (adminEmailAudience === 'defaulters') {
       targetStudents = activeStudents.filter(s => (s.pendingFee || 0) > 0);
       audienceLabel = 'Pending Dues Defaulters Only';
@@ -8708,6 +9317,16 @@ ${emailLogs.join('\n')}`);
       targetStudents = match ? [match] : (activeStudents.length ? [activeStudents[0]] : []);
       if (targetStudents[0]) adminEmailSelectedStudentId = targetStudents[0].id || targetStudents[0].student_id || targetStudents[0].rollNo;
       audienceLabel = targetStudents[0] ? `${targetStudents[0].name} (Roll #${targetStudents[0].rollNo})` : 'Individual Student';
+    } else {
+      // Any canonical batch id. The four hardcoded branches this replaces
+      // ('10th', '9th', '8th', 'junio') stopped matching anything once the
+      // resolver started returning canonical ids, so the batch audiences in
+      // the dropdown silently selected zero recipients — and eight of the
+      // twelve batches had no option at all.
+      targetStudents = activeStudents.filter(s =>
+        getBatchCategoryKey(s.className || s.class_name || s.batchName || '') === adminEmailAudience
+      );
+      audienceLabel = batchLabel(adminEmailAudience);
     }
 
     // Dynamic Computations & Indian Standard Time (IST) Quota Guards
@@ -8730,7 +9349,7 @@ ${emailLogs.join('\n')}`);
         <div class="dash-card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
           <div>
             <div class="dash-card-title">
-              <i class="fa-solid fa-envelope-open-text" style="color: var(--primary-emerald);"></i> Dedicated Email Dispatch & Campaign Manager
+              <i aria-hidden="true" class="fa-solid fa-envelope-open-text" style="color: var(--primary-emerald);"></i> Dedicated Email Dispatch & Campaign Manager
             </div>
             <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 0.25rem;">
               Send official digital tuition invoices, mid-month fee reminder notices, exam schedules, and circulars directly to parents & students.
@@ -8738,10 +9357,10 @@ ${emailLogs.join('\n')}`);
           </div>
           <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
             <span class="user-badge-tag" style="background: #064E3B; color: #fff; font-weight: 700; font-size: 0.78rem;">
-              <i class="fa-solid fa-clock"></i> IST Active: Day ${ist.day} (${ist.monthKey})
+              <i aria-hidden="true" class="fa-solid fa-clock"></i> IST Active: Day ${ist.day} (${ist.monthKey})
             </span>
             <span class="user-badge-tag" style="background: #1E40AF; color: #fff; font-weight: 700; font-size: 0.78rem;">
-              <i class="fa-solid fa-bolt"></i> Resend Cloud API
+              <i aria-hidden="true" class="fa-solid fa-bolt"></i> Resend Cloud API
             </span>
           </div>
         </div>
@@ -8750,7 +9369,7 @@ ${emailLogs.join('\n')}`);
         ${isBroadcastingPaused ? `
           <div style="margin-bottom: 1.25rem; background: #FEF2F2; border: 2px solid #F87171; border-radius: 12px; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 0.85rem;">
             <div style="width: 44px; height: 44px; border-radius: 50%; background: #DC2626; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0;">
-              <i class="fa-solid fa-ban"></i>
+              <i aria-hidden="true" class="fa-solid fa-ban"></i>
             </div>
             <div>
               <div style="font-weight: 800; font-size: 0.95rem; color: #991B1B;">
@@ -8764,7 +9383,7 @@ ${emailLogs.join('\n')}`);
         ` : `
           <div style="margin-bottom: 1.25rem; background: #F0FDF4; border: 1.5px solid #86EFAC; border-radius: 10px; padding: 0.85rem 1.15rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.6rem;">
             <div style="font-size: 0.86rem; font-weight: 700; color: #166534; display: flex; align-items: center; gap: 0.5rem;">
-              <i class="fa-solid fa-circle-check" style="color: #16A34A; font-size: 1.1rem;"></i>
+              <i aria-hidden="true" class="fa-solid fa-circle-check" style="color: #16A34A; font-size: 1.1rem;"></i>
               <span>Broadcasting Window Active (Day ${ist.day}, IST) • Daily Limit: <strong>Max 100 Emails</strong></span>
             </div>
             <div style="font-size: 0.82rem; font-weight: 800; color: ${validEmailCount > MAX_DAILY_BROADCAST_LIMIT ? '#DC2626' : '#15803D'}; background: ${validEmailCount > MAX_DAILY_BROADCAST_LIMIT ? '#FEE2E2' : '#DCFCE7'}; padding: 0.25rem 0.65rem; border-radius: 6px; border: 1px solid ${validEmailCount > MAX_DAILY_BROADCAST_LIMIT ? '#FCA5A5' : '#86EFAC'};">
@@ -8805,15 +9424,11 @@ ${emailLogs.join('\n')}`);
           <div class="admin-email-form-grid">
             <!-- Target Audience Selector -->
             <div>
-              <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.35rem; color: var(--text-mahogany);">
-                <i class="fa-solid fa-users-viewfinder" style="color: var(--primary-emerald);"></i> 1. Select Target Audience *
+              <label for="adminEmailAudienceSelect" style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.35rem; color: var(--text-mahogany);">
+                <i class="fa-solid fa-users-viewfinder" style="color: var(--primary-emerald);" aria-hidden="true"></i> 1. Select Target Audience *
               </label>
               <select id="adminEmailAudienceSelect" class="portal-input" style="font-weight: 600; width: 100%;">
-                <option value="all" ${adminEmailAudience === 'all' ? 'selected' : ''}>🎯 All Enrolled Students (All Batches)</option>
-                <option value="10th" ${adminEmailAudience === '10th' ? 'selected' : ''}>Class 10th (ACHIEVER Batch)</option>
-                <option value="9th" ${adminEmailAudience === '9th' ? 'selected' : ''}>Class 9th (NURTURE Batch)</option>
-                <option value="8th" ${adminEmailAudience === '8th' ? 'selected' : ''}>Class 8th (ALPHA Batch)</option>
-                <option value="junio" ${adminEmailAudience === 'junio' ? 'selected' : ''}>Junior Batch (JUNIO)</option>
+                ${batchFilterOptions(adminEmailAudience, '🎯 All Enrolled Students (All Batches)')}
                 <option value="defaulters" ${adminEmailAudience === 'defaulters' ? 'selected' : ''}>⚠️ Defaulters Only (Students with Pending Fees)</option>
                 <option value="student" ${adminEmailAudience === 'student' ? 'selected' : ''}>👤 Specific Individual Student</option>
               </select>
@@ -8821,8 +9436,8 @@ ${emailLogs.join('\n')}`);
 
             <!-- Campaign Template Preset Selector -->
             <div>
-              <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.35rem; color: var(--text-mahogany);">
-                <i class="fa-solid fa-wand-magic-sparkles" style="color: #D97706;"></i> 2. Email Type / Template Preset *
+              <label for="adminEmailTemplateSelect" style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.35rem; color: var(--text-mahogany);">
+                <i class="fa-solid fa-wand-magic-sparkles" style="color: #D97706;" aria-hidden="true"></i> 2. Email Type / Template Preset *
               </label>
               <select id="adminEmailTemplateSelect" class="portal-input" style="font-weight: 600; width: 100%;">
                 <option value="monthly_invoice" ${adminEmailCampaignType === 'monthly_invoice' ? 'selected' : ''}>📄 Official Monthly Fee Invoice (with UPI QR)</option>
@@ -8836,8 +9451,8 @@ ${emailLogs.join('\n')}`);
           <!-- Individual Student Selector (shown only if audience is student) -->
           ${adminEmailAudience === 'student' ? `
             <div style="background: #F1F5F9; border: 1.5px solid #CBD5E1; border-radius: 10px; padding: 0.85rem 1rem; margin-bottom: 1rem;">
-              <label style="display: block; font-weight: 700; font-size: 0.84rem; color: #1E293B; margin-bottom: 0.35rem;">
-                <i class="fa-solid fa-user-check" style="color: var(--primary-emerald);"></i> Choose Student Recipient:
+              <label for="adminEmailIndividualStudentSelect" style="display: block; font-weight: 700; font-size: 0.84rem; color: #1E293B; margin-bottom: 0.35rem;">
+                <i aria-hidden="true" class="fa-solid fa-user-check" style="color: var(--primary-emerald);"></i> Choose Student Recipient:
               </label>
               <select id="adminEmailIndividualStudentSelect" class="portal-input" style="font-weight: 600; width: 100%;">
                 ${activeStudents.map(s => {
@@ -8851,7 +9466,7 @@ ${emailLogs.join('\n')}`);
 
           <!-- Subject Line -->
           <div style="margin-bottom: 1rem;">
-            <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.35rem; color: var(--text-mahogany);">
+            <label for="adminEmailSubjectInput" style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.35rem; color: var(--text-mahogany);">
               Email Subject Line *
             </label>
             <input type="text" id="adminEmailSubjectInput" class="portal-input" value="${defaultSubject.replace(/"/g, '&quot;')}" required style="font-weight: 600; width: 100%;">
@@ -8860,7 +9475,7 @@ ${emailLogs.join('\n')}`);
           <!-- Message Body with Smart Placeholders Hint -->
           <div style="margin-bottom: 1rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.35rem;">
-              <label style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany);">Email Body / Message Text *</label>
+              <label for="adminEmailBodyInput" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany);">Email Body / Message Text *</label>
               <span style="font-size: 0.74rem; color: var(--text-muted); font-weight: 600;">
                 Tags: <code>{student_name}</code>, <code>{roll_no}</code>, <code>{monthly_fee}</code>, <code>{pending_fee}</code>
               </span>
@@ -8870,14 +9485,14 @@ ${emailLogs.join('\n')}`);
 
           <!-- Options & Toggles -->
           <div class="admin-email-toggles-grid">
-            <label style="display: flex; align-items: center; gap: 0.6rem; font-size: 0.84rem; font-weight: 700; color: #065F46; background: #ECFDF5; border: 1px solid #A7F3D0; padding: 0.65rem 0.85rem; border-radius: 8px; cursor: pointer; user-select: none;">
+            <label for="adminEmailIncludePaymentLink" style="display: flex; align-items: center; gap: 0.6rem; font-size: 0.84rem; font-weight: 700; color: #065F46; background: #ECFDF5; border: 1px solid #A7F3D0; padding: 0.65rem 0.85rem; border-radius: 8px; cursor: pointer; user-select: none;">
               <input type="checkbox" id="adminEmailIncludePaymentLink" ${(adminEmailCampaignType === 'monthly_invoice' || adminEmailCampaignType === 'fee_reminder') ? 'checked' : ''} style="width: 17px; height: 17px; accent-color: var(--primary-emerald); cursor: pointer; flex-shrink: 0;">
-              <span><i class="fa-solid fa-qrcode"></i> Include 1-Click Online Payment Link & UPI Details</span>
+              <span><i aria-hidden="true" class="fa-solid fa-qrcode"></i> Include 1-Click Online Payment Link & UPI Details</span>
             </label>
 
-            <label style="display: flex; align-items: center; gap: 0.6rem; font-size: 0.84rem; font-weight: 700; color: #1E40AF; background: #EFF6FF; border: 1px solid #BFDBFE; padding: 0.65rem 0.85rem; border-radius: 8px; cursor: pointer; user-select: none;">
+            <label for="adminEmailIncludeSeal" style="display: flex; align-items: center; gap: 0.6rem; font-size: 0.84rem; font-weight: 700; color: #1E40AF; background: #EFF6FF; border: 1px solid #BFDBFE; padding: 0.65rem 0.85rem; border-radius: 8px; cursor: pointer; user-select: none;">
               <input type="checkbox" id="adminEmailIncludeSeal" checked style="width: 17px; height: 17px; accent-color: #2563EB; cursor: pointer; flex-shrink: 0;">
-              <span><i class="fa-solid fa-stamp"></i> Include Official Pragyan Crest Seal & Signatures</span>
+              <span><i aria-hidden="true" class="fa-solid fa-stamp"></i> Include Official Pragyan Crest Seal & Signatures</span>
             </label>
           </div>
 
@@ -8889,24 +9504,24 @@ ${emailLogs.join('\n')}`);
           <div class="admin-email-actions-bar">
             <div class="admin-email-sub-actions" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
               <button type="button" id="btnPreviewEmailCampaign" class="btn" style="background: #F1F5F9; color: #334155; border: 1.5px solid #CBD5E1; font-weight: 700; padding: 0.65rem 1.15rem; border-radius: 8px; cursor: pointer;">
-                <i class="fa-solid fa-eye"></i> Preview HTML Email
+                <i aria-hidden="true" class="fa-solid fa-eye"></i> Preview HTML Email
               </button>
               <button type="button" id="btnTestEmailCampaign" class="btn" style="background: #EFF6FF; color: #1D4ED8; border: 1.5px solid #93C5FD; font-weight: 700; padding: 0.65rem 1.15rem; border-radius: 8px; cursor: pointer;">
-                <i class="fa-solid fa-paper-plane"></i> Send Test to Me
+                <i aria-hidden="true" class="fa-solid fa-paper-plane"></i> Send Test to Me
               </button>
             </div>
 
             ${isBroadcastingPaused ? `
               <button type="submit" id="btnDispatchEmailCampaign" class="btn" disabled style="padding: 0.75rem 1.85rem; font-size: 0.92rem; font-weight: 800; border-radius: 8px; background: #9CA3AF; color: #fff; cursor: not-allowed; box-shadow: none;">
-                <i class="fa-solid fa-ban"></i> Broadcasting Paused (Days 1–4 & 15–19 IST)
+                <i aria-hidden="true" class="fa-solid fa-ban"></i> Broadcasting Paused (Days 1–4 & 15–19 IST)
               </button>
             ` : (validEmailCount > MAX_DAILY_BROADCAST_LIMIT ? `
               <button type="submit" id="btnDispatchEmailCampaign" class="btn btn-emerald" style="padding: 0.75rem 1.85rem; font-size: 0.92rem; font-weight: 800; border-radius: 8px;">
-                <i class="fa-solid fa-rocket"></i> Dispatch Capped (${MAX_DAILY_BROADCAST_LIMIT} of ${validEmailCount} Recipients)
+                <i aria-hidden="true" class="fa-solid fa-rocket"></i> Dispatch Capped (${MAX_DAILY_BROADCAST_LIMIT} of ${validEmailCount} Recipients)
               </button>
             ` : `
               <button type="submit" id="btnDispatchEmailCampaign" class="btn btn-emerald" style="padding: 0.75rem 1.85rem; font-size: 0.92rem; font-weight: 800; border-radius: 8px;">
-                <i class="fa-solid fa-rocket"></i> Dispatch Campaign (${validEmailCount} Recipients)
+                <i aria-hidden="true" class="fa-solid fa-rocket"></i> Dispatch Campaign (${validEmailCount} Recipients)
               </button>
             `)}
           </div>
@@ -8991,7 +9606,7 @@ ${emailLogs.join('\n')}`);
       } catch (err) {
         showNotification(`❌ Failed: ` + err.message, 'error');
       } finally {
-        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Send Test to Me'; }
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-paper-plane"></i> Send Test to Me'; }
       }
     });
 
@@ -9029,7 +9644,7 @@ ${emailLogs.join('\n')}`);
         logBox.style.display = 'block';
         logBox.innerHTML = `<div>[${new Date().toLocaleTimeString('en-IN')}] Initializing campaign dispatch for ${targetDispatchRecipients.length} recipients (Day ${currentIst.day} IST)...</div>`;
       }
-      if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Dispatching Emails...'; }
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-spinner fa-spin"></i> Dispatching Emails...'; }
 
       let sentCount = 0;
       let failCount = 0;
@@ -9087,7 +9702,7 @@ ${emailLogs.join('\n')}`);
       } finally {
         if (submitBtn) {
           submitBtn.disabled = false;
-          submitBtn.innerHTML = `<i class="fa-solid fa-rocket"></i> Dispatch Campaign (${validEmailCount} Recipients)`;
+          submitBtn.innerHTML = `<i aria-hidden="true" class="fa-solid fa-rocket"></i> Dispatch Campaign (${validEmailCount} Recipients)`;
         }
       }
     });
@@ -9098,8 +9713,8 @@ ${emailLogs.join('\n')}`);
       <div class="inner-modal-backdrop active" id="addStudentModal">
         <div class="inner-modal-content" style="max-width: 680px;">
           <div class="inner-modal-header">
-            <h3><i class="fa-solid fa-user-plus" style="color: var(--primary-emerald);"></i> Register New Student</h3>
-            <button class="btn-close-inner" onclick="document.getElementById('addStudentModal').remove()"><i class="fa-solid fa-xmark"></i></button>
+            <h3><i aria-hidden="true" class="fa-solid fa-user-plus" style="color: var(--primary-emerald);"></i> Register New Student</h3>
+            <button type="button" aria-label="Close add student dialog" class="btn-close-inner" onclick="document.getElementById('addStudentModal').remove()"><i aria-hidden="true" class="fa-solid fa-xmark"></i></button>
           </div>
           <form id="newStudentForm">
             <!-- Server Authoritative Student ID Banner -->
@@ -9107,7 +9722,7 @@ ${emailLogs.join('\n')}`);
               <div>
                 <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700;">Authoritative Sequence Format (YYCCSS)</div>
                 <div style="font-size: 1.05rem; font-weight: 800; color: #10B981; margin-top: 2px;">
-                  <i class="fa-solid fa-id-card"></i> Student ID: <span id="newStuIdBadgeDisplay">Calculating...</span>
+                  <i aria-hidden="true" class="fa-solid fa-id-card"></i> Student ID: <span id="newStuIdBadgeDisplay">Calculating...</span>
                 </div>
               </div>
               <span style="background: rgba(16, 185, 129, 0.2); color: #10B981; font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 99px;">Server Sequence</span>
@@ -9115,42 +9730,39 @@ ${emailLogs.join('\n')}`);
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; margin-bottom: 1rem;">
               <div>
-                <label style="font-size: 0.85rem; font-weight: 600;">Student Full Name *</label>
+                <label for="newStuName" style="font-size: 0.85rem; font-weight: 600;">Student Full Name *</label>
                 <input type="text" id="newStuName" class="portal-input" required placeholder="e.g. Amit Kumar">
               </div>
               <div>
-                <label style="font-size: 0.85rem; font-weight: 600;">Mobile Number *</label>
+                <label for="newStuMobile" style="font-size: 0.85rem; font-weight: 600;">Mobile Number *</label>
                 <input type="tel" id="newStuMobile" class="portal-input" required maxlength="10" pattern="[0-9]{10}" inputmode="numeric" placeholder="10-digit mobile number">
               </div>
               <div>
-                <label style="font-size: 0.85rem; font-weight: 600;">Date of Birth (DOB) *</label>
+                <label for="newStuDob" style="font-size: 0.85rem; font-weight: 600;">Date of Birth (DOB) *</label>
                 <input type="date" id="newStuDob" class="portal-input" required>
               </div>
               <div>
-                <label style="font-size: 0.85rem; font-weight: 600;">Class / Batch Assignment *</label>
+                <label for="newStuClass" style="font-size: 0.85rem; font-weight: 600;">Class / Batch Assignment *</label>
                 <select id="newStuClass" class="portal-input">
-                  <option value="Class 10th (ACHIEVER)" data-monthly="1000">Class 10th (ACHIEVER) — ₹1,000/Month</option>
-                  <option value="Class 9th (NURTURE)" data-monthly="1000">Class 9th (NURTURE) — ₹1,000/Month</option>
-                  <option value="Class 8th (ALPHA)" data-monthly="800">Class 8th (ALPHA) — ₹800/Month</option>
-                  <option value="Junior Batch (JUNIO)" data-monthly="700">Junior Batch (JUNIO) — ₹700/Month</option>
+                  ${batchAssignmentOptions('')}
                 </select>
               </div>
               <div>
-                <label style="font-size: 0.85rem; font-weight: 600;">Monthly Fee Rate (₹/Month) *</label>
+                <label for="newStuMonthlyFee" style="font-size: 0.85rem; font-weight: 600;">Monthly Fee Rate (₹/Month) *</label>
                 <input type="number" id="newStuMonthlyFee" class="portal-input" value="1000" min="0" required placeholder="e.g. 1000">
                 <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.2rem;">Added automatically on 1st–4th of each month.</div>
               </div>
               <div>
-                <label style="font-size: 0.85rem; font-weight: 600;">Old / Past Pending Fees (₹) <span style="font-weight:400; color:var(--text-muted);">(0 for new admissions)</span></label>
+                <label for="newStuPrevDue" style="font-size: 0.85rem; font-weight: 600;">Old / Past Pending Fees (₹) <span style="font-weight:400; color:var(--text-muted);">(0 for new admissions)</span></label>
                 <input type="number" id="newStuPrevDue" class="portal-input" value="0" min="0" placeholder="0 if starting fresh, or enter past dues">
                 <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.2rem;">Initial balance due. Default is ₹0 for fresh admissions.</div>
               </div>
               <div>
-                <label style="font-size: 0.85rem; font-weight: 600;">Email Address <span style="font-weight:400; color:var(--text-muted);">(Optional)</span></label>
+                <label for="newStuEmail" style="font-size: 0.85rem; font-weight: 600;">Email Address <span style="font-weight:400; color:var(--text-muted);">(Optional)</span></label>
                 <input type="email" id="newStuEmail" class="portal-input" placeholder="student@gmail.com">
               </div>
               <div>
-                <label style="font-size: 0.85rem; font-weight: 600;">Blood Group <span style="font-weight:400; color:var(--text-muted);">(Optional)</span></label>
+                <label for="newStuBloodGroup" style="font-size: 0.85rem; font-weight: 600;">Blood Group <span style="font-weight:400; color:var(--text-muted);">(Optional)</span></label>
                 <select id="newStuBloodGroup" class="portal-input">
                   <option value="Not Specified">Not Specified</option>
                   <option value="A+">A+</option>
@@ -9164,26 +9776,27 @@ ${emailLogs.join('\n')}`);
                 </select>
               </div>
               <div>
-                <label style="font-size: 0.85rem; font-weight: 600;">Father / Guardian Name</label>
+                <label for="newStuGuardian" style="font-size: 0.85rem; font-weight: 600;">Father / Guardian Name</label>
                 <input type="text" id="newStuGuardian" class="portal-input" placeholder="Guardian Name">
               </div>
               <div>
-                <label style="font-size: 0.85rem; font-weight: 600;">Guardian Mobile <span style="font-weight:400; color:var(--text-muted);">(Optional)</span></label>
+                <label for="newStuGuardianMobile" style="font-size: 0.85rem; font-weight: 600;">Guardian Mobile <span style="font-weight:400; color:var(--text-muted);">(Optional)</span></label>
                 <input type="tel" id="newStuGuardianMobile" class="portal-input" maxlength="10" pattern="[0-9]{10}" inputmode="numeric" placeholder="10-digit guardian mobile">
               </div>
               <div style="grid-column: span 2;">
-                <label style="font-size: 0.85rem; font-weight: 600;">Residential Address <span style="font-weight:400; color:var(--text-muted);">(Optional)</span></label>
+                <label for="newStuAddress" style="font-size: 0.85rem; font-weight: 600;">Residential Address <span style="font-weight:400; color:var(--text-muted);">(Optional)</span></label>
                 <input type="text" id="newStuAddress" class="portal-input" placeholder="e.g. Main Road, Near Bus Stand, Lalganj, Vaishali">
               </div>
             </div>
             <button type="submit" class="btn btn-emerald" style="width: 100%; padding: 0.8rem;">
-              <i class="fa-solid fa-check"></i> Complete Student Registration
+              <i aria-hidden="true" class="fa-solid fa-check"></i> Complete Student Registration
             </button>
           </form>
         </div>
       </div>
     `;
     document.body.insertAdjacentHTML('beforeend', modalHtml);
+    wireModalA11y('addStudentModal', { closeOnBackdrop: false });
 
     // Real-time 10-digit mobile masking
     const newMobInput = document.getElementById('newStuMobile');
@@ -9211,10 +9824,23 @@ ${emailLogs.join('\n')}`);
     updateIdPreview();
 
     // Auto update monthly fee input and Student ID when batch selection changes
-    classSelect.addEventListener('change', () => {
+    // Auto update monthly fee input and Student ID when batch selection changes
+    const syncMonthlyFeeToBatch = () => {
       const selectedOpt = classSelect.options[classSelect.selectedIndex];
-      const monthly = selectedOpt.dataset.monthly || '1000';
-      document.getElementById('newStuMonthlyFee').value = monthly;
+      // Falls back to the canonical rate for the selected batch, not a flat
+      // ₹1,000 — that default under-charged the four ₹1,500 senior batches by
+      // a third on every new admission.
+      const monthly = selectedOpt?.dataset.monthly || classMonthlyFee(classSelect.value) || '';
+      const feeInput = document.getElementById('newStuMonthlyFee');
+      if (feeInput && monthly) feeInput.value = monthly;
+    };
+
+    // Run once on open: the fee field ships with a static default, which no
+    // longer matches whichever batch the select happens to show first.
+    syncMonthlyFeeToBatch();
+
+    classSelect.addEventListener('change', () => {
+      syncMonthlyFeeToBatch();
       updateIdPreview();
     });
 
@@ -9321,13 +9947,13 @@ ${emailLogs.join('\n')}`);
       <div class="inner-modal-backdrop active" id="requestUpdateModal">
         <div class="inner-modal-content" style="max-width: 650px;">
           <div class="inner-modal-header">
-            <h3><i class="fa-solid fa-user-pen" style="color: var(--primary-emerald);"></i> Request Profile Detail Update</h3>
-            <button class="btn-close-inner" id="btnCloseReqModal"><i class="fa-solid fa-xmark"></i></button>
+            <h3><i aria-hidden="true" class="fa-solid fa-user-pen" style="color: var(--primary-emerald);"></i> Request Profile Detail Update</h3>
+            <button type="button" aria-label="Close profile update request dialog" class="btn-close-inner" id="btnCloseReqModal"><i aria-hidden="true" class="fa-solid fa-xmark"></i></button>
           </div>
           
           ${existingPending ? `
             <div style="background: #FEF3C7; border: 1px solid #F59E0B; color: #92400E; padding: 0.65rem 0.9rem; border-radius: 8px; font-size: 0.84rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
-              <div><i class="fa-solid fa-clock-rotate-left"></i> <strong>Pending Request Active:</strong> Submitting will update your pending request for Admin review.</div>
+              <div><i aria-hidden="true" class="fa-solid fa-clock-rotate-left"></i> <strong>Pending Request Active:</strong> Submitting will update your pending request for Admin review.</div>
               <button type="button" id="btnCancelThisReq" style="background: #DC2626; color: #fff; border: none; padding: 0.25rem 0.6rem; border-radius: 4px; font-size: 0.76rem; font-weight: 700; cursor: pointer;">
                 Cancel Request
               </button>
@@ -9341,31 +9967,31 @@ ${emailLogs.join('\n')}`);
           <form id="reqUpdateForm">
             <div class="portal-form-grid-2col" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; margin-bottom: 1rem;">
               <div>
-                <label style="font-size: 0.85rem; font-weight: 600;">Student Full Name *</label>
+                <label for="reqStuName" style="font-size: 0.85rem; font-weight: 600;">Student Full Name *</label>
                 <input type="text" id="reqStuName" class="portal-input" value="${safeValue(currentValues.name || s.name)}" required>
               </div>
               <div>
-                <label style="font-size: 0.85rem; font-weight: 600;">Mobile Number *</label>
+                <label for="reqStuMobile" style="font-size: 0.85rem; font-weight: 600;">Mobile Number *</label>
                 <input type="tel" id="reqStuMobile" class="portal-input" value="${safeValue(currentValues.mobile || s.mobile)}" required>
               </div>
               <div>
-                <label style="font-size: 0.85rem; font-weight: 600;">Date of Birth (DOB) *</label>
+                <label for="reqStuDob" style="font-size: 0.85rem; font-weight: 600;">Date of Birth (DOB) *</label>
                 <input type="date" id="reqStuDob" class="portal-input" value="${safeValue(currentValues.dob || s.dob)}" required>
               </div>
               <div>
-                <label style="font-size: 0.85rem; font-weight: 600;">Email Address (Optional)</label>
+                <label for="reqStuEmail" style="font-size: 0.85rem; font-weight: 600;">Email Address (Optional)</label>
                 <input type="email" id="reqStuEmail" class="portal-input" value="${safeValue(currentValues.email || s.email)}">
               </div>
               <div>
-                <label style="font-size: 0.85rem; font-weight: 600;">Father / Guardian Name</label>
+                <label for="reqStuGuardian" style="font-size: 0.85rem; font-weight: 600;">Father / Guardian Name</label>
                 <input type="text" id="reqStuGuardian" class="portal-input" value="${safeValue(currentValues.guardianName || s.guardianName)}">
               </div>
               <div>
-                <label style="font-size: 0.85rem; font-weight: 600;">Guardian Mobile</label>
+                <label for="reqStuGuardianMobile" style="font-size: 0.85rem; font-weight: 600;">Guardian Mobile</label>
                 <input type="tel" id="reqStuGuardianMobile" class="portal-input" value="${safeValue(currentValues.guardianMobile || s.guardianMobile || s.mobile)}">
               </div>
               <div>
-                <label style="font-size: 0.85rem; font-weight: 600;">Blood Group</label>
+                <label for="reqStuBloodGroup" style="font-size: 0.85rem; font-weight: 600;">Blood Group</label>
                 <select id="reqStuBloodGroup" class="portal-input">
                   <option value="Not Specified" ${(currentValues.bloodGroup || s.bloodGroup) === 'Not Specified' ? 'selected' : ''}>Not Specified</option>
                   <option value="A+" ${(currentValues.bloodGroup || s.bloodGroup) === 'A+' ? 'selected' : ''}>A+</option>
@@ -9379,11 +10005,11 @@ ${emailLogs.join('\n')}`);
                 </select>
               </div>
               <div>
-                <label style="font-size: 0.85rem; font-weight: 600;">Class / Batch (Read Only)</label>
-                <input type="text" class="portal-input" value="${safeValue(s.className)}" disabled style="background:#f3f4f6;">
+                <label for="reqStuClassDisplay" style="font-size: 0.85rem; font-weight: 600;">Class / Batch (Read Only)</label>
+                <input type="text" id="reqStuClassDisplay" class="portal-input" value="${safeValue(s.className)}" disabled style="background:#f3f4f6;">
               </div>
               <div style="grid-column: span 2;">
-                <label style="font-size: 0.85rem; font-weight: 600;"><i class="fa-solid fa-camera" style="color: var(--primary-emerald);"></i> Upload New Profile Photo (PF)</label>
+                <label for="reqStuPhotoInput" style="font-size: 0.85rem; font-weight: 600;"><i aria-hidden="true" class="fa-solid fa-camera" style="color: var(--primary-emerald);"></i> Upload New Profile Photo (PF)</label>
                 <input type="file" id="reqStuPhotoInput" accept="image/*" class="portal-input" style="padding: 0.4rem;">
                 <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 0.2rem;">Choose a profile picture to submit for verification & approval.</div>
                 <div id="reqPhotoPreviewContainer" style="margin-top: 0.4rem; display: ${currentValues.photoUrl ? 'block' : 'none'};">
@@ -9391,12 +10017,12 @@ ${emailLogs.join('\n')}`);
                 </div>
               </div>
               <div style="grid-column: span 2;">
-                <label style="font-size: 0.85rem; font-weight: 600;">Residential Address</label>
+                <label for="reqStuAddress" style="font-size: 0.85rem; font-weight: 600;">Residential Address</label>
                 <input type="text" id="reqStuAddress" class="portal-input" value="${safeValue(currentValues.address || s.address)}">
               </div>
             </div>
             <button type="submit" id="btnSubmitProfileReq" class="btn btn-emerald" style="width: 100%; padding: 0.8rem;">
-              <i class="fa-solid fa-paper-plane"></i> ${existingPending ? 'Update Pending Request' : 'Submit Update Request to Admin'}
+              <i aria-hidden="true" class="fa-solid fa-paper-plane"></i> ${existingPending ? 'Update Pending Request' : 'Submit Update Request to Admin'}
             </button>
           </form>
         </div>
@@ -9405,6 +10031,7 @@ ${emailLogs.join('\n')}`);
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 
     const modalEl = document.getElementById('requestUpdateModal');
+    wireModalA11y(modalEl, { closeOnBackdrop: false });
     const photoInput = modalEl?.querySelector('#reqStuPhotoInput');
     const previewContainer = modalEl?.querySelector('#reqPhotoPreviewContainer');
     const previewImg = modalEl?.querySelector('#reqPhotoPreviewImg');
@@ -9419,15 +10046,17 @@ ${emailLogs.join('\n')}`);
         if (currentRequest) {
           const newPhoto = currentRequest.newData?.photoUrl || currentRequest.newData?.photo;
           const oldPhoto = currentRequest.oldData?.photoUrl || currentRequest.oldData?.photo;
-          if (newPhoto && newPhoto !== oldPhoto && typeof SupabaseSync !== 'undefined' && SupabaseSync.deleteFile) {
-            try { await SupabaseSync.deleteFile(newPhoto); } catch(e) {}
-          }
           if (currentRequest.id && typeof SupabaseSync !== 'undefined') {
             const result = await SupabaseSync.mutate('student_requests', 'delete', null, { where: { request_id: currentRequest.id } });
-            if (!result.success) {
-              alert(result.error || 'Unable to cancel the request. Please try again.');
+            if (!result || result.success !== true) {
+              alert(result?.error || 'Unable to cancel the request. Please try again.');
               return;
             }
+          }
+          // Only now. The upload delete is irreversible, and doing it first left a
+          // still-pending request whose photo the admin could no longer open.
+          if (newPhoto && newPhoto !== oldPhoto && typeof SupabaseSync !== 'undefined' && SupabaseSync.deleteFile) {
+            try { await SupabaseSync.deleteFile(newPhoto); } catch(e) { console.warn('Cancelled-upload cleanup note:', e.message); }
           }
         }
         const allReqs = AppState.getRequests().filter(r => !(isStudentRequestMatch(r, s) && String(r.status || '').toLowerCase() === 'pending'));
@@ -9475,7 +10104,7 @@ ${emailLogs.join('\n')}`);
       const submitBtn = modalEl.querySelector('#btnSubmitProfileReq');
       if (submitBtn) {
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting Request...';
+        submitBtn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-spinner fa-spin"></i> Submitting Request...';
       }
 
       try {
@@ -9583,7 +10212,7 @@ ${emailLogs.join('\n')}`);
         alert('❌ Request failed: ' + err.message);
         if (submitBtn) {
           submitBtn.disabled = false;
-          submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Update Request to Admin';
+          submitBtn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-paper-plane"></i> Submit Update Request to Admin';
         }
       }
     });
@@ -9595,33 +10224,51 @@ ${emailLogs.join('\n')}`);
   function openStudentPaymentRequestModal(s) {
     document.getElementById('studentPayReqModal')?.remove();
 
-    const totalDue = s.pendingFee || 1000;
-    const monthlyFee = s.monthlyFee || 1000;
-    let selectedPayAmount = totalDue;
-    const initialUpiLink = `upi://pay?pa=chandankr1501998@ybl&pn=Chandan%20Kumar%20Pragyan%20Institute&cu=INR&am=${selectedPayAmount}`;
+    // A student with nothing outstanding used to see this modal pre-filled with
+    // ₹1,000 (`s.pendingFee || 1000`), inviting them to pay a bill they did not
+    // have. The monthly rate is the canonical one for their batch, not a flat
+    // ₹1,000 that under-charged the ₹1,500 senior batches.
+    const totalDue = Math.max(0, Number(s.pendingFee ?? s.pending_fee ?? 0));
+    const monthlyFee = studentMonthlyFee(s);
+    // Pre-fill with the outstanding balance; if nothing is due, fall back to one
+    // month so an advance payment is still possible, and say so in the modal.
+    let selectedPayAmount = totalDue > 0 ? totalDue : monthlyFee;
+    const payee = (ACADEMIC && ACADEMIC.PAYEE) || {
+      upiId: 'chandankr1501998@ybl', name: 'CHANDAN KUMAR',
+      displayName: 'Chandan Kumar', role: 'Managing Director, Pragyan Institute'
+    };
+    const upiLinkFor = (amt) =>
+      `upi://pay?pa=${encodeURIComponent(payee.upiId)}` +
+      `&pn=${encodeURIComponent(payee.name + ' Pragyan Institute')}` +
+      `&cu=INR&am=${Number(amt) || 0}`;
+    const initialUpiLink = upiLinkFor(selectedPayAmount);
 
     const modalHtml = `
       <div class="inner-modal-backdrop active" id="studentPayReqModal">
-        <div class="inner-modal-content" style="max-width: 600px;">
+        <div class="inner-modal-content" style="max-width: 600px;" role="dialog" aria-modal="true" aria-labelledby="payReqModalTitle">
           <div class="inner-modal-header">
-            <h3><i class="fa-solid fa-credit-card" style="color: var(--primary-emerald);"></i> Submit Online Payment Proof</h3>
-            <button class="btn-close-inner" onclick="document.getElementById('studentPayReqModal').remove()"><i class="fa-solid fa-xmark"></i></button>
+            <h3 id="payReqModalTitle"><i class="fa-solid fa-credit-card" style="color: var(--primary-emerald);" aria-hidden="true"></i> Submit Online Payment Proof</h3>
+            <button class="btn-close-inner" type="button" aria-label="Close payment proof dialog"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
           </div>
 
           <!-- Payment Option Quick Select (Pay in Full vs Pay in Partial) -->
           <div style="background: var(--bg-surface-cream, #FAF9F6); border: 1.5px solid var(--border-sand, #E5E7EB); border-radius: 10px; padding: 0.85rem; margin-bottom: 1.15rem;">
-            <div style="font-size: 0.78rem; font-weight: 800; color: var(--primary-emerald, #064E3B); text-transform: uppercase; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">
-              <i class="fa-solid fa-hand-holding-dollar"></i> Choose Payment Option / भुगतान विकल्प
+            <div id="payOptionGroupLabel" style="font-size: 0.78rem; font-weight: 800; color: var(--primary-emerald, #064E3B); text-transform: uppercase; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">
+              <i class="fa-solid fa-hand-holding-dollar" aria-hidden="true"></i> Choose Payment Option / भुगतान विकल्प
             </div>
-            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-              <button type="button" class="btn-pay-option active" id="btnStudentPayFull" style="flex: 1; min-width: 140px; padding: 0.6rem 0.75rem; border-radius: 8px; border: 2px solid #10B981; background: #ECFDF5; color: #064E3B; font-weight: 700; font-size: 0.82rem; cursor: pointer; text-align: center; font-family: inherit;">
-                <i class="fa-solid fa-circle-check"></i> Pay Full Due (₹${totalDue.toLocaleString()})
+            ${totalDue === 0 ? `
+            <p style="margin: 0 0 0.6rem; font-size: 0.8rem; color: #047857; font-weight: 700;">
+              <i class="fa-solid fa-circle-check" aria-hidden="true"></i> Your account is fully paid. Any amount you submit here is recorded as an advance.
+            </p>` : ''}
+            <div role="group" aria-labelledby="payOptionGroupLabel" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+              <button type="button" class="btn-pay-option active" id="btnStudentPayFull" aria-pressed="true" style="flex: 1; min-width: 140px; min-height: 44px; padding: 0.6rem 0.75rem; border-radius: 8px; border: 2px solid #10B981; background: #ECFDF5; color: #064E3B; font-weight: 700; font-size: 0.82rem; cursor: pointer; text-align: center; font-family: inherit;">
+                <i class="fa-solid fa-circle-check" aria-hidden="true"></i> ${totalDue > 0 ? `Pay Full Due (₹${totalDue.toLocaleString('en-IN')})` : `Pay 1 Month Advance (₹${monthlyFee.toLocaleString('en-IN')})`}
               </button>
-              <button type="button" class="btn-pay-option" id="btnStudentPayMonthly" style="flex: 1; min-width: 140px; padding: 0.6rem 0.75rem; border-radius: 8px; border: 1.5px solid #CBD5E1; background: #fff; color: #334155; font-weight: 700; font-size: 0.82rem; cursor: pointer; text-align: center; font-family: inherit;">
-                <i class="fa-solid fa-calendar-days"></i> 1-Month Fee (₹${monthlyFee.toLocaleString()})
+              <button type="button" class="btn-pay-option" id="btnStudentPayMonthly" aria-pressed="false" style="flex: 1; min-width: 140px; min-height: 44px; padding: 0.6rem 0.75rem; border-radius: 8px; border: 1.5px solid #CBD5E1; background: #fff; color: #334155; font-weight: 700; font-size: 0.82rem; cursor: pointer; text-align: center; font-family: inherit;">
+                <i class="fa-solid fa-calendar-days" aria-hidden="true"></i> 1-Month Fee (₹${monthlyFee.toLocaleString('en-IN')})
               </button>
-              <button type="button" class="btn-pay-option" id="btnStudentPayPartial" style="flex: 1; min-width: 140px; padding: 0.6rem 0.75rem; border-radius: 8px; border: 1.5px solid #CBD5E1; background: #fff; color: #334155; font-weight: 700; font-size: 0.82rem; cursor: pointer; text-align: center; font-family: inherit;">
-                <i class="fa-solid fa-pencil"></i> Custom Partial Amount
+              <button type="button" class="btn-pay-option" id="btnStudentPayPartial" aria-pressed="false" style="flex: 1; min-width: 140px; min-height: 44px; padding: 0.6rem 0.75rem; border-radius: 8px; border: 1.5px solid #CBD5E1; background: #fff; color: #334155; font-weight: 700; font-size: 0.82rem; cursor: pointer; text-align: center; font-family: inherit;">
+                <i class="fa-solid fa-pencil" aria-hidden="true"></i> Custom Partial Amount
               </button>
             </div>
           </div>
@@ -9629,25 +10276,29 @@ ${emailLogs.join('\n')}`);
           <!-- Official UPI Gateway Card with PhonePe QR Code -->
           <div style="background: linear-gradient(135deg, #064E3B 0%, #022c22 100%); color: #fff; padding: 1.25rem; border-radius: 12px; margin-bottom: 1.25rem; box-shadow: 0 4px 15px rgba(6, 78, 59, 0.25);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.4rem;">
-              <span style="font-size: 0.85rem; font-weight: 700; color: #A7F3D0;"><i class="fa-solid fa-shield-halved"></i> Official Institute UPI Gateway</span>
+              <span style="font-size: 0.85rem; font-weight: 700; color: #A7F3D0;"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Official Institute UPI Gateway</span>
               <span style="background: rgba(52, 211, 153, 0.2); border: 1px solid #34D399; color: #34D399; padding: 0.2rem 0.55rem; border-radius: 99px; font-weight: 700; font-size: 0.72rem;">Verified Gateway</span>
             </div>
 
-            <div style="display: grid; grid-template-columns: auto 1fr; gap: 1.25rem; align-items: center;">
+            <!-- .upi-gateway-grid, not an inline two-column grid: the mobile rule
+                 that collapses modal grids only matches divs inside a <form>, so
+                 this card kept a 130px QR beside the payee text on a 375px screen
+                 and pushed the UPI-id chip out of the card. -->
+            <div class="upi-gateway-grid">
               <div style="background: #FFFFFF; padding: 6px; border-radius: 10px; border: 2px solid #10B981; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
-                <img src="assets/images/chandan_upi_qr.png" alt="PhonePe QR Code - Chandan Kumar Pragyan Institute" style="width: 130px; height: 170px; object-fit: contain; border-radius: 6px; display: block;">
+                <img src="assets/images/chandan_upi_qr.png" alt="PhonePe QR code for ${payee.displayName}, Pragyan Institute" style="width: 130px; height: 170px; object-fit: contain; border-radius: 6px; display: block;">
                 <div style="font-size: 0.65rem; color: #065F46; font-weight: 800; margin-top: 4px;">SCAN ANY UPI APP</div>
               </div>
 
-              <div>
+              <div style="min-width: 0;">
                 <div style="font-size: 0.78rem; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.5px;">Beneficiary / Payee</div>
-                <div style="font-size: 1.1rem; font-weight: 800; color: #FFFFFF; margin-bottom: 0.35rem;">Chandan Kumar <span style="font-size: 0.75rem; font-weight: 600; color: #6EE7B7;">(Director)</span></div>
+                <div style="font-size: 1.1rem; font-weight: 800; color: #FFFFFF; margin-bottom: 0.35rem;">${payee.displayName} <span style="font-size: 0.75rem; font-weight: 600; color: #6EE7B7;">(${payee.role})</span></div>
 
                 <div style="font-size: 0.78rem; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.5px;">Official UPI ID</div>
                 <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.2rem; flex-wrap: wrap;">
-                  <span id="upiIdText" style="font-family: monospace; font-size: 1rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 1px solid rgba(52, 211, 153, 0.4); padding: 0.3rem 0.65rem; border-radius: 6px; color: #6EE7B7;">chandankr1501998@ybl</span>
-                  <button type="button" id="btnCopyUpiId" style="background: #059669; color: #fff; border: none; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700; cursor: pointer;">
-                    <i class="fa-regular fa-copy"></i> Copy
+                  <span id="upiIdText" style="font-family: monospace; font-size: 1rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 1px solid rgba(52, 211, 153, 0.4); padding: 0.3rem 0.65rem; border-radius: 6px; color: #6EE7B7; word-break: break-all;">${payee.upiId}</span>
+                  <button type="button" id="btnCopyUpiId" style="background: #047857; color: #fff; border: none; min-height: 36px; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700; cursor: pointer;">
+                    <i class="fa-regular fa-copy" aria-hidden="true"></i> Copy
                   </button>
                 </div>
               </div>
@@ -9655,21 +10306,21 @@ ${emailLogs.join('\n')}`);
 
             <!-- One-Tap Auto-UPI Button for Mobile Devices -->
             <div style="margin-top: 1rem; padding-top: 0.85rem; border-top: 1px solid rgba(255,255,255,0.12);">
-              <a id="autoUpiPayBtn" href="${initialUpiLink}" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; text-decoration: none; width: 100%; padding: 0.75rem 1rem; border-radius: 8px; font-weight: 700; font-size: 0.92rem; background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: #fff; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35); text-align: center;">
-                <i class="fa-solid fa-mobile-screen-button"></i> <span id="autoUpiBtnLabel">Pay ₹${selectedPayAmount.toLocaleString()} with PhonePe / GPay / Paytm</span>
+              <a id="autoUpiPayBtn" href="${initialUpiLink}" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; text-decoration: none; width: 100%; min-height: 44px; padding: 0.75rem 1rem; border-radius: 8px; font-weight: 700; font-size: 0.92rem; background: linear-gradient(135deg, #10B981 0%, #047857 100%); color: #fff; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35); text-align: center;">
+                <i class="fa-solid fa-mobile-screen-button" aria-hidden="true"></i> <span id="autoUpiBtnLabel">Pay ₹${selectedPayAmount.toLocaleString('en-IN')} with PhonePe / GPay / Paytm</span>
               </a>
-              <div id="autoUpiNoteText" style="text-align: center; font-size: 0.72rem; opacity: 0.8; margin-top: 0.35rem;">Clicking opens PhonePe, Google Pay, or Paytm directly with ₹${selectedPayAmount.toLocaleString()} pre-filled.</div>
+              <div id="autoUpiNoteText" style="text-align: center; font-size: 0.72rem; opacity: 0.8; margin-top: 0.35rem;">Clicking opens PhonePe, Google Pay, or Paytm directly with ₹${selectedPayAmount.toLocaleString('en-IN')} pre-filled.</div>
             </div>
           </div>
 
           <form id="studentPayReqForm">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; margin-bottom: 1rem;">
               <div>
-                <label style="font-size: 0.85rem; font-weight: 600;">Payment Amount (₹) *</label>
-                <input type="number" id="payReqAmount" class="portal-input" value="${selectedPayAmount}" required min="1">
+                <label for="payReqAmount" style="font-size: 0.85rem; font-weight: 600;">Payment Amount (₹) *</label>
+                <input type="number" id="payReqAmount" class="portal-input" value="${selectedPayAmount}" required min="1" inputmode="numeric">
               </div>
               <div>
-                <label style="font-size: 0.85rem; font-weight: 600;">Payment Mode *</label>
+                <label for="payReqMode" style="font-size: 0.85rem; font-weight: 600;">Payment Mode *</label>
                 <select id="payReqMode" class="portal-input">
                   <option value="UPI (PhonePe)">UPI (PhonePe)</option>
                   <option value="UPI (Google Pay / Paytm / BHIM)">UPI (Google Pay / Paytm / BHIM)</option>
@@ -9678,25 +10329,25 @@ ${emailLogs.join('\n')}`);
                 </select>
               </div>
               <div style="grid-column: span 2;">
-                <label style="font-size: 0.85rem; font-weight: 600;">UTR / Transaction Reference No. *</label>
-                <input type="text" id="payReqUtr" class="portal-input" placeholder="e.g. 423910982341 (Required)" required>
-                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Enter 12-digit UTR or Transaction ID from PhonePe / GPay / Paytm receipt.</div>
+                <label for="payReqUtr" style="font-size: 0.85rem; font-weight: 600;">UTR / Transaction Reference No. *</label>
+                <input type="text" id="payReqUtr" class="portal-input" placeholder="e.g. 423910982341 (Required)" required inputmode="numeric" aria-describedby="payReqUtrHelp">
+                <div id="payReqUtrHelp" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Enter 12-digit UTR or Transaction ID from PhonePe / GPay / Paytm receipt.</div>
               </div>
               <div style="grid-column: span 2;">
-                <label style="font-size: 0.85rem; font-weight: 600;">Attach Payment Proof Screenshot (Optional)</label>
+                <label for="payReqProofInput" style="font-size: 0.85rem; font-weight: 600;">Attach Payment Proof Screenshot (Optional)</label>
                 <input type="file" id="payReqProofInput" accept="image/*" class="portal-input" style="padding: 0.4rem;">
                 <div id="payProofPreviewWrap" style="margin-top: 0.4rem; display: none;">
-                  <img id="payProofPreviewImg" src="" style="max-height: 90px; border-radius: 6px; border: 1px solid var(--border-sand);">
+                  <img id="payProofPreviewImg" src="" alt="Preview of the payment screenshot you attached" style="max-height: 90px; border-radius: 6px; border: 1px solid var(--border-sand);">
                 </div>
               </div>
               <div style="grid-column: span 2;">
-                <label style="font-size: 0.85rem; font-weight: 600;">Note / Remarks (Optional)</label>
+                <label for="payReqNote" style="font-size: 0.85rem; font-weight: 600;">Note / Remarks (Optional)</label>
                 <input type="text" id="payReqNote" class="portal-input" placeholder="e.g. Paid monthly tuition fee via PhonePe">
               </div>
             </div>
 
-            <button type="submit" class="btn btn-emerald" style="width: 100%; padding: 0.8rem;">
-              <i class="fa-solid fa-paper-plane"></i> Submit Payment Verification Request
+            <button type="submit" class="btn btn-emerald" style="width: 100%; min-height: 44px; padding: 0.8rem;">
+              <i class="fa-solid fa-paper-plane" aria-hidden="true"></i> Submit Payment Verification Request
             </button>
           </form>
         </div>
@@ -9705,6 +10356,7 @@ ${emailLogs.join('\n')}`);
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 
     const modalEl = document.getElementById('studentPayReqModal');
+    const dialog = wireModalA11y(modalEl, { initialFocus: '#payReqAmount' });
     const proofInput = modalEl.querySelector('#payReqProofInput');
     const proofWrap = modalEl.querySelector('#payProofPreviewWrap');
     const proofImg = modalEl.querySelector('#payProofPreviewImg');
@@ -9717,13 +10369,13 @@ ${emailLogs.join('\n')}`);
     function updateModalUpiLink(amt) {
       const val = parseFloat(amt) || 0;
       if (autoUpiBtn) {
-        autoUpiBtn.href = `upi://pay?pa=chandankr1501998@ybl&pn=Chandan%20Kumar%20Pragyan%20Institute&cu=INR&am=${val}`;
+        autoUpiBtn.href = upiLinkFor(val);
       }
       if (autoUpiLabel) {
-        autoUpiLabel.textContent = `Pay ₹${val.toLocaleString()} with PhonePe / GPay / Paytm`;
+        autoUpiLabel.textContent = `Pay ₹${val.toLocaleString('en-IN')} with PhonePe / GPay / Paytm`;
       }
       if (autoUpiNote) {
-        autoUpiNote.textContent = `Clicking opens PhonePe, Google Pay, or Paytm directly with ₹${val.toLocaleString()} pre-filled.`;
+        autoUpiNote.textContent = `Clicking opens PhonePe, Google Pay, or Paytm directly with ₹${val.toLocaleString('en-IN')} pre-filled.`;
       }
     }
 
@@ -9731,10 +10383,17 @@ ${emailLogs.join('\n')}`);
     const btnMonthly = modalEl.querySelector('#btnStudentPayMonthly');
     const btnPartial = modalEl.querySelector('#btnStudentPayPartial');
 
+    // These three buttons behave as a radio group. Without aria-pressed the
+    // selected option was conveyed by border colour alone, so a screen-reader
+    // user could not tell which amount was armed — and neither could a sighted
+    // user relying on a high-contrast mode that overrides borders.
     function setActivePayOption(activeBtn) {
       [btnFull, btnMonthly, btnPartial].forEach(b => {
         if (!b) return;
-        if (b === activeBtn) {
+        const isActive = b === activeBtn;
+        b.classList.toggle('active', isActive);
+        b.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        if (isActive) {
           b.style.borderColor = '#10B981';
           b.style.background = '#ECFDF5';
           b.style.color = '#064E3B';
@@ -9748,8 +10407,11 @@ ${emailLogs.join('\n')}`);
 
     btnFull?.addEventListener('click', () => {
       setActivePayOption(btnFull);
-      amountInput.value = totalDue;
-      updateModalUpiLink(totalDue);
+      // With nothing outstanding the "full due" button pays one month forward
+      // rather than filling in ₹0 and failing the min="1" check on submit.
+      const amt = totalDue > 0 ? totalDue : monthlyFee;
+      amountInput.value = amt;
+      updateModalUpiLink(amt);
     });
 
     btnMonthly?.addEventListener('click', () => {
@@ -9772,11 +10434,19 @@ ${emailLogs.join('\n')}`);
 
     // Copy UPI ID button
     copyBtn?.addEventListener('click', () => {
-      navigator.clipboard.writeText('chandankr1501998@ybl').then(() => {
-        copyBtn.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
-        setTimeout(() => { copyBtn.innerHTML = '<i class="fa-regular fa-copy"></i> Copy'; }, 2000);
-      }).catch(() => {
-        alert('UPI ID: chandankr1501998@ybl');
+      const done = () => {
+        copyBtn.innerHTML = '<i class="fa-solid fa-check" aria-hidden="true"></i> Copied!';
+        setTimeout(() => { copyBtn.innerHTML = '<i class="fa-regular fa-copy" aria-hidden="true"></i> Copy'; }, 2000);
+      };
+      // navigator.clipboard is undefined on insecure origins and in some
+      // in-app webviews, where the old code threw a TypeError before the
+      // .catch() could show the fallback.
+      if (!navigator.clipboard?.writeText) {
+        alert(`UPI ID: ${payee.upiId}`);
+        return;
+      }
+      navigator.clipboard.writeText(payee.upiId).then(done).catch(() => {
+        alert(`UPI ID: ${payee.upiId}`);
       });
     });
 
@@ -9795,53 +10465,91 @@ ${emailLogs.join('\n')}`);
 
     modalEl.querySelector('#studentPayReqForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const amount = parseFloat(modalEl.querySelector('#payReqAmount').value) || 0;
-      const mode = modalEl.querySelector('#payReqMode').value;
-      const utr = modalEl.querySelector('#payReqUtr').value.trim();
-      const note = modalEl.querySelector('#payReqNote').value.trim();
-
-      if (!utr) {
-        alert('Please enter a valid UTR / Transaction Reference number.');
-        return;
+      const submitBtn = e.currentTarget.querySelector('button[type="submit"]');
+      // Guard against a double submit. The proof upload below is awaited, so on
+      // a slow mobile connection the dialog stayed live for several seconds and
+      // a second tap filed a duplicate payment request with the same UTR — which
+      // the admin then had to reconcile by hand.
+      if (submitBtn?.dataset.busy === '1') return;
+      if (submitBtn) {
+        submitBtn.dataset.busy = '1';
+        submitBtn.disabled = true;
+        submitBtn.setAttribute('aria-busy', 'true');
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Submitting…';
       }
+      const releaseSubmit = () => {
+        if (!submitBtn) return;
+        delete submitBtn.dataset.busy;
+        submitBtn.disabled = false;
+        submitBtn.removeAttribute('aria-busy');
+        submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane" aria-hidden="true"></i> Submit Payment Verification Request';
+      };
 
-      let proofPhotoUrl = '';
-      const proofFile = proofInput?.files[0];
-      if (proofFile) {
-        try {
-          proofPhotoUrl = await SupabaseSync.uploadFile(proofFile, 'payment_proofs');
-        } catch (error) {
-          alert(error.message || 'Unable to upload payment proof.');
+      try {
+        const amount = parseFloat(modalEl.querySelector('#payReqAmount').value) || 0;
+        const mode = modalEl.querySelector('#payReqMode').value;
+        const utr = modalEl.querySelector('#payReqUtr').value.trim();
+        const note = modalEl.querySelector('#payReqNote').value.trim();
+
+        if (!utr) {
+          showNotification('Please enter a valid UTR / Transaction Reference number.', 'error');
+          modalEl.querySelector('#payReqUtr')?.focus();
+          releaseSubmit();
           return;
         }
-      }
-
-      const allReqs = AppState.getRequests();
-      allReqs.unshift({
-        id: `REQ-PAY-${Date.now().toString(36).slice(-4)}-${Math.random().toString(36).slice(2,5)}`,
-        type: 'payment',
-        studentId: s.id,
-        studentName: s.name,
-        rollNo: s.rollNo,
-        className: s.className,
-        date: new Date().toISOString().split('T')[0],
-        timestamp: getFormattedTimestamp(),
-        status: 'Pending',
-        paymentDetails: {
-          amount,
-          mode,
-          utr,
-          proofPhotoUrl,
-          note
+        if (amount <= 0) {
+          showNotification('Enter the amount you paid — it must be more than ₹0.', 'error');
+          modalEl.querySelector('#payReqAmount')?.focus();
+          releaseSubmit();
+          return;
         }
-      });
 
-      await AppState.saveRequests(allReqs);
-      AppState.addAuditLog(`Student (${s.name})`, 'PAYMENT_REQUEST_SUBMITTED', s.name, s.rollNo, `Submitted online payment verification request for ₹${amount.toLocaleString()} (UTR: ${utr})`, { amount, utr, mode });
+        let proofPhotoUrl = '';
+        const proofFile = proofInput?.files[0];
+        if (proofFile) {
+          try {
+            proofPhotoUrl = await SupabaseSync.uploadFile(proofFile, 'payment_proofs');
+          } catch (error) {
+            showNotification(error.message || 'Unable to upload payment proof.', 'error');
+            releaseSubmit();
+            return;
+          }
+        }
 
-      modalEl.remove();
-      alert(`✅ Online payment verification request submitted! Admin will verify UTR: ${utr} and issue your official email receipt.`);
-      renderStudentDashboard();
+        const allReqs = AppState.getRequests();
+        allReqs.unshift({
+          id: `REQ-PAY-${Date.now().toString(36).slice(-4)}-${Math.random().toString(36).slice(2,5)}`,
+          type: 'payment',
+          studentId: s.id,
+          studentName: s.name,
+          rollNo: s.rollNo,
+          className: s.className,
+          date: new Date().toISOString().split('T')[0],
+          timestamp: getFormattedTimestamp(),
+          status: 'Pending',
+          paymentDetails: {
+            amount,
+            mode,
+            utr,
+            proofPhotoUrl,
+            note
+          }
+        });
+
+        await AppState.saveRequests(allReqs);
+        AppState.addAuditLog(`Student (${s.name})`, 'PAYMENT_REQUEST_SUBMITTED', s.name, s.rollNo, `Submitted online payment verification request for ₹${amount.toLocaleString('en-IN')} (UTR: ${utr})`, { amount, utr, mode });
+
+        // dialog.close(), not modalEl.remove(): the helper is what unlocks body
+        // scrolling and returns focus. Removing the node directly left the page
+        // permanently unscrollable behind a dialog that was no longer there.
+        dialog.close();
+        showNotification(`✅ Payment request submitted. Admin will verify UTR ${utr} and email your receipt.`, 'success');
+        renderStudentDashboard();
+      } catch (err) {
+        console.error('[Portal] Payment request submission failed:', err);
+        showNotification(err?.message || 'Could not submit the payment request. Please try again.', 'error');
+        releaseSubmit();
+      }
     });
   }
 
@@ -9908,7 +10616,7 @@ ${emailLogs.join('\n')}`);
       <div class="dash-card">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.25rem;">
           <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-mahogany); margin: 0;">
-            <i class="fa-solid fa-tasks" style="color: var(--primary-emerald);"></i> Administrative Requests Center
+            <i aria-hidden="true" class="fa-solid fa-tasks" style="color: var(--primary-emerald);"></i> Administrative Requests Center
           </h3>
           <span style="font-size: 0.85rem; color: var(--text-muted);">
             Total Pending Review: <strong style="color: #DC2626;">${pendingRequests.length}</strong>
@@ -9918,10 +10626,10 @@ ${emailLogs.join('\n')}`);
         <!-- Sub-Pills Selector -->
         <div class="req-sub-pills-bar" style="display: flex; gap: 0.5rem; margin-bottom: 1.25rem; border-bottom: 2px solid var(--border-sand); padding-bottom: 0.75rem; flex-wrap: wrap;">
           <button class="req-sub-pill ${activeAdminReqSubTab === 'payment' ? 'active' : ''}" data-sub="payment" style="flex: 1 1 200px; text-align: center; justify-content: center; min-width: 160px; height: 38px;">
-            <i class="fa-solid fa-credit-card"></i> Fee Payment Verification (${pendingPaymentCount} Pending)
+            <i aria-hidden="true" class="fa-solid fa-credit-card"></i> Fee Payment Verification (${pendingPaymentCount} Pending)
           </button>
           <button class="req-sub-pill ${activeAdminReqSubTab === 'profile' ? 'active' : ''}" data-sub="profile" style="flex: 1 1 200px; text-align: center; justify-content: center; min-width: 160px; height: 38px;">
-            <i class="fa-solid fa-user-pen"></i> Profile Detail Requests (${pendingProfileCount} Pending)
+            <i aria-hidden="true" class="fa-solid fa-user-pen"></i> Profile Detail Requests (${pendingProfileCount} Pending)
           </button>
         </div>
 
@@ -9929,7 +10637,7 @@ ${emailLogs.join('\n')}`);
           <!-- PAYMENT VERIFICATION REQUESTS SUB-PART -->
           ${paymentReqs.length === 0 ? `
             <div style="text-align: center; color: var(--text-muted); padding: 3rem 1rem;">
-              <i class="fa-solid fa-circle-check" style="font-size: 2.5rem; color: #10B981; margin-bottom: 0.75rem;"></i>
+              <i aria-hidden="true" class="fa-solid fa-circle-check" style="font-size: 2.5rem; color: #10B981; margin-bottom: 0.75rem;"></i>
               <p style="font-weight: 600;">No payment verification requests pending.</p>
               <p style="font-size: 0.82rem;">When students submit online payment proofs, they will appear here for verification.</p>
             </div>
@@ -9977,10 +10685,10 @@ ${emailLogs.join('\n')}`);
                       ${(p.proofUrl || p.proof) ? `
                         <div style="grid-column: span 2; margin-top: 4px; padding: 8px; background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 6px; display: flex; align-items: center; gap: 10px;">
                           <a href="${sanitizeUrl(p.proofUrl || p.proof)}" target="_blank" rel="noopener">
-                            <img src="${sanitizeUrl(p.proofUrl || p.proof)}" style="width: 55px; height: 55px; object-fit: cover; border-radius: 4px; border: 1px solid #059669;" alt="Payment Proof">
+                            <img src="${sanitizeUrl(p.proofUrl || p.proof)}" style="width: 55px; height: 55px; object-fit: cover; border-radius: 4px; border: 1px solid #059669;" alt="Open the full payment proof screenshot">
                           </a>
                           <div>
-                            <strong style="color: #065F46; font-size: 0.85rem;"><i class="fa-solid fa-receipt"></i> Payment Proof Screenshot Attached</strong>
+                            <strong style="color: #065F46; font-size: 0.85rem;"><i aria-hidden="true" class="fa-solid fa-receipt"></i> Payment Proof Screenshot Attached</strong>
                             <div style="font-size: 0.75rem; color: #047857;"><a href="${sanitizeUrl(p.proofUrl || p.proof)}" target="_blank" rel="noopener" style="color: #059669; text-decoration: underline;">Click to open full proof screenshot</a></div>
                           </div>
                         </div>
@@ -9990,15 +10698,15 @@ ${emailLogs.join('\n')}`);
                     ${isPending ? `
                       <div class="req-action-buttons-wrap" style="display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: stretch; margin-top: 0.65rem;">
                         <div style="display: flex; align-items: center; gap: 0.4rem; flex: 1 1 220px; min-width: 170px;">
-                          <span style="font-size: 0.8rem; font-weight: 700; color: #065F46; background: #D1FAE5; padding: 0.4rem 0.75rem; border-radius: 6px; display: inline-flex; align-items: center; gap: 0.4rem; width: 100%; box-sizing: border-box; height: 38px;">
-                            <i class="fa-solid fa-user-check"></i> Verifier: ${getActiveTeacherName()}
+                          <span class="req-verifier-chip" style="font-size: 0.8rem; font-weight: 700; color: #065F46; background: #D1FAE5; padding: 0.4rem 0.75rem; border-radius: 6px; display: inline-flex; align-items: center; gap: 0.4rem; width: 100%; box-sizing: border-box; height: 38px;">
+                            <i aria-hidden="true" class="fa-solid fa-user-check"></i> Verifier: ${getActiveTeacherName()}
                           </span>
                         </div>
                         <button class="btn btn-emerald btn-approve-pay-req" data-id="${req.id}" style="padding: 0.5rem 1.15rem; font-size: 0.84rem; flex: 1 1 200px; justify-content: center; display: inline-flex; align-items: center; gap: 0.4rem; height: 38px;">
-                          <i class="fa-solid fa-check-double"></i> Verify & Approve Payment
+                          <i aria-hidden="true" class="fa-solid fa-check-double"></i> Verify & Approve Payment
                         </button>
                         <button class="btn btn-decline-pay-req" data-id="${req.id}" style="background-color: #DC2626; color: #fff; padding: 0.5rem 1rem; font-size: 0.84rem; border: none; cursor: pointer; border-radius: 6px; font-weight: 600; flex: 0 1 90px; justify-content: center; display: inline-flex; align-items: center; gap: 0.4rem; height: 38px;">
-                          <i class="fa-solid fa-xmark"></i> Decline
+                          <i aria-hidden="true" class="fa-solid fa-xmark"></i> Decline
                         </button>
                       </div>
                     ` : ''}
@@ -10011,7 +10719,7 @@ ${emailLogs.join('\n')}`);
           <!-- PROFILE DETAIL REQUESTS SUB-PART -->
           ${profileReqs.length === 0 ? `
             <div style="text-align: center; color: var(--text-muted); padding: 3rem 1rem;">
-              <i class="fa-solid fa-circle-check" style="font-size: 2.5rem; color: #10B981; margin-bottom: 0.75rem;"></i>
+              <i aria-hidden="true" class="fa-solid fa-circle-check" style="font-size: 2.5rem; color: #10B981; margin-bottom: 0.75rem;"></i>
               <p style="font-weight: 600;">No profile detail change requests pending.</p>
               <p style="font-size: 0.82rem;">When students request detail updates, they will appear here for your approval.</p>
             </div>
@@ -10059,7 +10767,7 @@ ${emailLogs.join('\n')}`);
                       <div style="margin-top: 6px; padding: 10px; background: #ECFDF5; border: 1.5px solid #10B981; border-radius: 8px; display: inline-flex; align-items: center; gap: 12px;">
                         <img src="${newPhotoVal}" style="width: 65px; height: 65px; border-radius: 8px; object-fit: cover; border: 2px solid #059669; box-shadow: 0 2px 5px rgba(0,0,0,0.15);" alt="New Photo Preview">
                         <div>
-                          <strong style="color: #065F46; font-size: 0.9rem;"><i class="fa-solid fa-camera"></i> Attached Profile Photo</strong>
+                          <strong style="color: #065F46; font-size: 0.9rem;"><i aria-hidden="true" class="fa-solid fa-camera"></i> Attached Profile Photo</strong>
                           <div style="font-size: 0.78rem; color: #047857; margin-top: 2px;">${newPhotoVal !== oldPhotoVal ? '✨ New photo update requested' : '📷 Existing photo attached'}</div>
                         </div>
                       </div>
@@ -10092,10 +10800,10 @@ ${emailLogs.join('\n')}`);
                     ${isPending ? `
                       <div class="req-action-buttons-wrap" style="display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.65rem;">
                         <button class="btn btn-emerald btn-approve-request" data-id="${req.id}" style="padding: 0.5rem 1.15rem; font-size: 0.84rem; flex: 1 1 180px; min-width: 140px; justify-content: center; display: inline-flex; align-items: center; gap: 0.4rem; height: 38px;">
-                          <i class="fa-solid fa-check"></i> Approve & Apply Changes
+                          <i aria-hidden="true" class="fa-solid fa-check"></i> Approve & Apply Changes
                         </button>
                         <button class="btn btn-decline-request" data-id="${req.id}" style="background-color: #DC2626; color: #fff; padding: 0.5rem 1.15rem; font-size: 0.84rem; border: none; cursor: pointer; border-radius: 6px; font-weight: 600; flex: 1 1 130px; min-width: 110px; justify-content: center; display: inline-flex; align-items: center; gap: 0.4rem; height: 38px;">
-                          <i class="fa-solid fa-xmark"></i> Decline Request
+                          <i aria-hidden="true" class="fa-solid fa-xmark"></i> Decline Request
                         </button>
                       </div>
                     ` : ''}
@@ -10126,103 +10834,120 @@ ${emailLogs.join('\n')}`);
         if (btn.dataset.processing === 'true') return;
         btn.dataset.processing = 'true';
         btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verifying & Updating Database...';
+        btn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-spinner fa-spin"></i> Verifying & Updating Database...';
 
         const verifierName = getActiveTeacherName();
-
-        // 1. Direct Cloud Database Update to student_requests
-        if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
-          try {
-            await SupabaseSync.mutate('student_requests', 'update', {
-              status: 'Approved',
-              updated_at: new Date().toISOString()
-            }, { where: { request_id: id } });
-          } catch(e) {
-            console.warn('Direct request status update note:', e.message);
-          }
-        }
-
-        // 2. Find Student and Update Balances
-        const students = AppState.getStudents();
-        const studentIdx = students.findIndex(s => s.id === reqItem.studentId || isStudentRequestMatch(reqItem, s));
-        if (studentIdx === -1) {
-          alert('⚠️ Student record not found in database.');
+        const restoreButton = () => {
+          btn.dataset.processing = 'false';
           btn.disabled = false;
-          btn.innerHTML = '<i class="fa-solid fa-check-double"></i> Verify & Approve Payment';
+          btn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-check-double"></i> Verify & Approve Payment';
+        };
+
+        // Crediting a payment happens server-side, in one transaction, and this
+        // browser does no fee arithmetic at all.
+        //
+        // What used to be here: a status mutate whose failure was only
+        // console.warn'd, then `s.paidFee = Number(s.paidFee || 0) + payVal` read
+        // out of the localStorage cache and written straight back. Three ways that
+        // lost money:
+        //
+        //   * the cache can be minutes stale, so a cash receipt entered on another
+        //     device was overwritten by this write;
+        //   * two admins working the same queue both read the same paidFee, and
+        //     the second save discarded the first payment;
+        //   * the receipt number was `REC-ONL-<timestamp>-<random>`, so a retry
+        //     after a dropped response minted a *second* receipt and credited the
+        //     amount twice — nothing anywhere could tell it was the same payment.
+        //
+        // approve_payment_request() takes FOR UPDATE on the request then the
+        // student, and derives the receipt number from the request id, so a replay
+        // returns the original receipt instead of creating another one.
+        const response = await postToApi('/api/approve-payment-request', {
+          requestId: id,
+          verifierName
+        });
+
+        if (!response.ok) {
+          const message = response.payload?.error || `Approval failed (HTTP ${response.status})`;
+          // ALREADY_PROCESSED means someone else got there first; the queue is
+          // stale rather than wrong, so refresh it instead of just complaining.
+          if (response.payload?.code === 'ALREADY_PROCESSED') {
+            alert('ℹ️ This payment request was already processed. Refreshing the queue.');
+          } else {
+            alert(`⚠️ ${message}`);
+          }
+          restoreButton();
+          if (typeof SupabaseSync !== 'undefined' && SupabaseSync.pullAll) {
+            try { await SupabaseSync.pullAll(); } catch (syncErr) { console.warn('Post-failure pullAll note:', syncErr.message); }
+          }
+          renderAdminRequestsManager();
           return;
         }
 
-        const s = students[studentIdx];
-        const payVal = Number(reqItem.paymentDetails.amount || 0);
-        const note = reqItem.paymentDetails.note || 'Online payment verified by admin';
-        const utrVal = reqItem.paymentDetails.utr || reqItem.paymentDetails.refNo || '';
-        const recNo = `REC-ONL-${Date.now().toString(36).slice(-4)}-${Math.random().toString(36).slice(2,5)}`;
+        // Authoritative figures come back from the transaction that wrote them.
+        const approved = response.payload.data || {};
+        const payVal = Number(approved.amount || 0);
+        const recNo = approved.receipt_no || '';
+        const note = approved.note || 'Online payment verified by admin';
+        const utrVal = approved.utr || '';
+        const studentName = approved.student_name || 'the student';
 
-        s.paidFee = Number(s.paidFee || 0) + payVal;
-        s.pendingFee = Math.max(0, Number(s.pendingFee || 0) - payVal);
+        // Mirror the server's result into the local cache so the UI is correct
+        // before the refetch lands. Assignment, not arithmetic: paid_fee and
+        // pending_fee are copied from the row the transaction committed.
+        const students = AppState.getStudents();
+        const studentIdx = students.findIndex(s =>
+          (approved.student_id && s.student_id === approved.student_id)
+          || (approved.student_uuid && s.id === approved.student_uuid)
+          || s.id === reqItem.studentId
+          || isStudentRequestMatch(reqItem, s));
 
-        if (!Array.isArray(s.feeHistory)) s.feeHistory = [];
-        s.feeHistory.push({
-          receiptNo: recNo,
-          utr: utrVal,
-          date: getFormattedTimestamp(),
-          amount: payVal,
-          mode: utrVal ? `UPI / Online (UTR: ${utrVal})` : 'Verified Online Payment',
-          status: 'Paid',
-          by: verifierName,
-          note: note
-        });
+        if (studentIdx !== -1) {
+          const s = students[studentIdx];
+          s.paidFee = Number(approved.paid_fee ?? s.paidFee ?? 0);
+          s.pendingFee = Number(approved.pending_fee ?? s.pendingFee ?? 0);
 
-        students[studentIdx] = s;
-        await AppState.saveStudents(students);
-
-        // Direct Cloud Update for Student & Fee Receipt
-        if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
-          try {
-            const stuWhere = s.student_id ? { student_id: s.student_id } : (s.rollNo ? { roll_no: s.rollNo } : { id: s.id });
-            await SupabaseSync.mutate('students', 'update', {
-              paid_fee: s.paidFee,
-              pending_fee: s.pendingFee
-            }, { where: stuWhere });
-
-            const studentUuid = s.db_uuid || (s.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s.id) ? s.id : null);
-            if (studentUuid) {
-              await SupabaseSync.mutate('fee_receipts', 'upsert', [{
-                receipt_no: recNo,
-                student_id: studentUuid,
-                amount: payVal,
-                payment_mode: utrVal ? `UPI (UTR: ${utrVal})` : 'Online Payment',
-                payment_date: new Date().toISOString().split('T')[0],
-                status: 'Paid',
-                collected_by: verifierName,
-                note: note
-              }], { conflict: 'receipt_no' });
-            }
-          } catch(err) {
-            console.warn('Cloud receipt insert note:', err.message);
+          if (!Array.isArray(s.feeHistory)) s.feeHistory = [];
+          // Keyed on the deterministic receipt number, so an idempotent replay
+          // does not add a second history line for one payment.
+          if (recNo && !s.feeHistory.some(entry => entry.receiptNo === recNo)) {
+            s.feeHistory.push({
+              receiptNo: recNo,
+              utr: utrVal,
+              date: getFormattedTimestamp(),
+              amount: payVal,
+              mode: approved.payment_mode || (utrVal ? `UPI / Online (UTR: ${utrVal})` : 'Verified Online Payment'),
+              status: 'Paid',
+              by: verifierName,
+              note: note
+            });
           }
+          students[studentIdx] = s;
+          await AppState.saveStudents(students);
         }
 
         reqItem.status = 'Approved';
         await AppState.saveRequests(reqList);
 
-        // Record Audit Log
-        AppState.addAuditLog(verifierName, 'PAYMENT_VERIFIED', s.name, s.rollNo, `Verified & approved payment request of ₹${payVal.toLocaleString()} ("${note}") for ${s.name}`, { amount: payVal, note, receiptNo: recNo });
+        // A replay is not a new approval, so it gets neither an audit entry nor a
+        // second notice to the family.
+        if (!response.payload.idempotent) {
+          AppState.addAuditLog(verifierName, 'PAYMENT_VERIFIED', studentName, approved.student_roll || '', `Verified & approved payment request of ₹${payVal.toLocaleString()} ("${note}") for ${studentName}`, { amount: payVal, note, receiptNo: recNo });
 
-        // Send Notice to Student
-        const notices = AppState.getNotices();
-        notices.unshift({
-          id: `NTC-PAY-APP-${Date.now().toString(36).slice(-4)}-${Math.random().toString(36).slice(2,5)}`,
-          title: `✅ Payment Request Approved (₹${payVal.toLocaleString()})`,
-          category: 'fees',
-          date: new Date().toISOString().split('T')[0],
-          message: `Dear ${s.name}, your online payment of ₹${payVal.toLocaleString()} ("${note}") has been verified and approved by ${verifierName}!`,
-          targetBatch: s.className,
-          unread: true
-        });
-        await AppState.saveNotices(notices);
+          const notices = AppState.getNotices();
+          notices.unshift({
+            id: `NTC-PAY-APP-${recNo || Date.now().toString(36)}`,
+            title: `✅ Payment Request Approved (₹${payVal.toLocaleString()})`,
+            category: 'fees',
+            date: new Date().toISOString().split('T')[0],
+            message: `Dear ${studentName}, your online payment of ₹${payVal.toLocaleString()} ("${note}") has been verified and approved by ${verifierName}!`,
+            targetBatch: approved.student_class || '',
+            unread: true
+          });
+          await AppState.saveNotices(notices);
+        }
 
-        // 3. FULL REFETCH FROM DATABASE to ensure 100% cloud consistency
+        // Full refetch so every other cached figure matches the database.
         if (typeof SupabaseSync !== 'undefined' && SupabaseSync.pullAll) {
           try {
             await SupabaseSync.pullAll();
@@ -10231,7 +10956,9 @@ ${emailLogs.join('\n')}`);
           }
         }
 
-        alert(`✅ Payment Request Approved for ${s.name}! ₹${payVal.toLocaleString()} credited.`);
+        alert(response.payload.idempotent
+          ? `ℹ️ This payment was already credited for ${studentName} (receipt ${recNo}). Nothing was charged twice.`
+          : `✅ Payment Request Approved for ${studentName}! ₹${payVal.toLocaleString()} credited (receipt ${recNo}).`);
         renderAdminRequestsManager();
         renderAdminDashboard();
       };
@@ -10247,22 +10974,37 @@ ${emailLogs.join('\n')}`);
         if (btn.dataset.processing === 'true') return;
         btn.dataset.processing = 'true';
         btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Declining in Database...';
+        btn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-spinner fa-spin"></i> Declining in Database...';
 
         const verifierName = getActiveTeacherName();
         const payVal = reqItem.paymentDetails?.amount || 0;
         const note = reqItem.paymentDetails?.note || '';
 
-        // 1. Direct Cloud Database Update to student_requests
-        if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
-          try {
-            await SupabaseSync.mutate('student_requests', 'update', {
-              status: 'Rejected',
-              updated_at: new Date().toISOString()
-            }, { where: { request_id: id } });
-          } catch(e) {
-            console.warn('Direct payment decline note:', e.message);
-          }
+        // The cloud write decides the outcome. It used to be wrapped in
+        // `try { await mutate(...) } catch { console.warn(...) }`, which was dead
+        // code — mutate() returns its failures rather than throwing — so a
+        // rejected write still produced a "Declined" alert, a decline notice to
+        // the family, and an audit entry, and then pullAll() pulled the row back
+        // as Pending. The student had been told their request was declined when it
+        // was still sitting in the queue.
+        if (typeof SupabaseSync === 'undefined' || !SupabaseSync.mutateOrThrow) {
+          alert('⚠️ Cloud sync is unavailable, so this decline cannot be recorded. Nothing was changed.');
+          btn.dataset.processing = 'false';
+          btn.disabled = false;
+          btn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-xmark"></i> Decline';
+          return;
+        }
+        try {
+          await SupabaseSync.mutateOrThrow('student_requests', 'update', {
+            status: 'Rejected',
+            updated_at: new Date().toISOString()
+          }, { where: { request_id: id } });
+        } catch (e) {
+          alert(`⚠️ Could not record the decline: ${e.message}\n\nNothing was changed. Please try again once you are back online.`);
+          btn.dataset.processing = 'false';
+          btn.disabled = false;
+          btn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-xmark"></i> Decline';
+          return;
         }
 
         reqItem.status = 'Rejected';
@@ -10306,10 +11048,15 @@ ${emailLogs.join('\n')}`);
         if (btn.dataset.processing === 'true') return;
         btn.dataset.processing = 'true';
         btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Updating Database & Applying Changes...';
+        btn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-spinner fa-spin"></i> Updating Database & Applying Changes...';
 
         const students = AppState.getStudents();
         const studentIdx = students.findIndex(s => isStudentRequestMatch(reqItem, s));
+        const restoreApproveButton = () => {
+          btn.dataset.processing = 'false';
+          btn.disabled = false;
+          btn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-check"></i> Approve &amp; Apply Changes';
+        };
 
         if (studentIdx !== -1) {
           const allowedProfileFields = ['name', 'mobile', 'dob', 'guardianName', 'guardian_name', 'guardianMobile', 'guardian_mobile', 'email', 'address', 'bloodGroup', 'blood_group', 'photo', 'photo_url', 'photoUrl'];
@@ -10323,46 +11070,67 @@ ${emailLogs.join('\n')}`);
             ...students[studentIdx],
             ...safeUpdates
           };
+          const previousPhoto = students[studentIdx].photo || students[studentIdx].photoUrl || students[studentIdx].photo_url || '';
+          let replacedPhoto = '';
           if (reqItem.newData?.photoUrl || reqItem.newData?.photo || reqItem.newData?.photo_url) {
             const photoVal = reqItem.newData.photoUrl || reqItem.newData.photo || reqItem.newData.photo_url;
-            const existingOldPhoto = students[studentIdx].photo || students[studentIdx].photoUrl || students[studentIdx].photo_url || '';
-            if (existingOldPhoto && existingOldPhoto !== photoVal && existingOldPhoto.includes('/pragyan-media/')) {
-              try { await SupabaseSync.deleteFile(existingOldPhoto); } catch(e) { console.warn('Cleaned old photo note:', e.message); }
+            if (previousPhoto && previousPhoto !== photoVal && previousPhoto.includes('/pragyan-media/')) {
+              replacedPhoto = previousPhoto;
             }
             updated.photo = photoVal;
             updated.photo_url = photoVal;
             updated.photoUrl = photoVal;
           }
+
+          // Cloud first, then local. The previous order saved the student locally
+          // and deleted the superseded photo BEFORE writing to the database, with
+          // the write's failure swallowed by a catch that could never fire —
+          // mutate() returns its errors rather than throwing. A rejected write
+          // therefore left the database row pointing at a photo that had already
+          // been deleted from storage, and the local cache showing changes the
+          // database had never accepted.
+          const stuTarget = students[studentIdx];
+          const supaPayload = {
+            name: updated.name,
+            mobile: updated.mobile || null,
+            dob: updated.dob,
+            class_name: updated.className,
+            guardian_name: updated.guardianName || null,
+            guardian_mobile: updated.guardianMobile || null,
+            email: (updated.email && updated.email.includes('@')) ? updated.email.trim() : null,
+            address: updated.address || '',
+            blood_group: updated.bloodGroup || '',
+            photo_url: updated.photoUrl || updated.photo || ''
+          };
+
+          const stuWhere = stuTarget.student_id
+            ? { student_id: stuTarget.student_id }
+            : (stuTarget.rollNo ? { roll_no: stuTarget.rollNo } : (stuTarget.id ? { id: stuTarget.id } : null));
+
+          if (!stuWhere) {
+            alert('⚠️ This student has no id, roll number or database key, so the profile change cannot be written. Nothing was changed.');
+            restoreApproveButton();
+            return;
+          }
+          if (typeof SupabaseSync === 'undefined' || !SupabaseSync.mutateOrThrow) {
+            alert('⚠️ Cloud sync is unavailable, so this approval cannot be recorded. Nothing was changed.');
+            restoreApproveButton();
+            return;
+          }
+          try {
+            await SupabaseSync.mutateOrThrow('students', 'update', supaPayload, { where: stuWhere });
+          } catch (dbErr) {
+            alert(`⚠️ Could not apply the profile change: ${dbErr.message}\n\nNothing was changed. Please try again once you are back online.`);
+            restoreApproveButton();
+            return;
+          }
+
           students[studentIdx] = updated;
           await AppState.saveStudents(students);
 
-          // Direct cloud database write to ensure instant remote update
-          if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
-            const stuTarget = students[studentIdx];
-            const supaPayload = {
-              name: updated.name,
-              mobile: updated.mobile || null,
-              dob: updated.dob,
-              class_name: updated.className,
-              guardian_name: updated.guardianName || null,
-              guardian_mobile: updated.guardianMobile || null,
-              email: (updated.email && updated.email.includes('@')) ? updated.email.trim() : null,
-              address: updated.address || '',
-              blood_group: updated.bloodGroup || '',
-              photo_url: updated.photoUrl || updated.photo || ''
-            };
-
-            try {
-              if (stuTarget.student_id) {
-                await SupabaseSync.mutate('students', 'update', supaPayload, { where: { student_id: stuTarget.student_id } });
-              } else if (stuTarget.rollNo) {
-                await SupabaseSync.mutate('students', 'update', supaPayload, { where: { roll_no: stuTarget.rollNo } });
-              } else if (stuTarget.id) {
-                await SupabaseSync.mutate('students', 'update', supaPayload, { where: { id: stuTarget.id } });
-              }
-            } catch(dbErr) {
-              console.warn('Direct student update note:', dbErr.message);
-            }
+          // Only now is the old file genuinely unreferenced.
+          if (replacedPhoto) {
+            try { await SupabaseSync.deleteFile(replacedPhoto); } catch(e) { console.warn('Cleaned old photo note:', e.message); }
           }
 
           // Relational Linking: Cascade profile changes to student_fee_accounts
@@ -10392,15 +11160,24 @@ ${emailLogs.join('\n')}`);
           }
         }
 
-        // 1. Direct Cloud Database Update to student_requests
-        if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
+        // The student row is already updated at this point, so a failure here
+        // leaves the request Pending while the change is live — recoverable by
+        // clicking again (the student write is idempotent), which is why this one
+        // reports and stops rather than trying to roll anything back.
+        if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutateOrThrow) {
           try {
-            await SupabaseSync.mutate('student_requests', 'update', {
+            await SupabaseSync.mutateOrThrow('student_requests', 'update', {
               status: 'Approved',
               updated_at: new Date().toISOString()
             }, { where: { request_id: id } });
           } catch(e) {
-            console.warn('Direct request status update note:', e.message);
+            alert(`⚠️ The profile change was applied, but the request could not be marked approved: ${e.message}\n\nPlease click Approve again to clear it from the queue.`);
+            restoreApproveButton();
+            if (typeof SupabaseSync.pullAll === 'function') {
+              try { await SupabaseSync.pullAll(); } catch (syncErr) { console.warn('Post-failure pullAll note:', syncErr.message); }
+            }
+            renderAdminRequestsManager();
+            return;
           }
         }
 
@@ -10446,29 +11223,42 @@ ${emailLogs.join('\n')}`);
         if (btn.dataset.processing === 'true') return;
         btn.dataset.processing = 'true';
         btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Declining in Database...';
+        btn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-spinner fa-spin"></i> Declining in Database...';
 
-        // If a new photo was uploaded with this request, delete it from storage on decline
         const newPhoto = reqItem.newData?.photoUrl || reqItem.newData?.photo || reqItem.newData?.photo_url;
         const oldPhoto = reqItem.oldData?.photoUrl || reqItem.oldData?.photo || reqItem.oldData?.photo_url;
-        if (newPhoto && newPhoto !== oldPhoto && typeof SupabaseSync !== 'undefined' && SupabaseSync.deleteFile) {
-          try {
-            await SupabaseSync.deleteFile(newPhoto);
-            console.log('Unapproved photo deleted from Supabase Storage:', newPhoto);
-          } catch(delErr) {
-            console.warn('Failed to delete unapproved photo:', delErr);
-          }
+
+        // Record the decline first, delete the rejected upload second. The other
+        // order threw the photo away before the write, and the write's failure was
+        // swallowed by a catch that could never fire, so a rejected decline left a
+        // still-Pending request whose newData pointed at an object that no longer
+        // existed — approving it later would set photo_url to a dead link.
+        if (typeof SupabaseSync === 'undefined' || !SupabaseSync.mutateOrThrow) {
+          alert('⚠️ Cloud sync is unavailable, so this decline cannot be recorded. Nothing was changed.');
+          btn.dataset.processing = 'false';
+          btn.disabled = false;
+          btn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-xmark"></i> Decline Request';
+          return;
+        }
+        try {
+          await SupabaseSync.mutateOrThrow('student_requests', 'update', {
+            status: 'Rejected',
+            updated_at: new Date().toISOString()
+          }, { where: { request_id: id } });
+        } catch(e) {
+          alert(`⚠️ Could not record the decline: ${e.message}\n\nNothing was changed, and the uploaded photo has been kept. Please try again once you are back online.`);
+          btn.dataset.processing = 'false';
+          btn.disabled = false;
+          btn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-xmark"></i> Decline Request';
+          return;
         }
 
-        // 1. Direct Cloud Database Update to student_requests
-        if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
+        // Now unreferenced by any pending request.
+        if (newPhoto && newPhoto !== oldPhoto && SupabaseSync.deleteFile) {
           try {
-            await SupabaseSync.mutate('student_requests', 'update', {
-              status: 'Rejected',
-              updated_at: new Date().toISOString()
-            }, { where: { request_id: id } });
-          } catch(e) {
-            console.warn('Direct request rejection note:', e.message);
+            await SupabaseSync.deleteFile(newPhoto);
+          } catch(delErr) {
+            console.warn('Failed to delete unapproved photo:', delErr);
           }
         }
 
@@ -10553,20 +11343,20 @@ ${emailLogs.join('\n')}`);
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.25rem;">
           <div>
             <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-mahogany); margin: 0;">
-              <i class="fa-solid fa-clock-rotate-left" style="color: var(--primary-emerald);"></i> Master Administrative Audit & Action History Log (${allLogs.length})
+              <i aria-hidden="true" class="fa-solid fa-clock-rotate-left" style="color: var(--primary-emerald);"></i> Master Administrative Audit & Action History Log (${allLogs.length})
             </h3>
             <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">Complete chronological audit trial of all fee collections, approvals, announcements, adjustments, and registrations by specific educators</div>
           </div>
           <div class="admin-audit-filter-wrap" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; width: 100%; max-width: 580px; justify-content: flex-end;">
-            <select id="adminAuditEducatorSelect" class="portal-input" style="flex: 1 1 140px; min-width: 130px; max-width: 100%; font-size: 0.82rem; height: 38px; padding: 0.4rem 0.65rem; border-color: var(--primary-emerald); font-weight: 600;">
+            <select id="adminAuditEducatorSelect" aria-label="Filter the audit trail by educator" class="portal-input" style="flex: 1 1 140px; min-width: 130px; max-width: 100%; font-size: 0.82rem; height: 38px; padding: 0.4rem 0.65rem; border-color: var(--primary-emerald); font-weight: 600;">
               <option value="all" ${currentAuditEducator === 'all' ? 'selected' : ''}>🌟 All Educators / Admins</option>
               <option value="Ravi" ${currentAuditEducator === 'Ravi' ? 'selected' : ''}>👔 Prof. Ravi Ranjan</option>
               <option value="Chandan" ${currentAuditEducator === 'Chandan' ? 'selected' : ''}>🔬 Chandan Kumar</option>
             </select>
-            <input type="text" id="adminAuditSearchInput" class="portal-input" placeholder="🔍 Search audit history..." value="${currentAuditSearch}" style="flex: 1 1 140px; min-width: 130px; max-width: 100%; font-size: 0.82rem; height: 38px; padding: 0.4rem 0.65rem;">
+            <input type="text" id="adminAuditSearchInput" aria-label="Search audit history" class="portal-input" placeholder="🔍 Search audit history..." value="${currentAuditSearch}" style="flex: 1 1 140px; min-width: 130px; max-width: 100%; font-size: 0.82rem; height: 38px; padding: 0.4rem 0.65rem;">
             ${isMainAdmin() ? `
               <button id="btnClearAllAuditLogs" class="btn" title="Main Admin Exclusive: Purge all audit logs from database and local storage" style="background: linear-gradient(135deg, #DC2626 0%, #991B1B 100%); color: #fff; border: 1px solid #7F1D1D; height: 38px; padding: 0 0.85rem; font-size: 0.8rem; font-weight: 700; border-radius: 6px; display: inline-flex; align-items: center; gap: 0.4rem; box-shadow: 0 2px 6px rgba(220, 38, 38, 0.25); cursor: pointer; white-space: nowrap;">
-                <i class="fa-solid fa-trash-can"></i> Clear All Audits
+                <i aria-hidden="true" class="fa-solid fa-trash-can"></i> Clear All Audits
               </button>
             ` : ''}
           </div>
@@ -10576,7 +11366,7 @@ ${emailLogs.join('\n')}`);
           <div style="background: #D1FAE5; border: 1px solid #10B981; border-radius: 8px; padding: 0.85rem 1.15rem; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
             <div>
               <div style="font-weight: 700; color: #065F46; font-size: 0.95rem;">
-                <i class="fa-solid fa-user-tie"></i> Audit Log Filtered for Educator: <strong>${currentAuditEducator === 'Ravi' ? 'Prof. Ravi Ranjan (Director & Maths Lead)' : 'Chandan Kumar (Director & Science Lead)'}</strong>
+                <i aria-hidden="true" class="fa-solid fa-user-tie"></i> Audit Log Filtered for Educator: <strong>${currentAuditEducator === 'Ravi' ? 'Prof. Ravi Ranjan (Director & Maths Lead)' : 'Chandan Kumar (Director & Science Lead)'}</strong>
               </div>
               <div style="font-size: 0.82rem; color: #047857; margin-top: 0.2rem;">
                 Total Fee Payments Verified / Accepted by this Educator: <strong style="font-size: 1rem; color: #065F46;">₹${totalCollectedByEducator.toLocaleString()}</strong> across <strong>${filteredLogs.filter(l => l.actionType === 'FEE_PAYMENT' || l.actionType === 'PAYMENT_VERIFIED').length}</strong> transactions.
@@ -10601,7 +11391,7 @@ ${emailLogs.join('\n')}`);
         <!-- History Timeline List -->
         ${filteredLogs.length === 0 ? `
           <div style="text-align: center; color: var(--text-muted); padding: 3rem 1rem;">
-            <i class="fa-solid fa-clock" style="font-size: 2.5rem; color: #9CA3AF; margin-bottom: 0.75rem;"></i>
+            <i aria-hidden="true" class="fa-solid fa-clock" style="font-size: 2.5rem; color: #9CA3AF; margin-bottom: 0.75rem;"></i>
             <p style="font-weight: 600;">No audit history records found matching criteria.</p>
           </div>
         ` : `
@@ -10615,39 +11405,39 @@ ${emailLogs.join('\n')}`);
               if (aType === 'FEE_ADJUSTMENT_CORRECTION' || aType === 'FEE_REGULATED') {
                 cardBorderLeft = 'border-left: 5px solid #7C3AED;';
                 cardBg = 'linear-gradient(135deg, #FAF5FF 0%, #F5EEFF 100%);';
-                typePill = '<span style="background: linear-gradient(135deg, #EDE9FE, #DDD6FE); color: #5B21B6; border: 1.5px solid #A78BFA; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.35rem; box-shadow: 0 1px 4px rgba(124, 58, 237, 0.15);"><i class="fa-solid fa-scale-balanced"></i> ⚖️ Fee Adjustment & Correction</span>';
+                typePill = '<span style="background: linear-gradient(135deg, #EDE9FE, #DDD6FE); color: #5B21B6; border: 1.5px solid #A78BFA; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.35rem; box-shadow: 0 1px 4px rgba(124, 58, 237, 0.15);"><i aria-hidden="true" class="fa-solid fa-scale-balanced"></i> ⚖️ Fee Adjustment & Correction</span>';
               } else if (aType === 'FEE_PAYMENT') {
                 cardBorderLeft = 'border-left: 5px solid #059669;';
                 cardBg = '#F0FDF4;';
-                typePill = '<span style="background: #D1FAE5; color: #065F46; border: 1.5px solid #6EE7B7; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i class="fa-solid fa-hand-holding-dollar"></i> Direct Partial/Cash Payment</span>';
+                typePill = '<span style="background: #D1FAE5; color: #065F46; border: 1.5px solid #6EE7B7; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i aria-hidden="true" class="fa-solid fa-hand-holding-dollar"></i> Direct Partial/Cash Payment</span>';
               } else if (aType === 'PAYMENT_VERIFIED') {
                 cardBorderLeft = 'border-left: 5px solid #0284C7;';
                 cardBg = '#F0F9FF;';
-                typePill = '<span style="background: #E0F2FE; color: #075985; border: 1.5px solid #7DD3FC; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i class="fa-solid fa-check-double"></i> Online Payment Verified</span>';
+                typePill = '<span style="background: #E0F2FE; color: #075985; border: 1.5px solid #7DD3FC; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i aria-hidden="true" class="fa-solid fa-check-double"></i> Online Payment Verified</span>';
               } else if (aType === 'OLD_DUE_ADDED') {
                 cardBorderLeft = 'border-left: 5px solid #D97706;';
                 cardBg = '#FFFBEB;';
-                typePill = '<span style="background: #FEF3C7; color: #92400E; border: 1.5px solid #FCD34D; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i class="fa-solid fa-clock-rotate-left"></i> Old Due Added</span>';
+                typePill = '<span style="background: #FEF3C7; color: #92400E; border: 1.5px solid #FCD34D; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i aria-hidden="true" class="fa-solid fa-clock-rotate-left"></i> Old Due Added</span>';
               } else if (aType === 'STUDENT_PERMANENTLY_DELETED') {
                 cardBorderLeft = 'border-left: 5px solid #DC2626;';
                 cardBg = '#FEF2F2;';
-                typePill = '<span style="background: #FEE2E2; color: #991B1B; border: 1.5px solid #FCA5A5; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i class="fa-solid fa-trash-can"></i> Student Deleted & Purged</span>';
+                typePill = '<span style="background: #FEE2E2; color: #991B1B; border: 1.5px solid #FCA5A5; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i aria-hidden="true" class="fa-solid fa-trash-can"></i> Student Deleted & Purged</span>';
               } else if (aType === 'STUDENT_PASSWORD_RESET') {
                 cardBorderLeft = 'border-left: 5px solid #0D9488;';
                 cardBg = '#F0FDFA;';
-                typePill = '<span style="background: #CCFBF1; color: #0F766E; border: 1.5px solid #5EEAD4; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i class="fa-solid fa-key"></i> Password Reset to DOB</span>';
+                typePill = '<span style="background: #CCFBF1; color: #0F766E; border: 1.5px solid #5EEAD4; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i aria-hidden="true" class="fa-solid fa-key"></i> Password Reset to DOB</span>';
               } else if (aType === 'PROFILE_APPROVED' || aType === 'PROFILE_EDITED') {
                 cardBorderLeft = 'border-left: 5px solid #2563EB;';
                 cardBg = '#EFF6FF;';
-                typePill = '<span style="background: #DBEAFE; color: #1E40AF; border: 1.5px solid #93C5FD; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i class="fa-solid fa-user-pen"></i> Profile Updated</span>';
+                typePill = '<span style="background: #DBEAFE; color: #1E40AF; border: 1.5px solid #93C5FD; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i aria-hidden="true" class="fa-solid fa-user-pen"></i> Profile Updated</span>';
               } else if (aType === 'NOTICE_BROADCAST') {
                 cardBorderLeft = 'border-left: 5px solid #4F46E5;';
                 cardBg = '#EEF2FF;';
-                typePill = '<span style="background: #E0E7FF; color: #3730A3; border: 1.5px solid #A5B4FC; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i class="fa-solid fa-bullhorn"></i> Announcement</span>';
+                typePill = '<span style="background: #E0E7FF; color: #3730A3; border: 1.5px solid #A5B4FC; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i aria-hidden="true" class="fa-solid fa-bullhorn"></i> Announcement</span>';
               } else {
                 cardBorderLeft = 'border-left: 5px solid #C026D3;';
                 cardBg = '#FDF4FF;';
-                typePill = '<span style="background: #FAE8FF; color: #86198F; border: 1.5px solid #F0ABFC; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i class="fa-solid fa-user-plus"></i> Student Registered</span>';
+                typePill = '<span style="background: #FAE8FF; color: #86198F; border: 1.5px solid #F0ABFC; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i aria-hidden="true" class="fa-solid fa-user-plus"></i> Student Registered</span>';
               }
 
               return `
@@ -10656,9 +11446,9 @@ ${emailLogs.join('\n')}`);
                     <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.35rem;">
                       ${typePill}
                       <span style="font-size: 0.78rem; font-weight: 700; color: var(--primary-emerald); background: rgba(6, 78, 59, 0.08); padding: 0.15rem 0.5rem; border-radius: 4px;">
-                        <i class="fa-solid fa-user-tie"></i> ${log.actor}
+                        <i aria-hidden="true" class="fa-solid fa-user-tie"></i> ${log.actor}
                       </span>
-                      <span style="font-size: 0.78rem; color: var(--text-muted);"><i class="fa-regular fa-clock"></i> ${log.timestamp}</span>
+                      <span style="font-size: 0.78rem; color: var(--text-muted);"><i aria-hidden="true" class="fa-regular fa-clock"></i> ${log.timestamp}</span>
                     </div>
                     <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-mahogany); margin-bottom: 0.2rem;">${log.description}</div>
                     <div style="font-size: 0.8rem; color: var(--text-muted);">Target Student: <strong>${log.studentName}</strong> (Roll #${log.studentRoll})</div>
@@ -10723,7 +11513,7 @@ ${emailLogs.join('\n')}`);
           <!-- Danger Header -->
           <div style="background: linear-gradient(135deg, #DC2626 0%, #991B1B 100%); color: #fff; padding: 1.15rem 1.35rem; display: flex; justify-content: space-between; align-items: center;">
             <div style="display: flex; align-items: center; gap: 0.65rem;">
-              <i class="fa-solid fa-triangle-exclamation" style="font-size: 1.6rem; color: #FEE2E2;"></i>
+              <i aria-hidden="true" class="fa-solid fa-triangle-exclamation" style="font-size: 1.6rem; color: #FEE2E2;"></i>
               <div>
                 <h3 style="margin: 0; font-size: 1.15rem; font-weight: 800; color: #fff; letter-spacing: 0.3px;">
                   ⚠️ STRICT SECURITY CONFIRMATION
@@ -10731,8 +11521,8 @@ ${emailLogs.join('\n')}`);
                 <div style="font-size: 0.76rem; color: #FEE2E2; margin-top: 0.15rem;">Main Admin Exclusive Action — Chandan Kumar</div>
               </div>
             </div>
-            <button onclick="document.getElementById('auditPurgeModal').remove()" style="background: none; border: none; color: #fff; font-size: 1.25rem; cursor: pointer;">
-              <i class="fa-solid fa-xmark"></i>
+            <button type="button" aria-label="Close audit purge dialog" onclick="document.getElementById('auditPurgeModal').remove()" style="background: none; border: none; color: #fff; font-size: 1.25rem; cursor: pointer;">
+              <i aria-hidden="true" class="fa-solid fa-xmark"></i>
             </button>
           </div>
 
@@ -10742,7 +11532,7 @@ ${emailLogs.join('\n')}`);
             <!-- Warning Alert Box -->
             <div style="background: #FEF2F2; border: 1.5px solid #F87171; border-radius: 8px; padding: 1rem; color: #991B1B;">
               <div style="font-weight: 800; font-size: 0.95rem; display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.35rem;">
-                <i class="fa-solid fa-trash-can"></i> Action: Permanent Deletion of All Audit Logs (${totalCount} Records)
+                <i aria-hidden="true" class="fa-solid fa-trash-can"></i> Action: Permanent Deletion of All Audit Logs (${totalCount} Records)
               </div>
               <p style="font-size: 0.84rem; line-height: 1.5; margin: 0; color: #7F1D1D;">
                 You are about to permanently purge all <strong>${totalCount} historical activity logs</strong> from both local browser storage and the cloud database. Once deleted, this activity timeline cannot be recovered.
@@ -10752,7 +11542,7 @@ ${emailLogs.join('\n')}`);
             <!-- Guaranteed Protected Data Card -->
             <div style="background: #F0FDF4; border: 1.5px solid #86EFAC; border-radius: 8px; padding: 1rem; color: #166534;">
               <div style="font-weight: 800; font-size: 0.9rem; display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.45rem; color: #14532D;">
-                <i class="fa-solid fa-shield-halved" style="color: #16A34A;"></i> GUARANTEED DATA SAFETY (100% Protected & Zero Impact):
+                <i aria-hidden="true" class="fa-solid fa-shield-halved" style="color: #16A34A;"></i> GUARANTEED DATA SAFETY (100% Protected & Zero Impact):
               </div>
               <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.82rem; line-height: 1.6; color: #166534;">
                 <li><strong>Student Pending Dues & Balances:</strong> 100% Intact & Unaffected</li>
@@ -10764,7 +11554,7 @@ ${emailLogs.join('\n')}`);
 
             <!-- Typed Confirmation Input -->
             <div>
-              <label style="display: block; font-size: 0.84rem; font-weight: 700; color: var(--text-mahogany); margin-bottom: 0.35rem;">
+              <label for="confirmAuditPurgeInput" style="display: block; font-size: 0.84rem; font-weight: 700; color: var(--text-mahogany); margin-bottom: 0.35rem;">
                 To confirm permanent deletion, type <code style="background: #FEE2E2; color: #991B1B; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 800;">DELETE</code> below:
               </label>
               <input type="text" id="confirmAuditPurgeInput" class="portal-input" placeholder="Type DELETE to enable button" style="width: 100%; font-size: 0.9rem; padding: 0.6rem 0.85rem; border: 1.5px solid #CBD5E1; text-transform: uppercase;">
@@ -10776,7 +11566,7 @@ ${emailLogs.join('\n')}`);
                 Cancel / Keep Data
               </button>
               <button type="button" id="btnConfirmPurgeAuditLogs" class="btn" disabled style="background: #94A3B8; color: #fff; font-weight: 800; padding: 0.6rem 1.25rem; font-size: 0.85rem; border-radius: 6px; cursor: not-allowed; display: inline-flex; align-items: center; gap: 0.4rem; transition: all 0.2s;">
-                <i class="fa-solid fa-trash-can"></i> Permanently Purge Logs
+                <i aria-hidden="true" class="fa-solid fa-trash-can"></i> Permanently Purge Logs
               </button>
             </div>
 
@@ -10787,10 +11577,14 @@ ${emailLogs.join('\n')}`);
 
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 
+    const purgeDialog = wireModalA11y('auditPurgeModal', {
+      closeOnBackdrop: false,
+      initialFocus: '#confirmAuditPurgeInput'
+    });
+
     const input = document.getElementById('confirmAuditPurgeInput');
     const confirmBtn = document.getElementById('btnConfirmPurgeAuditLogs');
 
-    input?.focus();
     input?.addEventListener('input', (e) => {
       if (e.target.value.trim().toUpperCase() === 'DELETE') {
         confirmBtn.disabled = false;
@@ -10809,11 +11603,11 @@ ${emailLogs.join('\n')}`);
       if (input.value.trim().toUpperCase() !== 'DELETE') return;
 
       confirmBtn.disabled = true;
-      confirmBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Purging Database...';
+      confirmBtn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-spinner fa-spin"></i> Purging Database...';
 
       try {
         await AppState.clearAllAuditLogs();
-        document.getElementById('auditPurgeModal')?.remove();
+        purgeDialog.close();
         alert(`🗑️ Master audit log purge complete!\n\n• All ${totalCount} previous activity entries have been cleared from database & local storage.\n• Student dues, fee balances, receipts, and profiles remain 100% safe & intact.`);
         renderAdminAuditHistoryTab();
         renderAdminDashboard();
@@ -10821,7 +11615,7 @@ ${emailLogs.join('\n')}`);
         console.error('Failed to clear audit logs:', err);
         alert('❌ Error deleting audit logs: ' + (err.message || 'Unknown error'));
         confirmBtn.disabled = false;
-        confirmBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i> Permanently Purge Logs';
+        confirmBtn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-trash-can"></i> Permanently Purge Logs';
       }
     });
   }

@@ -1,413 +1,401 @@
-import { getSupabase } from './_lib/auth.js';
+// ============================================================================
+// /api/cron-monthly-fees — the 10-day rolling billing engine
+// ----------------------------------------------------------------------------
+// Vercel cron hits this once a day. The calendar in api/_lib/academic-config.js
+// decides what "today" means: days 1-6 accrue the monthly tuition fee for that
+// day's batches and email the statement, days 7-10 chase whoever still has a
+// balance, and days 11-31 are a deliberate rest state where the handler does
+// nothing but report that fact.
+//
+// Four defects this file used to carry, all fixed here:
+//
+//   1. `supabase.raw('email_attempts + 1')` — supabase-js has no .raw(). Every
+//      call threw a TypeError inside retryUnsentEmails(), which runs after
+//      billing on EVERY invocation, so the handler returned 500 and skipped its
+//      audit-log write even on days when the money side had fully succeeded.
+//      Replaced with the claim_ledger_email RPC, which does the increment
+//      atomically and reports whether this process won the claim.
+//
+//   2. Fees were guessed from substrings of class_name, and 'Class 12th PCM'
+//      matched none of the branches: a senior with no explicit monthly_fee was
+//      billed 1000 instead of 1500, and Special English 1st-5th was billed 1000
+//      instead of 500. Amounts now resolve through the canonical batch table.
+//
+//   3. The schedule had drifted to "all batches on days 1-4, reminders on days
+//      15-19", which bills every batch four times over (idempotently, but it
+//      also means a day-1 outage silently rebills nothing) and puts reminders
+//      outside the specified window. Now derived from BILLING_CALENDAR.
+//
+//   4. No quota accounting whatsoever. This is the highest-volume sender in the
+//      system and it posted straight to Resend, so a billing day landing on top
+//      of a busy receipt day would blow the 100/day cap and the last families
+//      in the loop would silently never receive a statement. Every send now
+//      reserves a slot first, and anything that does not fit is reported as
+//      `deferred` rather than lost.
+// ============================================================================
+
+import { getSupabase, requireCronOrAdmin } from './_lib/auth.js';
 import {
   sendEmailViaResend,
   extractResendErrorMessage,
   isValidResendApiKey,
   isVerifiedSenderDomain,
-  DEFAULT_FROM
+  DEFAULT_FROM,
+  EMAIL_PATTERN
 } from './_lib/resend-sender.js';
+import { feeEmail, reminderEmail, formatMonthLabel } from './_lib/email-templates.js';
 import {
-  feeEmail,
-  reminderEmail,
-  escapeHtml,
-  formatMonthLabel
-} from './_lib/email-templates.js';
+  dispatchWithQuota,
+  statusForSendResult,
+  EMAIL_CATEGORIES
+} from './_lib/email-quota.js';
+import {
+  scheduleForDay,
+  isStudentInScope,
+  monthlyFeeFor,
+  istMonthKey,
+  istDayOfMonth
+} from './_lib/academic-config.js';
 
-const BATCH_SCHEDULE = {
-  // Days 1-4: Monthly Tuition Fee Generation & Statements (Day 1 covers ALL active batches; Days 2-4 provide redundant idempotent catch-up)
-  1: { key: 'all', label: 'All Batches (1st-of-Month Unified Fee Accrual)', type: 'billing' },
-  2: { key: 'all', label: 'All Batches (Day 2 Idempotent Billing Catch-Up)', type: 'billing' },
-  3: { key: 'all', label: 'All Batches (Day 3 Idempotent Billing Catch-Up)', type: 'billing' },
-  4: { key: 'all', label: 'All Batches (Day 4 Idempotent Billing Catch-Up)', type: 'billing' },
-
-  // Days 15-19: Mid-Month Pending Due Reminders (Only for students with pending_fee > 0)
-  15: { key: '10th', label: 'Class 10th (ACHIEVER)', type: 'reminder' },
-  16: { key: '9th', label: 'Class 9th (NURTURE)', type: 'reminder' },
-  17: { key: '8th', label: 'Class 8th (ALPHA)', type: 'reminder' },
-  18: { key: 'junior', label: 'Junior Batch (JUNIO)', type: 'reminder' },
-  19: { key: 'all', label: 'All Batches (Pending Dues Reminder)', type: 'reminder' }
-};
-
-function getStudentDefaultMonthlyFee(className) {
-  const str = String(className || '').toLowerCase();
-  if (str.includes('10')) return 1000;
-  if (str.includes('9')) return 1000;
-  if (str.includes('8')) return 800;
-  if (str.includes('junior') || str.includes('junio') || str.includes('6') || str.includes('7')) return 700;
-  return 1000;
-}
-
-function indiaDateParts(date = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' })
-    .formatToParts(date)
-    .reduce((all, part) => ({ ...all, [part.type]: part.value }), {});
-  return { day: Number(parts.day), monthKey: `${parts.year}-${parts.month}` };
-}
+const MAX_EMAIL_ATTEMPTS = 3;
 
 const monthLabel = formatMonthLabel;
 
-function extractErrorMessage(err) {
-  if (!err) return 'Email delivery failed';
-  if (typeof err === 'string') return err;
-  if (err.message && typeof err.message === 'string') return err.message;
-  if (err.error?.message && typeof err.error.message === 'string') return err.error.message;
-  if (err.error && typeof err.error === 'string') return err.error;
-  try {
-    const str = JSON.stringify(err);
-    return str !== '{}' ? str : 'Email delivery failed';
-  } catch (e) {
-    return 'Email delivery failed';
+const isActive = student => !student.status || String(student.status).toLowerCase() === 'active';
+const hasEmail = student => typeof student.email === 'string' && EMAIL_PATTERN.test(student.email.trim());
+
+/**
+ * Send one statement for an already-written ledger row.
+ *
+ * Ordering matters: the quota slot is reserved by dispatchWithQuota BEFORE this
+ * runs, and the ledger claim is taken here. Doing it the other way round would
+ * burn one of the three email attempts every time the day's quota was exhausted,
+ * so a busy day would permanently retire the retry budget for those rows.
+ */
+async function sendLedgerStatement(supabase, from, { ledger, student }) {
+  const { data: claim, error: claimError } = await supabase.rpc('claim_ledger_email', {
+    p_ledger_id: ledger.ledger_id,
+    p_max_attempts: MAX_EMAIL_ATTEMPTS
+  });
+
+  if (claimError) {
+    console.error('[cron] claim_ledger_email failed:', claimError.message);
+    return null;
   }
+  if (!claim?.claimed) {
+    // Another invocation owns this row, it is already sent, or the attempt
+    // budget is spent. Either way this process must not send.
+    return null;
+  }
+
+  const result = await sendEmailViaResend({
+    from,
+    to: [student.email],
+    subject: `Monthly Fee Statement — ${student.name} (${monthLabel(ledger.billing_month)})`,
+    html: feeEmail(student, ledger),
+    // Resend's own idempotency key. The ledger's idempotency_key stops a retried
+    // cron from billing twice; this stops it emailing twice when the retry lands
+    // before the first response was recorded.
+    headers: { 'X-Entity-Ref-ID': `${ledger.idempotency_key || `ledger-${ledger.ledger_id}`}` }
+  });
+
+  const status = statusForSendResult(result);
+  // 'unknown' counts as sent for the ledger: the message may well have been
+  // delivered, and re-sending a fee statement to a parent is worse than not
+  // recording a message id.
+  await supabase.rpc('settle_ledger_email', {
+    p_ledger_id: ledger.ledger_id,
+    p_success: status === 'sent' || status === 'unknown',
+    p_message_id: result?.data?.id || null,
+    p_error: status === 'sent' ? null : extractResendErrorMessage(result?.error).slice(0, 500)
+  });
+
+  return {
+    result,
+    error: status === 'sent' ? null : extractResendErrorMessage(result?.error),
+    report: { studentId: student.student_id, action: 'statement' }
+  };
 }
 
-async function sendLedgerEmail(supabase, from, ledger, student) {
-  // STEP 1: Acquire exclusive lock by updating email_attempts atomically
-  const lockResult = await supabase
+/** Statements for ledger rows this run just created or found already pending. */
+async function dispatchStatements(supabase, from, pending, monthKey) {
+  if (!pending.length) return { results: [], deferred: [], quotaError: null };
+  return dispatchWithQuota({
+    items: pending,
+    category: EMAIL_CATEGORIES.BILLING,
+    getEmail: item => item.student.email,
+    reference: `BILL-${monthKey}`,
+    send: (item) => sendLedgerStatement(supabase, from, item)
+  });
+}
+
+/** Mid-month chase for students still carrying a balance. */
+async function dispatchReminders(supabase, from, students, monthKey, isFinal) {
+  if (!students.length) return { results: [], deferred: [], quotaError: null };
+  const monthName = monthLabel(monthKey);
+  return dispatchWithQuota({
+    items: students,
+    category: EMAIL_CATEGORIES.REMINDER,
+    getEmail: student => student.email,
+    reference: `REMIND-${monthKey}`,
+    // Reminders have no ledger row to claim, so this is their only duplicate
+    // guard: keyed per student per IST day, it survives a cron retry and an
+    // admin pressing the button on the same day, while still allowing the day-7
+    // chase and the day-10 final notice to both go out.
+    getDedupeKey: student => `REMIND-${student.student_id}-${monthKey}`,
+    send: async (student) => {
+      const result = await sendEmailViaResend({
+        from,
+        to: [student.email],
+        subject: `${isFinal ? 'Final Reminder' : 'Fee Reminder'} (${monthName}) — ${student.name} (Roll #${student.roll_no})`,
+        html: reminderEmail(student, monthName),
+        headers: { 'X-Entity-Ref-ID': `REMIND-${student.student_id}-${monthKey}` }
+      });
+      return {
+        result,
+        error: result?.success ? null : extractResendErrorMessage(result?.error),
+        report: { studentId: student.student_id, action: 'reminder' }
+      };
+    }
+  });
+}
+
+/**
+ * Sweep ledger rows whose statement never went out — a quota-exhausted day, a
+ * provider outage, a run that timed out mid-batch. Bounded and ordered oldest
+ * first so the same rows cannot starve behind newer ones.
+ */
+async function retryUnsentStatements(supabase, from) {
+  const { data: rows, error } = await supabase
     .from('fee_billing_ledger')
-    .update({
-      email_attempts: supabase.raw('email_attempts + 1'),
-      last_email_attempt_at: new Date().toISOString()
-    })
-    .eq('id', ledger.id)
-    .is('email_sent_at', null) // Only lock if not already sent
-    .select('id, email_attempts')
-    .maybeSingle();
+    .select('id,student_id,billing_month,amount,previous_due,updated_due,idempotency_key,email_attempts')
+    .is('email_sent_at', null)
+    .lt('email_attempts', MAX_EMAIL_ATTEMPTS)
+    .order('created_at', { ascending: true })
+    .limit(60);
+  if (error) throw error;
+  if (!rows?.length) return { results: [], deferred: [], quotaError: null };
 
-  if (lockResult.error || !lockResult.data) {
-    // Another process already locked this record or email was sent
-    return { studentId: ledger.student_id, status: 'already_processing_or_sent' };
-  }
+  const studentIds = [...new Set(rows.map(row => row.student_id))];
+  const { data: students, error: studentsError } = await supabase
+    .from('students')
+    .select('student_id,name,roll_no,class_name,monthly_fee,pending_fee,email')
+    .in('student_id', studentIds);
+  if (studentsError) throw studentsError;
 
-  const attempt = Number(ledger.email_attempts || 0) + 1;
-  const attemptedAt = new Date().toISOString();
-
-  if (!student?.email) {
-    await supabase.from('fee_billing_ledger')
-      .update({ email_error: 'No registered email address' })
-      .eq('id', ledger.id);
-    return { studentId: ledger.student_id, status: 'billed_no_email' };
-  }
-
-  try {
-    // STEP 2: Generate idempotency key from ledger ID + billing month
-    const idempotencyKey = `ledger_${ledger.id}_${ledger.billing_month}`;
-
-    const result = await sendEmailViaResend({
-      from,
-      to: student.email,
-      subject: `Monthly Fee Statement — ${student.name} (${monthLabel(ledger.billing_month)})`,
-      html: feeEmail(student, ledger),
-      headers: {
-        'X-Entity-Ref-ID': idempotencyKey // Resend custom header for tracking
+  const byStudentId = new Map((students || []).map(s => [s.student_id, s]));
+  const items = [];
+  for (const row of rows) {
+    const student = byStudentId.get(row.student_id);
+    if (!student || !hasEmail(student)) continue;
+    items.push({
+      student: { ...student, email: student.email.trim() },
+      ledger: {
+        ledger_id: row.id,
+        billing_month: row.billing_month,
+        amount: row.amount,
+        previous_due: row.previous_due,
+        updated_due: row.updated_due,
+        idempotency_key: row.idempotency_key
       }
     });
-
-    if (!result.success) {
-      const finalError = extractResendErrorMessage(result.error).slice(0, 500);
-      await supabase.from('fee_billing_ledger')
-        .update({ email_error: finalError })
-        .eq('id', ledger.id);
-      return { studentId: ledger.student_id, status: 'email_failed', error: finalError };
-    }
-
-    // STEP 3: Mark as sent with Resend message ID for audit trail
-    await supabase.from('fee_billing_ledger')
-      .update({
-        email_sent_at: attemptedAt,
-        email_error: null,
-        resend_message_id: result.data?.id || null
-      })
-      .eq('id', ledger.id);
-
-    return { studentId: ledger.student_id, status: 'emailed', emailId: result.data?.id || null };
-  } catch (error) {
-    const finalError = extractResendErrorMessage(error).slice(0, 500);
-    await supabase.from('fee_billing_ledger')
-      .update({ email_error: finalError })
-      .eq('id', ledger.id);
-    return { studentId: ledger.student_id, status: 'email_failed', error: finalError };
   }
-}
+  if (!items.length) return { results: [], deferred: [], quotaError: null };
 
-async function retryUnsentEmails(supabase, from) {
-  const MAX_RETRY_ATTEMPTS = 3;
-  const BASE_DELAY_MS = 2000; // Start with 2 seconds
-
-  const { data: pending, error } = await supabase
-    .from('fee_billing_ledger')
-    .select('id,student_id,billing_month,amount,previous_due,updated_due,email_attempts')
-    .is('email_sent_at', null)
-    .lt('email_attempts', MAX_RETRY_ATTEMPTS) // Only retry if under max attempts
-    .order('created_at', { ascending: true })
-    .limit(100);
-  if (error) throw error;
-  if (!pending?.length) return [];
-
-  const studentIds = [...new Set(pending.map(row => row.student_id))];
-  const { data: students, error: studentsError } = await supabase.from('students').select('student_id,name,roll_no,class_name,email').in('student_id', studentIds);
-  if (studentsError) throw studentsError;
-  const byStudentId = new Map((students || []).map(student => [student.student_id, student]));
-  const results = [];
-
-  for (const ledger of pending) {
-    // Re-verify that email hasn't been sent in parallel by another process
-    const { data: currentRecord } = await supabase
-      .from('fee_billing_ledger')
-      .select('email_sent_at,email_attempts')
-      .eq('id', ledger.id)
-      .maybeSingle();
-
-    if (currentRecord?.email_sent_at) {
-      console.log(`[Retry] Skipped ledger ${ledger.id} (already sent by another process)`);
-      continue;
-    }
-
-    const attemptNumber = Number(currentRecord?.email_attempts ?? ledger.email_attempts ?? 0);
-    if (attemptNumber >= MAX_RETRY_ATTEMPTS) {
-      continue;
-    }
-
-    // Exponential backoff: 2s, 4s, 8s, 16s, 32s...
-    const delayMs = BASE_DELAY_MS * Math.pow(2, attemptNumber);
-    const jitter = Math.random() * 1000; // Add 0-1s random jitter
-    const totalDelay = Math.min(delayMs + jitter, 60000); // Cap at 60 seconds
-
-    console.log(`[Retry ${attemptNumber + 1}/${MAX_RETRY_ATTEMPTS}] Waiting ${Math.round(totalDelay)}ms before retry for student ${ledger.student_id}...`);
-    await new Promise(resolve => setTimeout(resolve, totalDelay));
-
-    results.push(await sendLedgerEmail(supabase, from, ledger, byStudentId.get(ledger.student_id)));
-  }
-  return results;
+  return dispatchWithQuota({
+    items,
+    category: EMAIL_CATEGORIES.BILLING,
+    getEmail: item => item.student.email,
+    reference: 'BILL-RETRY',
+    send: (item) => sendLedgerStatement(supabase, from, item)
+  });
 }
 
 export default async function handler(req, res) {
-  const authHeader = req.headers.authorization || req.headers.Authorization || '';
-  const expectedBearer = `Bearer ${process.env.CRON_SECRET}`;
-  if (!process.env.CRON_SECRET || (authHeader !== expectedBearer && authHeader !== process.env.CRON_SECRET)) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  // Accepts the cron bearer secret (constant-time compared) or a signed admin
+  // session, so the same engine backs both the schedule and a manual re-run.
+  const session = requireCronOrAdmin(req, res);
+  if (!session) return;
 
   const supabase = getSupabase();
-  const resendKey = process.env.RESEND_API_KEY;
+  if (!supabase) return res.status(503).json({ error: 'Billing service is not configured' });
+
   const rawFrom = process.env.RESEND_FROM_EMAIL || DEFAULT_FROM;
   const from = isVerifiedSenderDomain(rawFrom) ? rawFrom : DEFAULT_FROM;
-  if (!supabase) return res.status(503).json({ error: 'Billing service is not configured' });
-  const emailConfigured = Boolean(isValidResendApiKey(resendKey) && isVerifiedSenderDomain(from));
+  const emailConfigured = Boolean(isValidResendApiKey(process.env.RESEND_API_KEY) && isVerifiedSenderDomain(from));
 
-  const { day, monthKey } = indiaDateParts();
-  const target = BATCH_SCHEDULE[day];
+  const day = istDayOfMonth();
+  const monthKey = istMonthKey();
+
+  // A caller may replay a specific calendar day for testing. Safe to expose:
+  // this endpoint already requires the cron secret or an admin session, and the
+  // ledger's idempotency key means replaying a day cannot bill anyone twice.
+  const requestedDay = Number((req.body || {}).forceDay);
+  const effectiveDay = Number.isInteger(requestedDay) && requestedDay >= 1 && requestedDay <= 31
+    ? requestedDay
+    : day;
+  if (effectiveDay !== day) {
+    console.log(`[cron] forceDay override: running day ${effectiveDay} instead of ${day}`);
+  }
+
+  const schedule = scheduleForDay(effectiveDay);
+
   const results = [];
-  const currentMonthName = monthLabel(monthKey);
+  const deferred = [];
+  let quotaError = null;
 
   try {
-    if (target) {
-      let query = supabase
+    if (schedule) {
+      const { data: allStudents, error } = await supabase
         .from('students')
         .select('student_id,name,roll_no,class_name,monthly_fee,status,pending_fee,email');
-      if (target.key && target.key !== 'all') {
-        if (target.key === 'junior') {
-          query = query.or('class_name.ilike.%junior%,class_name.ilike.%junio%,class_name.ilike.%6%,class_name.ilike.%7%');
-        } else {
-          query = query.ilike('class_name', `%${target.key}%`);
-        }
-      }
-      const { data: students, error } = await query;
       if (error) throw error;
-      const activeStudents = (students || []).filter(s => !s.status || s.status === 'Active' || s.status === 'active');
 
-      if (target.type === 'billing') {
-        // --- DAYS 1 to 4: MONTHLY FEE ADDITION & STATEMENT GENERATION ---
-        for (const student of activeStudents) {
-          const amount = Number(student.monthly_fee) > 0 ? Number(student.monthly_fee) : getStudentDefaultMonthlyFee(student.class_name);
-          let handled = false;
+      // Scope by resolved batch, not by an ilike on class_name. The old
+      // `ilike('%10%')` matched 'Class 10th' but equally 'Class 1st to 5th (10
+      // students)' and any free text containing 10, and its junior branch
+      // matched every class name containing a 6 or a 7.
+      const inScope = (allStudents || [])
+        .filter(isActive)
+        .filter(s => isStudentInScope(s.class_name, schedule.batchIds));
 
-          try {
-            const { data: response, error: billingError } = await supabase.rpc('apply_monthly_fee', {
-              p_student_id: student.student_id,
-              p_billing_month: monthKey,
-              p_amount: amount,
-              p_batch_label: target.label
-            });
-            if (!billingError && response !== null && response !== undefined) {
-              handled = true;
-              let isApplied = true;
-              let resObj = response;
+      if (schedule.type === 'billing') {
+        const pendingStatements = [];
 
-              if (typeof resObj === 'string') {
-                try {
-                  resObj = JSON.parse(resObj);
-                } catch {
-                  resObj = { applied: true };
-                }
-              }
-
-              if (Array.isArray(resObj)) {
-                resObj = resObj[0] || {};
-              }
-
-              if (resObj && typeof resObj === 'object') {
-                if ('applied' in resObj) {
-                  isApplied = Boolean(resObj.applied);
-                } else if ('is_applied' in resObj) {
-                  isApplied = Boolean(resObj.is_applied);
-                } else if ('success' in resObj) {
-                  isApplied = Boolean(resObj.success);
-                }
-              } else if (typeof resObj === 'boolean') {
-                isApplied = resObj;
-              }
-
-              results.push({ studentId: student.student_id, status: isApplied ? 'billed' : 'already_billed' });
-            }
-          } catch (rpcErr) {
-            // Fall back to direct ledger upsert
+        for (const student of inScope) {
+          // An explicit per-student monthly_fee wins (scholarships, siblings
+          // concessions); otherwise the canonical batch rate.
+          const explicit = Number(student.monthly_fee);
+          const amount = explicit > 0 ? explicit : monthlyFeeFor(student.class_name, null);
+          if (!(amount > 0)) {
+            results.push({ studentId: student.student_id, status: 'billing_skipped', error: `Cannot resolve a fee for class "${student.class_name || ''}"` });
+            continue;
           }
 
-          if (!handled) {
-            try {
-              // Use UPSERT with UNIQUE constraint - database will prevent duplicates
-              const { data: freshStudent } = await supabase
-                .from('students')
-                .select('id,student_id,name,roll_no,class_name,pending_fee,total_fee')
-                .eq('student_id', student.student_id)
-                .single();
+          const { data: response, error: billingError } = await supabase.rpc('apply_monthly_fee', {
+            p_student_id: student.student_id,
+            p_billing_month: monthKey,
+            p_amount: amount,
+            p_batch_label: schedule.label
+          });
 
-              const studentUuid = freshStudent?.id || student.id;
-              const previousDue = Number(freshStudent?.pending_fee || 0);
-              const updatedDue = previousDue + amount;
-              const receiptNo = `REC-BILL-${student.student_id}-${monthKey}`;
-
-              // ATOMIC: Insert ledger entry with UNIQUE constraint enforcement
-              const { data: ledgerResult, error: ledgerError } = await supabase
-                .from('fee_billing_ledger')
-                .upsert({
-                  student_id: student.student_id,
-                  billing_month: monthKey,
-                  amount: amount,
-                  previous_due: previousDue,
-                  updated_due: updatedDue,
-                  batch_label: target.label,
-                  idempotency_key: `fee_${student.student_id}_${monthKey}`
-                }, {
-                  onConflict: 'student_id,billing_month',
-                  ignoreDuplicates: true
-                })
-                .select();
-
-              if (ledgerError) {
-                throw ledgerError;
-              }
-
-              // Check if this was a duplicate (no rows returned)
-              if (!ledgerResult || ledgerResult.length === 0) {
-                results.push({ studentId: student.student_id, status: 'already_billed' });
-                continue;
-              }
-
-              // Only update student fees if ledger entry was actually created
-              const { error: updateError } = await supabase.from('students').update({
-                pending_fee: updatedDue,
-                total_fee: Number(freshStudent?.total_fee || 0) + amount,
-                updated_at: new Date().toISOString()
-              }).eq('id', studentUuid);
-
-              if (updateError) {
-                throw updateError;
-              }
-
-              if (studentUuid) {
-                try {
-                  await supabase.from('fee_receipts').upsert({
-                    receipt_no: receiptNo,
-                    student_id: studentUuid,
-                    amount: amount,
-                    payment_mode: 'System Monthly Billing',
-                    payment_date: new Date().toISOString().split('T')[0],
-                    status: 'Billed',
-                    collected_by: 'System Monthly Engine',
-                    note: `Monthly tuition fee for ${currentMonthName}`
-                  }, { onConflict: 'receipt_no', ignoreDuplicates: true });
-                } catch (receiptErr) {
-                  console.warn('[cron] fee_receipts upsert note:', receiptErr.message);
-                }
-              }
-
-              results.push({ studentId: student.student_id, status: 'billed', receiptNo });
-            } catch (dbErr) {
-              results.push({ studentId: student.student_id, status: 'billing_failed', error: dbErr.message });
-            }
-          }
-        }
-      } else if (target.type === 'reminder') {
-        // --- DAYS 15 to 18: MID-MONTH PENDING DUE REMINDERS ---
-        const pendingStudents = activeStudents.filter(s => Number(s.pending_fee) > 0 && s.email && s.email.includes('@'));
-
-        console.log(`📧 Sending ${pendingStudents.length} reminder emails...`);
-        let successCount = 0;
-        let failureCount = 0;
-        const CIRCUIT_BREAKER_THRESHOLD = Number(process.env.CIRCUIT_BREAKER_THRESHOLD) || 5;
-        let consecutiveFailures = 0;
-
-        for (const student of pendingStudents) {
-          // Circuit breaker: Stop if too many consecutive failures
-          if (consecutiveFailures >= CIRCUIT_BREAKER_THRESHOLD) {
-            console.error(`🚨 Circuit breaker triggered after ${consecutiveFailures} failures. Stopping email batch.`);
+          // No non-atomic fallback. The previous version fell back to a
+          // read-then-write ledger upsert whenever the RPC errored, which is
+          // exactly the race apply_monthly_fee's FOR UPDATE lock exists to
+          // prevent — two retries could both read the same pending_fee and
+          // double-bill. A failure is now recorded and left for the next run.
+          if (billingError || !response || response.success === false) {
             results.push({
-              status: 'circuit_breaker_open',
-              message: `Stopped after ${consecutiveFailures} consecutive failures`,
-              remainingCount: pendingStudents.length - results.filter(r => r.status && r.status.includes('reminder')).length
+              studentId: student.student_id,
+              status: 'billing_failed',
+              error: billingError?.message || response?.error || 'apply_monthly_fee returned no result'
             });
-            break;
+            continue;
           }
 
-          try {
-            const result = await sendEmailViaResend({
-              from,
-              to: student.email,
-              subject: `⚠️ Fee Reminder (${currentMonthName}) — ${student.name} (Roll #${student.roll_no})`,
-              html: reminderEmail(student, currentMonthName)
-            });
+          results.push({ studentId: student.student_id, status: response.applied ? 'billed' : 'already_billed' });
 
-            if (result.success) {
-              results.push({ studentId: student.student_id, status: 'reminder_sent', emailId: result.data?.id });
-              successCount++;
-              consecutiveFailures = 0; // Reset on success
-            } else {
-              results.push({ studentId: student.student_id, status: 'reminder_failed', error: extractResendErrorMessage(result.error) });
-              failureCount++;
-              consecutiveFailures++;
+          // Queue the statement when the row has no email recorded yet. That
+          // covers both a fresh charge and an idempotent re-run whose earlier
+          // email never made it out.
+          if (response.email_sent_at) continue;
+          if (Number(response.email_attempts || 0) >= MAX_EMAIL_ATTEMPTS) continue;
+          if (!hasEmail(student)) {
+            results.push({ studentId: student.student_id, status: 'billed_no_email' });
+            continue;
+          }
+          pendingStatements.push({
+            student: { ...student, email: student.email.trim(), monthly_fee: amount },
+            ledger: {
+              ledger_id: response.ledger_id,
+              billing_month: response.billing_month || monthKey,
+              amount: response.amount ?? amount,
+              previous_due: response.previous_due,
+              updated_due: response.updated_due,
+              idempotency_key: response.idempotency_key
             }
-          } catch (remErr) {
-            // Catch ALL errors to prevent loop from crashing
-            console.error(`❌ Unexpected error sending reminder to ${student.student_id}:`, remErr);
-            results.push({ studentId: student.student_id, status: 'reminder_failed', error: extractResendErrorMessage(remErr) });
-            failureCount++;
-            consecutiveFailures++;
-          } finally {
-            // Always throttle, even on error (100ms base delay)
-            await new Promise(resolve => setTimeout(resolve, 100));
-          }
+          });
         }
 
-        console.log(`✅ Reminder emails complete: ${successCount} sent, ${failureCount} failed`);
+        if (emailConfigured) {
+          const outcome = await dispatchStatements(supabase, from, pendingStatements, monthKey);
+          results.push(...outcome.results);
+          deferred.push(...outcome.deferred);
+          quotaError = quotaError || outcome.quotaError;
+        } else if (pendingStatements.length) {
+          results.push({ status: 'email_skipped', message: 'Resend is not configured; statements were billed but not emailed', count: pendingStatements.length });
+        }
+      } else if (schedule.type === 'reminder') {
+        const owing = inScope
+          .filter(s => Number(s.pending_fee) > 0 && hasEmail(s))
+          .map(s => ({
+            ...s,
+            email: s.email.trim(),
+            // reminderEmail() falls back to 1000 for a missing rate, which is
+            // wrong for every batch except 9th/10th. Resolve it up front.
+            monthly_fee: Number(s.monthly_fee) > 0 ? Number(s.monthly_fee) : monthlyFeeFor(s.class_name, 0)
+          }));
+
+        if (!emailConfigured) {
+          results.push({ status: 'email_skipped', message: 'Resend is not configured; reminders were not sent', count: owing.length });
+        } else {
+          const outcome = await dispatchReminders(supabase, from, owing, monthKey, Boolean(schedule.final));
+          results.push(...outcome.results);
+          deferred.push(...outcome.deferred);
+          quotaError = quotaError || outcome.quotaError;
+        }
       }
     }
 
-    const emailResults = await retryUnsentEmails(supabase, from);
-    results.push(...emailResults);
+    // Runs on every day of the month, including the rest state — an unsent
+    // statement from a quota-exhausted day should not wait for the next cycle.
+    if (emailConfigured) {
+      const retry = await retryUnsentStatements(supabase, from);
+      results.push(...retry.results);
+      deferred.push(...retry.deferred);
+      quotaError = quotaError || retry.quotaError;
+    }
 
-    await supabase.from('audit_logs').insert({
-      log_id: `AUD-CRON-${monthKey}-${Date.now()}`,
-      timestamp: new Date().toISOString(),
-      actor: 'System Cron',
-      action_type: target?.type === 'reminder' ? 'MONTHLY_FEE_REMINDER' : 'MONTHLY_FEE_GENERATION',
-      student_name: target?.label || 'Cron Queue',
-      student_roll: 'N/A',
-      description: target ? `${target.type === 'reminder' ? 'Mid-Month Reminder' : 'Monthly Billing'} executed for ${target.label} (${monthKey})` : 'Cron execution',
-      details: { results }
+    const summary = results.reduce((acc, r) => {
+      const key = r.status || 'unknown';
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+
+    // Audit-log write is best-effort: it must never turn a successful billing
+    // run into a 500, because the caller would retry a run that already charged.
+    try {
+      await supabase.from('audit_logs').insert({
+        log_id: `AUD-CRON-${monthKey}-${effectiveDay}-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        actor: session.isCron ? 'System Cron' : (session.name || 'Admin'),
+        action_type: schedule?.type === 'reminder' ? 'MONTHLY_FEE_REMINDER' : 'MONTHLY_FEE_GENERATION',
+        student_name: schedule?.label || 'Cron Queue',
+        student_roll: 'N/A',
+        description: schedule
+          ? `Day ${effectiveDay} ${schedule.type === 'reminder' ? 'reminder sweep' : 'billing run'} for ${schedule.label} (${monthKey})`
+          : `Day ${effectiveDay} rest state — retry sweep only (${monthKey})`,
+        details: { summary, deferred, quotaError, results: results.slice(0, 200) }
+      });
+    } catch (auditError) {
+      console.error('[cron] audit log write failed:', auditError.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      day: effectiveDay,
+      month: monthKey,
+      restState: !schedule,
+      batch: schedule?.label || null,
+      type: schedule?.type || null,
+      summary,
+      // Non-empty `deferred` means the 100/day cap was reached: these addresses
+      // were billed but not emailed, and the retry sweep will pick them up.
+      partial: deferred.length > 0,
+      deferred,
+      quotaError,
+      results
     });
-
-    return res.status(200).json({ success: true, batch: target?.label || null, type: target?.type || null, month: monthKey, results });
   } catch (error) {
     console.error('Monthly billing error:', error.message);
     return res.status(500).json({ success: false, error: 'Monthly billing execution failed' });

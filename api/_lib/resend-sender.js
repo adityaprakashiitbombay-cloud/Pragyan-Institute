@@ -57,7 +57,22 @@ export function isValidResendApiKey(key) {
   return /^re_[a-zA-Z0-9_-]+$/.test(trimmed);
 }
 
-export async function sendEmailViaResend({ from, to, subject, html, text, apiKey }) {
+/**
+ * POST one message to Resend.
+ *
+ * `headers` is passed through to Resend's `headers` payload field. It exists so
+ * callers can set X-Entity-Ref-ID, which is Resend's own idempotency key: two
+ * sends carrying the same ref ID are deduplicated provider-side. That is the
+ * outer guard for the cron-runs-twice case — the ledger's idempotency_key stops
+ * the second billing row, and this stops the second email if the retry happens
+ * before the first response was recorded.
+ *
+ * On timeout the result carries `timedOut: true`. That distinction matters for
+ * quota accounting: Resend may well have accepted and delivered the message, so
+ * the reserved slot has to stay consumed ('unknown') rather than be released
+ * ('failed'). Releasing it would let the day's 101st mail through.
+ */
+export async function sendEmailViaResend({ from, to, subject, html, text, apiKey, headers }) {
   const key = (apiKey || process.env.RESEND_API_KEY || '').trim();
   if (!isValidResendApiKey(key)) {
     throw new Error('RESEND_API_KEY is not configured or is invalid (must start with "re_")');
@@ -68,12 +83,18 @@ export async function sendEmailViaResend({ from, to, subject, html, text, apiKey
   const senderFrom = isVerifiedSenderDomain(rawFrom) ? rawFrom : DEFAULT_FROM;
 
   const recipients = Array.isArray(to) ? to : [to];
+  const customHeaders = headers && typeof headers === 'object'
+    ? Object.fromEntries(Object.entries(headers)
+        .filter(([name, value]) => name && value !== undefined && value !== null)
+        .map(([name, value]) => [String(name), String(value)]))
+    : null;
   const payload = {
     from: senderFrom,
     to: recipients,
     subject,
     html,
-    ...(text ? { text } : {})
+    ...(text ? { text } : {}),
+    ...(customHeaders && Object.keys(customHeaders).length ? { headers: customHeaders } : {})
   };
 
   function doRequest(postData, authKey) {
@@ -111,7 +132,10 @@ export async function sendEmailViaResend({ from, to, subject, html, text, apiKey
       req.on('error', (err) => resolve({ success: false, error: err }));
       req.on('timeout', () => {
         req.destroy();
-        resolve({ success: false, error: { message: 'Resend request timed out after 15s' } });
+        // timedOut, not just an error: the request may have reached Resend and
+        // been accepted. Callers must treat this as "slot consumed, delivery
+        // unconfirmed", never as a failure that frees the slot.
+        resolve({ success: false, timedOut: true, error: { message: 'Resend request timed out after 15s' } });
       });
 
       req.write(dataStr);
