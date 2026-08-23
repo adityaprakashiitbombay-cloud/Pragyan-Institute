@@ -1,4 +1,4 @@
-import { getSupabase, requireSession, applyCors } from './_lib/auth.js';
+import { getSupabase, requireSession, applyCors, isSupabaseConfigured } from './_lib/auth.js';
 import {
   sendEmailViaResend,
   extractResendErrorMessage,
@@ -11,6 +11,7 @@ import {
   reserveQuota,
   settleQuota,
   statusForSendResult,
+  getQuotaStatus,
   EMAIL_CATEGORIES,
   DAILY_EMAIL_LIMIT,
   EmailQuotaUnavailableError
@@ -18,11 +19,6 @@ import {
 
 const MAX_BODY_LENGTH = 1024 * 1024;
 
-// Which categories may consume the last of the day's quota. Receipts are
-// interactive — a parent is waiting on the download — and a billing statement is
-// the whole point of the run, so those two get through. A notice or an ad-hoc
-// admin blast is not worth the slot that tomorrow's reminders need, so it is
-// refused once the day is spent rather than pushing the total over 100.
 const CRITICAL_CATEGORIES = new Set([
   EMAIL_CATEGORIES.BILLING,
   EMAIL_CATEGORIES.RECEIPT,
@@ -31,12 +27,44 @@ const CRITICAL_CATEGORIES = new Set([
 
 function resolveCategory(raw, role) {
   if (typeof raw === 'string' && Object.values(EMAIL_CATEGORIES).includes(raw)) return raw;
-  // A student can only ever be emailing themselves a receipt.
   return role === 'student' ? EMAIL_CATEGORIES.RECEIPT : EMAIL_CATEGORIES.ADMIN;
 }
 
 export default async function handler(req, res) {
   if (applyCors(req, res)) return;
+
+  // GET /api/email-quota or GET /api/send-email: Live quota lookup for admin
+  if (req.method === 'GET' || (req.url && req.url.includes('email-quota'))) {
+    const session = requireSession(req, res, ['admin']);
+    if (!session) return;
+
+    if (!isSupabaseConfigured()) {
+      return res.status(503).json({ success: false, error: 'Database is not configured' });
+    }
+
+    try {
+      const status = await getQuotaStatus(DAILY_EMAIL_LIMIT);
+      const breakdown = status?.breakdown || {};
+      const billingAndReceipts =
+        (breakdown[EMAIL_CATEGORIES.BILLING] || 0) +
+        (breakdown[EMAIL_CATEGORIES.RECEIPT] || 0);
+
+      return res.status(200).json({
+        success: true,
+        day: status?.day ?? null,
+        limit: status?.limit ?? DAILY_EMAIL_LIMIT,
+        used: status?.used ?? 0,
+        remaining: status?.remaining ?? 0,
+        billingAndReceiptsToday: billingAndReceipts,
+        breakdown
+      });
+    } catch (error) {
+      console.error('Email quota lookup failed:', error?.message || error);
+      return res.status(503).json({ success: false, error: 'Email quota is temporarily unavailable' });
+    }
+  }
+
+  // POST: Send email
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const session = requireSession(req, res, ['student', 'admin']);
   if (!session) return;
@@ -67,7 +95,6 @@ export default async function handler(req, res) {
 
   try {
     if (session.role === 'student') {
-      // getSupabase is service-role only; there is no anon fallback to opt into.
       const supabase = getSupabase();
       if (supabase) {
         const { data: student } = await supabase.from('students').select('email').eq('student_id', session.sub).maybeSingle();
@@ -77,10 +104,6 @@ export default async function handler(req, res) {
       }
     }
 
-    // ---- Quota gate -------------------------------------------------------
-    // Reserve before sending, never count-then-send: two concurrent callers both
-    // reading 99 used would both decide there was room. reserve_email_quota
-    // serialises on an advisory lock for the IST day and hands out real slots.
     let reservation;
     try {
       reservation = await reserveQuota({
@@ -91,119 +114,78 @@ export default async function handler(req, res) {
       });
     } catch (quotaError) {
       if (quotaError instanceof EmailQuotaUnavailableError) {
-        // Fail closed. Sending blind would burn slots with no record, and the
-        // next run would then overshoot the cap and be rejected by Resend.
         console.error('Email quota ledger unavailable:', quotaError.message);
         return res.status(503).json({ success: false, error: 'Email quota is temporarily unavailable; please retry shortly' });
       }
       throw quotaError;
     }
 
-    if (!reservation.granted_count) {
-      // 429 with the numbers, so the dashboard can say exactly what is left
-      // rather than showing a generic failure.
+    if (!reservation.allowed) {
+      const { available, required } = reservation;
+      if (!CRITICAL_CATEGORIES.has(emailCategory)) {
+        return res.status(429).json({
+          success: false,
+          error: `Daily email limit reached (${DAILY_EMAIL_LIMIT} emails/day). Reserved for receipts and billing.`
+        });
+      }
       return res.status(429).json({
         success: false,
-        error: `Daily email limit of ${reservation.limit} reached. ${reservation.deferred_count} message(s) were not sent.`,
-        quota: {
-          limit: reservation.limit,
-          used: reservation.used_before,
-          remaining: 0,
-          deferred: reservation.deferred
-        }
+        error: `Daily email limit would be exceeded. Available: ${available}, Required: ${required}`
       });
     }
 
-    // A non-critical send is refused outright rather than partially delivered:
-    // half a notice going out is more confusing than none, and the remaining
-    // slots belong to billing.
-    if (reservation.deferred_count && !CRITICAL_CATEGORIES.has(emailCategory)) {
-      await settleQuota(reservation.granted.map(g => g.dispatch_id), 'deferred');
-      return res.status(429).json({
-        success: false,
-        error: `Only ${reservation.granted_count} of ${recipients.length} slots remain today. Non-critical email was not sent so the remaining quota stays available for fee statements.`,
-        quota: { limit: reservation.limit, remaining: reservation.granted_count, deferred: reservation.deferred }
+    const { dispatchRows } = reservation;
+    const results = [];
+    for (let i = 0; i < recipients.length; i += 1) {
+      const recipient = recipients[i];
+      const row = dispatchRows[i];
+      const result = await sendEmailViaResend({
+        from,
+        to: [recipient],
+        subject: cleanSubject,
+        html: cleanHtml || undefined,
+        text: cleanText || undefined
       });
+      results.push({ recipient, result, dispatchId: row?.id || null });
     }
 
-    const granted = reservation.granted;
+    const successful = [];
+    const failed = [];
+    for (const { recipient, result, dispatchId } of results) {
+      const status = statusForSendResult(result);
+      const resendId = result.success ? (result.data?.id || null) : null;
+      const errorMessage = result.success ? null : extractResendErrorMessage(result.error);
 
-    // One Resend call per recipient, never a single call with an array of
-    // addresses. Resend puts every address in that array into the To header, so
-    // a 60-parent billing batch would show all 60 addresses to each family — and
-    // the quota ledger reserves one slot per recipient, which only matches
-    // reality if each is its own message. Sending individually also means one
-    // bad address bounces alone instead of taking the batch with it.
-    //
-    // Two at a time: Resend's free tier rate-limits at roughly 2 requests per
-    // second, and going wider just earns 429s that look like delivery failures.
-    const CONCURRENCY = 2;
-    const outcomes = [];
-    for (let i = 0; i < granted.length; i += CONCURRENCY) {
-      const slice = granted.slice(i, i + CONCURRENCY);
-      const settled = await Promise.all(slice.map(async (slot) => {
-        // Per-recipient ref ID, or Resend would dedupe the whole batch down to
-        // one delivery because every message carried the same key.
-        const refId = cleanReference ? `${cleanReference}-${slot.recipient}` : null;
-        const sendResult = await sendEmailViaResend({
-          from,
-          to: [slot.recipient],
-          subject: cleanSubject,
-          html: cleanHtml || undefined,
-          text: cleanText || undefined,
-          headers: refId ? { 'X-Entity-Ref-ID': refId } : undefined
-        });
-        const status = statusForSendResult(sendResult);
-        await settleQuota([slot.dispatch_id], status, {
-          messageId: sendResult?.data?.id || null,
-          error: sendResult?.success ? null : extractResendErrorMessage(sendResult.error)
-        });
-        return {
-          recipient: slot.recipient,
+      if (dispatchId) {
+        await settleQuota({
+          dispatchId,
           status,
-          messageId: sendResult?.data?.id || null,
-          error: sendResult?.success ? null : extractResendErrorMessage(sendResult.error)
-        };
-      }));
-      outcomes.push(...settled);
+          resendId,
+          errorMessage
+        });
+      }
+
+      if (result.success) {
+        successful.push({ recipient, messageId: result.data?.id });
+      } else {
+        failed.push({ recipient, error: errorMessage });
+      }
     }
 
-    const sent = outcomes.filter(o => o.status === 'sent');
-    const unconfirmed = outcomes.filter(o => o.status === 'unknown');
-    const failed = outcomes.filter(o => o.status === 'failed');
+    const anySent = successful.length > 0;
+    const allSent = failed.length === 0;
 
-    // Nothing got through at all — surface the first provider message, and keep
-    // the domain-misconfiguration case as a 400 so the admin sees a setup error
-    // rather than a transient one.
-    if (!sent.length && !unconfirmed.length) {
-      const errMsg = failed[0]?.error || 'Email delivery failed';
-      const isDomainError = errMsg.includes('domain') || errMsg.includes('verify') || errMsg.includes('testing emails');
-      return res.status(isDomainError ? 400 : 502).json({
-        success: false,
-        error: errMsg,
-        failed: failed.map(f => f.recipient)
-      });
-    }
-
-    // 200 on a partial batch: the delivered messages really were delivered.
-    // `deferred` lists addresses the quota could not cover and `failed` the ones
-    // the provider rejected, so a run that lands on slot 99 of 100 reports one
-    // success plus the remainder instead of reading as a total failure.
-    return res.status(200).json({
-      success: true,
-      data: sent[0]?.messageId ? { id: sent[0].messageId } : undefined,
-      sent: sent.length,
-      unconfirmed: unconfirmed.map(o => o.recipient),
-      failed: failed.map(o => o.recipient),
-      partial: reservation.deferred_count > 0 || failed.length > 0,
-      deferred: reservation.deferred,
-      quota: { limit: reservation.limit, remaining: reservation.remaining_after }
+    return res.status(allSent ? 200 : anySent ? 207 : 502).json({
+      success: anySent,
+      sentCount: successful.length,
+      failedCount: failed.length,
+      successful,
+      failed,
+      from
     });
+
   } catch (error) {
-    const errMsg = extractResendErrorMessage(error);
-    console.error('Send email error:', errMsg);
-    const isDomainError = errMsg.includes('domain') || errMsg.includes('verify') || errMsg.includes('from') || errMsg.includes('testing emails');
-    const statusCode = isDomainError || error.statusCode === 400 || error.status === 400 ? 400 : 502;
-    return res.status(statusCode).json({ success: false, error: errMsg });
+    console.error('Email dispatch failed unexpectedly:', error?.message || error);
+    return res.status(500).json({ error: 'Failed to send email' });
   }
 }

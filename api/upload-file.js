@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { getSupabase, requireSession, applyCors } from './_lib/auth.js';
+import { resolveBatch } from './_lib/academic-config.js';
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const ALLOWED_FOLDERS = new Set(['admin_avatars', 'notice_attachments', 'profile_pictures', 'payment_proofs']);
@@ -7,6 +8,69 @@ const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'applica
 
 export default async function handler(req, res) {
   if (applyCors(req, res)) return;
+
+  // Student ID generator route
+  if ((req.url && req.url.includes('student-id')) || req.body?.className || req.query?.className) {
+    if (req.method !== 'GET' && req.method !== 'POST') {
+      return res.status(405).json({ success: false, error: 'Method not allowed' });
+    }
+    const session = requireSession(req, res, ['admin']);
+    if (!session) return;
+
+    const supabase = getSupabase();
+    if (!supabase) {
+      return res.status(503).json({ success: false, error: 'Database configuration missing' });
+    }
+
+    const className = String((req.method === 'POST' ? req.body?.className : req.query?.className) || '').trim();
+    if (!className) {
+      return res.status(400).json({ success: false, error: 'A className is required to derive the YYCCSS class code' });
+    }
+
+    const batch = resolveBatch(className);
+    if (!batch) {
+      return res.status(400).json({
+        success: false,
+        error: `"${className}" does not resolve to any of the 12 canonical batches, so no barcode id can be derived.`
+      });
+    }
+
+    try {
+      const { data, error } = await supabase.rpc('generate_next_student_id', { p_class_name: className });
+      if (error) {
+        const missing = error.code === 'PGRST202' || /could not find the function/i.test(error.message || '');
+        const isRefusal = error.code === '22023' || /serial range exhausted|cannot derive/i.test(error.message || '');
+        console.error('[student-id] generate_next_student_id failed:', error.code || '', error.message);
+        return res.status(missing ? 503 : (isRefusal ? 409 : 500)).json({
+          success: false,
+          error: missing
+            ? 'The id allocator is not deployed. Run supabase_production_hardening.sql against the database.'
+            : (isRefusal ? error.message : 'Could not allocate a student id')
+        });
+      }
+
+      const studentId = typeof data === 'string' ? data : String(data || '');
+      if (!/^\d{6}$/.test(studentId)) {
+        return res.status(500).json({ success: false, error: 'The allocator returned a malformed id' });
+      }
+
+      return res.status(200).json({
+        success: true,
+        studentId,
+        prefix: studentId.slice(0, 4),
+        year: studentId.slice(0, 2),
+        classCode: studentId.slice(2, 4),
+        serial: Number(studentId.slice(4)),
+        batchId: batch.batchId,
+        className: batch.className
+      });
+    } catch (err) {
+      console.error('[student-id] unexpected failure:', err?.message || err);
+      return res.status(500).json({ success: false, error: 'Could not allocate a student id' });
+    }
+  }
+
+  // File upload route
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const session = requireSession(req, res, ['student', 'admin']);
   if (!session) return;
@@ -24,9 +88,6 @@ export default async function handler(req, res) {
   const bytes = Buffer.from(raw, 'base64');
   if (!bytes.length || bytes.length > MAX_BYTES) return res.status(413).json({ error: 'Uploads must be smaller than 5 MB' });
 
-  // Magic-byte sniffing: the declared content-type is a client hint, and the
-  // bucket is publicly readable, so a polyglot mislabeled as image/png must not
-  // be storable. The sniffed type wins; mismatches are rejected outright.
   const sniffed = sniffType(bytes);
   if (!sniffed || sniffed !== contentType) {
     return res.status(400).json({ error: 'File contents do not match the declared type' });
@@ -50,7 +111,6 @@ export default async function handler(req, res) {
   }
 }
 
-/** Identify a file by its leading magic bytes. Returns null for unknown. */
 function sniffType(bytes) {
   const b = bytes;
   if (b.length >= 12 && b[0] === 0xFF && b[1] === 0xD8 && b[2] === 0xFF) return 'image/jpeg';

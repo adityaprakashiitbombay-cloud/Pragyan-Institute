@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { StreamChat } from 'stream-chat';
 import { getSupabase, requireSession, applyCors } from './_lib/auth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -16,6 +17,24 @@ function packageVersion() {
 
 export default async function handler(req, res) {
   if (applyCors(req, res)) return;
+
+  // Stream token generator route
+  if (req.url && req.url.includes('stream-token')) {
+    if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+    const session = requireSession(req, res, ['student', 'admin']);
+    if (!session) return;
+
+    const apiKey = process.env.STREAM_API_KEY;
+    const apiSecret = process.env.STREAM_API_SECRET;
+    if (!apiKey || !apiSecret) return res.status(503).json({ error: 'Chat is not configured' });
+
+    const prefix = session.role === 'admin' ? 'admin' : 'student';
+    const userId = `${prefix}_${String(session.sub).replace(/[^a-zA-Z0-9_-]/g, '')}`;
+    const token = StreamChat.getInstance(apiKey, apiSecret).createToken(userId);
+    return res.status(200).json({ apiKey, userId, token });
+  }
+
+  // Health check route
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
 
   let dbOnline = false;
@@ -37,8 +56,6 @@ export default async function handler(req, res) {
     dbDetail = 'connection_exception';
   }
 
-  // Driver-level error text (relation names, RLS hints, DNS failures) is an
-  // oracle for probing the backend — full detail only for admin sessions.
   let showDetail = false;
   try {
     showDetail = Boolean(requireSession(req, res, ['admin']));
@@ -46,8 +63,6 @@ export default async function handler(req, res) {
     showDetail = false;
   }
 
-  // An unconfigured database is NOT "online" — reporting it as healthy hid
-  // total outages from uptime monitors.
   const now = new Date();
   const uptimePayload = {
     status: dbOnline ? 'online' : 'degraded',

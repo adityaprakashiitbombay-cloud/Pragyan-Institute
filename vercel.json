@@ -3,6 +3,26 @@
   "outputDirectory": ".",
   "rewrites": [
     {
+      "source": "/api/admin-password",
+      "destination": "/api/password"
+    },
+    {
+      "source": "/api/student-password",
+      "destination": "/api/password"
+    },
+    {
+      "source": "/api/email-quota",
+      "destination": "/api/send-email"
+    },
+    {
+      "source": "/api/stream-token",
+      "destination": "/api/health"
+    },
+    {
+      "source": "/api/student-id",
+      "destination": "/api/upload-file"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },
