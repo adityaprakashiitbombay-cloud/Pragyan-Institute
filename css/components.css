@@ -66,8 +66,8 @@
 }
 
 .brand-tagline {
-  font-size: 0.75rem;
-  color: var(--secondary-sage);
+  font-size: 0.8rem;
+  color: var(--secondary-sage-text);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -307,7 +307,7 @@
 }
 
 .pill-sage {
-  color: var(--secondary-sage);
+  color: var(--secondary-sage-text);
   border-color: rgba(111, 127, 95, 0.3);
   background-color: var(--secondary-sage-light);
 }
@@ -580,12 +580,12 @@
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   flex-shrink: 0;
   box-shadow: 0 2px 5px rgba(0,0,0,0.12);
 }
 
-.badge-icon.sage-bg { background-color: var(--secondary-sage); }
+.badge-icon.sage-bg { background-color: var(--secondary-sage-text); }
 .badge-icon.terracotta-bg { background-color: var(--primary-terracotta); }
 
 .badge-text-group {
@@ -595,13 +595,13 @@
 
 .badge-text-title {
   font-weight: 700;
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   color: var(--text-mahogany);
   line-height: 1.15;
 }
 
 .badge-text-sub {
-  font-size: 0.6rem;
+  font-size: 0.8rem;
   color: var(--text-muted);
   font-weight: 500;
   margin-top: 0.05rem;
@@ -678,7 +678,7 @@
   inset-inline: 0;
   background: rgba(6, 78, 59, 0.92);
   color: #fff;
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 800;
   text-align: center;
   padding: 4px 0;
@@ -712,7 +712,7 @@
   gap: 0.35rem;
   background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
   color: #fff;
-  font-size: 0.76rem;
+  font-size: 0.8rem;
   font-weight: 800;
   padding: 0.28rem 0.7rem;
   border-radius: var(--radius-full);
@@ -728,9 +728,9 @@
 
 .degree-pill {
   background-color: var(--secondary-sage-light);
-  color: var(--secondary-sage);
+  color: var(--secondary-sage-text);
   border: 1px solid rgba(6, 78, 59, 0.18);
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 700;
   padding: 0.2rem 0.55rem;
   border-radius: 6px;
@@ -779,7 +779,7 @@
 
 .teacher-qualification {
   font-size: 0.875rem;
-  color: var(--secondary-sage);
+  color: var(--secondary-sage-text);
   font-weight: 700;
   margin-bottom: 0.85rem;
 }
@@ -903,8 +903,8 @@
   padding: 0.25rem 0.6rem;
   border-radius: var(--radius-sm);
   background-color: var(--secondary-sage-light);
-  color: var(--secondary-sage);
-  font-size: 0.75rem;
+  color: var(--secondary-sage-text);
+  font-size: 0.8rem;
   font-weight: 800;
   text-transform: uppercase;
 }
@@ -948,7 +948,7 @@
   color: #fff;
   padding: 0.35rem 1.25rem;
   border-radius: var(--radius-full);
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -971,7 +971,7 @@
 
 .batch-timing {
   font-size: 0.875rem;
-  color: var(--secondary-sage);
+  color: var(--secondary-sage-text);
   font-weight: 700;
   margin-top: 0.25rem;
 }
@@ -1017,11 +1017,11 @@
   height: 20px;
   border-radius: 50%;
   background-color: var(--secondary-sage-light);
-  color: var(--secondary-sage);
+  color: var(--secondary-sage-text);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   flex-shrink: 0;
 }
 
@@ -1294,7 +1294,7 @@
   font-size: 0.8125rem;
   font-weight: 700;
   text-transform: uppercase;
-  color: var(--secondary-sage);
+  color: var(--secondary-sage-text);
   letter-spacing: 0.05em;
 }
 
@@ -1577,7 +1577,7 @@
     font-size: 1.45rem;
   }
   .stat-label {
-    font-size: 0.72rem;
+    font-size: 0.8rem;
   }
   .gallery-track {
     grid-template-columns: 1fr;
@@ -1621,7 +1621,7 @@
     font-size: 1.35rem;
   }
   .stat-label {
-    font-size: 0.72rem;
+    font-size: 0.8rem;
   }
   /* M4: Show animated brand badge and bigger static corner logos cleanly with safe clearance from border on mobile */
   .hero-corner-logo {
@@ -1652,10 +1652,10 @@
     height: 22px !important;
   }
   .floating-badge.badge-top-right .badge-text-title {
-    font-size: 0.7rem !important;
+    font-size: 0.8rem !important;
   }
   .floating-badge.badge-top-right .badge-text-sub {
-    font-size: 0.58rem !important;
+    font-size: 0.8rem !important;
   }
   .floating-actions-widget {
     bottom: 0.75rem;

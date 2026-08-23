@@ -536,7 +536,7 @@ html.scroll-locked body {
   border-radius: 50%;
   background-color: rgba(240, 230, 216, 0.85);
   color: var(--text-mahogany, #4A2C2A);
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   display: flex;
   align-items: center;
   justify-content: center;

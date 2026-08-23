@@ -3177,7 +3177,7 @@ function renderStudentDashboard() {
 
     const notifBtn = document.querySelector('.student-tab-btn[data-tab="notifications"]');
     if (notifBtn) {
-      notifBtn.innerHTML = `<i aria-hidden="true" class="fa-solid fa-bell"></i> Notification Tab ${count > 0 ? `<span class="badge" style="background:#059669; color:#fff; padding:1px 7px; border-radius:99px; font-size:0.75rem; margin-left:6px; font-weight:700;">${count}</span>` : ''}`;
+      notifBtn.innerHTML = `<i aria-hidden="true" class="fa-solid fa-bell"></i> Notification Tab ${count > 0 ? `<span class="badge" style="background:#059669; color:#fff; padding:1px 7px; border-radius:99px; font-size: 0.8rem; margin-left:6px; font-weight:700;">${count}</span>` : ''}`;
     }
 
     // Render Student Tabs
@@ -3460,7 +3460,7 @@ function renderStudentDashboard() {
               <div class="detail-label">Official Profile Photo</div>
               <div class="detail-val" style="font-size: 0.82rem; color: ${(s.photoUrl || s.photo_url || s.photo) ? 'var(--primary-emerald)' : 'var(--text-muted)'}; font-weight: 600;">
                 ${(s.photoUrl || s.photo_url || s.photo) ? '✅ Verified Photo Linked' : '📷 Default Avatar'}
-                ${pendingReq && (pendingReq.newData?.photoUrl || pendingReq.newData?.photo) ? `<span style="display: block; font-size: 0.75rem; color: #D97706; font-weight: 700; margin-top: 2px;"><i aria-hidden="true" class="fa-solid fa-clock-rotate-left"></i> New Photo Pending Review</span>` : ''}
+                ${pendingReq && (pendingReq.newData?.photoUrl || pendingReq.newData?.photo) ? `<span style="display: block; font-size: 0.8rem; color: #D97706; font-weight: 700; margin-top: 2px;"><i aria-hidden="true" class="fa-solid fa-clock-rotate-left"></i> New Photo Pending Review</span>` : ''}
               </div>
             </div>
           </div>
@@ -3519,15 +3519,15 @@ function renderStudentDashboard() {
           </div>
           <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
             ${hasCustomPassword ? `
-              <span class="pill-item" id="studentPasswordStatusPill" style="background: #ECFDF5; color: #065F46; border: 1px solid #10B981; font-size: 0.78rem; font-weight: 700;">
+              <span class="pill-item" id="studentPasswordStatusPill" style="background: #ECFDF5; color: #065F46; border: 1px solid #10B981; font-size: 0.8rem; font-weight: 700;">
                 <i aria-hidden="true" class="fa-solid fa-circle-check"></i> Custom Password Active
               </span>
             ` : `
-              <span class="pill-item" id="studentPasswordStatusPill" style="background: #EFF6FF; color: #1E40AF; border: 1px solid #93C5FD; font-size: 0.78rem; font-weight: 700;">
+              <span class="pill-item" id="studentPasswordStatusPill" style="background: #EFF6FF; color: #1E40AF; border: 1px solid #93C5FD; font-size: 0.8rem; font-weight: 700;">
                 <i aria-hidden="true" class="fa-solid fa-cake-candles"></i> Using Default DOB Password
               </span>
             `}
-            <span class="pill-item pill-emerald" style="font-size: 0.75rem;"><i aria-hidden="true" class="fa-solid fa-bolt"></i> Instant Update</span>
+            <span class="pill-item pill-emerald" style="font-size: 0.8rem;"><i aria-hidden="true" class="fa-solid fa-bolt"></i> Instant Update</span>
           </div>
         </div>
         <div class="student-security-body" style="padding: 0.5rem 0;">
@@ -4110,15 +4110,15 @@ function renderStudentDashboard() {
 
         <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-top:1rem;">
           <div style="background:var(--bg-surface-cream); border-radius:10px; padding:0.75rem 1.1rem; flex:1; min-width:140px;">
-            <div style="font-size:0.78rem; color:var(--text-muted); font-weight:600;">MONTHLY FEE</div>
+            <div style="font-size: 0.8rem; color:var(--text-muted); font-weight:600;">MONTHLY FEE</div>
             <div style="font-size:1.3rem; font-weight:800; color:var(--primary-emerald);">₹${batchFee.toLocaleString()}</div>
           </div>
           <div style="background:var(--bg-surface-cream); border-radius:10px; padding:0.75rem 1.1rem; flex:1; min-width:140px;">
-            <div style="font-size:0.78rem; color:var(--text-muted); font-weight:600;">BATCH CODE</div>
+            <div style="font-size: 0.8rem; color:var(--text-muted); font-weight:600;">BATCH CODE</div>
             <div style="font-size:1.1rem; font-weight:800; color:var(--text-mahogany);">${(myBatch.id || myBatch.batch_id || 'BAT-01')}</div>
           </div>
           <div style="background:var(--bg-surface-cream); border-radius:10px; padding:0.75rem 1.1rem; flex:1; min-width:140px;">
-            <div style="font-size:0.78rem; color:var(--text-muted); font-weight:600;">STUDENTS IN BATCH</div>
+            <div style="font-size: 0.8rem; color:var(--text-muted); font-weight:600;">STUDENTS IN BATCH</div>
             <div style="font-size:1.3rem; font-weight:800; color:var(--text-mahogany);">${enrolledInBatchCount || '—'}</div>
           </div>
         </div>
@@ -4229,14 +4229,14 @@ function renderStudentDashboard() {
                 <div class="notice-item-card ${notice.unread ? 'unread' : ''}" style="border: 1px solid var(--border-sand); border-radius: 10px; padding: 1.15rem; background: #FAF9F6; transition: transform 0.15s ease;">
                   <div class="notice-top-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
                     <div style="display: flex; gap: 0.5rem; align-items: center;">
-                      <span class="notice-cat-badge cat-${notice.category}" style="padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 700; font-size: 0.75rem; text-transform: uppercase; ${notice.category === 'exam' ? 'background:#FEF3C7; color:#92400E;' : notice.category === 'fees' ? 'background:#D1FAE5; color:#065F46;' : 'background:#EEF2FF; color:#4338CA;'}">
+                      <span class="notice-cat-badge cat-${notice.category}" style="padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 700; font-size: 0.8rem; text-transform: uppercase; ${notice.category === 'exam' ? 'background:#FEF3C7; color:#92400E;' : notice.category === 'fees' ? 'background:#D1FAE5; color:#065F46;' : 'background:#EEF2FF; color:#4338CA;'}">
                         ${notice.category === 'exam' ? '🎯 Exam' : notice.category === 'fees' ? '💳 Fees' : '📢 General'}
                       </span>
-                      <span style="font-size: 0.76rem; color: var(--text-muted); background: rgba(0,0,0,0.04); padding: 0.15rem 0.5rem; border-radius: 4px;">
+                      <span style="font-size: 0.8rem; color: var(--text-muted); background: rgba(0,0,0,0.04); padding: 0.15rem 0.5rem; border-radius: 4px;">
                         Target: <strong>${notice.targetBatch || notice.target_batch || 'All Batches'}</strong>
                       </span>
                     </div>
-                    <span class="notice-date" style="font-size: 0.78rem; color: var(--text-muted);"><i aria-hidden="true" class="fa-regular fa-clock"></i> ${formatDate(notice.date)}</span>
+                    <span class="notice-date" style="font-size: 0.8rem; color: var(--text-muted);"><i aria-hidden="true" class="fa-regular fa-clock"></i> ${formatDate(notice.date)}</span>
                   </div>
                   <div class="notice-title" style="font-size: 1.05rem; font-weight: 700; color: var(--text-mahogany); margin-bottom: 0.4rem;">${sanitizeInput(notice.title)}</div>
                   <div class="notice-body" style="font-size: 0.9rem; color: #374151; line-height: 1.6;">${notice.message}</div>
@@ -4314,7 +4314,7 @@ function renderStudentDashboard() {
               Submitted ₹${(pendingPayReq.paymentDetails?.amount || 0).toLocaleString()} via ${pendingPayReq.paymentDetails?.mode || 'Online'} (UTR: <strong>${pendingPayReq.paymentDetails?.utr}</strong>). Admin verification in progress.
             </div>
           </div>
-          <span class="status-badge" style="background: #F59E0B; color: #fff; font-weight: 700; font-size: 0.78rem;">⏳ Under Review</span>
+          <span class="status-badge" style="background: #F59E0B; color: #fff; font-weight: 700; font-size: 0.8rem;">⏳ Under Review</span>
         </div>
       ` : ''}
 
@@ -4333,7 +4333,7 @@ function renderStudentDashboard() {
               </div>
             </div>
           </div>
-          <span style="background: #7C3AED; color: #fff; font-weight: 800; font-size: 0.75rem; padding: 0.35rem 0.8rem; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 2px 5px rgba(124, 58, 237, 0.25);">
+          <span style="background: #7C3AED; color: #fff; font-weight: 800; font-size: 0.8rem; padding: 0.35rem 0.8rem; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 2px 5px rgba(124, 58, 237, 0.25);">
             Verified Adjustment
           </span>
         </div>
@@ -4361,22 +4361,22 @@ function renderStudentDashboard() {
         <div class="fee-stat-box">
           <div class="fee-stat-label">1. Earlier Unpaid Dues (Till Last Month)</div>
           <div class="fee-stat-value" style="color: #475569;">₹${feeAcc.previousDue.toLocaleString()}</div>
-          <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem;">बकाया पिछले माह तक</div>
+          <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">बकाया पिछले माह तक</div>
         </div>
         <div class="fee-stat-box">
           <div class="fee-stat-label">2. This Month Tuition Fee</div>
           <div class="fee-stat-value" style="color: var(--primary-emerald);">₹${feeAcc.currentMonthFee.toLocaleString()}</div>
-          <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem;">इस माह का शुल्क (${feeAcc.billingMonth})</div>
+          <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">इस माह का शुल्क (${feeAcc.billingMonth})</div>
         </div>
         <div class="fee-stat-box">
           <div class="fee-stat-label">Total Amount Paid</div>
           <div class="fee-stat-value emerald">₹${s.paidFee.toLocaleString()}</div>
-          <div style="font-size: 0.78rem; color: #059669; margin-top: 0.2rem;">Status: Active Paid</div>
+          <div style="font-size: 0.8rem; color: #059669; margin-top: 0.2rem;">Status: Active Paid</div>
         </div>
         <div class="fee-stat-box" style="border: 2px solid ${s.pendingFee > 0 ? '#EF4444' : '#10B981'}; background: ${s.pendingFee > 0 ? '#FEF2F2' : '#ECFDF5'};">
           <div class="fee-stat-label" style="font-weight: 800; color: ${s.pendingFee > 0 ? '#991B1B' : '#065F46'};">TOTAL NET PAYABLE DUE</div>
           <div class="fee-stat-value pending" style="color: ${s.pendingFee > 0 ? '#DC2626' : '#059669'}; font-size: 1.5rem;">₹${s.pendingFee.toLocaleString()}</div>
-          <div style="font-size: 0.78rem; color: ${s.pendingFee > 0 ? '#B91C1C' : '#065F46'}; margin-top: 0.2rem; font-weight: 700;">${s.pendingFee > 0 ? 'कुल देय राशि' : 'All Clear ✅'}</div>
+          <div style="font-size: 0.8rem; color: ${s.pendingFee > 0 ? '#B91C1C' : '#065F46'}; margin-top: 0.2rem; font-weight: 700;">${s.pendingFee > 0 ? 'कुल देय राशि' : 'All Clear ✅'}</div>
         </div>
       </div>
 
@@ -4417,27 +4417,27 @@ function renderStudentDashboard() {
 
                 if (isDiscount) {
                   rowBg = 'background: #FAF5FF;';
-                  statusPillHtml = `<span class="status-badge" style="background: linear-gradient(135deg, #EDE9FE, #DDD6FE); color: #5B21B6; border: 1.5px solid #C4B5FD; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.3rem;"><i aria-hidden="true" class="fa-solid fa-tags"></i> 💜 CONCESSION / DISCOUNT</span>`;
-                  amtDisplayHtml = `<strong style="color: #7C3AED; font-weight: 800;">- ₹${Math.abs(item.amount).toLocaleString()} <span style="font-size: 0.72rem; color: #8B5CF6;">(Waived)</span></strong>`;
+                  statusPillHtml = `<span class="status-badge" style="background: linear-gradient(135deg, #EDE9FE, #DDD6FE); color: #5B21B6; border: 1.5px solid #C4B5FD; font-weight: 800; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.3rem;"><i aria-hidden="true" class="fa-solid fa-tags"></i> 💜 CONCESSION / DISCOUNT</span>`;
+                  amtDisplayHtml = `<strong style="color: #7C3AED; font-weight: 800;">- ₹${Math.abs(item.amount).toLocaleString()} <span style="font-size: 0.8rem; color: #8B5CF6;">(Waived)</span></strong>`;
                 } else if (isPenalty) {
                   rowBg = 'background: #FFFBEB;';
-                  statusPillHtml = `<span class="status-badge" style="background: #FEF3C7; color: #92400E; border: 1.5px solid #FCD34D; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.3rem;"><i aria-hidden="true" class="fa-solid fa-circle-plus"></i> 🧡 FEE ADD-ON</span>`;
-                  amtDisplayHtml = `<strong style="color: #D97706; font-weight: 800;">+ ₹${item.amount.toLocaleString()} <span style="font-size: 0.72rem; color: #B45309;">(Added)</span></strong>`;
+                  statusPillHtml = `<span class="status-badge" style="background: #FEF3C7; color: #92400E; border: 1.5px solid #FCD34D; font-weight: 800; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.3rem;"><i aria-hidden="true" class="fa-solid fa-circle-plus"></i> 🧡 FEE ADD-ON</span>`;
+                  amtDisplayHtml = `<strong style="color: #D97706; font-weight: 800;">+ ₹${item.amount.toLocaleString()} <span style="font-size: 0.8rem; color: #B45309;">(Added)</span></strong>`;
                 } else if (isRate) {
                   rowBg = 'background: #F0FDF4;';
-                  statusPillHtml = `<span class="status-badge" style="background: #DCFCE7; color: #166534; border: 1.5px solid #86EFAC; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.3rem;"><i aria-hidden="true" class="fa-solid fa-gem"></i> 💎 RATE ADJUSTED</span>`;
+                  statusPillHtml = `<span class="status-badge" style="background: #DCFCE7; color: #166534; border: 1.5px solid #86EFAC; font-weight: 800; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.3rem;"><i aria-hidden="true" class="fa-solid fa-gem"></i> 💎 RATE ADJUSTED</span>`;
                   amtDisplayHtml = `<strong style="color: #059669; font-weight: 800;">₹${item.amount.toLocaleString()}/mo</strong>`;
                 } else if (isAdjustment) {
                   rowBg = 'background: #F0F9FF;';
-                  statusPillHtml = `<span class="status-badge" style="background: #E0F2FE; color: #075985; border: 1.5px solid #7DD3FC; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.3rem;"><i aria-hidden="true" class="fa-solid fa-scale-balanced"></i> ⚖️ BALANCE ADJUSTED</span>`;
+                  statusPillHtml = `<span class="status-badge" style="background: #E0F2FE; color: #075985; border: 1.5px solid #7DD3FC; font-weight: 800; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.3rem;"><i aria-hidden="true" class="fa-solid fa-scale-balanced"></i> ⚖️ BALANCE ADJUSTED</span>`;
                   amtDisplayHtml = `<strong style="color: #0284C7; font-weight: 800;">${item.amount < 0 ? `- ₹${Math.abs(item.amount).toLocaleString()}` : `₹${item.amount.toLocaleString()}`}</strong>`;
                 } else if (isOldDue) {
                   rowBg = 'background: #FEF2F2;';
-                  statusPillHtml = `<span class="status-badge" style="background: #FEE2E2; color: #991B1B; border: 1.5px solid #FCA5A5; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.3rem;"><i aria-hidden="true" class="fa-solid fa-clock-rotate-left"></i> 🔴 OLD DUE</span>`;
+                  statusPillHtml = `<span class="status-badge" style="background: #FEE2E2; color: #991B1B; border: 1.5px solid #FCA5A5; font-weight: 800; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.3rem;"><i aria-hidden="true" class="fa-solid fa-clock-rotate-left"></i> 🔴 OLD DUE</span>`;
                   amtDisplayHtml = `<strong style="color: #DC2626; font-weight: 800;">₹${item.amount.toLocaleString()}</strong>`;
                 } else {
                   rowBg = '';
-                  statusPillHtml = `<span class="status-badge" style="background: #D1FAE5; color: #065F46; border: 1.5px solid #6EE7B7; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.3rem;"><i aria-hidden="true" class="fa-solid fa-circle-check"></i> 🟢 PAID</span>`;
+                  statusPillHtml = `<span class="status-badge" style="background: #D1FAE5; color: #065F46; border: 1.5px solid #6EE7B7; font-weight: 800; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.3rem;"><i aria-hidden="true" class="fa-solid fa-circle-check"></i> 🟢 PAID</span>`;
                   amtDisplayHtml = `<strong style="color: #059669; font-weight: 800;">₹${item.amount.toLocaleString()}</strong>`;
                 }
 
@@ -4449,11 +4449,11 @@ function renderStudentDashboard() {
                     <td><span style="font-size: 0.82rem; font-weight: 600; color: var(--text-mahogany);"><i aria-hidden="true" class="fa-solid fa-user-tie"></i> ${item.by || 'CHANDAN KUMAR (Director & Science Lead)'}</span></td>
                     <td>
                       <div><strong>${item.mode}</strong></div>
-                      ${item.note ? `<div style="font-size: 0.78rem; color: var(--text-muted);">${sanitizeInput(item.note)}</div>` : ''}
+                      ${item.note ? `<div style="font-size: 0.8rem; color: var(--text-muted);">${sanitizeInput(item.note)}</div>` : ''}
                     </td>
                     <td>${statusPillHtml}</td>
                     <td>
-                      <button class="btn btn-download-receipt" data-receipt="${item.receiptNo}" style="background: ${isAdjustment ? '#6D28D9' : '#064E3B'}; color: #fff; border: none; padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.78rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                      <button class="btn btn-download-receipt" data-receipt="${item.receiptNo}" style="background: ${isAdjustment ? '#6D28D9' : '#064E3B'}; color: #fff; border: none; padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.8rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                         <i aria-hidden="true" class="fa-solid fa-file-arrow-down"></i> ${isAdjustment ? 'Download Voucher' : 'Download Receipt'}
                       </button>
                     </td>
@@ -4669,7 +4669,7 @@ function renderStudentDashboard() {
               <h3 style="margin: 0; font-size: 1.15rem; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
                 <i aria-hidden="true" class="fa-solid fa-indian-rupee-sign" style="color: #34D399;"></i> Fee Collection & Revenue Breakdown
               </h3>
-              <div style="font-size: 0.75rem; color: #A7F3D0; margin-top: 0.15rem;">Interactive filterable view across months, academic batches & faculty collectors</div>
+              <div style="font-size: 0.8rem; color: #A7F3D0; margin-top: 0.15rem;">Interactive filterable view across months, academic batches & faculty collectors</div>
             </div>
             <button type="button" aria-label="Close fee collection dialog" class="btn-close-inner" onclick="document.getElementById('feeCollectionModal').remove()" style="background: none; border: none; color: #fff; font-size: 1.2rem; cursor: pointer;">
               <i aria-hidden="true" class="fa-solid fa-xmark"></i>
@@ -4688,7 +4688,7 @@ function renderStudentDashboard() {
                 <div style="font-size: 1.85rem; font-weight: 800; color: #34D399;" id="feeModalKpiAmount">
                   ₹0
                 </div>
-                <div style="font-size: 0.76rem; color: #D1FAE5; margin-top: 0.2rem;" id="feeModalKpiSubtext">
+                <div style="font-size: 0.8rem; color: #D1FAE5; margin-top: 0.2rem;" id="feeModalKpiSubtext">
                   Across all batches and payment records
                 </div>
               </div>
@@ -4701,7 +4701,7 @@ function renderStudentDashboard() {
             <div style="background: #ffffff; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 0.85rem; display: flex; flex-direction: column; gap: 0.65rem;">
               <div style="font-weight: 700; font-size: 0.82rem; color: var(--text-mahogany); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
                 <span><i aria-hidden="true" class="fa-solid fa-filter" style="color: var(--primary-emerald);"></i> Filter Collection Data:</span>
-                <button type="button" id="btnResetFeeModalFilters" style="background: none; border: none; font-size: 0.76rem; color: #059669; font-weight: 700; cursor: pointer; text-decoration: underline;">
+                <button type="button" id="btnResetFeeModalFilters" style="background: none; border: none; font-size: 0.8rem; color: #059669; font-weight: 700; cursor: pointer; text-decoration: underline;">
                   Reset All Filters
                 </button>
               </div>
@@ -4709,7 +4709,7 @@ function renderStudentDashboard() {
               <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.6rem;">
                 <!-- 1. Month Filter -->
                 <div>
-                  <label for="feeModalMonthSelect" style="display: block; font-size: 0.74rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">🗓️ Month</label>
+                  <label for="feeModalMonthSelect" style="display: block; font-size: 0.8rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">🗓️ Month</label>
                   <select id="feeModalMonthSelect" class="portal-input" style="width: 100%; font-size: 0.8rem; height: 36px; padding: 0.35rem 0.6rem;">
                     <option value="all">All Months (All-Time)</option>
                   </select>
@@ -4717,7 +4717,7 @@ function renderStudentDashboard() {
 
                 <!-- 2. Class / Batch Filter -->
                 <div>
-                  <label for="feeModalClassSelect" style="display: block; font-size: 0.74rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">🎯 Class / Batch</label>
+                  <label for="feeModalClassSelect" style="display: block; font-size: 0.8rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">🎯 Class / Batch</label>
                   <select id="feeModalClassSelect" class="portal-input" style="width: 100%; font-size: 0.8rem; height: 36px; padding: 0.35rem 0.6rem;">
                     ${batchFilterOptions('all', 'All Batches')}
                   </select>
@@ -4725,7 +4725,7 @@ function renderStudentDashboard() {
 
                 <!-- 3. Admin / Collector Filter -->
                 <div>
-                  <label for="feeModalAdminSelect" style="display: block; font-size: 0.74rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">👨‍🏫 Faculty / Admin</label>
+                  <label for="feeModalAdminSelect" style="display: block; font-size: 0.8rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">👨‍🏫 Faculty / Admin</label>
                   <select id="feeModalAdminSelect" class="portal-input" style="width: 100%; font-size: 0.8rem; height: 36px; padding: 0.35rem 0.6rem;">
                     ${facultyCollectorOptions()}
                   </select>
@@ -4733,7 +4733,7 @@ function renderStudentDashboard() {
 
                 <!-- 4. Payment Mode Filter -->
                 <div>
-                  <label for="feeModalModeSelect" style="display: block; font-size: 0.74rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">💳 Payment Mode</label>
+                  <label for="feeModalModeSelect" style="display: block; font-size: 0.8rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">💳 Payment Mode</label>
                   <select id="feeModalModeSelect" class="portal-input" style="width: 100%; font-size: 0.8rem; height: 36px; padding: 0.35rem 0.6rem;">
                     <option value="all">All Payment Modes</option>
                     <option value="cash">💵 Cash at Counter</option>
@@ -4755,7 +4755,7 @@ function renderStudentDashboard() {
                 <h4 style="font-size: 0.95rem; font-weight: 800; color: var(--text-mahogany); margin: 0; display: flex; align-items: center; gap: 0.4rem;">
                   <i aria-hidden="true" class="fa-solid fa-layer-group" style="color: var(--primary-emerald);"></i> Batch-Wise Collection Summary
                 </h4>
-                <span style="font-size: 0.75rem; color: var(--text-muted);" id="feeModalBatchCountLabel">${canonicalBatchCards().length} Institutional Batches</span>
+                <span style="font-size: 0.8rem; color: var(--text-muted);" id="feeModalBatchCountLabel">${canonicalBatchCards().length} Institutional Batches</span>
               </div>
               <div id="feeModalBatchGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem;">
                 <!-- Populated dynamically by updateFeeModalContent() -->
@@ -4768,7 +4768,7 @@ function renderStudentDashboard() {
                 <h4 style="font-size: 0.95rem; font-weight: 800; color: var(--text-mahogany); margin: 0; display: flex; align-items: center; gap: 0.4rem;">
                   <i aria-hidden="true" class="fa-solid fa-receipt" style="color: var(--primary-emerald);"></i> Verified Payment Receipts
                 </h4>
-                <span id="feeModalReceiptCountBadge" style="background: #ECFDF5; color: #065F46; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 700; font-size: 0.76rem;">
+                <span id="feeModalReceiptCountBadge" style="background: #ECFDF5; color: #065F46; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 700; font-size: 0.8rem;">
                   0 Receipts
                 </span>
               </div>
@@ -5013,9 +5013,9 @@ function renderStudentDashboard() {
             <div style="background: #ffffff; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 0.9rem; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
                 <span style="font-weight: 800; font-size: 0.88rem; color: var(--text-mahogany);">${b.icon} ${b.name}</span>
-                <span style="font-size: 0.72rem; background: #F1F5F9; color: #475569; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 700;">₹${b.rate}/mo</span>
+                <span style="font-size: 0.8rem; background: #F1F5F9; color: #475569; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 700;">₹${b.rate}/mo</span>
               </div>
-              <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+              <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;">
                 ${batchStudents.length} Enrolled • ${batchPayments.length} Filtered Receipts
               </div>
               <div style="font-size: 1.25rem; font-weight: 800; color: #059669;">
@@ -5047,15 +5047,15 @@ function renderStudentDashboard() {
             const col = collectorDisplay(r.collector);
             return `
               <tr>
-                <td style="font-family: monospace; font-weight: 700; color: var(--text-mahogany); font-size: 0.78rem;">
+                <td style="font-family: monospace; font-weight: 700; color: var(--text-mahogany); font-size: 0.8rem;">
                   ${r.receiptNo}
                 </td>
                 <td>
                   <strong>${sanitizeInput(r.studentName)}</strong>
-                  ${r.rollNo ? `<div style="font-size: 0.74rem; color: var(--text-muted);">Roll #${r.rollNo}</div>` : ''}
+                  ${r.rollNo ? `<div style="font-size: 0.8rem; color: var(--text-muted);">Roll #${r.rollNo}</div>` : ''}
                 </td>
                 <td>
-                  <span style="background: #F8FAFC; border: 1px solid #E2E8F0; padding: 0.15rem 0.45rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                  <span style="background: #F8FAFC; border: 1px solid #E2E8F0; padding: 0.15rem 0.45rem; border-radius: 4px; font-size: 0.8rem; font-weight: 600;">
                     ${r.className}
                   </span>
                 </td>
@@ -5063,16 +5063,16 @@ function renderStudentDashboard() {
                   ₹${r.amount.toLocaleString()}
                 </td>
                 <td>
-                  <span style="background: ${isCash ? '#FEF3C7; color: #78350F;' : '#D1FAE5; color: #065F46;'} padding: 0.15rem 0.45rem; border-radius: 99px; font-size: 0.72rem; font-weight: 700;">
+                  <span style="background: ${isCash ? '#FEF3C7; color: #78350F;' : '#D1FAE5; color: #065F46;'} padding: 0.15rem 0.45rem; border-radius: 99px; font-size: 0.8rem; font-weight: 700;">
                     <i class="${isCash ? 'fa-solid fa-money-bill-wave' : 'fa-solid fa-mobile-screen'}" aria-hidden="true"></i> ${r.mode}
                   </span>
                 </td>
                 <td>
-                  <div style="font-weight: 700; font-size: 0.76rem; color: ${col.color};">
+                  <div style="font-weight: 700; font-size: 0.8rem; color: ${col.color};">
                     ${col.label}
                   </div>
                 </td>
-                <td style="font-size: 0.76rem; color: var(--text-muted); white-space: nowrap;">
+                <td style="font-size: 0.8rem; color: var(--text-muted); white-space: nowrap;">
                   ${r.date}
                 </td>
               </tr>
@@ -5145,7 +5145,7 @@ function renderStudentDashboard() {
               <h3 style="margin: 0; font-size: 1.15rem; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
                 <i aria-hidden="true" class="fa-solid fa-clock-rotate-left" style="color: #FCA5A5;"></i> Outstanding Fee Dues & Reminder Manager
               </h3>
-              <div style="font-size: 0.75rem; color: #FECACA; margin-top: 0.15rem;">Filter student dues by batch, educator lead, amount range, and dispatch instant reminders</div>
+              <div style="font-size: 0.8rem; color: #FECACA; margin-top: 0.15rem;">Filter student dues by batch, educator lead, amount range, and dispatch instant reminders</div>
             </div>
             <button type="button" aria-label="Close pending fees dialog" class="btn-close-inner" onclick="document.getElementById('pendingFeesModal').remove()" style="background: none; border: none; color: #fff; font-size: 1.2rem; cursor: pointer;">
               <i aria-hidden="true" class="fa-solid fa-xmark"></i>
@@ -5164,7 +5164,7 @@ function renderStudentDashboard() {
                 <div style="font-size: 1.85rem; font-weight: 800; color: #FCA5A5; display: flex; align-items: baseline; gap: 0.5rem;" id="pendingModalKpiAmount">
                   ₹0
                 </div>
-                <div style="font-size: 0.76rem; color: #FEE2E2; margin-top: 0.2rem;" id="pendingModalKpiSubtext">
+                <div style="font-size: 0.8rem; color: #FEE2E2; margin-top: 0.2rem;" id="pendingModalKpiSubtext">
                   Across all enrolled students with pending balance
                 </div>
               </div>
@@ -5179,7 +5179,7 @@ function renderStudentDashboard() {
             <div style="background: #ffffff; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 0.85rem; display: flex; flex-direction: column; gap: 0.65rem;">
               <div style="font-weight: 700; font-size: 0.82rem; color: var(--text-mahogany); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
                 <span><i aria-hidden="true" class="fa-solid fa-filter" style="color: #DC2626;"></i> Filter Outstanding Dues:</span>
-                <button type="button" id="btnResetPendingModalFilters" style="background: none; border: none; font-size: 0.76rem; color: #DC2626; font-weight: 700; cursor: pointer; text-decoration: underline;">
+                <button type="button" id="btnResetPendingModalFilters" style="background: none; border: none; font-size: 0.8rem; color: #DC2626; font-weight: 700; cursor: pointer; text-decoration: underline;">
                   Reset All Filters
                 </button>
               </div>
@@ -5187,7 +5187,7 @@ function renderStudentDashboard() {
               <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.6rem;">
                 <!-- 1. Class / Batch Filter -->
                 <div>
-                  <label for="pendingModalClassSelect" style="display: block; font-size: 0.74rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">🎯 Class / Batch</label>
+                  <label for="pendingModalClassSelect" style="display: block; font-size: 0.8rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">🎯 Class / Batch</label>
                   <select id="pendingModalClassSelect" class="portal-input" style="width: 100%; font-size: 0.8rem; height: 36px; padding: 0.35rem 0.6rem;">
                     ${batchFilterOptions('all', 'All Batches')}
                   </select>
@@ -5195,7 +5195,7 @@ function renderStudentDashboard() {
 
                 <!-- 2. Faculty / Admin Lead Filter -->
                 <div>
-                  <label for="pendingModalAdminSelect" style="display: block; font-size: 0.74rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">👨‍🏫 Faculty Lead</label>
+                  <label for="pendingModalAdminSelect" style="display: block; font-size: 0.8rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">👨‍🏫 Faculty Lead</label>
                   <select id="pendingModalAdminSelect" class="portal-input" style="width: 100%; font-size: 0.8rem; height: 36px; padding: 0.35rem 0.6rem;">
                     ${facultyFilterOptions()}
                   </select>
@@ -5203,7 +5203,7 @@ function renderStudentDashboard() {
 
                 <!-- 3. Due Amount Range Filter -->
                 <div>
-                  <label for="pendingModalDueRangeSelect" style="display: block; font-size: 0.74rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">💰 Due Amount</label>
+                  <label for="pendingModalDueRangeSelect" style="display: block; font-size: 0.8rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem;">💰 Due Amount</label>
                   <select id="pendingModalDueRangeSelect" class="portal-input" style="width: 100%; font-size: 0.8rem; height: 36px; padding: 0.35rem 0.6rem;">
                     <option value="all">All Pending Amounts (> ₹0)</option>
                     <option value="high">🚨 High Dues (> ₹2,000)</option>
@@ -5226,7 +5226,7 @@ function renderStudentDashboard() {
                 <h4 style="font-size: 0.95rem; font-weight: 800; color: var(--text-mahogany); margin: 0; display: flex; align-items: center; gap: 0.4rem;">
                   <i aria-hidden="true" class="fa-solid fa-layer-group" style="color: #DC2626;"></i> Batch-Wise Outstanding Dues
                 </h4>
-                <span style="font-size: 0.75rem; color: var(--text-muted);" id="pendingModalBatchLabel">${canonicalBatchCards().length} Institutional Batches</span>
+                <span style="font-size: 0.8rem; color: var(--text-muted);" id="pendingModalBatchLabel">${canonicalBatchCards().length} Institutional Batches</span>
               </div>
               <div id="pendingModalBatchGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem;">
                 <!-- Populated dynamically -->
@@ -5239,7 +5239,7 @@ function renderStudentDashboard() {
                 <h4 style="font-size: 0.95rem; font-weight: 800; color: var(--text-mahogany); margin: 0; display: flex; align-items: center; gap: 0.4rem;">
                   <i aria-hidden="true" class="fa-solid fa-users" style="color: #DC2626;"></i> Students with Pending Balance
                 </h4>
-                <span id="pendingModalStudentCountBadge" style="background: #FEE2E2; color: #991B1B; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 700; font-size: 0.76rem;">
+                <span id="pendingModalStudentCountBadge" style="background: #FEE2E2; color: #991B1B; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 700; font-size: 0.8rem;">
                   0 Students
                 </span>
               </div>
@@ -5354,9 +5354,9 @@ function renderStudentDashboard() {
             <div style="background: #ffffff; border: 1.5px solid #FCA5A5; border-radius: 10px; padding: 0.9rem; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
                 <span style="font-weight: 800; font-size: 0.88rem; color: var(--text-mahogany);">${b.icon} ${b.name}</span>
-                <span style="font-size: 0.72rem; background: #FEF2F2; color: #991B1B; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 700;">₹${b.rate}/mo</span>
+                <span style="font-size: 0.8rem; background: #FEF2F2; color: #991B1B; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 700;">₹${b.rate}/mo</span>
               </div>
-              <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+              <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;">
                 ${batchDefaulters.length} Students Pending Balance
               </div>
               <div style="font-size: 1.25rem; font-weight: 800; color: #DC2626;">
@@ -5379,7 +5379,7 @@ function renderStudentDashboard() {
               <td colspan="5" style="text-align: center; padding: 2.5rem 1rem; color: #059669;">
                 <i aria-hidden="true" class="fa-solid fa-circle-check" style="font-size: 2rem; color: #10B981; margin-bottom: 0.5rem; display: block;"></i>
                 <div style="font-weight: 700; font-size: 0.95rem;">🎉 Zero Pending Dues in Selected Filter!</div>
-                <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem;">All students matching this criteria have cleared their tuition fees 100%.</div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">All students matching this criteria have cleared their tuition fees 100%.</div>
               </td>
             </tr>
           `;
@@ -5395,12 +5395,12 @@ function renderStudentDashboard() {
               <tr>
                 <td>
                   <strong>${sanitizeInput(s.name)}</strong>
-                  <div style="font-size: 0.74rem; color: var(--text-muted);">
+                  <div style="font-size: 0.8rem; color: var(--text-muted);">
                     Roll #${s.rollNo || s.roll_no || s.student_id || ''} • ID: ${s.id || ''}
                   </div>
                 </td>
                 <td>
-                  <span style="background: #F8FAFC; border: 1px solid #E2E8F0; padding: 0.15rem 0.45rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                  <span style="background: #F8FAFC; border: 1px solid #E2E8F0; padding: 0.15rem 0.45rem; border-radius: 4px; font-size: 0.8rem; font-weight: 600;">
                     ${s.className || s.class_name || 'General'}
                   </span>
                 </td>
@@ -5409,16 +5409,16 @@ function renderStudentDashboard() {
                 </td>
                 <td>
                   <div style="font-weight: 600; font-size: 0.8rem;">${s.guardianName || 'Guardian'}</div>
-                  <div style="font-size: 0.75rem; color: var(--text-muted);">${guardianPhone || 'N/A'}</div>
+                  <div style="font-size: 0.8rem; color: var(--text-muted);">${guardianPhone || 'N/A'}</div>
                 </td>
                 <td style="text-align: right;">
                   <div style="display: inline-flex; gap: 0.35rem; align-items: center; justify-content: flex-end;">
                     ${waPhone ? `
-                      <a href="https://wa.me/${waPhone}?text=${waMsg}" target="_blank" class="btn" style="background-color: #25D366; color: #fff; padding: 0.3rem 0.6rem; font-size: 0.75rem; font-weight: 700; border-radius: 6px; text-decoration: none; display: inline-flex; align-items: center; gap: 0.3rem;" title="Send WhatsApp Reminder">
+                      <a href="https://wa.me/${waPhone}?text=${waMsg}" target="_blank" class="btn" style="background-color: #25D366; color: #fff; padding: 0.3rem 0.6rem; font-size: 0.8rem; font-weight: 700; border-radius: 6px; text-decoration: none; display: inline-flex; align-items: center; gap: 0.3rem;" title="Send WhatsApp Reminder">
                         <i aria-hidden="true" class="fa-brands fa-whatsapp"></i> Remind
                       </a>
                     ` : ''}
-                    <button class="btn btn-pending-pay-modal" data-id="${s.id}" style="background-color: #059669; color: #fff; padding: 0.3rem 0.65rem; font-size: 0.75rem; font-weight: 700; border: none; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;" title="Record Fee Payment">
+                    <button class="btn btn-pending-pay-modal" data-id="${s.id}" style="background-color: #059669; color: #fff; padding: 0.3rem 0.65rem; font-size: 0.8rem; font-weight: 700; border: none; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;" title="Record Fee Payment">
                       <i aria-hidden="true" class="fa-solid fa-hand-holding-dollar"></i> Collect Fee
                     </button>
                   </div>
@@ -6080,7 +6080,7 @@ function renderStudentDashboard() {
         <td><strong class="font-mono">${s.student_id || s.rollNo || s.id}</strong></td>
         <td>
           <div style="font-weight: 700; color: var(--text-mahogany);">${sanitizeInput(s.name)}</div>
-          <div style="font-size: 0.78rem; color: var(--text-muted);">Roll: #${s.rollNo} | ₹${studentMonthlyFee(s).toLocaleString('en-IN')}/mo</div>
+          <div style="font-size: 0.8rem; color: var(--text-muted);">Roll: #${s.rollNo} | ₹${studentMonthlyFee(s).toLocaleString('en-IN')}/mo</div>
         </td>
         <td>${sanitizeInput(s.mobile)}</td>
         <td>${formatDate(s.dob)}</td>
@@ -6088,10 +6088,10 @@ function renderStudentDashboard() {
         <td>
           <div style="font-weight: 700; color: var(--primary-emerald);">Paid: ₹${s.paidFee.toLocaleString()}</div>
           ${s.pendingFee > 0 
-            ? `<div style="font-size: 0.78rem; color: #DC2626; font-weight:700;"><i aria-hidden="true" class="fa-solid fa-circle"></i> Pending: ₹${s.pendingFee.toLocaleString()}</div>` 
-            : '<div style="font-size: 0.78rem; color: #059669; font-weight:700;"><i aria-hidden="true" class="fa-solid fa-circle"></i> Cleared</div>'}
+            ? `<div style="font-size: 0.8rem; color: #DC2626; font-weight:700;"><i aria-hidden="true" class="fa-solid fa-circle"></i> Pending: ₹${s.pendingFee.toLocaleString()}</div>` 
+            : '<div style="font-size: 0.8rem; color: #059669; font-weight:700;"><i aria-hidden="true" class="fa-solid fa-circle"></i> Cleared</div>'}
           ${(Array.isArray(s.feeHistory) && s.feeHistory.some(h => h.status === 'Adjusted' || (h.receiptNo && (h.receiptNo.startsWith('ADJ-') || h.receiptNo.startsWith('RATE-') || h.receiptNo.startsWith('DISC-'))))) 
-            ? `<div style="margin-top: 0.2rem;"><span style="background: linear-gradient(135deg, #EDE9FE, #DDD6FE); color: #5B21B6; border: 1px solid #C4B5FD; padding: 0.12rem 0.45rem; border-radius: 4px; font-size: 0.7rem; font-weight: 800; display: inline-flex; align-items: center; gap: 0.25rem;"><i aria-hidden="true" class="fa-solid fa-scale-balanced"></i> Adjusted</span></div>`
+            ? `<div style="margin-top: 0.2rem;"><span style="background: linear-gradient(135deg, #EDE9FE, #DDD6FE); color: #5B21B6; border: 1px solid #C4B5FD; padding: 0.12rem 0.45rem; border-radius: 4px; font-size: 0.8rem; font-weight: 800; display: inline-flex; align-items: center; gap: 0.25rem;"><i aria-hidden="true" class="fa-solid fa-scale-balanced"></i> Adjusted</span></div>`
             : ''}
         </td>
         <td>
@@ -6099,7 +6099,7 @@ function renderStudentDashboard() {
             <button class="btn-make-changes" data-id="${s.id}" style="background-color: var(--primary-emerald, #064E3B); color: #fff; border: none; padding: 0.45rem 0.75rem; border-radius: 6px; font-weight: 700; font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem; box-shadow: 0 2px 6px rgba(6, 78, 59, 0.2);" title="Manage student profile, payments & dues">
               <i aria-hidden="true" class="fa-solid fa-sliders"></i> Make Changes
             </button>
-            <button class="btn-reset-pw-dob" data-id="${s.id}" data-name="${s.name}" data-dob="${s.dob}" style="background-color: #FEF3C7; color: #92400E; border: 1px solid #FCD34D; padding: 0.45rem 0.65rem; border-radius: 6px; font-weight: 700; font-size: 0.78rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem;" title="Reset login password to official Date of Birth (${s.dob})">
+            <button class="btn-reset-pw-dob" data-id="${s.id}" data-name="${s.name}" data-dob="${s.dob}" style="background-color: #FEF3C7; color: #92400E; border: 1px solid #FCD34D; padding: 0.45rem 0.65rem; border-radius: 6px; font-weight: 700; font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem;" title="Reset login password to official Date of Birth (${s.dob})">
               <i aria-hidden="true" class="fa-solid fa-key"></i> Reset to DOB
             </button>
             <button class="btn-delete-student" data-id="${s.id}" style="color: #DC2626; cursor: pointer; border: none; background: transparent; padding: 0.4rem; font-size: 0.95rem;" title="Delete Record">
@@ -6211,7 +6211,7 @@ function renderStudentDashboard() {
 
           <!-- PURGE IMPACT CHECKLIST -->
           <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 0.9rem 1rem; margin-bottom: 1.15rem; font-size: 0.82rem; color: var(--text-mahogany);">
-            <div style="font-weight: 700; color: #334155; margin-bottom: 0.5rem; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">
+            <div style="font-weight: 700; color: #334155; margin-bottom: 0.5rem; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.5px;">
               Permanent Cascade Actions (Irreversible):
             </div>
             <ul style="margin: 0; padding-left: 1.2rem; line-height: 1.65; color: #475569;">
@@ -6547,7 +6547,7 @@ function renderStudentDashboard() {
                     <div style="flex: 1;">
                       <input type="file" id="mgmtStuPhotoInput" accept="image/*" class="portal-input" style="padding: 0.35rem; font-size: 0.8rem;">
                       <input type="hidden" id="mgmtStuPhotoUrl" value="${target.photoUrl || target.photo_url || target.photo || ''}">
-                      <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.2rem;">Select photo to upload directly to Supabase Storage</div>
+                      <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">Select photo to upload directly to Supabase Storage</div>
                     </div>
                   </div>
                 </div>
@@ -6577,11 +6577,11 @@ function renderStudentDashboard() {
 
                   <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; margin-bottom: 1rem;">
                     <div style="background: #fff; border: 1px solid #E2E8F0; border-radius: 8px; padding: 0.65rem 0.85rem;">
-                      <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Student ID</div>
+                      <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Student ID</div>
                       <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-mahogany); font-family: monospace;">${target.student_id || target.rollNo || target.id}</div>
                     </div>
                     <div style="background: #fff; border: 1px solid #E2E8F0; border-radius: 8px; padding: 0.65rem 0.85rem;">
-                      <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Default Password (DOB)</div>
+                      <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Default Password (DOB)</div>
                       <div style="font-size: 0.95rem; font-weight: 700; color: #059669; font-family: monospace;">${formatDate(target.dob)} (${target.dob})</div>
                     </div>
                   </div>
@@ -7338,7 +7338,7 @@ function renderStudentDashboard() {
           <div class="dash-card" style="border: 2px solid #059669; background: #FAF9F6; margin-bottom: 0.5rem; box-shadow: 0 4px 14px rgba(6, 78, 59, 0.08);">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem; border-bottom: 1.5px solid #A7F3D0; padding-bottom: 0.85rem;">
               <div>
-                <span class="section-tag" style="background: #D1FAE5; color: #065F46; font-weight: 800; padding: 0.25rem 0.65rem; border-radius: 99px; font-size: 0.75rem;">
+                <span class="section-tag" style="background: #D1FAE5; color: #065F46; font-weight: 800; padding: 0.25rem 0.65rem; border-radius: 99px; font-size: 0.8rem;">
                   <i aria-hidden="true" class="fa-solid fa-paper-plane"></i> MAIN ADMIN DISPATCH CENTER
                 </span>
                 <h3 style="font-size: 1.25rem; font-weight: 800; color: #064E3B; margin-top: 0.35rem;">
@@ -7407,7 +7407,7 @@ function renderStudentDashboard() {
                 </h4>
                 <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 0.2rem;">Live revenue, collection efficiency, and dues tracking configured for every academic batch</div>
               </div>
-              <span style="background: #ECFDF5; color: #065F46; border: 1px solid #10B981; padding: 0.3rem 0.75rem; border-radius: 99px; font-size: 0.78rem; font-weight: 700;">
+              <span style="background: #ECFDF5; color: #065F46; border: 1px solid #10B981; padding: 0.3rem 0.75rem; border-radius: 99px; font-size: 0.8rem; font-weight: 700;">
                 <i class="fa-solid fa-graduation-cap" aria-hidden="true"></i> ${canonicalBatchCards().length} Standard Institutional Batches
               </span>
             </div>
@@ -7444,7 +7444,7 @@ function renderStudentDashboard() {
                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.65rem;">
                       <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
                         <strong style="font-size: 1.05rem; color: var(--text-mahogany); font-weight: 800;">${bName}</strong>
-                        <span style="font-size: 0.75rem; background: ${badgeBg}; color: ${badgeColor}; padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: 700;">
+                        <span style="font-size: 0.8rem; background: ${badgeBg}; color: ${badgeColor}; padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: 700;">
                           ${badgeText}
                         </span>
                         <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">
@@ -7458,7 +7458,7 @@ function renderStudentDashboard() {
                       </div>
                     </div>
 
-                    <div style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.6rem; display: flex; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.6rem; display: flex; align-items: center; flex-wrap: wrap; gap: 1rem;">
                       <span><i aria-hidden="true" class="fa-regular fa-clock" style="color: #6B7280;"></i> ${b.timing || b.timings || 'Mon – Sat: Regular Timings'}</span>
                       <span><i aria-hidden="true" class="fa-solid fa-door-open" style="color: #6B7280;"></i> ${b.room || 'Classroom'}</span>
                       <span><i aria-hidden="true" class="fa-solid fa-chalkboard-user" style="color: #6B7280;"></i> ${b.teacher || 'Chandan Kumar & Ravi Ranjan'}</span>
@@ -7467,7 +7467,7 @@ function renderStudentDashboard() {
                     <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; margin-bottom: 0.4rem;">
                       <span style="color: #374151; font-weight: 700;">
                         Collection Progress: <strong style="color: ${bPct >= 80 ? '#059669' : (bPct >= 50 ? '#D97706' : '#DC2626')}; font-size: 0.9rem;">${bPct}%</strong>
-                        <span style="font-size: 0.76rem; color: var(--text-muted); font-weight: 500; margin-left: 0.4rem;">(${clearedCount}/${batchStudents.length} students cleared)</span>
+                        <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500; margin-left: 0.4rem;">(${clearedCount}/${batchStudents.length} students cleared)</span>
                       </span>
                       <span style="color: #DC2626; font-weight: 700;">
                         <i aria-hidden="true" class="fa-solid fa-triangle-exclamation"></i> Pending Dues: ₹${bPending.toLocaleString()}
@@ -7536,24 +7536,24 @@ function renderStudentDashboard() {
                   ${pageTx.length === 0 ? '<tr><td colspan="7" style="text-align:center; padding: 2rem; color: var(--text-muted);">No payment transactions match your search filter.</td></tr>' :
                     pageTx.map(t => `
                       <tr>
-                        <td style="white-space: nowrap; color: var(--text-muted); font-size: 0.78rem;">
+                        <td style="white-space: nowrap; color: var(--text-muted); font-size: 0.8rem;">
                           <i aria-hidden="true" class="fa-regular fa-calendar-days" style="color: var(--primary-emerald);"></i> ${t.date}
                         </td>
                         <td>
                           <strong>${t.studentName}</strong>
-                          <div style="font-size: 0.76rem; color: var(--text-muted);">Roll #${t.rollNo}</div>
+                          <div style="font-size: 0.8rem; color: var(--text-muted);">Roll #${t.rollNo}</div>
                         </td>
-                        <td><span style="background: #FAF9F6; padding: 0.2rem 0.5rem; border-radius: 4px; border: 1px solid var(--border-sand); font-size: 0.78rem;">${t.className}</span></td>
+                        <td><span style="background: #FAF9F6; padding: 0.2rem 0.5rem; border-radius: 4px; border: 1px solid var(--border-sand); font-size: 0.8rem;">${t.className}</span></td>
                         <td style="font-weight: 800; color: #047857; font-size: 1rem;">₹${t.amount.toLocaleString()}</td>
                         <td>
-                          <span style="padding: 0.25rem 0.65rem; border-radius: 99px; font-size: 0.76rem; font-weight: 700; background: ${t.mode.toLowerCase().includes('cash') ? '#FEF3C7; color: #78350F;' : '#D1FAE5; color: #065F46;'}">
+                          <span style="padding: 0.25rem 0.65rem; border-radius: 99px; font-size: 0.8rem; font-weight: 700; background: ${t.mode.toLowerCase().includes('cash') ? '#FEF3C7; color: #78350F;' : '#D1FAE5; color: #065F46;'}">
                             <i class="${t.mode.toLowerCase().includes('cash') ? 'fa-solid fa-money-bill-wave' : 'fa-solid fa-mobile-screen'}" aria-hidden="true"></i> ${t.mode}
                           </span>
                         </td>
                         <td style="font-family: monospace; font-size: 0.8rem; font-weight: 700; color: var(--text-mahogany);">${t.receiptNo}</td>
                         <td>
                           <div style="font-weight: 700; color: ${collectorDisplay(t.collector).color}; font-size: 0.82rem;">${collectorDisplay(t.collector).label}</div>
-                          ${t.note ? `<div style="font-size: 0.72rem; color: var(--text-muted); font-style: italic;">"${t.note}"</div>` : ''}
+                          ${t.note ? `<div style="font-size: 0.8rem; color: var(--text-muted); font-style: italic;">"${t.note}"</div>` : ''}
                         </td>
                       </tr>
                     `).join('')
@@ -7607,9 +7607,9 @@ function renderStudentDashboard() {
                 <div style="background: #ffffff; border: 1.5px solid ${accent}; border-radius: 10px; padding: 1.1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.03);">
                   <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.6rem;">
                     <div style="font-weight: 800; font-size: 1rem; color: var(--text-mahogany);">👨‍🏫 ${titleCaseName(f.name)}</div>
-                    <span style="font-size: 0.72rem; background: ${chip.bg}; color: ${chip.fg}; padding: 0.2rem 0.5rem; border-radius: 99px; font-weight: 700;">${t.count} receipt${t.count === 1 ? '' : 's'}</span>
+                    <span style="font-size: 0.8rem; background: ${chip.bg}; color: ${chip.fg}; padding: 0.2rem 0.5rem; border-radius: 99px; font-weight: 700;">${t.count} receipt${t.count === 1 ? '' : 's'}</span>
                   </div>
-                  <div style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.75rem;">${f.role}</div>
+                  <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;">${f.role}</div>
 
                   <div style="font-size: 1.5rem; font-weight: 800; color: ${accent}; margin-bottom: 0.75rem;">
                     ₹${t.total.toLocaleString()}
@@ -7629,9 +7629,9 @@ function renderStudentDashboard() {
                 <div style="background: #FFFBEB; border: 1.5px solid #B45309; border-radius: 10px; padding: 1.1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.03);">
                   <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.6rem;">
                     <div style="font-weight: 800; font-size: 1rem; color: #78350F;">⚠️ Collector Not Recorded</div>
-                    <span style="font-size: 0.72rem; background: #FEF3C7; color: #78350F; padding: 0.2rem 0.5rem; border-radius: 99px; font-weight: 700;">${collectorTally.get(UNATTRIBUTED).count} receipt${collectorTally.get(UNATTRIBUTED).count === 1 ? '' : 's'}</span>
+                    <span style="font-size: 0.8rem; background: #FEF3C7; color: #78350F; padding: 0.2rem 0.5rem; border-radius: 99px; font-weight: 700;">${collectorTally.get(UNATTRIBUTED).count} receipt${collectorTally.get(UNATTRIBUTED).count === 1 ? '' : 's'}</span>
                   </div>
-                  <div style="font-size: 0.78rem; color: #92400E; margin-bottom: 0.75rem;">Attributed to nobody — reconcile these against the physical receipt book.</div>
+                  <div style="font-size: 0.8rem; color: #92400E; margin-bottom: 0.75rem;">Attributed to nobody — reconcile these against the physical receipt book.</div>
 
                   <div style="font-size: 1.5rem; font-weight: 800; color: #B45309; margin-bottom: 0.75rem;">
                     ₹${collectorTally.get(UNATTRIBUTED).total.toLocaleString()}
@@ -7874,7 +7874,7 @@ function renderStudentDashboard() {
                   <span>💳 Total Processed: <strong>${targets.length} Students</strong></span>
                   <span>📢 Invoices & Notices Posted: <strong>${notifiedCount}</strong></span>
                 </div>
-                <div style="font-size: 0.78rem; opacity: 0.9; max-height: 140px; overflow-y: auto; background: rgba(255,255,255,0.7); padding: 0.5rem; border-radius: 4px; border: 1px solid #A7F3D0;">
+                <div style="font-size: 0.8rem; opacity: 0.9; max-height: 140px; overflow-y: auto; background: rgba(255,255,255,0.7); padding: 0.5rem; border-radius: 4px; border: 1px solid #A7F3D0;">
                   ${results.map(r => `<div>• <strong>${escapeHtml(r.name)}</strong>: ${r.status}</div>`).join('')}
                 </div>
               `;
@@ -8045,7 +8045,7 @@ function renderStudentDashboard() {
           <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 1.25rem;">
             The Community Chat feature has been temporarily disabled by Pragyan Institute Management. All existing messages and chat archives remain securely preserved in the database.
           </p>
-          <div style="font-size: 0.75rem; background: #FEF3C7; color: #92400E; padding: 0.5rem 0.85rem; border-radius: 8px; font-weight: 700; display: inline-flex; align-items: center; gap: 0.4rem;">
+          <div style="font-size: 0.8rem; background: #FEF3C7; color: #92400E; padding: 0.5rem 0.85rem; border-radius: 8px; font-weight: 700; display: inline-flex; align-items: center; gap: 0.4rem;">
             🛡️ Status: Offline by Admin Order • Code & History Intact
           </div>
         </div>
@@ -8085,9 +8085,9 @@ function renderStudentDashboard() {
               <div>
                 <h3 style="font-size: 1.05rem; font-weight: 800; color: #fff; margin: 0; display: flex; align-items: center; gap: 0.4rem;">
                   Pragyan Institute Community Forum
-                  <span style="font-size: 0.68rem; background: #34D399; color: #064E3B; padding: 0.12rem 0.45rem; border-radius: 99px; font-weight: 800;">GetStream Live</span>
+                  <span style="font-size: 0.8rem; background: #34D399; color: #064E3B; padding: 0.12rem 0.45rem; border-radius: 99px; font-weight: 800;">GetStream Live</span>
                 </h3>
-                <div style="font-size: 0.74rem; opacity: 0.85; margin-top: 0.1rem;">
+                <div style="font-size: 0.8rem; opacity: 0.85; margin-top: 0.1rem;">
                   Full Page Lounge • ${messages.length} Messages
                 </div>
               </div>
@@ -8095,13 +8095,13 @@ function renderStudentDashboard() {
 
             <!-- Filter Pills -->
             <div style="display: flex; gap: 0.35rem; background: rgba(0,0,0,0.25); padding: 0.2rem; border-radius: 8px;">
-              <button class="btn btn-community-filter ${communityActiveFilter === 'all' ? 'active' : ''}" data-filter="all" style="padding: 0.25rem 0.55rem; font-size: 0.75rem; border-radius: 6px; border: none; cursor: pointer; background: ${communityActiveFilter === 'all' ? '#ffffff' : 'transparent'}; color: ${communityActiveFilter === 'all' ? '#064E3B' : '#fff'}; font-weight: 700;">
+              <button class="btn btn-community-filter ${communityActiveFilter === 'all' ? 'active' : ''}" data-filter="all" style="padding: 0.25rem 0.55rem; font-size: 0.8rem; border-radius: 6px; border: none; cursor: pointer; background: ${communityActiveFilter === 'all' ? '#ffffff' : 'transparent'}; color: ${communityActiveFilter === 'all' ? '#064E3B' : '#fff'}; font-weight: 700;">
                 All Chat
               </button>
-              <button class="btn btn-community-filter ${communityActiveFilter === 'pinned' ? 'active' : ''}" data-filter="pinned" style="padding: 0.25rem 0.55rem; font-size: 0.75rem; border-radius: 6px; border: none; cursor: pointer; background: ${communityActiveFilter === 'pinned' ? '#ffffff' : 'transparent'}; color: ${communityActiveFilter === 'pinned' ? '#064E3B' : '#fff'}; font-weight: 700;">
+              <button class="btn btn-community-filter ${communityActiveFilter === 'pinned' ? 'active' : ''}" data-filter="pinned" style="padding: 0.25rem 0.55rem; font-size: 0.8rem; border-radius: 6px; border: none; cursor: pointer; background: ${communityActiveFilter === 'pinned' ? '#ffffff' : 'transparent'}; color: ${communityActiveFilter === 'pinned' ? '#064E3B' : '#fff'}; font-weight: 700;">
                 ✨ Pinned (${pinnedMsgs.length})
               </button>
-              <button class="btn btn-community-filter ${communityActiveFilter === 'files' ? 'active' : ''}" data-filter="files" style="padding: 0.25rem 0.55rem; font-size: 0.75rem; border-radius: 6px; border: none; cursor: pointer; background: ${communityActiveFilter === 'files' ? '#ffffff' : 'transparent'}; color: ${communityActiveFilter === 'files' ? '#064E3B' : '#fff'}; font-weight: 700;">
+              <button class="btn btn-community-filter ${communityActiveFilter === 'files' ? 'active' : ''}" data-filter="files" style="padding: 0.25rem 0.55rem; font-size: 0.8rem; border-radius: 6px; border: none; cursor: pointer; background: ${communityActiveFilter === 'files' ? '#ffffff' : 'transparent'}; color: ${communityActiveFilter === 'files' ? '#064E3B' : '#fff'}; font-weight: 700;">
                 📄 Files
               </button>
             </div>
@@ -8113,15 +8113,15 @@ function renderStudentDashboard() {
               <div style="font-size: 1.1rem; color: #D97706; margin-top: 0.1rem;" class="hg-sparkle-icon">✨</div>
               <div style="flex: 1;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.15rem;">
-                  <span style="font-size: 0.72rem; font-weight: 800; color: #92400E; text-transform: uppercase; letter-spacing: 0.5px;">✨ HIGHLIGHTED ANNOUNCEMENT (${pinnedMsgs.length})</span>
-                  <span style="font-size: 0.7rem; color: #B45309;">By ${topPinned.senderName || 'Admin'} • ${topPinned.timestamp || ''}</span>
+                  <span style="font-size: 0.8rem; font-weight: 800; color: #92400E; text-transform: uppercase; letter-spacing: 0.5px;">✨ HIGHLIGHTED ANNOUNCEMENT (${pinnedMsgs.length})</span>
+                  <span style="font-size: 0.8rem; color: #B45309;">By ${topPinned.senderName || 'Admin'} • ${topPinned.timestamp || ''}</span>
                 </div>
                 <div style="font-size: 0.84rem; color: #78350F; font-weight: 600; line-height: 1.35;">
                   "${topPinned.text || ''}"
                 </div>
                 ${topPinned.linkUrl ? `
                   <div style="margin-top: 0.35rem;">
-                    <a href="${topPinned.linkUrl}" target="_blank" class="btn" style="background: linear-gradient(135deg, #D97706 0%, #B45309 100%); color: #fff; font-size: 0.74rem; padding: 0.2rem 0.55rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 0.3rem; text-decoration: none; font-weight: 800;">
+                    <a href="${topPinned.linkUrl}" target="_blank" class="btn" style="background: linear-gradient(135deg, #D97706 0%, #B45309 100%); color: #fff; font-size: 0.8rem; padding: 0.2rem 0.55rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 0.3rem; text-decoration: none; font-weight: 800;">
                       <i aria-hidden="true" class="fa-solid fa-arrow-up-right-from-square"></i> Open Announcement Link
                     </a>
                   </div>
@@ -8141,7 +8141,7 @@ function renderStudentDashboard() {
               <div style="text-align: center; padding: 3rem 1rem; color: var(--text-muted); background: #ffffff; border-radius: 12px; margin: 1rem auto; max-width: 320px;">
                 <div style="font-size: 2.2rem; margin-bottom: 0.35rem;">💬</div>
                 <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-mahogany);">No community messages yet</div>
-                <div style="font-size: 0.78rem; margin-top: 0.25rem;">Type a message or use <strong>/ad</strong> for Admin Alert</div>
+                <div style="font-size: 0.8rem; margin-top: 0.25rem;">Type a message or use <strong>/ad</strong> for Admin Alert</div>
               </div>
             ` : displayMsgs.map(msg => {
               if (!msg) return '';
@@ -8158,21 +8158,21 @@ function renderStudentDashboard() {
               return `
                 <div class="whatsapp-msg-row" style="display: flex; gap: 0.35rem; max-width: 90%; margin-bottom: 0.1rem; align-self: ${isSelf ? 'flex-end' : 'flex-start'}; flex-direction: ${isSelf ? 'row-reverse' : 'row'};">
                   
-                  <div style="width: 24px; height: 24px; border-radius: 50%; background: ${isMsgAdmin ? '#ECFDF5' : '#EFF6FF'}; border: 1.5px solid ${isMsgAdmin ? '#059669' : '#3B82F6'}; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; flex-shrink: 0; margin-top: 1px;">
+                  <div style="width: 24px; height: 24px; border-radius: 50%; background: ${isMsgAdmin ? '#ECFDF5' : '#EFF6FF'}; border: 1.5px solid ${isMsgAdmin ? '#059669' : '#3B82F6'}; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; flex-shrink: 0; margin-top: 1px;">
                     ${msg.avatar || (isMsgAdmin ? '👨‍🏫' : '🎓')}
                   </div>
 
                   <div class="whatsapp-bubble ${msg.isHighlighted ? 'hg-sparkle-card' : ''}" style="background: ${msg.isHighlighted ? '#FEF3C7' : msg.isAdminAlert ? '#FEE2E2' : (isSelf ? '#DCF8C6' : '#ffffff')}; border: 1px solid ${msg.isHighlighted ? '#F59E0B' : msg.isAdminAlert ? '#EF4444' : (isSelf ? '#B7E493' : '#E5E7EB')}; border-radius: ${isSelf ? '10px 0px 10px 10px' : '0px 10px 10px 10px'}; padding: 0.25rem 0.55rem; box-shadow: 0 1px 2px rgba(0,0,0,0.04); min-width: 110px; max-width: 100%; position: relative;">
                     
-                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.35rem; margin-bottom: 0.1rem; font-size: 0.72rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.35rem; margin-bottom: 0.1rem; font-size: 0.8rem;">
                       <span style="font-weight: 800; color: ${isMsgAdmin ? '#065F46' : '#1D4ED8'}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                         ${msg.senderName}
                       </span>
                       
                       <div style="display: flex; gap: 0.2rem; align-items: center;">
-                        ${msg.isHighlighted ? '<span style="background: #F59E0B; color: #fff; font-size: 0.6rem; padding: 0.01rem 0.3rem; border-radius: 3px; font-weight: 800;" class="hg-sparkle-icon">✨ HIGHLIGHTED</span>' : ''}
-                        ${msg.isAdminAlert ? '<span style="background: #DC2626; color: #fff; font-size: 0.6rem; padding: 0.01rem 0.3rem; border-radius: 3px; font-weight: 800;"><i aria-hidden="true" class="fa-solid fa-bell"></i> ADMIN ALERT</span>' : ''}
-                        ${!msg.isHighlighted && !msg.isAdminAlert && isMsgAdmin ? '<span style="background: #D1FAE5; color: #065F46; font-size: 0.6rem; padding: 0.01rem 0.25rem; border-radius: 3px; font-weight: 700;">FACULTY</span>' : ''}
+                        ${msg.isHighlighted ? '<span style="background: #F59E0B; color: #fff; font-size: 0.8rem; padding: 0.01rem 0.3rem; border-radius: 3px; font-weight: 800;" class="hg-sparkle-icon">✨ HIGHLIGHTED</span>' : ''}
+                        ${msg.isAdminAlert ? '<span style="background: #DC2626; color: #fff; font-size: 0.8rem; padding: 0.01rem 0.3rem; border-radius: 3px; font-weight: 800;"><i aria-hidden="true" class="fa-solid fa-bell"></i> ADMIN ALERT</span>' : ''}
+                        ${!msg.isHighlighted && !msg.isAdminAlert && isMsgAdmin ? '<span style="background: #D1FAE5; color: #065F46; font-size: 0.8rem; padding: 0.01rem 0.25rem; border-radius: 3px; font-weight: 700;">FACULTY</span>' : ''}
                       </div>
                     </div>
 
@@ -8180,7 +8180,7 @@ function renderStudentDashboard() {
 
                     ${urlMatch ? `
                       <div style="margin-top: 0.25rem;">
-                        <a href="${urlMatch}" target="_blank" class="btn" style="background: linear-gradient(135deg, #059669 0%, #047857 100%); color: #ffffff !important; text-decoration: none; padding: 0.2rem 0.55rem; border-radius: 4px; font-weight: 800; font-size: 0.74rem; display: inline-flex; align-items: center; gap: 0.3rem; box-shadow: 0 2px 6px rgba(5, 150, 105, 0.3);">
+                        <a href="${urlMatch}" target="_blank" class="btn" style="background: linear-gradient(135deg, #059669 0%, #047857 100%); color: #ffffff !important; text-decoration: none; padding: 0.2rem 0.55rem; border-radius: 4px; font-weight: 800; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.3rem; box-shadow: 0 2px 6px rgba(5, 150, 105, 0.3);">
                           <i aria-hidden="true" class="fa-solid fa-arrow-up-right-from-square"></i> Open Link
                         </a>
                       </div>
@@ -8188,10 +8188,10 @@ function renderStudentDashboard() {
 
                     ${msg.attachment ? `
                       <div style="margin-top: 0.25rem; background: rgba(0,0,0,0.04); border-radius: 4px; padding: 0.25rem 0.45rem; display: flex; align-items: center; justify-content: space-between; gap: 0.4rem;">
-                        <div style="font-size: 0.74rem; font-weight: 700; color: #1F2937; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        <div style="font-size: 0.8rem; font-weight: 700; color: #1F2937; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                           📄 ${msg.attachment.name}
                         </div>
-                        <a href="${msg.attachment.data}" download="${msg.attachment.name}" style="color: #059669; font-weight: 700; font-size: 0.72rem; text-decoration: none; white-space: nowrap;">
+                        <a href="${msg.attachment.data}" download="${msg.attachment.name}" style="color: #059669; font-weight: 700; font-size: 0.8rem; text-decoration: none; white-space: nowrap;">
                           📥 Download
                         </a>
                       </div>
@@ -8200,35 +8200,35 @@ function renderStudentDashboard() {
                     ${(msg.replies && msg.replies.length > 0) ? `
                       <div style="margin-top: 0.25rem; padding-left: 0.4rem; border-left: 2px solid var(--primary-emerald); display: flex; flex-direction: column; gap: 0.15rem;">
                         ${msg.replies.map(r => `
-                          <div style="font-size: 0.74rem; background: rgba(0,0,0,0.03); padding: 0.15rem 0.35rem; border-radius: 3px;">
-                            <strong style="font-size: 0.7rem; color: #374151;">${r.senderName}:</strong> ${r.text}
+                          <div style="font-size: 0.8rem; background: rgba(0,0,0,0.03); padding: 0.15rem 0.35rem; border-radius: 3px;">
+                            <strong style="font-size: 0.8rem; color: #374151;">${r.senderName}:</strong> ${r.text}
                           </div>
                         `).join('')}
                       </div>
                     ` : ''}
 
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.15rem; font-size: 0.64rem; color: #6B7280; gap: 0.4rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.15rem; font-size: 0.8rem; color: #6B7280; gap: 0.4rem;">
                       <div style="display: flex; gap: 0.4rem; align-items: center;">
-                        <button class="btn btn-reply-msg" data-id="${msg.id}" style="background: none; border: none; padding: 0; color: #059669; font-size: 0.68rem; font-weight: 700; cursor: pointer;">
+                        <button class="btn btn-reply-msg" data-id="${msg.id}" style="background: none; border: none; padding: 0; color: #059669; font-size: 0.8rem; font-weight: 700; cursor: pointer;">
                           <i aria-hidden="true" class="fa-solid fa-reply"></i> Reply
                         </button>
                         ${isAdmin ? `
-                          <button class="btn btn-toggle-pin-msg" data-id="${msg.id}" style="background: none; border: none; padding: 0; color: #D97706; font-size: 0.68rem; font-weight: 700; cursor: pointer;">
+                          <button class="btn btn-toggle-pin-msg" data-id="${msg.id}" style="background: none; border: none; padding: 0; color: #D97706; font-size: 0.8rem; font-weight: 700; cursor: pointer;">
                             <i aria-hidden="true" class="fa-solid fa-thumbtack"></i> ${msg.isPinned ? 'Unpin' : 'Pin'}
                           </button>
-                          <button class="btn btn-delete-msg" data-id="${msg.id}" style="background: none; border: none; padding: 0; color: #DC2626; font-size: 0.68rem; font-weight: 700; cursor: pointer;" title="Delete">
+                          <button class="btn btn-delete-msg" data-id="${msg.id}" style="background: none; border: none; padding: 0; color: #DC2626; font-size: 0.8rem; font-weight: 700; cursor: pointer;" title="Delete">
                             <i aria-hidden="true" class="fa-solid fa-trash-can"></i>
                           </button>
                         ` : ''}
                       </div>
-                      <span style="font-size: 0.63rem; color: #6B7280;">${msg.timestamp}</span>
+                      <span style="font-size: 0.8rem; color: #6B7280;">${msg.timestamp}</span>
                     </div>
 
                     ${activeReplyMsgId === msg.id ? `
                       <div style="margin-top: 0.35rem; background: #ffffff; padding: 0.3rem; border-radius: 4px; border: 1px solid var(--primary-emerald);">
                         <div style="display: flex; gap: 0.3rem;">
-                          <input type="text" id="inputReplyText-${msg.id}" aria-label="Reply to ${msg.senderName}" class="portal-input" placeholder="Reply to ${msg.senderName}..." style="font-size: 0.74rem; height: 26px; padding: 0.1rem 0.4rem;">
-                          <button class="btn btn-emerald btn-submit-reply" data-id="${msg.id}" style="padding: 0.1rem 0.45rem; font-size: 0.7rem;">
+                          <input type="text" id="inputReplyText-${msg.id}" aria-label="Reply to ${msg.senderName}" class="portal-input" placeholder="Reply to ${msg.senderName}..." style="font-size: 0.8rem; height: 26px; padding: 0.1rem 0.4rem;">
+                          <button class="btn btn-emerald btn-submit-reply" data-id="${msg.id}" style="padding: 0.1rem 0.45rem; font-size: 0.8rem;">
                             Post
                           </button>
                         </div>
@@ -8241,7 +8241,7 @@ function renderStudentDashboard() {
           </div>
 
           <div style="background: #ffffff; border-top: 1.5px solid var(--border-sand); padding: 0.6rem 0.9rem; flex-shrink: 0;">
-            <div id="communityAttachmentPreview" style="display: none; margin-bottom: 0.4rem; background: #ECFDF5; border: 1px solid #059669; color: #065F46; padding: 0.35rem 0.55rem; border-radius: 6px; font-size: 0.76rem; justify-content: space-between; align-items: center;">
+            <div id="communityAttachmentPreview" style="display: none; margin-bottom: 0.4rem; background: #ECFDF5; border: 1px solid #059669; color: #065F46; padding: 0.35rem 0.55rem; border-radius: 6px; font-size: 0.8rem; justify-content: space-between; align-items: center;">
               <div style="display: flex; align-items: center; gap: 0.35rem;">
                 <i aria-hidden="true" class="fa-solid fa-paperclip"></i>
                 <span id="communityAttachmentName">Attachment.pdf</span>
@@ -8258,14 +8258,14 @@ function renderStudentDashboard() {
                 </button>
               </div>
 
-              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.35rem; font-size: 0.72rem; color: var(--text-muted);">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.35rem; font-size: 0.8rem; color: var(--text-muted);">
                 <div style="display: flex; gap: 0.65rem; align-items: center;">
                   <span>✨ <strong>/hg</strong>: Sparkling Link / Announcement (Admin)</span>
                   <span>🚨 <strong>/ad</strong>: Admin Alert Notification</span>
                 </div>
 
                 ${isAdmin ? `
-                  <label for="communityFileInput" class="btn" style="background: #FAF9F6; border: 1px dashed var(--primary-emerald); color: var(--primary-emerald); padding: 0.2rem 0.55rem; font-size: 0.72rem; font-weight: 700; border-radius: 6px; cursor: pointer; margin: 0; display: inline-flex; align-items: center; gap: 0.25rem;">
+                  <label for="communityFileInput" class="btn" style="background: #FAF9F6; border: 1px dashed var(--primary-emerald); color: var(--primary-emerald); padding: 0.2rem 0.55rem; font-size: 0.8rem; font-weight: 700; border-radius: 6px; cursor: pointer; margin: 0; display: inline-flex; align-items: center; gap: 0.25rem;">
                     <i aria-hidden="true" class="fa-solid fa-paperclip"></i> Attach File
                     <input type="file" id="communityFileInput" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.zip" style="display: none;">
                   </label>
@@ -8724,7 +8724,7 @@ function renderStudentDashboard() {
             </div>
             <div>
               <div style="font-weight: 800; font-size: 0.92rem; color: #064E3B;">In-Portal Noticeboard & Student Feed</div>
-              <div style="font-size: 0.78rem; color: #047857;">Broadcast notices here to display them immediately inside student dashboards and noticeboards.</div>
+              <div style="font-size: 0.8rem; color: #047857;">Broadcast notices here to display them immediately inside student dashboards and noticeboards.</div>
             </div>
           </div>
           <button type="button" class="btn btn-emerald" onclick="switchAdminTab('email')" style="padding: 0.45rem 1rem; font-size: 0.82rem; font-weight: 700; border-radius: 8px;">
@@ -8738,7 +8738,7 @@ function renderStudentDashboard() {
           </div>
           <div>
             <div style="font-weight: 800; font-size: 0.92rem; color: #064E3B;">In-Portal Noticeboard Broadcasts</div>
-            <div style="font-size: 0.78rem; color: #64748B;">Notices posted here are immediately visible to students in their portal feeds. (Mass email campaigns are dispatched by Main Admin Chandan Kumar).</div>
+            <div style="font-size: 0.8rem; color: #64748B;">Notices posted here are immediately visible to students in their portal feeds. (Mass email campaigns are dispatched by Main Admin Chandan Kumar).</div>
           </div>
         </div>
       `}
@@ -8775,10 +8775,10 @@ function renderStudentDashboard() {
                 <i aria-hidden="true" class="fa-solid fa-users-viewfinder" style="color: var(--primary-emerald);"></i> Target Batches for In-Portal Noticeboard *
               </label>
               <div style="display: flex; gap: 0.4rem;">
-                <button type="button" id="btnSelectAllBatches" class="btn" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; border-radius: 6px; font-weight: 700; cursor: pointer;">
+                <button type="button" id="btnSelectAllBatches" class="btn" style="padding: 0.25rem 0.65rem; font-size: 0.8rem; background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; border-radius: 6px; font-weight: 700; cursor: pointer;">
                   Select All
                 </button>
-                <button type="button" id="btnClearAllBatches" class="btn" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; background: #F1F5F9; color: #475569; border: 1px solid #CBD5E1; border-radius: 6px; font-weight: 700; cursor: pointer;">
+                <button type="button" id="btnClearAllBatches" class="btn" style="padding: 0.25rem 0.65rem; font-size: 0.8rem; background: #F1F5F9; color: #475569; border: 1px solid #CBD5E1; border-radius: 6px; font-weight: 700; cursor: pointer;">
                   Clear
                 </button>
               </div>
@@ -8805,7 +8805,7 @@ function renderStudentDashboard() {
           <div style="margin-bottom: 1.25rem;">
             <label for="noticeAttachmentInput" style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.35rem;">Attach Photo or PDF Document (Optional)</label>
             <input type="file" id="noticeAttachmentInput" class="portal-input" accept="image/*,.pdf,.doc,.docx" style="padding: 0.45rem;">
-            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Stored securely in Supabase Storage bucket. Supports photos & PDF documents.</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">Stored securely in Supabase Storage bucket. Supports photos & PDF documents.</div>
           </div>
           <button type="submit" class="btn btn-emerald" style="padding: 0.75rem 1.75rem;">
             <i aria-hidden="true" class="fa-solid fa-bullhorn"></i> Post to Student Noticeboard
@@ -8849,18 +8849,18 @@ function renderStudentDashboard() {
           <div style="display: flex; flex-direction: column; gap: 1rem;">
             ${filteredNotices.map(notice => {
               const catBadge = notice.category === 'exam' 
-                ? '<span style="background: #FEF3C7; color: #92400E; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 700; font-size: 0.75rem;"><i aria-hidden="true" class="fa-solid fa-file-pen"></i> Exam & Test</span>'
+                ? '<span style="background: #FEF3C7; color: #92400E; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 700; font-size: 0.8rem;"><i aria-hidden="true" class="fa-solid fa-file-pen"></i> Exam & Test</span>'
                 : notice.category === 'holiday'
-                ? '<span style="background: #E0F2FE; color: #0369A1; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 700; font-size: 0.75rem;"><i aria-hidden="true" class="fa-solid fa-umbrella-beach"></i> Holiday / Off</span>'
+                ? '<span style="background: #E0F2FE; color: #0369A1; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 700; font-size: 0.8rem;"><i aria-hidden="true" class="fa-solid fa-umbrella-beach"></i> Holiday / Off</span>'
                 : notice.category === 'fees'
-                ? '<span style="background: #FEE2E2; color: #991B1B; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 700; font-size: 0.75rem;"><i aria-hidden="true" class="fa-solid fa-receipt"></i> Fee Notice</span>'
+                ? '<span style="background: #FEE2E2; color: #991B1B; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 700; font-size: 0.8rem;"><i aria-hidden="true" class="fa-solid fa-receipt"></i> Fee Notice</span>'
                 : notice.category === 'urgent'
-                ? '<span style="background: #FEE2E2; color: #B91C1C; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 800; font-size: 0.75rem;"><i aria-hidden="true" class="fa-solid fa-triangle-exclamation"></i> Urgent Alert</span>'
-                : '<span style="background: #D1FAE5; color: #065F46; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 700; font-size: 0.75rem;"><i aria-hidden="true" class="fa-solid fa-bullhorn"></i> General</span>';
+                ? '<span style="background: #FEE2E2; color: #B91C1C; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 800; font-size: 0.8rem;"><i aria-hidden="true" class="fa-solid fa-triangle-exclamation"></i> Urgent Alert</span>'
+                : '<span style="background: #D1FAE5; color: #065F46; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 700; font-size: 0.8rem;"><i aria-hidden="true" class="fa-solid fa-bullhorn"></i> General</span>';
 
               const targetBatchBadge = notice.targetBatch 
-                ? `<span style="background: #EEF2FF; color: #4338CA; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 600; font-size: 0.75rem;"><i aria-hidden="true" class="fa-solid fa-users"></i> ${notice.targetBatch}</span>`
-                : '<span style="background: #EEF2FF; color: #4338CA; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 600; font-size: 0.75rem;"><i aria-hidden="true" class="fa-solid fa-users"></i> All Batches</span>';
+                ? `<span style="background: #EEF2FF; color: #4338CA; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 600; font-size: 0.8rem;"><i aria-hidden="true" class="fa-solid fa-users"></i> ${notice.targetBatch}</span>`
+                : '<span style="background: #EEF2FF; color: #4338CA; padding: 0.2rem 0.6rem; border-radius: 99px; font-weight: 600; font-size: 0.8rem;"><i aria-hidden="true" class="fa-solid fa-users"></i> All Batches</span>';
 
               return `
                 <div style="background: #ffffff; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 1.15rem; transition: transform 0.15s ease, box-shadow 0.15s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
@@ -8870,11 +8870,11 @@ function renderStudentDashboard() {
                       ${targetBatchBadge}
                     </div>
                     <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-                      <span style="font-size: 0.78rem; color: var(--text-muted); font-weight: 600;">📅 ${notice.date}</span>
-                      <button type="button" class="btn btn-edit-notice" data-id="${notice.id}" style="padding: 0.35rem 0.75rem; font-size: 0.78rem; font-weight: 700; background: #ECFDF5; color: #065F46; border: 1px solid #10B981; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; transition: background 0.15s ease;" title="Edit Notice">
+                      <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">📅 ${notice.date}</span>
+                      <button type="button" class="btn btn-edit-notice" data-id="${notice.id}" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; font-weight: 700; background: #ECFDF5; color: #065F46; border: 1px solid #10B981; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; transition: background 0.15s ease;" title="Edit Notice">
                         <i aria-hidden="true" class="fa-solid fa-pen-to-square"></i> Edit
                       </button>
-                      <button type="button" class="btn btn-delete-notice" data-id="${notice.id}" style="padding: 0.35rem 0.75rem; font-size: 0.78rem; font-weight: 700; background: #FEE2E2; color: #DC2626; border: 1px solid #FECACA; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; transition: background 0.15s ease;" title="Delete Notice">
+                      <button type="button" class="btn btn-delete-notice" data-id="${notice.id}" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; font-weight: 700; background: #FEE2E2; color: #DC2626; border: 1px solid #FECACA; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; transition: background 0.15s ease;" title="Delete Notice">
                         <i aria-hidden="true" class="fa-solid fa-trash-can"></i> Delete
                       </button>
                     </div>
@@ -9125,7 +9125,7 @@ function renderStudentDashboard() {
                   <i aria-hidden="true" class="fa-solid fa-paperclip" style="color: var(--primary-emerald);"></i> Current Attachment: 
                   <a href="${target.attachmentUrl || target.attachment_url}" target="_blank" style="font-weight: 700; color: var(--primary-emerald); text-decoration: underline;">View File</a>
                 </div>
-                <button type="button" id="btnRemoveNoticeAttachment" class="btn" style="padding: 0.2rem 0.5rem; font-size: 0.72rem; background: #FEE2E2; color: #DC2626; border: 1px solid #FECACA; border-radius: 4px; cursor: pointer;">
+                <button type="button" id="btnRemoveNoticeAttachment" class="btn" style="padding: 0.2rem 0.5rem; font-size: 0.8rem; background: #FEE2E2; color: #DC2626; border: 1px solid #FECACA; border-radius: 4px; cursor: pointer;">
                   <i class="fa-solid fa-xmark" aria-hidden="true"></i> Remove Attachment
                 </button>
               </div>
@@ -9448,10 +9448,10 @@ function renderStudentDashboard() {
             </div>
           </div>
           <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-            <span class="user-badge-tag" style="background: #064E3B; color: #fff; font-weight: 700; font-size: 0.78rem;">
+            <span class="user-badge-tag" style="background: #064E3B; color: #fff; font-weight: 700; font-size: 0.8rem;">
               <i aria-hidden="true" class="fa-solid fa-clock"></i> IST Active: Day ${ist.day} (${ist.monthKey})
             </span>
-            <span class="user-badge-tag" style="background: #1E40AF; color: #fff; font-weight: 700; font-size: 0.78rem;">
+            <span class="user-badge-tag" style="background: #1E40AF; color: #fff; font-weight: 700; font-size: 0.8rem;">
               <i aria-hidden="true" class="fa-solid fa-bolt"></i> Resend Cloud API
             </span>
           </div>
@@ -9487,27 +9487,27 @@ function renderStudentDashboard() {
         <!-- Audience & Live Database Fee Statistics Grid -->
         <div class="admin-email-metrics-grid">
           <div style="background: #F0FDF4; border: 1.5px solid #BBF7D0; border-radius: 10px; padding: 0.85rem 1rem;">
-            <div style="font-size: 0.75rem; font-weight: 700; color: #166534; text-transform: uppercase; letter-spacing: 0.5px;">Target Enrolled</div>
+            <div style="font-size: 0.8rem; font-weight: 700; color: #166534; text-transform: uppercase; letter-spacing: 0.5px;">Target Enrolled</div>
             <div style="font-size: 1.35rem; font-weight: 900; color: #064E3B; margin-top: 0.2rem;">${totalCount} <span style="font-size: 0.8rem; font-weight: 600; color: #15803D;">students</span></div>
-            <div style="font-size: 0.72rem; color: #166534; margin-top: 0.2rem;">${audienceLabel}</div>
+            <div style="font-size: 0.8rem; color: #166534; margin-top: 0.2rem;">${audienceLabel}</div>
           </div>
 
           <div style="background: #EFF6FF; border: 1.5px solid #BFDBFE; border-radius: 10px; padding: 0.85rem 1rem;">
-            <div style="font-size: 0.75rem; font-weight: 700; color: #1E40AF; text-transform: uppercase; letter-spacing: 0.5px;">Valid Email IDs</div>
+            <div style="font-size: 0.8rem; font-weight: 700; color: #1E40AF; text-transform: uppercase; letter-spacing: 0.5px;">Valid Email IDs</div>
             <div style="font-size: 1.35rem; font-weight: 900; color: #1D4ED8; margin-top: 0.2rem;">${validEmailCount} <span style="font-size: 0.8rem; font-weight: 600; color: #2563EB;">/ ${totalCount}</span></div>
-            <div style="font-size: 0.72rem; color: #1E40AF; margin-top: 0.2rem;">${totalCount - validEmailCount > 0 ? `⚠️ ${totalCount - validEmailCount} missing email` : '✅ 100% email coverage'}</div>
+            <div style="font-size: 0.8rem; color: #1E40AF; margin-top: 0.2rem;">${totalCount - validEmailCount > 0 ? `⚠️ ${totalCount - validEmailCount} missing email` : '✅ 100% email coverage'}</div>
           </div>
 
           <div style="background: #FFFBEB; border: 1.5px solid #FDE68A; border-radius: 10px; padding: 0.85rem 1rem;">
-            <div style="font-size: 0.75rem; font-weight: 700; color: #92400E; text-transform: uppercase; letter-spacing: 0.5px;">Outstanding Dues</div>
+            <div style="font-size: 0.8rem; font-weight: 700; color: #92400E; text-transform: uppercase; letter-spacing: 0.5px;">Outstanding Dues</div>
             <div style="font-size: 1.35rem; font-weight: 900; color: #B45309; margin-top: 0.2rem;">₹${totalPendingDues.toLocaleString('en-IN')}</div>
-            <div style="font-size: 0.72rem; color: #92400E; margin-top: 0.2rem;">${totalDefaultersInTarget} students with balance</div>
+            <div style="font-size: 0.8rem; color: #92400E; margin-top: 0.2rem;">${totalDefaultersInTarget} students with balance</div>
           </div>
 
           <div style="background: #FDF2F8; border: 1.5px solid #FBCFE8; border-radius: 10px; padding: 0.85rem 1rem;">
-            <div style="font-size: 0.75rem; font-weight: 700; color: #9D174D; text-transform: uppercase; letter-spacing: 0.5px;">Fee Collected in Target</div>
+            <div style="font-size: 0.8rem; font-weight: 700; color: #9D174D; text-transform: uppercase; letter-spacing: 0.5px;">Fee Collected in Target</div>
             <div style="font-size: 1.35rem; font-weight: 900; color: #BE185D; margin-top: 0.2rem;">₹${totalPaidFee.toLocaleString('en-IN')}</div>
-            <div style="font-size: 0.72rem; color: #9D174D; margin-top: 0.2rem;">From enrolled records</div>
+            <div style="font-size: 0.8rem; color: #9D174D; margin-top: 0.2rem;">From enrolled records</div>
           </div>
         </div>
 
@@ -9568,7 +9568,7 @@ function renderStudentDashboard() {
           <div style="margin-bottom: 1rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.35rem;">
               <label for="adminEmailBodyInput" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany);">Email Body / Message Text *</label>
-              <span style="font-size: 0.74rem; color: var(--text-muted); font-weight: 600;">
+              <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">
                 Tags: <code>{student_name}</code>, <code>{roll_no}</code>, <code>{monthly_fee}</code>, <code>{pending_fee}</code>
               </span>
             </div>
@@ -9812,12 +9812,12 @@ function renderStudentDashboard() {
             <!-- Server Authoritative Student ID Banner -->
             <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 8px; padding: 0.65rem 0.9rem; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between;">
               <div>
-                <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700;">Authoritative Sequence Format (YYCCSS)</div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700;">Authoritative Sequence Format (YYCCSS)</div>
                 <div style="font-size: 1.05rem; font-weight: 800; color: #10B981; margin-top: 2px;">
                   <i aria-hidden="true" class="fa-solid fa-id-card"></i> Student ID: <span id="newStuIdBadgeDisplay">Calculating...</span>
                 </div>
               </div>
-              <span style="background: rgba(16, 185, 129, 0.2); color: #10B981; font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 99px;">Server Sequence</span>
+              <span style="background: rgba(16, 185, 129, 0.2); color: #10B981; font-size: 0.8rem; font-weight: 700; padding: 3px 8px; border-radius: 99px;">Server Sequence</span>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; margin-bottom: 1rem;">
@@ -9842,12 +9842,12 @@ function renderStudentDashboard() {
               <div>
                 <label for="newStuMonthlyFee" style="font-size: 0.85rem; font-weight: 600;">Monthly Fee Rate (₹/Month) *</label>
                 <input type="number" id="newStuMonthlyFee" class="portal-input" value="1000" min="0" required placeholder="e.g. 1000">
-                <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.2rem;">Added automatically on 1st–4th of each month.</div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">Added automatically on 1st–4th of each month.</div>
               </div>
               <div>
                 <label for="newStuPrevDue" style="font-size: 0.85rem; font-weight: 600;">Old / Past Pending Fees (₹) <span style="font-weight:400; color:var(--text-muted);">(0 for new admissions)</span></label>
                 <input type="number" id="newStuPrevDue" class="portal-input" value="0" min="0" placeholder="0 if starting fresh, or enter past dues">
-                <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.2rem;">Initial balance due. Default is ₹0 for fresh admissions.</div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">Initial balance due. Default is ₹0 for fresh admissions.</div>
               </div>
               <div>
                 <label for="newStuEmail" style="font-size: 0.85rem; font-weight: 600;">Email Address <span style="font-weight:400; color:var(--text-muted);">(Optional)</span></label>
@@ -10046,7 +10046,7 @@ function renderStudentDashboard() {
           ${existingPending ? `
             <div style="background: #FEF3C7; border: 1px solid #F59E0B; color: #92400E; padding: 0.65rem 0.9rem; border-radius: 8px; font-size: 0.84rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
               <div><i aria-hidden="true" class="fa-solid fa-clock-rotate-left"></i> <strong>Pending Request Active:</strong> Submitting will update your pending request for Admin review.</div>
-              <button type="button" id="btnCancelThisReq" style="background: #DC2626; color: #fff; border: none; padding: 0.25rem 0.6rem; border-radius: 4px; font-size: 0.76rem; font-weight: 700; cursor: pointer;">
+              <button type="button" id="btnCancelThisReq" style="background: #DC2626; color: #fff; border: none; padding: 0.25rem 0.6rem; border-radius: 4px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">
                 Cancel Request
               </button>
             </div>
@@ -10103,7 +10103,7 @@ function renderStudentDashboard() {
               <div style="grid-column: span 2;">
                 <label for="reqStuPhotoInput" style="font-size: 0.85rem; font-weight: 600;"><i aria-hidden="true" class="fa-solid fa-camera" style="color: var(--primary-emerald);"></i> Upload New Profile Photo (PF)</label>
                 <input type="file" id="reqStuPhotoInput" accept="image/*" class="portal-input" style="padding: 0.4rem;">
-                <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 0.2rem;">Choose a profile picture to submit for verification & approval.</div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">Choose a profile picture to submit for verification & approval.</div>
                 <div id="reqPhotoPreviewContainer" style="margin-top: 0.4rem; display: ${currentValues.photoUrl ? 'block' : 'none'};">
                   <img id="reqPhotoPreviewImg" src="${safeImageUrl(currentValues.photoUrl)}" style="width: 55px; height: 55px; border-radius: 8px; object-fit: cover; border: 2px solid var(--primary-emerald);">
                 </div>
@@ -10353,7 +10353,7 @@ function renderStudentDashboard() {
 
           <!-- Payment Option Quick Select (Pay in Full vs Pay in Partial) -->
           <div style="background: var(--bg-surface-cream, #FAF9F6); border: 1.5px solid var(--border-sand, #E5E7EB); border-radius: 10px; padding: 0.85rem; margin-bottom: 1.15rem;">
-            <div id="payOptionGroupLabel" style="font-size: 0.78rem; font-weight: 800; color: var(--primary-emerald, #064E3B); text-transform: uppercase; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">
+            <div id="payOptionGroupLabel" style="font-size: 0.8rem; font-weight: 800; color: var(--primary-emerald, #064E3B); text-transform: uppercase; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">
               <i class="fa-solid fa-hand-holding-dollar" aria-hidden="true"></i> Choose Payment Option / भुगतान विकल्प
             </div>
             ${totalDue === 0 ? `
@@ -10377,7 +10377,7 @@ function renderStudentDashboard() {
           <div style="background: linear-gradient(135deg, #064E3B 0%, #022c22 100%); color: #fff; padding: 1.25rem; border-radius: 12px; margin-bottom: 1.25rem; box-shadow: 0 4px 15px rgba(6, 78, 59, 0.25);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.4rem;">
               <span style="font-size: 0.85rem; font-weight: 700; color: #A7F3D0;"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Official Institute UPI Gateway</span>
-              <span style="background: rgba(52, 211, 153, 0.2); border: 1px solid #34D399; color: #34D399; padding: 0.2rem 0.55rem; border-radius: 99px; font-weight: 700; font-size: 0.72rem;">Verified Gateway</span>
+              <span style="background: rgba(52, 211, 153, 0.2); border: 1px solid #34D399; color: #34D399; padding: 0.2rem 0.55rem; border-radius: 99px; font-weight: 700; font-size: 0.8rem;">Verified Gateway</span>
             </div>
 
             <!-- .upi-gateway-grid, not an inline two-column grid: the mobile rule
@@ -10387,17 +10387,17 @@ function renderStudentDashboard() {
             <div class="upi-gateway-grid">
               <div style="background: #FFFFFF; padding: 6px; border-radius: 10px; border: 2px solid #10B981; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
                 <img src="assets/images/chandan_upi_qr.png" alt="PhonePe QR code for ${payee.displayName}, Pragyan Institute" style="width: 130px; height: 170px; object-fit: contain; border-radius: 6px; display: block;">
-                <div style="font-size: 0.65rem; color: #065F46; font-weight: 800; margin-top: 4px;">SCAN ANY UPI APP</div>
+                <div style="font-size: 0.8rem; color: #065F46; font-weight: 800; margin-top: 4px;">SCAN ANY UPI APP</div>
               </div>
 
               <div style="min-width: 0;">
-                <div style="font-size: 0.78rem; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.5px;">Beneficiary / Payee</div>
-                <div style="font-size: 1.1rem; font-weight: 800; color: #FFFFFF; margin-bottom: 0.35rem;">${payee.displayName} <span style="font-size: 0.75rem; font-weight: 600; color: #6EE7B7;">(${payee.role})</span></div>
+                <div style="font-size: 0.8rem; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.5px;">Beneficiary / Payee</div>
+                <div style="font-size: 1.1rem; font-weight: 800; color: #FFFFFF; margin-bottom: 0.35rem;">${payee.displayName} <span style="font-size: 0.8rem; font-weight: 600; color: #6EE7B7;">(${payee.role})</span></div>
 
-                <div style="font-size: 0.78rem; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.5px;">Official UPI ID</div>
+                <div style="font-size: 0.8rem; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.5px;">Official UPI ID</div>
                 <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.2rem; flex-wrap: wrap;">
                   <span id="upiIdText" style="font-family: monospace; font-size: 1rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 1px solid rgba(52, 211, 153, 0.4); padding: 0.3rem 0.65rem; border-radius: 6px; color: #6EE7B7; word-break: break-all;">${payee.upiId}</span>
-                  <button type="button" id="btnCopyUpiId" style="background: #047857; color: #fff; border: none; min-height: 36px; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700; cursor: pointer;">
+                  <button type="button" id="btnCopyUpiId" style="background: #047857; color: #fff; border: none; min-height: 36px; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">
                     <i class="fa-regular fa-copy" aria-hidden="true"></i> Copy
                   </button>
                 </div>
@@ -10409,7 +10409,7 @@ function renderStudentDashboard() {
               <a id="autoUpiPayBtn" href="${initialUpiLink}" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; text-decoration: none; width: 100%; min-height: 44px; padding: 0.75rem 1rem; border-radius: 8px; font-weight: 700; font-size: 0.92rem; background: linear-gradient(135deg, #10B981 0%, #047857 100%); color: #fff; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35); text-align: center;">
                 <i class="fa-solid fa-mobile-screen-button" aria-hidden="true"></i> <span id="autoUpiBtnLabel">Pay ₹${selectedPayAmount.toLocaleString('en-IN')} with PhonePe / GPay / Paytm</span>
               </a>
-              <div id="autoUpiNoteText" style="text-align: center; font-size: 0.72rem; opacity: 0.8; margin-top: 0.35rem;">Clicking opens PhonePe, Google Pay, or Paytm directly with ₹${selectedPayAmount.toLocaleString('en-IN')} pre-filled.</div>
+              <div id="autoUpiNoteText" style="text-align: center; font-size: 0.8rem; opacity: 0.8; margin-top: 0.35rem;">Clicking opens PhonePe, Google Pay, or Paytm directly with ₹${selectedPayAmount.toLocaleString('en-IN')} pre-filled.</div>
             </div>
           </div>
 
@@ -10431,7 +10431,7 @@ function renderStudentDashboard() {
               <div style="grid-column: span 2;">
                 <label for="payReqUtr" style="font-size: 0.85rem; font-weight: 600;">UTR / Transaction Reference No. *</label>
                 <input type="text" id="payReqUtr" class="portal-input" placeholder="e.g. 423910982341 (Required)" required inputmode="numeric" aria-describedby="payReqUtrHelp">
-                <div id="payReqUtrHelp" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Enter 12-digit UTR or Transaction ID from PhonePe / GPay / Paytm receipt.</div>
+                <div id="payReqUtrHelp" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">Enter 12-digit UTR or Transaction ID from PhonePe / GPay / Paytm receipt.</div>
               </div>
               <div style="grid-column: span 2;">
                 <label for="payReqProofInput" style="font-size: 0.85rem; font-weight: 600;">Attach Payment Proof Screenshot (Optional)</label>
@@ -10834,12 +10834,12 @@ function renderStudentDashboard() {
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
                       <div>
                         <h4 style="font-size: 1.05rem; font-weight: 700; margin: 0; color: var(--text-mahogany);">${req.studentName} <span style="font-size: 0.82rem; font-weight: 400; color: var(--text-muted);">(Roll #${req.rollNo} • ${req.className})</span></h4>
-                        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem;">Submitted: ${req.timestamp || req.date} | Request ID: <strong>${req.id}</strong></div>
+                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">Submitted: ${req.timestamp || req.date} | Request ID: <strong>${req.id}</strong></div>
                       </div>
                       <div>
-                        ${isPending ? `<span style="background: #FEF3C7; color: #92400E; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 700; font-size: 0.78rem;">⏳ Pending Verification</span>` : ''}
-                        ${isApproved ? `<span style="background: #D1FAE5; color: #065F46; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 700; font-size: 0.78rem;">✅ Verified & Paid</span>` : ''}
-                        ${isRejected ? `<span style="background: #FEE2E2; color: #991B1B; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 700; font-size: 0.78rem;">❌ Verification Declined</span>` : ''}
+                        ${isPending ? `<span style="background: #FEF3C7; color: #92400E; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 700; font-size: 0.8rem;">⏳ Pending Verification</span>` : ''}
+                        ${isApproved ? `<span style="background: #D1FAE5; color: #065F46; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 700; font-size: 0.8rem;">✅ Verified & Paid</span>` : ''}
+                        ${isRejected ? `<span style="background: #FEE2E2; color: #991B1B; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 700; font-size: 0.8rem;">❌ Verification Declined</span>` : ''}
                       </div>
                     </div>
 
@@ -10855,7 +10855,7 @@ function renderStudentDashboard() {
                           </a>
                           <div>
                             <strong style="color: #065F46; font-size: 0.85rem;"><i aria-hidden="true" class="fa-solid fa-receipt"></i> Payment Proof Screenshot Attached</strong>
-                            <div style="font-size: 0.75rem; color: #047857;"><a href="${sanitizeUrl(p.proofUrl || p.proof)}" target="_blank" rel="noopener" style="color: #059669; text-decoration: underline;">Click to open full proof screenshot</a></div>
+                            <div style="font-size: 0.8rem; color: #047857;"><a href="${sanitizeUrl(p.proofUrl || p.proof)}" target="_blank" rel="noopener" style="color: #059669; text-decoration: underline;">Click to open full proof screenshot</a></div>
                           </div>
                         </div>
                       ` : ''}
@@ -10872,8 +10872,8 @@ function renderStudentDashboard() {
                           ${Number.isFinite(remainingAfter) ? `<div><span style="color:var(--text-muted);">Claims after this payment:</span> <br><strong>₹${remainingAfter.toLocaleString('en-IN')}</strong></div>` : ''}
                           <div><span style="color:var(--text-muted);">LIVE recorded dues:</span> <br><strong>${livePending === null ? 'Student not found in roster' : '₹' + livePending.toLocaleString('en-IN')}</strong></div>
                         </div>
-                        ${claimsMoreThanDues ? `<div style="margin-top: 0.45rem; color:#991B1B; font-size: 0.78rem;">The claimed balance exceeds live dues + one month's fee. Confirm the transferred amount on the bank statement matches ₹${payAmount.toLocaleString('en-IN')} EXACTLY.</div>`
-                          : claimMismatch ? `<div style="margin-top: 0.45rem; color:#92400E; font-size: 0.78rem;">Claimed dues differ from the live record (statement was generated before a recent change?). Totals are reconciled automatically on approval.</div>` : ''}
+                        ${claimsMoreThanDues ? `<div style="margin-top: 0.45rem; color:#991B1B; font-size: 0.8rem;">The claimed balance exceeds live dues + one month's fee. Confirm the transferred amount on the bank statement matches ₹${payAmount.toLocaleString('en-IN')} EXACTLY.</div>`
+                          : claimMismatch ? `<div style="margin-top: 0.45rem; color:#92400E; font-size: 0.8rem;">Claimed dues differ from the live record (statement was generated before a recent change?). Totals are reconciled automatically on approval.</div>` : ''}
                       </div>
                     ` : ''}
 
@@ -10950,7 +10950,7 @@ function renderStudentDashboard() {
                         <img src="${newPhotoVal}" style="width: 65px; height: 65px; border-radius: 8px; object-fit: cover; border: 2px solid #059669; box-shadow: 0 2px 5px rgba(0,0,0,0.15);" alt="New Photo Preview">
                         <div>
                           <strong style="color: #065F46; font-size: 0.9rem;"><i aria-hidden="true" class="fa-solid fa-camera"></i> Attached Profile Photo</strong>
-                          <div style="font-size: 0.78rem; color: #047857; margin-top: 2px;">${newPhotoVal !== oldPhotoVal ? '✨ New photo update requested' : '📷 Existing photo attached'}</div>
+                          <div style="font-size: 0.8rem; color: #047857; margin-top: 2px;">${newPhotoVal !== oldPhotoVal ? '✨ New photo update requested' : '📷 Existing photo attached'}</div>
                         </div>
                       </div>
                     `);
@@ -10963,12 +10963,12 @@ function renderStudentDashboard() {
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
                       <div>
                         <h4 style="font-size: 1.05rem; font-weight: 700; margin: 0; color: var(--text-mahogany);">${req.studentName} <span style="font-size: 0.82rem; font-weight: 400; color: var(--text-muted);">(Roll #${req.rollNo} • ${req.className})</span></h4>
-                        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem;">Request ID: <strong>${req.id}</strong> | Date: ${req.date}</div>
+                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">Request ID: <strong>${req.id}</strong> | Date: ${req.date}</div>
                       </div>
                       <div>
-                        ${isPending ? `<span style="background: #FEF3C7; color: #92400E; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 700; font-size: 0.78rem;">⏳ Pending Review</span>` : ''}
-                        ${isApproved ? `<span style="background: #D1FAE5; color: #065F46; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 700; font-size: 0.78rem;">✅ Approved & Updated</span>` : ''}
-                        ${isRejected ? `<span style="background: #FEE2E2; color: #991B1B; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 700; font-size: 0.78rem;">❌ Declined</span>` : ''}
+                        ${isPending ? `<span style="background: #FEF3C7; color: #92400E; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 700; font-size: 0.8rem;">⏳ Pending Review</span>` : ''}
+                        ${isApproved ? `<span style="background: #D1FAE5; color: #065F46; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 700; font-size: 0.8rem;">✅ Approved & Updated</span>` : ''}
+                        ${isRejected ? `<span style="background: #FEE2E2; color: #991B1B; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 700; font-size: 0.8rem;">❌ Declined</span>` : ''}
                       </div>
                     </div>
 
@@ -11554,7 +11554,7 @@ function renderStudentDashboard() {
                 Total Fee Payments Verified / Accepted by this Educator: <strong style="font-size: 1rem; color: #065F46;">₹${totalCollectedByEducator.toLocaleString()}</strong> across <strong>${filteredLogs.filter(l => l.actionType === 'FEE_PAYMENT' || l.actionType === 'PAYMENT_VERIFIED').length}</strong> transactions.
               </div>
             </div>
-            <button class="btn" id="btnClearEducatorFilter" style="background: #065F46; color: #fff; padding: 0.3rem 0.75rem; font-size: 0.78rem; border-radius: 6px;">Clear Filter</button>
+            <button class="btn" id="btnClearEducatorFilter" style="background: #065F46; color: #fff; padding: 0.3rem 0.75rem; font-size: 0.8rem; border-radius: 6px;">Clear Filter</button>
           </div>
         ` : ''}
 
@@ -11587,39 +11587,39 @@ function renderStudentDashboard() {
               if (aType === 'FEE_ADJUSTMENT_CORRECTION' || aType === 'FEE_REGULATED') {
                 cardBorderLeft = 'border-left: 5px solid #7C3AED;';
                 cardBg = 'linear-gradient(135deg, #FAF5FF 0%, #F5EEFF 100%);';
-                typePill = '<span style="background: linear-gradient(135deg, #EDE9FE, #DDD6FE); color: #5B21B6; border: 1.5px solid #A78BFA; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.35rem; box-shadow: 0 1px 4px rgba(124, 58, 237, 0.15);"><i aria-hidden="true" class="fa-solid fa-scale-balanced"></i> ⚖️ Fee Adjustment & Correction</span>';
+                typePill = '<span style="background: linear-gradient(135deg, #EDE9FE, #DDD6FE); color: #5B21B6; border: 1.5px solid #A78BFA; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.35rem; box-shadow: 0 1px 4px rgba(124, 58, 237, 0.15);"><i aria-hidden="true" class="fa-solid fa-scale-balanced"></i> ⚖️ Fee Adjustment & Correction</span>';
               } else if (aType === 'FEE_PAYMENT') {
                 cardBorderLeft = 'border-left: 5px solid #059669;';
                 cardBg = '#F0FDF4;';
-                typePill = '<span style="background: #D1FAE5; color: #065F46; border: 1.5px solid #6EE7B7; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i aria-hidden="true" class="fa-solid fa-hand-holding-dollar"></i> Direct Partial/Cash Payment</span>';
+                typePill = '<span style="background: #D1FAE5; color: #065F46; border: 1.5px solid #6EE7B7; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i aria-hidden="true" class="fa-solid fa-hand-holding-dollar"></i> Direct Partial/Cash Payment</span>';
               } else if (aType === 'PAYMENT_VERIFIED') {
                 cardBorderLeft = 'border-left: 5px solid #0284C7;';
                 cardBg = '#F0F9FF;';
-                typePill = '<span style="background: #E0F2FE; color: #075985; border: 1.5px solid #7DD3FC; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i aria-hidden="true" class="fa-solid fa-check-double"></i> Online Payment Verified</span>';
+                typePill = '<span style="background: #E0F2FE; color: #075985; border: 1.5px solid #7DD3FC; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i aria-hidden="true" class="fa-solid fa-check-double"></i> Online Payment Verified</span>';
               } else if (aType === 'OLD_DUE_ADDED') {
                 cardBorderLeft = 'border-left: 5px solid #D97706;';
                 cardBg = '#FFFBEB;';
-                typePill = '<span style="background: #FEF3C7; color: #92400E; border: 1.5px solid #FCD34D; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i aria-hidden="true" class="fa-solid fa-clock-rotate-left"></i> Old Due Added</span>';
+                typePill = '<span style="background: #FEF3C7; color: #92400E; border: 1.5px solid #FCD34D; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i aria-hidden="true" class="fa-solid fa-clock-rotate-left"></i> Old Due Added</span>';
               } else if (aType === 'STUDENT_PERMANENTLY_DELETED') {
                 cardBorderLeft = 'border-left: 5px solid #DC2626;';
                 cardBg = '#FEF2F2;';
-                typePill = '<span style="background: #FEE2E2; color: #991B1B; border: 1.5px solid #FCA5A5; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i aria-hidden="true" class="fa-solid fa-trash-can"></i> Student Deleted & Purged</span>';
+                typePill = '<span style="background: #FEE2E2; color: #991B1B; border: 1.5px solid #FCA5A5; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i aria-hidden="true" class="fa-solid fa-trash-can"></i> Student Deleted & Purged</span>';
               } else if (aType === 'STUDENT_PASSWORD_RESET') {
                 cardBorderLeft = 'border-left: 5px solid #0D9488;';
                 cardBg = '#F0FDFA;';
-                typePill = '<span style="background: #CCFBF1; color: #0F766E; border: 1.5px solid #5EEAD4; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i aria-hidden="true" class="fa-solid fa-key"></i> Password Reset to DOB</span>';
+                typePill = '<span style="background: #CCFBF1; color: #0F766E; border: 1.5px solid #5EEAD4; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i aria-hidden="true" class="fa-solid fa-key"></i> Password Reset to DOB</span>';
               } else if (aType === 'PROFILE_APPROVED' || aType === 'PROFILE_EDITED') {
                 cardBorderLeft = 'border-left: 5px solid #2563EB;';
                 cardBg = '#EFF6FF;';
-                typePill = '<span style="background: #DBEAFE; color: #1E40AF; border: 1.5px solid #93C5FD; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i aria-hidden="true" class="fa-solid fa-user-pen"></i> Profile Updated</span>';
+                typePill = '<span style="background: #DBEAFE; color: #1E40AF; border: 1.5px solid #93C5FD; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i aria-hidden="true" class="fa-solid fa-user-pen"></i> Profile Updated</span>';
               } else if (aType === 'NOTICE_BROADCAST') {
                 cardBorderLeft = 'border-left: 5px solid #4F46E5;';
                 cardBg = '#EEF2FF;';
-                typePill = '<span style="background: #E0E7FF; color: #3730A3; border: 1.5px solid #A5B4FC; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i aria-hidden="true" class="fa-solid fa-bullhorn"></i> Announcement</span>';
+                typePill = '<span style="background: #E0E7FF; color: #3730A3; border: 1.5px solid #A5B4FC; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i aria-hidden="true" class="fa-solid fa-bullhorn"></i> Announcement</span>';
               } else {
                 cardBorderLeft = 'border-left: 5px solid #C026D3;';
                 cardBg = '#FDF4FF;';
-                typePill = '<span style="background: #FAE8FF; color: #86198F; border: 1.5px solid #F0ABFC; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i aria-hidden="true" class="fa-solid fa-user-plus"></i> Student Registered</span>';
+                typePill = '<span style="background: #FAE8FF; color: #86198F; border: 1.5px solid #F0ABFC; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i aria-hidden="true" class="fa-solid fa-user-plus"></i> Student Registered</span>';
               }
 
               return `
@@ -11627,10 +11627,10 @@ function renderStudentDashboard() {
                   <div style="flex: 1; min-width: 250px;">
                     <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.35rem;">
                       ${typePill}
-                      <span style="font-size: 0.78rem; font-weight: 700; color: var(--primary-emerald); background: rgba(6, 78, 59, 0.08); padding: 0.15rem 0.5rem; border-radius: 4px;">
+                      <span style="font-size: 0.8rem; font-weight: 700; color: var(--primary-emerald); background: rgba(6, 78, 59, 0.08); padding: 0.15rem 0.5rem; border-radius: 4px;">
                         <i aria-hidden="true" class="fa-solid fa-user-tie"></i> ${log.actor}
                       </span>
-                      <span style="font-size: 0.78rem; color: var(--text-muted);"><i aria-hidden="true" class="fa-regular fa-clock"></i> ${log.timestamp}</span>
+                      <span style="font-size: 0.8rem; color: var(--text-muted);"><i aria-hidden="true" class="fa-regular fa-clock"></i> ${log.timestamp}</span>
                     </div>
                     <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-mahogany); margin-bottom: 0.2rem;">${log.description}</div>
                     <div style="font-size: 0.8rem; color: var(--text-muted);">Target Student: <strong>${log.studentName}</strong> (Roll #${log.studentRoll})</div>
@@ -11700,7 +11700,7 @@ function renderStudentDashboard() {
                 <h3 style="margin: 0; font-size: 1.15rem; font-weight: 800; color: #fff; letter-spacing: 0.3px;">
                   ⚠️ STRICT SECURITY CONFIRMATION
                 </h3>
-                <div style="font-size: 0.76rem; color: #FEE2E2; margin-top: 0.15rem;">Main Admin Exclusive Action — Chandan Kumar</div>
+                <div style="font-size: 0.8rem; color: #FEE2E2; margin-top: 0.15rem;">Main Admin Exclusive Action — Chandan Kumar</div>
               </div>
             </div>
             <button type="button" aria-label="Close audit purge dialog" onclick="document.getElementById('auditPurgeModal').remove()" style="background: none; border: none; color: #fff; font-size: 1.25rem; cursor: pointer;">

@@ -1,12 +1,25 @@
-/* CSS Design Tokens - Pragyan Institute Lalganj */
+/* ==========================================================================
+   CSS Design Tokens — Pragyan Institute Lalganj
+   --------------------------------------------------------------------------
+   SINGLE SOURCE OF TRUTH for color, type, space, elevation, motion and
+   layering. Legacy token names are preserved verbatim below so existing
+   stylesheets keep resolving; new work MUST consume the semantic aliases.
+
+   BREAKPOINT CONTRACT (media queries cannot read custom properties, so this
+   contract is documentation enforced by review):
+     sm  640px   | md  768px   | lg  1024px   | xl  1280px
+   Mobile-first (min-width) preferred; legacy one-off breakpoints
+   (420/480/560/576/600/850/992) migrate opportunistically — do not ADD new ones.
+   ========================================================================== */
 :root {
-  /* Color Palette - Earthy Minimalist Warm Aesthetics */
+  /* ── Brand palette (legacy names — decorative/base hues) ─────────────── */
   --primary-terracotta: #B5543A;
   --primary-terracotta-hover: #9E452D;
   --primary-terracotta-light: rgba(181, 84, 58, 0.12);
-  
-  --secondary-sage: #6F7F5F;
-  --secondary-sage-hover: #5A694C;
+
+  --secondary-sage: #6F7F5F;            /* tints, borders, icons ONLY — fails AA as text */
+  --secondary-sage-text: #55634A;       /* AA-safe sage for text & solid buttons */
+  --secondary-sage-hover: #49563E;
   --secondary-sage-light: rgba(111, 127, 95, 0.15);
 
   --primary-emerald: #064E3B;
@@ -14,19 +27,65 @@
   --primary-emerald-light: rgba(6, 78, 59, 0.12);
   --primary-emerald-lighter: rgba(6, 78, 59, 0.06);
 
+  /* Gold/amber accent — shared by shimmer text, experience badges, and the
+     pay-gateway accent so the "24K" story stays one hue family everywhere. */
+  --gold-500: #F59E0B;
+  --gold-600: #D97706;
+  --gold-700: #B45309;
+
+  /* ── Surfaces ──────────────────────────────────────────────────────────── */
   --bg-warm-cream: #F0E6D8;
   --bg-surface-cream: #F8F3EC;
   --bg-surface-pure: #FFFFFF;
 
+  /* Semantic surface aliases (use these in new work) */
+  --surface: var(--bg-surface-pure);
+  --surface-warm: var(--bg-warm-cream);
+  --surface-raised: var(--bg-surface-cream);
+
+  /* ── Text ──────────────────────────────────────────────────────────────── */
   --text-mahogany: #5A2E25;
   --text-charcoal: #2E2E2E;
   --text-muted: #6B6259;
   --text-on-accent: #FFFFFF;
 
+  /* Semantic text aliases */
+  --text-primary: var(--text-charcoal);
+  --text-heading: var(--text-mahogany);
+  --text-secondary: #475569;            /* slate-600 — portal neutral, 7:1 on white */
+
+  /* ── Borders ───────────────────────────────────────────────────────────── */
   --border-sand: #DDD5CD;
   --border-sand-dark: #C5BBAF;
 
-  /* Shadows & Glows */
+  /* Semantic border aliases (cool neutral used by portal/pay surfaces) */
+  --border-default: var(--border-sand);
+  --border-cool: #E2E8F0;
+  --border-strong: var(--border-sand-dark);
+
+  /* ── Status taxonomy (AA-checked pairings; shared by marketing, portal,
+        pay.html — do NOT fork these hexes locally) ───────────────────────── */
+  --status-success-fg: #047857;         /* 5.4:1 on white */
+  --status-success-bg: #ECFDF5;
+  --status-success-border: #A7F3D0;
+
+  --status-warning-fg: #92400E;         /* 7.2:1 on warning-bg */
+  --status-warning-bg: #FEF3C7;
+  --status-warning-border: #FDE68A;
+
+  --status-danger-fg: #B91C1C;          /* 5.9:1 on white */
+  --status-danger-bg: #FEE2E2;
+  --status-danger-border: #FECACA;
+
+  --status-info-fg: #1E40AF;            /* 8.6:1 on info-bg */
+  --status-info-bg: #DBEAFE;
+  --status-info-border: #BFDBFE;
+
+  --status-neutral-fg: #334155;
+  --status-neutral-bg: #F1F5F9;
+  --status-neutral-border: #CBD5E1;
+
+  /* ── Shadows: legacy trio kept; layered elevation recipes added ────────── */
   --shadow-sm: 0 2px 8px rgba(90, 46, 37, 0.06);
   --shadow-md: 0 8px 24px rgba(90, 46, 37, 0.09);
   --shadow-lg: 0 16px 40px rgba(90, 46, 37, 0.14);
@@ -34,22 +93,72 @@
   --shadow-sage-glow: 0 8px 25px rgba(111, 127, 95, 0.25);
   --shadow-emerald-glow: 0 8px 25px rgba(6, 78, 59, 0.3);
 
-  /* Typography */
-  --font-heading: 'Outfit', 'Cinzel', serif;
+  /* Elevation tiers: ambient + key + hairline top-light, ready to drop onto
+     any card. Pair with border: 1px solid rgba(255,255,255,0.7). */
+  --elevation-1: 0 1px 2px rgba(90, 46, 37, 0.05), 0 4px 12px -6px rgba(90, 46, 37, 0.10);
+  --elevation-2: 0 2px 4px rgba(90, 46, 37, 0.05), 0 10px 28px -10px rgba(90, 46, 37, 0.16);
+  --elevation-3: 0 4px 8px rgba(90, 46, 37, 0.06), 0 20px 44px -14px rgba(90, 46, 37, 0.22);
+
+  /* ── Typography ────────────────────────────────────────────────────────── */
+  --font-heading: 'Outfit', sans-serif;
   --font-body: 'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif;
 
-  /* Border Radii */
+  /* Type scale. Floor rule: NOTHING renders below --text-micro (11.2px at the
+     480px/14px root). Legacy hard-coded sizes migrate to these tokens. */
+  --text-micro: 0.8rem;      /* 12.8px desktop / 11.2px small-mobile floor  */
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-md: 1.0625rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.35rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: clamp(2rem, 3.8vw, 2.75rem);
+
+  /* ── Radii ─────────────────────────────────────────────────────────────── */
   --radius-sm: 0.5rem;
   --radius-md: 0.875rem;
   --radius-lg: 1.25rem;
   --radius-full: 9999px;
 
-  /* Transitions */
+  /* ── Spacing scale (4pt rhythm; adopt incrementally) ───────────────────── */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-14: 3.5rem;
+
+  /* ── Controls & focus ──────────────────────────────────────────────────── */
+  --tap-target: 2.75rem;                /* 44px coarse-pointer floor           */
+  --focus-ring-color: var(--primary-terracotta);
+  --focus-ring-width: 3px;
+
+  /* ── Glass surfaces (standardised frosted recipe) ──────────────────────── */
+  --glass-blur: 10px;
+  --glass-bg: rgba(248, 243, 236, 0.88);
+  --glass-border: rgba(255, 255, 255, 0.7);
+
+  /* ── Transitions ───────────────────────────────────────────────────────── */
   --transition-fast: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   --transition-normal: 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   --transition-slow: 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
 
-  /* Layout */
+  /* ── Layering contract (map literal z-indexes to these over time) ──────── */
+  --z-raised: 10;          /* in-card floats, ribbons                       */
+  --z-nav: 1000;           /* fixed site header                             */
+  --z-drawer: 1015;        /* mobile nav drawer                             */
+  --z-sticky: 1020;        /* hamburger above drawer                        */
+  --z-toast: 1100;         /* site toast                                    */
+  --z-modal-backdrop: 2000;/* lightbox                                      */
+  --z-portal: 9990;        /* full-screen portal overlay                    */
+  --z-max: 10000;          /* last-resort debug/dev only — never new code   */
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
   --nav-height: 76px;
   --max-width: 1280px;
 }

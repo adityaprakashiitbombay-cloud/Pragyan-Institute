@@ -19,29 +19,31 @@
   <meta property="og:title" content="Online Fee Payment — Pragyan Institute Lalganj">
   <meta property="og:image" content="https://pragyaninstitute.com/assets/images/logo.png">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="css/variables.css?v=90.0.29b24f49">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Outfit:wght@500;600;700;800;900&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --primary: #064E3B;
+      --primary: var(--primary-emerald);
       --primary-dark: #022C22;
       --primary-light: #047857;
-      --accent: #B45309;
+      --accent: var(--gold-700);
       --bg: #FAF9F6;
       --card-bg: #FFFFFF;
       --text: #1E293B;
       /* Was #64748B, which sits at 4.6:1 on the near-white card — nominally a
          pass, but every use here is 11-12px text where it reads as grey mush.
          Slate-600 clears 7:1 and still looks secondary. */
-      --text-muted: #475569;
-      --border: #E2E8F0;
+      --text-muted: var(--text-secondary);
+      --border: var(--border-cool);
       --radius: 16px;
-      --focus-ring: #1D4ED8;
+      /* Unified with the site-wide focus identity (was a divergent blue) */
+      --focus-ring: var(--focus-ring-color);
       /* Emerald-600 (#059669) fails AA as text on white (3.2:1). Emerald-700
          is the darkest shade that still reads as the brand green. */
-      --money-in: #047857;
-      --danger: #B91C1C;
+      --money-in: var(--status-success-fg);
+      --danger: var(--status-danger-fg);
       /* 44px is the WCAG 2.5.8 enhanced target size and the size a thumb
          actually hits on a 5-inch phone held one-handed. */
       --tap-target: 2.75rem;
@@ -142,7 +144,7 @@
     .inst-sub {
       display: block;
       font-family: 'Plus Jakarta Sans', sans-serif;
-      font-size: 0.78rem;
+      font-size: 0.8rem;
       font-weight: 700;
       color: #A7F3D0;
       text-transform: uppercase;
@@ -155,7 +157,7 @@
       background: rgba(6, 95, 70, 0.55);
       border: 1px solid #34D399;
       color: #D1FAE5;
-      font-size: 0.78rem;
+      font-size: 0.8rem;
       font-weight: 800;
       padding: 0.3rem 0.9rem;
       border-radius: 99px;
@@ -220,7 +222,7 @@
     }
     .meta-label {
       display: block;
-      font-size: 0.72rem;
+      font-size: 0.8rem;
       font-weight: 700;
       color: var(--text-muted);
       text-transform: uppercase;
@@ -252,7 +254,7 @@
     }
     .amount-hero-label {
       font-family: 'Outfit', sans-serif;
-      font-size: 0.78rem;
+      font-size: 0.8rem;
       font-weight: 800;
       color: #065F46;
       text-transform: uppercase;
@@ -269,7 +271,7 @@
       overflow-wrap: anywhere;
     }
     .amount-hero-sub {
-      font-size: 0.78rem;
+      font-size: 0.8rem;
       font-weight: 700;
       color: #065F46;
     }
@@ -291,9 +293,9 @@
       gap: 0.5rem;
       flex-wrap: wrap;
     }
-    .breakdown-header .section-heading { margin: 0; font-size: 0.78rem; color: #334155; }
+    .breakdown-header .section-heading { margin: 0; font-size: 0.8rem; color: #334155; }
     .badge-payment-type {
-      font-size: 0.75rem;
+      font-size: 0.8rem;
       font-weight: 800;
       color: var(--money-in);
       text-transform: uppercase;
@@ -328,7 +330,7 @@
     }
     .row-note {
       display: block;
-      font-size: 0.75rem;
+      font-size: 0.8rem;
       font-weight: 600;
       color: var(--text-muted);
       margin-top: 2px;
@@ -389,7 +391,7 @@
     }
     .mode-pill-sub {
       display: block;
-      font-size: 0.74rem;
+      font-size: 0.8rem;
       font-weight: 600;
       color: var(--text-muted);
       margin-top: 2px;
@@ -425,12 +427,12 @@
       margin-bottom: 0.4rem;
     }
     .partial-label label {
-      font-size: 0.78rem;
+      font-size: 0.8rem;
       font-weight: 700;
       color: var(--text-muted);
     }
     .partial-range-hint {
-      font-size: 0.72rem;
+      font-size: 0.8rem;
       /* Was #059669 on a near-white tray: 3.2:1, unreadable at 11.5px. */
       color: #065F46;
       font-weight: 700;
@@ -477,7 +479,7 @@
       border: 1px solid var(--border);
       border-radius: 99px;
       padding: 0.35rem 0.9rem;
-      font-size: 0.75rem;
+      font-size: 0.8rem;
       font-weight: 700;
       color: #334155;
       cursor: pointer;
@@ -531,7 +533,7 @@
       border-radius: 10px;
       text-decoration: none;
       color: var(--text);
-      font-size: 0.72rem;
+      font-size: 0.8rem;
       font-weight: 700;
       text-align: center;
       transition: background 0.15s ease, border-color 0.15s ease;
@@ -539,7 +541,7 @@
     .app-btn:hover { border-color: #10B981; background: #F0FDF4; }
     .app-btn i { font-size: 1.25rem; margin-bottom: 0.25rem; }
     .upi-hint {
-      font-size: 0.75rem;
+      font-size: 0.8rem;
       font-weight: 600;
       color: var(--text-muted);
       margin-top: 0.7rem;
@@ -593,7 +595,7 @@
     }
     .upi-pill:hover { background: #D1FAE5; }
     .payee-line {
-      font-size: 0.78rem;
+      font-size: 0.8rem;
       color: var(--text-muted);
       font-weight: 600;
     }
@@ -608,7 +610,7 @@
     .form-group { margin-bottom: 0.85rem; }
     .form-group label {
       display: block;
-      font-size: 0.78rem;
+      font-size: 0.8rem;
       font-weight: 700;
       color: var(--text-muted);
       margin-bottom: 0.3rem;
@@ -633,13 +635,13 @@
     }
     .form-input[aria-invalid="true"] { border-color: var(--danger); }
     .form-hint {
-      font-size: 0.72rem;
+      font-size: 0.8rem;
       font-weight: 600;
       color: var(--text-muted);
       margin-top: 0.3rem;
     }
     .form-error {
-      font-size: 0.75rem;
+      font-size: 0.8rem;
       font-weight: 700;
       color: var(--danger);
       margin-top: 0.3rem;
@@ -678,7 +680,7 @@
 
     .footer-note {
       text-align: center;
-      font-size: 0.75rem;
+      font-size: 0.8rem;
       color: var(--text-muted);
       line-height: 1.6;
       padding: 1rem;
@@ -994,9 +996,9 @@
     </footer>
   </div>
 
-  <script src="js/academic-config.js?v=90.0.4d4f796b"></script>
-  <script src="js/config.js?v=90.0.4d4f796b"></script>
-  <script src="js/supabase-sync.js?v=90.0.4d4f796b"></script>
+  <script src="js/academic-config.js?v=90.0.29b24f49"></script>
+  <script src="js/config.js?v=90.0.29b24f49"></script>
+  <script src="js/supabase-sync.js?v=90.0.29b24f49"></script>
   <script>
   /* ==========================================================================
    * PAYMENT GATEWAY PAGE LOGIC
