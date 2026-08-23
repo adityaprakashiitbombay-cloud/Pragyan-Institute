@@ -1747,3 +1747,320 @@
     var(--primary-emerald) 100%
   ) 1;
 }
+
+/* ==========================================================================
+   SPECIAL ENGLISH ACADEMY & SPOKEN MASTERY — featured section
+   --------------------------------------------------------------------------
+   Token-driven feature section for the three Special English tiers
+   (eng912 / eng68 / eng15). Fee figures are NOT hardcoded here: every card
+   price is a [data-price-key] span driven by js/app.js applyPricing(), so
+   the global monthly/annual billing toggle governs this grid exactly like
+   the main pricing grid.
+   ========================================================================== */
+
+.english-academy-section {
+  padding-block: 5.5rem;
+  background:
+    radial-gradient(circle at 88% 8%, rgba(217, 119, 6, 0.07) 0%, transparent 42%),
+    radial-gradient(circle at 6% 92%, rgba(111, 127, 95, 0.08) 0%, transparent 40%),
+    linear-gradient(180deg, var(--bg-surface-pure) 0%, var(--bg-surface-cream) 100%);
+  border-top: 1px solid var(--border-sand);
+  border-bottom: 1px solid var(--border-sand);
+}
+
+/* -- Overline tag: gold family, AA pairings from the status tokens -------- */
+.academy-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 1.1rem;
+  border-radius: var(--radius-full);
+  background-color: var(--status-warning-bg);
+  border: 1px solid var(--status-warning-border);
+  color: var(--status-warning-fg);
+  font-size: var(--text-micro);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 0.9rem;
+}
+
+.academy-tag i { color: var(--gold-600); }
+
+/* -- Core pillars: frosted cards on the section wash ----------------------- */
+.academy-pillars {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+  max-width: var(--max-width);
+  margin: 0 auto 3rem;
+}
+
+.academy-pillar {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.35rem 1.4rem;
+  border-radius: var(--radius-lg);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--border-sand);
+  outline: 1px solid var(--glass-border);
+  outline-offset: -1px;
+  box-shadow: var(--elevation-1);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.academy-pillar:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--elevation-2);
+}
+
+.academy-pillar-icon {
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+}
+
+.academy-pillar-icon.i-board    { background-color: var(--primary-emerald-light); color: var(--primary-emerald); }
+.academy-pillar-icon.i-spoken   { background-color: var(--primary-terracotta-light); color: var(--primary-terracotta-hover); }
+.academy-pillar-icon.i-writing  { background-color: rgba(217, 119, 6, 0.14); color: var(--gold-700); }
+
+.academy-pillar h3 {
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: var(--text-heading);
+  margin-bottom: 0.3rem;
+}
+
+.academy-pillar p {
+  font-size: 0.925rem;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+/* -- Tier cards ------------------------------------------------------------ */
+.academy-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  max-width: var(--max-width);
+  margin: 0 auto;
+}
+
+.academy-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 1.75rem 1.5rem 1.5rem;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, var(--bg-surface-pure) 0%, #FDFBF7 100%);
+  border: 1px solid var(--border-sand);
+  outline: 1px solid var(--glass-border);
+  outline-offset: -1px;
+  box-shadow: var(--elevation-1);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.academy-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--elevation-2), var(--shadow-terracotta-glow);
+}
+
+/* Tier identity: left accent bar + matching badge */
+.academy-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 1.1rem;
+  bottom: 1.1rem;
+  width: 4px;
+  border-radius: 0 4px 4px 0;
+}
+.academy-card.tier-senior::before  { background: linear-gradient(180deg, var(--gold-600) 0%, var(--gold-500) 100%); }
+.academy-card.tier-middle::before  { background: linear-gradient(180deg, var(--secondary-sage-text) 0%, var(--secondary-sage) 100%); }
+.academy-card.tier-primary::before { background: linear-gradient(180deg, var(--primary-terracotta) 0%, var(--gold-600) 100%); }
+
+.academy-tier {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  align-self: flex-start;
+  padding: 0.32rem 0.85rem;
+  border-radius: var(--radius-full);
+  color: var(--text-on-accent);
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 0.9rem;
+}
+.tier-senior  .academy-tier { background-color: var(--gold-700); }
+.tier-middle  .academy-tier { background-color: var(--secondary-sage-text); }
+.tier-primary .academy-tier { background-color: var(--primary-terracotta-hover); }
+
+.academy-card h3 {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--text-heading);
+  margin-bottom: 0.85rem;
+}
+
+.academy-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px dashed var(--border-sand-dark);
+}
+
+.academy-price-row .batch-price {
+  font-family: var(--font-heading);
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--text-heading);
+  line-height: 1;
+}
+
+.academy-price-row .batch-period {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.academy-deliverables {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  margin-bottom: 1.4rem;
+  flex-grow: 1;
+}
+
+.academy-deliverables li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  font-size: 0.925rem;
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+.academy-check {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background-color: var(--primary-terracotta-light);
+  color: var(--primary-terracotta-hover);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.68rem;
+  margin-top: 0.1rem;
+}
+
+.academy-note {
+  font-size: var(--text-micro);
+  color: var(--text-secondary);
+  background-color: var(--status-success-bg);
+  border: 1px dashed var(--status-success-border);
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.7rem;
+  margin-bottom: 1.1rem;
+}
+.academy-note strong { color: var(--status-success-fg); }
+
+.academy-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  min-height: var(--tap-target);
+  padding: 0.8rem 1.4rem;
+  border-radius: var(--radius-full);
+  background-color: var(--primary-emerald);
+  color: var(--text-on-accent);
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-decoration: none;
+  box-shadow: var(--shadow-emerald-glow);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), background-color var(--transition-fast);
+}
+.academy-cta:hover {
+  background-color: var(--primary-emerald-hover);
+  transform: translateY(-2px);
+}
+.academy-cta:active {
+  transform: translateY(0) scale(0.98);
+}
+.academy-cta i { font-size: 1.05rem; }
+
+/* -- Value-add banner ------------------------------------------------------ */
+.academy-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  text-align: center;
+  max-width: var(--max-width);
+  margin: 2.25rem auto 0;
+  padding: 1.1rem 1.6rem;
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(135deg, var(--primary-emerald) 0%, var(--primary-emerald-hover) 100%);
+  color: #FFFFFF;
+  box-shadow: var(--shadow-emerald-glow);
+}
+
+.academy-banner-icon {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: var(--status-warning-bg);
+  font-size: 1.05rem;
+}
+
+.academy-banner-text {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+.academy-banner-text strong {
+  color: var(--status-warning-bg);
+  font-weight: 800;
+}
+
+/* -- Responsive: 2-col tablet, 3-col desktop -------------------------------- */
+@media (min-width: 768px) {
+  .academy-pillars { grid-template-columns: repeat(3, 1fr); }
+  .academy-grid { grid-template-columns: repeat(2, 1fr); }
+  /* Three cards in two columns: the last one spans full width as a wide row */
+  .academy-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
+
+@media (min-width: 1024px) {
+  .english-academy-section { padding-block: 6rem; }
+  .academy-grid { grid-template-columns: repeat(3, 1fr); }
+  .academy-card:last-child:nth-child(odd) { grid-column: auto; }
+}
+
+@media (max-width: 480px) {
+  .english-academy-section { padding-block: 3.25rem; }
+  .academy-pillar { flex-direction: column; gap: 0.75rem; }
+  .academy-banner { flex-direction: column; gap: 0.7rem; padding: 1.25rem 1.1rem; }
+}
