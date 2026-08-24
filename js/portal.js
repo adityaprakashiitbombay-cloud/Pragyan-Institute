@@ -11047,10 +11047,32 @@ function renderStudentDashboard() {
         // approve_payment_request() takes FOR UPDATE on the request then the
         // student, and derives the receipt number from the request id, so a replay
         // returns the original receipt instead of creating another one.
-        const response = await postToApi('/api/approve-payment-request', {
+        const approveCall = (allowSurplus) => postToApi('/api/approve-payment-request', {
           requestId: id,
-          verifierName
+          verifierName,
+          allow_surplus: allowSurplus === true
         });
+
+        let response = await approveCall(false);
+
+        // F-R5: the server refuses amounts above live dues (+1 month grace)
+        // unless the verifier explicitly overrides after seeing the figures.
+        if (!response.ok && response.payload?.code === 'AMOUNT_EXCEEDS_DUES' && response.payload?.needsOverride) {
+          const req = Number(response.payload.requestedAmount || 0);
+          const live = Number(response.payload.livePending || 0);
+          const proceed = confirm(
+            `⚠️ SURPLUS APPROVAL CONFIRMATION\n\n` +
+            `Requested amount: ₹${req.toLocaleString('en-IN')}\n` +
+            `Student's recorded dues: ₹${live.toLocaleString('en-IN')}\n\n` +
+            `This payment exceeds recorded dues. Approve anyway only if you have verified the bank transfer matches ₹${req.toLocaleString('en-IN')} exactly.\n\n` +
+            `Proceed with surplus override?`
+          );
+          if (!proceed) {
+            restoreButton();
+            return;
+          }
+          response = await approveCall(true);
+        }
 
         if (!response.ok) {
           const message = response.payload?.error || `Approval failed (HTTP ${response.status})`;

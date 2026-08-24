@@ -62,11 +62,10 @@ export function runMarkupTests(assert) {
     `T19.2: all ${Object.keys(PRICE_TABLE).length} canonical batches have a card in index.html${absent.length ? ` (missing: ${absent.join(', ')})` : ''}`
   );
 
-  // 12 main pricing-grid cards + the three Special English Academy tier cards
-  // (eng912/eng68/eng15) introduced with the featured section. All 15 are
-  // driven by applyPricing() and must resolve to canonical entries; the eng
-  // keys legitimately appear twice on the page.
-  assert(priced.length === 15, `T19.3: index.html renders exactly 15 priced batch cards (12 grid + 3 academy tiers; got ${priced.length})`);
+  // 9 main academic pricing-grid cards + the 3 Special English Academy tier cards
+  // (eng912/eng68/eng15) in the dedicated #english-academy section. Exactly 12 cards
+  // covering all canonical batches.
+  assert(priced.length === 12, `T19.3: index.html renders exactly 12 priced batch cards (9 academic + 3 academy tiers; got ${priced.length})`);
 
   // The bug this catches: the right key on a card showing another batch's fee.
   const mispriced = priced.filter(p => PRICE_TABLE[p.key] && digits(p.text) !== PRICE_TABLE[p.key].monthlyValue);

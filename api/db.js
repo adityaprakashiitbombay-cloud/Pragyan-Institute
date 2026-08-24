@@ -39,8 +39,36 @@ const STUDENT_TABLES = new Set([
 // passthrough. Anything not listed here is refused — the gateway must never
 // become a generic SQL-rpc proxy. increment_blog_views is intentionally
 // anonymous-callable: counting a read needs no session.
+// Best-effort anonymous abuse brake for public RPCs (per warm instance).
+// The DB-side checks (published-only, slug format) are authoritative; this
+// just blunts scripted hammering between cold starts.
+const ANON_RPC_LIMITS = {
+  increment_blog_views: { windowMs: 60 * 60 * 1000, max: 8 }
+};
+const anonRpcBuckets = new Map(); // `${fn}:${ip}:${argKey}` -> { count, windowStart }
+
+function anonRpcAllowed(fn, ip, argKey) {
+  const limit = ANON_RPC_LIMITS[fn];
+  if (!limit) return true;
+  const now = Date.now();
+  const key = `${fn}:${ip}:${argKey}`;
+  const bucket = anonRpcBuckets.get(key);
+  if (!bucket || bucket.windowStart + limit.windowMs < now) {
+    anonRpcBuckets.set(key, { count: 1, windowStart: now });
+    if (anonRpcBuckets.size > 8000) {
+      for (const [k, v] of anonRpcBuckets) {
+        if (v.windowStart + limit.windowMs < now) anonRpcBuckets.delete(k);
+      }
+    }
+    return true;
+  }
+  bucket.count += 1;
+  return bucket.count <= limit.max;
+}
 const RPC_ALLOWLIST = {
-  increment_blog_views: { anon: true, params: ['p_slug'] }
+  increment_blog_views: { anon: true, params: ['p_slug'] },
+  submit_mentor_rating: { anon: true, params: ['p_mentor_id', 'p_rating', 'p_client_id'] },
+  get_mentor_ratings:   { anon: true, params: [] }
 };
 
 // Free-text self-edit fields are stripped of markup server-side so an approved
@@ -257,6 +285,18 @@ export default async function handler(req, res) {
     const params = {};
     for (const key of entry.params) {
       if (rawParams[key] !== undefined) params[key] = String(rawParams[key]).slice(0, 200);
+    }
+    // F-R4: slug hygiene + per-caller throttle for the anonymous counter.
+    let clientIp = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'anon')
+      .toString().split(',')[0].trim();
+    if (rpcFn === 'increment_blog_views') {
+      const slug = String(params.p_slug || '');
+      if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) {
+        return res.status(400).json({ success: false, error: 'Invalid article slug' });
+      }
+      if (!anonRpcAllowed(rpcFn, clientIp, slug)) {
+        return res.status(429).json({ success: false, error: 'Too many requests' });
+      }
     }
     try {
       const { data: rpcData, error } = await supabaseRpc.rpc(rpcFn, params);

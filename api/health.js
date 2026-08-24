@@ -30,8 +30,12 @@ export default async function handler(req, res) {
 
     const prefix = session.role === 'admin' ? 'admin' : 'student';
     const userId = `${prefix}_${String(session.sub).replace(/[^a-zA-Z0-9_-]/g, '')}`;
-    const token = StreamChat.getInstance(apiKey, apiSecret).createToken(userId);
-    return res.status(200).json({ apiKey, userId, token });
+    // F-R7: tokens expire with a predictable 7-day window instead of living
+    // forever. stream-chat's createToken(userId, exp) embeds the claim.
+    const CHAT_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
+    const exp = Math.floor(Date.now() / 1000) + CHAT_TOKEN_TTL_SECONDS;
+    const token = StreamChat.getInstance(apiKey, apiSecret).createToken(userId, exp);
+    return res.status(200).json({ apiKey, userId, token, expiresAt: new Date(exp * 1000).toISOString() });
   }
 
   // Health check route

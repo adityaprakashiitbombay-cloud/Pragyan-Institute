@@ -4,6 +4,19 @@ import { getSupabase, createSession, publicAdmin, applyCors } from './_lib/auth.
 // In-memory rate limiter (use Redis in production for multi-instance deployments)
 const loginAttempts = new Map(); // key: identifier, value: { count, resetTime }
 
+/**
+ * Canonical rate-limit key: strips formatting so `98765-43210`,
+ * `+91 98765 43210`, ` 9876543210 ` and mixed-case usernames all land in
+ * ONE bucket per real identity. Applied ONLY to limiter keys; credential
+ * comparison still uses the raw sanitized input.
+ */
+function normalizeRateLimitKey(identifier) {
+  const raw = String(identifier || '').trim().toLowerCase();
+  // Keep a leading + for international numbers, strip every other separator.
+  const compact = raw.startsWith('+') ? '+' + raw.slice(1).replace(/[\s\-()]/g, '') : raw.replace(/[\s\-()]/g, '');
+  return compact || raw;
+}
+
 function cleanupExpiredAttempts() {
   const now = Date.now();
   if (loginAttempts.size > 50) {
@@ -60,7 +73,7 @@ export default async function handler(req, res) {
     const safeId = String(identifier || '').replace(/[\r\n,()"']/g, '').trim();
 
     // Check rate limit
-    const rateLimitCheck = checkRateLimit(safeId);
+    const rateLimitCheck = checkRateLimit(normalizeRateLimitKey(safeId));
     if (!rateLimitCheck.allowed) {
       return res.status(429).json({ success: false, error: rateLimitCheck.message });
     }
@@ -100,7 +113,7 @@ export default async function handler(req, res) {
       }
 
       // Reset rate limit on successful login
-      resetRateLimit(safeId);
+      resetRateLimit(normalizeRateLimitKey(safeId));
 
       const adminId = admin.admin_id || admin.id;
       const token = createSession({ sub: adminId, role: 'admin', name: admin.name });
@@ -267,7 +280,7 @@ export default async function handler(req, res) {
       }
 
       // Reset rate limit on successful login
-      resetRateLimit(safeId);
+      resetRateLimit(normalizeRateLimitKey(safeId));
 
       const student = matchedStudent;
       const studentId = student.student_id || student.id;

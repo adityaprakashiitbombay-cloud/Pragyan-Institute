@@ -362,15 +362,27 @@
       if (opts.announce !== false) announce(next);
     }
 
+    function getSlideDuration(index) {
+      // First slide (Chandan Sir's Smartboard Lecture) stays for the longest time (8.0s vs 4.5s)
+      return index === 0 ? 8000 : 4500;
+    }
+
     function stopTimer() {
-      if (timer) window.clearInterval(timer);
+      if (timer) {
+        window.clearTimeout(timer);
+        window.clearInterval(timer);
+      }
       timer = null;
     }
 
     function startTimer() {
       stopTimer();
       if (!autoplayWanted || document.hidden) return;
-      timer = window.setInterval(() => goToSlide(currentIndex + 1, { announce: false }), AUTOPLAY_MS);
+      const duration = getSlideDuration(currentIndex);
+      timer = window.setTimeout(() => {
+        goToSlide(currentIndex + 1, { announce: false });
+        startTimer();
+      }, duration);
     }
 
     function syncPlayPauseButton() {
@@ -593,7 +605,7 @@
    * 6. Batch filters, billing toggle & pricing
    * -------------------------------------------------------------------------- */
   function initBatchTabs() {
-    const tabButtons = Array.prototype.slice.call(document.querySelectorAll('.tabs-container .tab-btn'));
+    const tabButtons = Array.prototype.slice.call(document.querySelectorAll('#batches .tabs-container .tab-btn'));
     const toggleSwitch = document.getElementById('billingToggle');
     const batchCards = Array.prototype.slice.call(document.querySelectorAll('.batch-card'));
     const status = document.getElementById('batchFilterStatus');
@@ -803,6 +815,7 @@
     const cards = Array.prototype.slice.call(document.querySelectorAll('.gallery-card'));
     const modal = document.getElementById('lightboxModal');
     const modalImg = document.getElementById('lightboxImg');
+    const modalVideo = document.getElementById('lightboxVideo');
     const modalCaption = document.getElementById('lightboxCaption');
     const closeBtn = document.getElementById('lightboxClose');
 
@@ -810,7 +823,7 @@
 
     modal.setAttribute('role', 'dialog');
     modal.setAttribute('aria-modal', 'true');
-    modal.setAttribute('aria-label', 'Enlarged institute photo');
+    modal.setAttribute('aria-label', 'Enlarged institute media viewer');
     setInert(modal, true);
 
     let lastTrigger = null;
@@ -818,12 +831,29 @@
 
     function openModal(card) {
       const img = card.querySelector('img');
-      if (!img) return;
+      const videoSrc = card.getAttribute('data-video-src');
       const title = (card.querySelector('.gallery-caption-title') || {}).textContent || '';
       const sub = (card.querySelector('.gallery-caption-sub') || {}).textContent || '';
 
-      modalImg.src = img.currentSrc || img.src;
-      modalImg.alt = img.alt || 'Institute photo';
+      if (videoSrc && modalVideo) {
+        // High-performance video mode: loaded strictly on-demand, 0KB loaded upfront
+        modalImg.style.display = 'none';
+        modalVideo.style.display = 'block';
+        modalVideo.src = videoSrc;
+        modalVideo.load();
+        modalVideo.play().catch(() => {});
+      } else if (img) {
+        // Standard high-res image mode
+        if (modalVideo) {
+          modalVideo.pause();
+          modalVideo.src = '';
+          modalVideo.style.display = 'none';
+        }
+        modalImg.style.display = 'block';
+        modalImg.src = img.currentSrc || img.src;
+        modalImg.alt = img.alt || 'Institute photo';
+      }
+
       if (modalCaption) modalCaption.textContent = [title, sub].filter(Boolean).join(' — ');
 
       lastTrigger = card;
@@ -838,6 +868,12 @@
     function closeModal() {
       if (!isOpen) return;
       isOpen = false;
+      // Stop and clear video to immediately free up browser decoding memory and bandwidth
+      if (modalVideo) {
+        modalVideo.pause();
+        modalVideo.src = '';
+        modalVideo.style.display = 'none';
+      }
       modal.classList.remove('active');
       modal.style.display = 'none';
       setInert(modal, true);
@@ -1144,7 +1180,32 @@ function blogApiPost(body) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
-  }).then(r => r.json().catch(() => ({})));
+  }).then(async r => {
+    if (r.ok) return r.json();
+    throw new Error(`HTTP ${r.status}`);
+  }).catch(async (err) => {
+    const cfg = window.PRAGYAN_CONFIG || {};
+    if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY) {
+      try {
+        if (body.operation === 'rpc' && body.fn) {
+          const rpcRes = await fetch(`${cfg.SUPABASE_URL}/rest/v1/rpc/${body.fn}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': cfg.SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${cfg.SUPABASE_ANON_KEY}`
+            },
+            body: JSON.stringify(body.params || {})
+          });
+          if (rpcRes.ok) {
+            const data = await rpcRes.json();
+            return { success: true, data };
+          }
+        }
+      } catch (_) {}
+    }
+    return { success: false, error: err.message };
+  });
 }
 
 function blogFmtDate(iso) {
@@ -1162,23 +1223,160 @@ function blogCatClass(category) {
   }
 }
 
+const SEED_BLOG_POSTS = [
+  {
+    id: 'seed-post-1',
+    slug: 'class-10-cbse-bseb-board-exam-strategy-2026',
+    title: 'Top 5 Strategies to Score 95%+ in Class 10th Board Exams (CBSE & BSEB)',
+    excerpt: 'A step-by-step revision routine by Chandan Sir covering NCERT mastery, time management in 3-hour papers, and daily self-assessment.',
+    category: 'Board Exams',
+    author_name: 'Chandan Kumar',
+    author_role: 'Science Lead & Head Admin',
+    read_time_minutes: 4,
+    views_count: 0,
+    published_at: '2026-08-20T10:00:00Z',
+    is_published: true,
+    content_markdown: `### The Golden Formula for Board Exam Success
+
+Every year, students ask: *"How many hours should I study to get 95%+ in Class 10th?"*
+The truth is that **strategy beats sheer hours**. Here is the exact roadmap we follow at Pragyan Institute.
+
+---
+
+#### 1. Master NCERT Exemplar & Concept Clarity
+- **Science**: Focus heavily on Chemical Reactions, Electricity numericals, and Life Processes diagrams.
+- **Maths**: Solve every single NCERT exercise problem twice before touching reference books.
+
+:::tip
+Always practice with a real stopwatch. Completing the paper 15 minutes before time gives you crucial revision margin.
+:::
+
+#### 2. Weekly Timed Mock Tests
+Take full 80-mark mock tests every Sunday. Analyze your silly mistakes in a separate **Error Notebook**.
+
+> "Mistakes made in practice are lessons; mistakes made in final exams are lost marks."
+
+#### 3. Answer Presentation Matters
+- Write in clean bullet points.
+- Highlight final numerical answers with neat boxes.
+- Draw diagrams with sharp pencils and clear labels.
+`
+  },
+  {
+    id: 'seed-post-2',
+    slug: 'spoken-english-confidence-guide-for-school-students',
+    title: 'How to Speak English Fluently Without Fear: A Guide for Hindi Medium Students',
+    excerpt: 'Overcoming hesitations in group discussions, building daily 10-minute vocabulary habits, and practical conversational drills.',
+    category: 'English Speaking',
+    author_name: 'Aditi Singh',
+    author_role: 'Language Mentor',
+    read_time_minutes: 3,
+    views_count: 0,
+    published_at: '2026-08-21T12:00:00Z',
+    is_published: true,
+    content_markdown: `### Overcoming the Hesitation Barrier
+
+Most students understand written English well, but when asked to speak in front of a class, fear of grammatical mistakes takes over.
+
+---
+
+#### 3 Simple Daily Habits for Fluency:
+1. **The 2-Minute Mirror Drill**: Pick any topic (e.g. *"My favorite science topic"*) and speak continuously for 2 minutes without stopping.
+2. **Think in English**: Instead of translating Hindi sentences in your mind, practice naming objects and thoughts directly in simple English.
+3. **Weekly Group Discussions**: Participate actively in Pragyan's free Saturday GD sessions.
+
+:::info
+Fluency is not about using complex words — it is about expressing your ideas clearly and confidently.
+:::
+`
+  },
+  {
+    id: 'seed-post-3',
+    slug: 'class-12-pcm-higher-mathematics-calculus-blueprint',
+    title: 'Class 12th PCM: How to Master Calculus & Differential Equations',
+    excerpt: 'Prof. Ravi Ranjan explains the highest weightage calculus topics, standard integration patterns, and shortcut methods for competitive exams.',
+    category: 'Board Exams',
+    author_name: 'Prof. Ravi Ranjan',
+    author_role: 'Higher Mathematics Specialist',
+    read_time_minutes: 5,
+    views_count: 0,
+    published_at: '2026-08-22T14:30:00Z',
+    is_published: true,
+    content_markdown: `### Calculus Accounts for 35%+ of Higher Mathematics
+
+In Class 12th board exams, Calculus carries the highest single weightage. If you master differentiation and integration fundamentals, scoring 90+ in Maths becomes guaranteed.
+
+---
+
+#### Focus Areas for 12th Board Exams:
+- **Definite Integrals**: Properties of definite integrals are guaranteed 5-mark questions.
+- **Differential Equations**: Linear differential equations with integrating factors.
+- **Application of Derivatives**: Maxima & Minima word problems.
+
+:::tip
+Draw rough sketches for Area Under Curves problems — it prevents coordinate sign errors!
+:::
+`
+  }
+];
+
+function getBlogViewsMap() {
+  try {
+    const raw = localStorage.getItem('pragyan_blog_views_cache');
+    return raw ? JSON.parse(raw) : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function saveBlogViewsMap(slug, count) {
+  try {
+    const map = getBlogViewsMap();
+    map[slug] = Number(count) || 0;
+    localStorage.setItem('pragyan_blog_views_cache', JSON.stringify(map));
+  } catch (_) {}
+}
+
+function mergeStoredBlogViews(posts) {
+  const viewsMap = getBlogViewsMap();
+  return posts.map(p => {
+    const stored = Number(viewsMap[p.slug]);
+    if (stored && stored > (Number(p.views_count) || 0)) {
+      p.views_count = stored;
+    }
+    return p;
+  });
+}
+
 async function fetchPublishedPosts() {
   const grid = document.getElementById('blogGrid');
   if (!grid || grid.dataset.loading === '1') return;
   grid.dataset.loading = '1';
   grid.innerHTML = '<div class="blog-loading"><i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i> Loading articles…</div>';
+  
+  // Try local sync store first for instant render
+  try {
+    if (window.SupabaseSync && typeof window.SupabaseSync.getAll === 'function') {
+      const cached = window.SupabaseSync.getAll('blog_posts');
+      if (Array.isArray(cached) && cached.length) {
+        blogPostsCache = cached.filter(p => p.is_published !== false);
+      }
+    }
+  } catch (_) {}
+
   try {
     const json = await blogApiPost({ table: 'blog_posts', operation: 'select', filters: { limit: 100 } });
-    if (json && json.success && Array.isArray(json.data)) {
+    if (json && json.success && Array.isArray(json.data) && json.data.length > 0) {
       blogPostsCache = json.data;
-    } else {
-      throw new Error(json?.error || 'unavailable');
+    } else if (!blogPostsCache.length) {
+      blogPostsCache = SEED_BLOG_POSTS.map(x => ({ ...x }));
     }
   } catch (err) {
-    grid.innerHTML = '<div class="blog-empty">Articles are temporarily unavailable. Please refresh in a moment.</div>';
-    delete grid.dataset.loading;
-    return;
+    if (!blogPostsCache.length) {
+      blogPostsCache = SEED_BLOG_POSTS.map(x => ({ ...x }));
+    }
   }
+  blogPostsCache = mergeStoredBlogViews(blogPostsCache);
   delete grid.dataset.loading;
   renderBlogGrid();
 }
@@ -1231,7 +1429,30 @@ function onBlogTabClick(btn) {
     b.setAttribute('aria-selected', String(active));
   });
   blogActiveCategory = btn.dataset.blogCat || 'all';
+  // F-R10: persist the filter so reloads and shared links land on the same view.
+  try {
+    const newHash = blogActiveCategory === 'all'
+      ? ''
+      : `#category=${encodeURIComponent(blogActiveCategory)}`;
+    history.replaceState(null, '', newHash || location.pathname + location.search);
+  } catch (_) {}
   renderBlogGrid();
+}
+
+function restoreBlogCategoryFromHash() {
+  const m = /^[#&]?category=([^&]+)/.exec((location.hash || '').slice(1) ? `#${location.hash.slice(1)}` : location.hash || '');
+  const raw = m ? decodeURIComponent(m[1]) : '';
+  const conf = BLOG_CATEGORIES.find(c => c.key === raw);
+  if (!conf) return null;
+  const btn = document.querySelector(`.blog-tab[data-blog-cat="${conf.key}"]`);
+  if (!btn) return null;
+  document.querySelectorAll('.blog-tab').forEach(b => {
+    const active = b === btn;
+    b.classList.toggle('active', active);
+    b.setAttribute('aria-selected', String(active));
+  });
+  blogActiveCategory = conf.key;
+  return conf.key;
 }
 
 /* -- Reader ---------------------------------------------------------------- */
@@ -1312,11 +1533,28 @@ function openBlogReader(slug) {
   overlay.querySelector('.blog-reader-close').addEventListener('click', closeBlogReader);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) closeBlogReader(); });
 
-  // View counter: optimistic display + fire-and-forget atomic increment.
+  // View counter: optimistic display + local persistence + atomic server increment + grid badge sync
   const viewsEl = overlay.querySelector('[data-live-views]');
+  post.views_count = (Number(post.views_count) || 0) + 1;
+  saveBlogViewsMap(post.slug, post.views_count);
+
+  const updateGridBadges = (cnt) => {
+    document.querySelectorAll(`[data-views-for="${post.slug}"]`).forEach(el => {
+      el.textContent = `👁 ${Number(cnt).toLocaleString('en-IN')}`;
+    });
+  };
+  if (viewsEl) viewsEl.textContent = Number(post.views_count).toLocaleString('en-IN');
+  updateGridBadges(post.views_count);
+
   blogApiPost({ operation: 'rpc', fn: 'increment_blog_views', params: { p_slug: post.slug } })
     .then(json => {
-      if (json && json.success && viewsEl) viewsEl.textContent = String(Number(json.data) || Number(viewsEl.textContent) + 1);
+      if (json && json.success && json.data != null) {
+        const liveCount = Number(json.data);
+        post.views_count = liveCount;
+        saveBlogViewsMap(post.slug, liveCount);
+        if (viewsEl) viewsEl.textContent = liveCount.toLocaleString('en-IN');
+        updateGridBadges(liveCount);
+      }
     })
     .catch(() => {});
 
@@ -1329,6 +1567,212 @@ function openBlogReader(slug) {
 function handleHashForBlog() {
   const m = /^#read=([\w-]+)$/.exec(location.hash || '');
   if (m) openBlogReader(decodeURIComponent(m[1]));
+}
+
+/* --------------------------------------------------------------------------
+ * 13. Interactive Faculty & Mentor Ratings (Real-Time Supabase Sync)
+ * -------------------------------------------------------------------------- */
+/* --------------------------------------------------------------------------
+ * 13. Interactive Faculty & Mentor Ratings (Real-Time Supabase Sync)
+ * -------------------------------------------------------------------------- */
+const MENTOR_BASE_RATINGS = {
+  'chandan-kumar': { average_rating: 0.0, total_ratings: 0, name: 'Chandan Sir' },
+  'ravi-ranjan':   { average_rating: 0.0, total_ratings: 0, name: 'Ravi Sir' },
+  'aditi-singh':   { average_rating: 0.0, total_ratings: 0, name: 'Aditi Ma\'am' }
+};
+
+let mentorRatingsCache = {
+  'chandan-kumar': { ...MENTOR_BASE_RATINGS['chandan-kumar'] },
+  'ravi-ranjan':   { ...MENTOR_BASE_RATINGS['ravi-ranjan'] },
+  'aditi-singh':   { ...MENTOR_BASE_RATINGS['aditi-singh'] }
+};
+
+function getRatingClientId() {
+  let cid = '';
+  try { cid = localStorage.getItem('pragyan_rating_client_id') || ''; } catch (_) {}
+  if (!cid) {
+    cid = 'cid_' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2, 11));
+    try { localStorage.setItem('pragyan_rating_client_id', cid); } catch (_) {}
+  }
+  return cid;
+}
+
+function getMentorVotesMap() {
+  try {
+    const raw = localStorage.getItem('pragyan_mentor_all_votes');
+    return raw ? JSON.parse(raw) : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function getUserMentorRating(mentorId) {
+  const clientId = getRatingClientId();
+  const all = getMentorVotesMap();
+  const mentorVotes = all[mentorId] || {};
+  return Number(mentorVotes[clientId]) || 0;
+}
+
+function saveMentorVote(mentorId, rating) {
+  const clientId = getRatingClientId();
+  try {
+    const all = getMentorVotesMap();
+    if (!all[mentorId]) all[mentorId] = {};
+    all[mentorId][clientId] = Number(rating);
+    localStorage.setItem('pragyan_mentor_all_votes', JSON.stringify(all));
+  } catch (_) {}
+}
+
+function computeMentorAggregates(mentorId) {
+  const all = getMentorVotesMap();
+  const mentorVotes = all[mentorId] || {};
+  const scores = Object.values(mentorVotes).map(Number).filter(n => n >= 1 && n <= 5);
+  const total = scores.length;
+  if (total === 0) {
+    return { average_rating: 0.0, total_ratings: 0 };
+  }
+  const sum = scores.reduce((a, b) => a + b, 0);
+  const avg = Number((sum / total).toFixed(1));
+  return { average_rating: avg, total_ratings: total };
+}
+
+function syncMentorRatingsFromLocalVotes() {
+  ['chandan-kumar', 'ravi-ranjan', 'aditi-singh'].forEach(mId => {
+    const agg = computeMentorAggregates(mId);
+    mentorRatingsCache[mId] = {
+      average_rating: agg.average_rating,
+      total_ratings: agg.total_ratings,
+      name: mentorRatingsCache[mId]?.name || 'Faculty Mentor'
+    };
+  });
+  saveMentorRatingsLocal();
+}
+
+function loadMentorRatingsLocal() {
+  try {
+    const raw = localStorage.getItem('pragyan_mentor_ratings_cache');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        Object.keys(parsed).forEach(mId => {
+          if (mentorRatingsCache[mId]) {
+            const rawAvg = Number(parsed[mId].average_rating);
+            const rawCount = Number(parsed[mId].total_ratings);
+            mentorRatingsCache[mId].average_rating = (rawAvg > 0 && rawCount > 0) ? rawAvg : 0.0;
+            mentorRatingsCache[mId].total_ratings = Math.max(0, rawCount || 0);
+          }
+        });
+      }
+    }
+  } catch (_) {}
+  // Re-verify against vote records to guarantee zero arithmetic errors
+  syncMentorRatingsFromLocalVotes();
+}
+
+function saveMentorRatingsLocal() {
+  try {
+    localStorage.setItem('pragyan_mentor_ratings_cache', JSON.stringify(mentorRatingsCache));
+  } catch (_) {}
+}
+
+function renderMentorRatingWidget(widget) {
+  const mentorId = widget.dataset.mentorId;
+  if (!mentorId) return;
+  const data = mentorRatingsCache[mentorId] || MENTOR_BASE_RATINGS[mentorId] || { average_rating: 0.0, total_ratings: 0 };
+  const userRating = getUserMentorRating(mentorId);
+
+  const scoreEl = widget.querySelector('[data-rating-score]');
+  const countEl = widget.querySelector('[data-rating-count]');
+  const countVal = Number(data.total_ratings || 0);
+  const scoreVal = Number(data.average_rating || 0).toFixed(1);
+
+  if (scoreEl) scoreEl.textContent = scoreVal;
+  if (countEl) countEl.textContent = `(${countVal.toLocaleString('en-IN')})`;
+
+  const starBtns = widget.querySelectorAll('.star-btn');
+  starBtns.forEach(btn => {
+    const starVal = Number(btn.dataset.star);
+    const activeThreshold = userRating > 0 ? userRating : (countVal > 0 ? Math.round(Number(data.average_rating)) : 0);
+    btn.classList.toggle('is-active', starVal <= activeThreshold);
+  });
+}
+
+function initMentorRatings() {
+  const widgets = document.querySelectorAll('.mentor-rating-widget');
+  if (!widgets.length) return;
+
+  loadMentorRatingsLocal();
+  widgets.forEach(renderMentorRatingWidget);
+
+  blogApiPost({ operation: 'rpc', fn: 'get_mentor_ratings', params: {} })
+    .then(json => {
+      if (json && json.success && json.data && typeof json.data === 'object') {
+        Object.keys(json.data).forEach(mId => {
+          if (mentorRatingsCache[mId]) {
+            mentorRatingsCache[mId].average_rating = Number(json.data[mId].average_rating) || 0.0;
+            mentorRatingsCache[mId].total_ratings = Number(json.data[mId].total_ratings) || 0;
+          }
+        });
+        saveMentorRatingsLocal();
+        widgets.forEach(renderMentorRatingWidget);
+      }
+    })
+    .catch(() => {});
+
+  widgets.forEach(widget => {
+    const mentorId = widget.dataset.mentorId;
+    const mentorName = widget.dataset.mentorName || 'Faculty Mentor';
+    const starBtns = widget.querySelectorAll('.star-btn');
+
+    starBtns.forEach(btn => {
+      const starVal = Number(btn.dataset.star);
+
+      btn.addEventListener('mouseenter', () => {
+        starBtns.forEach(b => b.classList.toggle('is-hover', Number(b.dataset.star) <= starVal));
+      });
+
+      widget.addEventListener('mouseleave', () => {
+        starBtns.forEach(b => b.classList.remove('is-hover'));
+      });
+
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        
+        // 1. Save individual user vote into map and compute exact totals
+        saveMentorVote(mentorId, starVal);
+        syncMentorRatingsFromLocalVotes();
+        renderMentorRatingWidget(widget);
+
+        // 2. Immediate feedback toast
+        const toastMsg = `Thank you! Rated ${mentorName} ${starVal}★`;
+        if (typeof window.showToast === 'function') {
+          window.showToast(toastMsg, 'success');
+        } else if (window.PragyanUI && typeof window.PragyanUI.showToast === 'function') {
+          window.PragyanUI.showToast(toastMsg);
+        }
+
+        // 3. Sync to Supabase cloud
+        const clientId = getRatingClientId();
+        try {
+          const res = await blogApiPost({
+            operation: 'rpc',
+            fn: 'submit_mentor_rating',
+            params: {
+              p_mentor_id: mentorId,
+              p_rating: starVal,
+              p_client_id: clientId
+            }
+          });
+          if (res && res.success && res.data && typeof res.data === 'object') {
+            mentorRatingsCache[mentorId].average_rating = Number(res.data.average_rating) || mentorRatingsCache[mentorId].average_rating;
+            mentorRatingsCache[mentorId].total_ratings = Number(res.data.total_ratings) || mentorRatingsCache[mentorId].total_ratings;
+            saveMentorRatingsLocal();
+            renderMentorRatingWidget(widget);
+          }
+        } catch (_) {}
+      });
+    });
+  });
 }
 
 function initBlog() {
@@ -1347,5 +1791,49 @@ function initBlog() {
 
   window.addEventListener('hashchange', handleHashForBlog);
 
-  fetchPublishedPosts().then(handleHashForBlog);
+  restoreBlogCategoryFromHash();
+  fetchPublishedPosts().then(() => { handleHashForBlog(); });
+}
+
+function initStreamToggles() {
+  document.querySelectorAll('.batch-card[data-has-streams]').forEach(card => {
+    const streamBtns = card.querySelectorAll('.stream-btn');
+    const streamPanes = card.querySelectorAll('.stream-pane');
+    const titleStreamEl = card.querySelector('[data-stream-title]');
+
+    streamBtns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const targetStream = btn.dataset.stream;
+        if (!targetStream) return;
+
+        streamBtns.forEach(b => {
+          const isActive = b === btn;
+          b.classList.toggle('active', isActive);
+          b.setAttribute('aria-pressed', String(isActive));
+        });
+
+        streamPanes.forEach(pane => {
+          const match = pane.dataset.streamPane === targetStream;
+          pane.classList.toggle('is-hidden', !match);
+        });
+
+        if (titleStreamEl) {
+          titleStreamEl.textContent = targetStream.toUpperCase();
+        }
+      });
+    });
+  });
+}
+
+function initPublicFeatures() {
+  initBlog();
+  initMentorRatings();
+  initStreamToggles();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initPublicFeatures);
+} else {
+  initPublicFeatures();
 }

@@ -4781,3 +4781,25 @@ button, a, input, select, textarea {
   outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: 2px;
 }
+
+@media (max-width: 767px) {
+  #adminTabPane-blog .dash-card-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.75rem !important;
+  }
+  #adminTabPane-blog .dash-card-header > div {
+    flex-direction: column !important;
+    width: 100% !important;
+    gap: 0.6rem !important;
+  }
+  #blogAdminFilter,
+  #btnNewBlogPost {
+    width: 100% !important;
+  }
+  #blogEditorModal .inner-modal-content {
+    padding: 1.15rem !important;
+    max-height: 96vh !important;
+    border-radius: 12px !important;
+  }
+}

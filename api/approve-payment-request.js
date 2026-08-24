@@ -73,10 +73,16 @@ export default async function handler(req, res) {
   const supabase = getSupabase();
   if (!supabase) return res.status(503).json({ success: false, error: 'Server database configuration is missing' });
 
+  // F-R5: the surplus boundary lives INSIDE approve_payment_request (the RPC
+  // owns the transaction and writes its own audit warning). The endpoint only
+  // forwards the verifier's explicit override flag.
+  const allowSurplus = req.body?.allow_surplus === true;
+
   try {
     const { data, error } = await supabase.rpc('approve_payment_request', {
       p_request_id: p_req_id,
-      p_verifier: p_verifier
+      p_verifier: p_verifier,
+      p_allow_surplus: allowSurplus
     });
 
     if (error) {
@@ -101,11 +107,14 @@ export default async function handler(req, res) {
     // A failure payload is a failure. This is the check whose absence let a
     // NOT_FOUND read as an approved payment.
     if (result.success === false) {
-      const status = STATUS_FOR_CODE[result.code] || 400;
+      const status = result.code === 'AMOUNT_EXCEEDS_DUES' ? 422 : (STATUS_FOR_CODE[result.code] || 400);
       return res.status(status).json({
         success: false,
         code: result.code || null,
-        error: result.error || 'Payment request could not be approved'
+        error: result.error || 'Payment request could not be approved',
+        requestedAmount: result.requested_amount ?? null,
+        livePending: result.live_pending ?? null,
+        needsOverride: Boolean(result.needs_override)
       });
     }
 

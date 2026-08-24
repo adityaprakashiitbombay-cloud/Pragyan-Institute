@@ -35,10 +35,36 @@ export function slugifyTitle(title) {
   return base || 'untitled';
 }
 
-/** Reading-time estimate at ~200 wpm, minimum 1. */
+/**
+ * Accurately calculate reading time for educational and technical articles:
+ * 1. Strips markdown syntax, code fences, and links to count true prose words.
+ * 2. Counts embedded illustrations / diagrams / images (+12s per image, Medium standard).
+ * 3. Uses standard 200 words-per-minute (WPM) baseline, with a floor of 1 minute.
+ */
 export function estimateReadingMinutes(markdown) {
-  const words = String(markdown || '').trim().split(/\s+/).filter(Boolean).length;
-  return Math.max(1, Math.round(words / 200) || 1);
+  if (!markdown || typeof markdown !== 'string') return 1;
+
+  // Count images (![alt](url))
+  const imgMatches = markdown.match(/!\[[^\]]*\]\([^)]+\)/g);
+  const imageCount = imgMatches ? imgMatches.length : 0;
+  const imageSeconds = imageCount * 12;
+
+  // Clean markdown to count actual prose words
+  const cleanProse = markdown
+    .replace(/```[\s\S]*?```/g, ' ')       // remove code blocks
+    .replace(/`[^`]+`/g, ' ')               // remove inline code
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, ' ')  // remove images
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')// keep link text only
+    .replace(/^[#>*_\-~]{1,}\s+/gm, ' ')    // remove headings/bullets/quotes
+    .replace(/:::(info|warn|tip|:::)/gi, ' ') // remove callout tags
+    .replace(/[#*_~`]/g, ' ')               // remove emphasis markers
+    .trim();
+
+  const words = cleanProse.split(/\s+/).filter(Boolean).length;
+  if (words === 0) return 1;
+
+  const totalMinutes = (words / 200) + (imageSeconds / 60);
+  return Math.max(1, Math.round(totalMinutes));
 }
 
 const CALLOUT_KINDS = new Set(['info', 'warn', 'tip']);

@@ -753,8 +753,9 @@ DROP FUNCTION IF EXISTS public.approve_payment_request(text, text);
 DROP FUNCTION IF EXISTS public.approve_payment_request(text);
 
 CREATE OR REPLACE FUNCTION public.approve_payment_request(
-  p_request_id text,
-  p_verifier   text DEFAULT 'ADMIN'
+p_request_id    text,
+p_verifier      text DEFAULT 'ADMIN',
+p_allow_surplus boolean DEFAULT false
 )
 RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER
@@ -856,10 +857,42 @@ BEGIN
   -- Lock order step 2: the student.
   SELECT * INTO v_student FROM public.students
     WHERE student_id = v_request.student_id FOR UPDATE;
-  IF NOT FOUND THEN
-    RETURN jsonb_build_object('success', false, 'code', 'NO_STUDENT',
-      'error', format('Student record %s not found', v_request.student_id));
+IF NOT FOUND THEN
+RETURN jsonb_build_object('success', false, 'code', 'NO_STUDENT',
+'error', format('Student record %s not found', v_request.student_id));
+END IF;
+
+-- F-R5: FINANCIAL BOUNDARY. A credit above live dues + one month's fee is a
+-- surplus and demands an explicit admin override. Every override is journalled
+-- to audit_logs INSIDE this transaction, so the money path stays single-owner.
+IF v_amount > COALESCE(v_student.pending_fee, 0) + COALESCE(v_student.monthly_fee, 0) THEN
+  IF NOT COALESCE(p_allow_surplus, false) THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'code', 'AMOUNT_EXCEEDS_DUES',
+      'error', format('Amount %s exceeds recorded dues %s; re-confirm with an explicit surplus override',
+                      v_amount, COALESCE(v_student.pending_fee, 0)),
+      'requested_amount', v_amount,
+      'live_pending', COALESCE(v_student.pending_fee, 0),
+      'needs_override', true);
   END IF;
+
+  INSERT INTO public.audit_logs
+    (log_id, timestamp, actor, action_type, student_name, student_roll, description, details)
+  VALUES
+    ('AUD-SURPLUS-' || v_receipt_no || '-' || extract(epoch FROM now())::bigint,
+     now(),
+     COALESCE(p_verifier, 'ADMIN'),
+     'SURPLUS_APPROVAL_OVERRIDE',
+     COALESCE(v_request.student_name, ''),
+     COALESCE(v_request.roll_no, 'N/A'),
+     format('Approved %s against live dues of %s with explicit surplus override',
+            v_amount, COALESCE(v_student.pending_fee, 0)),
+     jsonb_build_object('request_id', btrim(p_request_id),
+                        'requested_amount', v_amount,
+                        'live_pending', COALESCE(v_student.pending_fee, 0),
+                        'override_by', COALESCE(p_verifier, 'ADMIN')));
+END IF;
 
   v_paid    := COALESCE(v_student.paid_fee, 0) + v_amount;
   v_pending := GREATEST(0, COALESCE(v_student.pending_fee, 0) - v_amount);
@@ -1411,3 +1444,136 @@ GRANT EXECUTE ON FUNCTION public.increment_blog_views(text) TO service_role;
 -- Verification:
 SELECT count(*) AS blog_posts_ready FROM pg_tables
  WHERE schemaname='public' AND tablename='blog_posts';
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- SECTION 15: INTERACTIVE MENTOR RATINGS & REVIEWS (public.mentor_ratings)
+-- ----------------------------------------------------------------------------
+-- Students and public visitors submit 1-5 star ratings for faculty mentors.
+-- Ratings are deduplicated per client_id and aggregated atomically in SQL.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS public.mentor_ratings (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  mentor_id   text NOT NULL CHECK (mentor_id IN ('chandan-kumar', 'ravi-ranjan', 'aditi-singh')),
+  rating      integer NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  client_id   text NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT uq_mentor_client UNIQUE (mentor_id, client_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_mentor_ratings_mentor
+  ON public.mentor_ratings (mentor_id);
+
+ALTER TABLE public.mentor_ratings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.mentor_ratings FORCE ROW LEVEL SECURITY;
+
+DO $do$
+DECLARE p record;
+BEGIN
+  FOR p IN SELECT policyname FROM pg_policies
+           WHERE schemaname='public' AND tablename='mentor_ratings'
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.mentor_ratings', p.policyname);
+  END LOOP;
+END $do$;
+
+CREATE POLICY "service_role_full_mentor_ratings" ON public.mentor_ratings
+  FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+REVOKE ALL ON public.mentor_ratings FROM PUBLIC, anon, authenticated;
+
+-- Atomic submission RPC (Upserts client rating and returns new aggregated average)
+CREATE OR REPLACE FUNCTION public.submit_mentor_rating(
+  p_mentor_id text,
+  p_rating integer,
+  p_client_id text
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $fn$
+DECLARE
+  v_mentor text := btrim(p_mentor_id);
+  v_client text := btrim(p_client_id);
+  v_score integer := p_rating;
+  v_avg numeric(3,1);
+  v_count integer;
+BEGIN
+  IF v_mentor NOT IN ('chandan-kumar', 'ravi-ranjan', 'aditi-singh') THEN
+    RAISE EXCEPTION 'Invalid mentor identifier: %', v_mentor;
+  END IF;
+  IF v_score < 1 OR v_score > 5 THEN
+    RAISE EXCEPTION 'Rating must be between 1 and 5 (got %)', v_score;
+  END IF;
+  IF length(v_client) < 4 THEN
+    v_client := 'anon-' || substr(md5(random()::text), 1, 12);
+  END IF;
+
+  INSERT INTO public.mentor_ratings (mentor_id, rating, client_id, updated_at)
+  VALUES (v_mentor, v_score, v_client, now())
+  ON CONFLICT (mentor_id, client_id)
+  DO UPDATE SET rating = EXCLUDED.rating, updated_at = now();
+
+  -- Calculate real live average and total review count
+  SELECT
+    COALESCE(ROUND(AVG(rating)::numeric, 1), 0.0),
+    COUNT(*)::integer
+    INTO v_avg, v_count
+    FROM public.mentor_ratings
+   WHERE mentor_id = v_mentor;
+
+  RETURN jsonb_build_object(
+    'mentor_id', v_mentor,
+    'average_rating', COALESCE(v_avg, 0.0),
+    'total_ratings', COALESCE(v_count, 0)
+  );
+END;
+$fn$;
+
+-- Query aggregated ratings for all mentors
+CREATE OR REPLACE FUNCTION public.get_mentor_ratings()
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $fn$
+DECLARE
+  v_res jsonb;
+BEGIN
+  WITH mentors AS (
+    SELECT 'chandan-kumar' AS mentor_id
+    UNION ALL
+    SELECT 'ravi-ranjan'   AS mentor_id
+    UNION ALL
+    SELECT 'aditi-singh'   AS mentor_id
+  ),
+  aggregated AS (
+    SELECT
+      m.mentor_id,
+      COALESCE(ROUND(AVG(r.rating)::numeric, 1), 0.0) AS average_rating,
+      COUNT(r.id)::integer AS total_ratings
+      FROM mentors m
+      LEFT JOIN public.mentor_ratings r ON r.mentor_id = m.mentor_id
+     GROUP BY m.mentor_id
+  )
+  SELECT jsonb_object_agg(
+    mentor_id,
+    jsonb_build_object('average_rating', average_rating, 'total_ratings', total_ratings)
+  ) INTO v_res FROM aggregated;
+
+  RETURN COALESCE(v_res, '{}'::jsonb);
+END;
+$fn$;
+
+REVOKE ALL ON FUNCTION public.submit_mentor_rating(text, integer, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.submit_mentor_rating(text, integer, text) TO service_role;
+
+REVOKE ALL ON FUNCTION public.get_mentor_ratings() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_mentor_ratings() TO service_role;
+
+-- Verification:
+SELECT count(*) AS mentor_ratings_ready FROM pg_tables
+ WHERE schemaname='public' AND tablename='mentor_ratings';

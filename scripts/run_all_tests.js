@@ -11,6 +11,8 @@ import { runEmailQuotaTests } from '../tests/email-quota.test.js';
 import { runPaymentApprovalTests } from '../tests/payment-approval.test.js';
 import { runClientMoneyAndTouchTests } from '../tests/client-money-and-touch.test.js';
 import { runBlogTests } from '../tests/blog.test.js';
+import { runSecurityHardeningTests } from '../tests/security-hardening.test.js';
+import { runMentorRatingTests } from '../tests/mentor-ratings.test.js';
 
 console.log('================================================================');
 console.log('   PRAGYAN INSTITUTE — T1 TO T6 MASTER TEST RUNNER & AUDIT      ');
@@ -846,6 +848,13 @@ runClientMoneyAndTouchTests(assert);
 // -----------------------------------------------------------------------------
 console.log('\n--- [T25] Blog & Academic Insights Hub ---');
 runBlogTests(assert);
+
+// -----------------------------------------------------------------------------
+// T26 — Interactive Faculty & Mentor Ratings. Covers SQL schema, unique
+// client constraints, atomic submit RPCs, gateway allowlist, and markup.
+// -----------------------------------------------------------------------------
+console.log('\n--- [T26] Interactive Faculty & Mentor Ratings ---');
+runMentorRatingTests(assert);
 
 console.log('\n================================================================');
 console.log(`MASTER TEST RESULTS: ${pass} Passed, ${fail} Failed`);
