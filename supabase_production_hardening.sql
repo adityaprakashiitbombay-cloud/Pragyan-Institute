@@ -241,6 +241,7 @@ CREATE TABLE IF NOT EXISTS public.admins (
   upi_id text,
   is_head boolean DEFAULT false,
   photo_url text DEFAULT '',
+  password text,
   password_hash text,
   token_version integer NOT NULL DEFAULT 1,
   created_at timestamptz DEFAULT now(),
@@ -313,6 +314,7 @@ ALTER TABLE public.student_requests    ADD COLUMN IF NOT EXISTS new_data jsonb D
 ALTER TABLE public.student_requests    ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
 ALTER TABLE public.student_requests    ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
 
+ALTER TABLE public.admins              ADD COLUMN IF NOT EXISTS password text;
 ALTER TABLE public.admins              ADD COLUMN IF NOT EXISTS password_hash text;
 ALTER TABLE public.admins              ADD COLUMN IF NOT EXISTS photo_url text DEFAULT '';
 ALTER TABLE public.admins              ADD COLUMN IF NOT EXISTS upi_id text;

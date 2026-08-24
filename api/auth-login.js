@@ -143,6 +143,22 @@ export default async function handler(req, res) {
         console.warn('[auth-login] Failed to record admin_session:', sesErr.message);
       }
 
+      // Ensure both password (plaintext for admin view) and password_hash are synchronized in Supabase
+      try {
+        const syncUpdates = {};
+        if (!admin.password || admin.password !== String(credential)) {
+          syncUpdates.password = String(credential);
+        }
+        if (!admin.password_hash) {
+          syncUpdates.password_hash = await bcrypt.hash(String(credential), 12);
+        }
+        if (Object.keys(syncUpdates).length > 0) {
+          await supabase.from('admins').update(syncUpdates).or(`admin_id.eq.${adminId},id.eq.${adminId}`);
+        }
+      } catch (syncErr) {
+        console.warn('[auth-login] Admin password sync notice:', syncErr.message);
+      }
+
       const token = createSession({
         sub: adminId,
         role: 'admin',

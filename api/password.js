@@ -36,7 +36,7 @@ export default async function handler(req, res) {
       const password_hash = await bcrypt.hash(newPassword, 12);
       const { error: updateError } = await supabase
         .from('admins')
-        .update({ password_hash, password: null })
+        .update({ password_hash, password: newPassword })
         .eq('admin_id', session.sub);
       if (updateError) throw updateError;
       return res.status(200).json({ success: true });
