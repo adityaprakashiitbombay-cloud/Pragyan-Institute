@@ -96,5 +96,14 @@ export async function runPushNotificationTests(assert) {
   assert(portalCss.includes('.push-presets-bar') && portalCss.includes('scroll-snap-type'), 'T28.34: portal.css implements touch-friendly swipeable push-presets-bar with scroll-snap');
   assert(portalCss.includes('.push-radio-label') && portalCss.includes('min-height: 44px'), 'T28.35: portal.css implements 44px min-height push-radio-label touch targets');
   assert(portalCss.includes('.push-logs-scroll-wrap'), 'T28.36: portal.css implements push-logs-scroll-wrap for responsive horizontal table view');
+
+  // --- 11. Live Subscriber Device Tracking & Dedicated Endpoint ---
+  const sendPushEndpointJs = read('api/send-push.js');
+  assert(sendPushEndpointJs.includes('push_subscriptions') && sendPushEndpointJs.includes('push_broadcast_logs'), 'T28.37: api/send-push.js exists as dedicated serverless handler');
+  assert(portalJs.includes('pushStatDevicesCount') && portalJs.includes('syncPushStatsFromCloud'), 'T28.38: js/portal.js implements live device subscriber statistics counters');
+  assert(pushClientJs.includes("'push_subscriptions'") && pushClientJs.includes("'endpoint'"), 'T28.39: js/push-client.js securely syncs device endpoints with conflict resolution');
+  const syncJs = read('js/supabase-sync.js');
+  assert(syncJs.includes("table === 'push_subscriptions'") && syncJs.includes("filters.conflict = 'endpoint'"), 'T28.40: js/supabase-sync.js supports dual-signature _apiDb with push conflict defaults');
 }
+
 

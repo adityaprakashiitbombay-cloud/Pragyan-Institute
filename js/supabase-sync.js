@@ -420,15 +420,37 @@
      * message that keeps the HTTP status prefix so existing catch-site logging
      * stays meaningful.
      */
-    async _apiDb(table, operation, { data = null, filters = {}, options = {} } = {}) {
+    async _apiDb(tableOrConfig, operationArg, opts = {}) {
+      let table = tableOrConfig;
+      let operation = operationArg;
+      let data = opts.data !== undefined ? opts.data : null;
+      let filters = opts.filters || {};
+      let options = opts.options || {};
+
+      if (tableOrConfig && typeof tableOrConfig === 'object' && !Array.isArray(tableOrConfig)) {
+        table = tableOrConfig.table;
+        operation = tableOrConfig.operation;
+        data = tableOrConfig.data !== undefined ? tableOrConfig.data : data;
+        filters = tableOrConfig.filters || filters;
+        options = tableOrConfig.options || options;
+      }
+
+      if (table === 'push_subscriptions' && operation === 'upsert' && !filters.conflict) {
+        filters.conflict = 'endpoint';
+      }
+      if (table === 'blog_posts' && operation === 'upsert' && !filters.conflict) {
+        filters.conflict = 'slug';
+      }
+
       const token = this.sessionToken ||
         (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pragyan_portal_token')) ||
         (typeof localStorage !== 'undefined' && localStorage.getItem('pragyan_portal_token')) ||
         (typeof AppState !== 'undefined' && AppState.token) || null;
       if (!token) {
-        // If public table read, anonymous access is permitted by /api/db
+        // If public table read or push registration, anonymous access is permitted by /api/db
         const isPublicRead = (table === 'notices' || table === 'batches' || table === 'blog_posts') && operation === 'select';
-        if (!isPublicRead) {
+        const isPushRegister = table === 'push_subscriptions' && (operation === 'insert' || operation === 'upsert');
+        if (!isPublicRead && !isPushRegister) {
           throw new Error(`Gateway ${operation} ${table} failed (401): no active session`);
         }
       }

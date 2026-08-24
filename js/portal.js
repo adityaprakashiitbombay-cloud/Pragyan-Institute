@@ -12760,6 +12760,34 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
           </div>
         </div>
 
+        <!-- Live Push Metric Cards -->
+        <div class="stats-grid" id="pushHubStatsGrid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 1.5rem;">
+          <div class="stat-card stat-card-blue">
+            <div class="stat-icon"><i aria-hidden="true" class="fa-solid fa-mobile-screen-button"></i></div>
+            <div class="stat-content">
+              <span class="stat-label">Registered Devices</span>
+              <span class="stat-value" id="pushStatDevicesCount">--</span>
+              <span class="stat-delta text-success"><i aria-hidden="true" class="fa-solid fa-signal"></i> Active Push Endpoints</span>
+            </div>
+          </div>
+          <div class="stat-card stat-card-emerald">
+            <div class="stat-icon"><i aria-hidden="true" class="fa-solid fa-user-check"></i></div>
+            <div class="stat-content">
+              <span class="stat-label">Subscribed Students</span>
+              <span class="stat-value" id="pushStatStudentsCount">--</span>
+              <span class="stat-delta text-emerald"><i aria-hidden="true" class="fa-solid fa-graduation-cap"></i> Authenticated</span>
+            </div>
+          </div>
+          <div class="stat-card stat-card-purple">
+            <div class="stat-icon"><i aria-hidden="true" class="fa-solid fa-paper-plane"></i></div>
+            <div class="stat-content">
+              <span class="stat-label">Broadcasts Delivered</span>
+              <span class="stat-value" id="pushStatDeliveredCount">--</span>
+              <span class="stat-delta text-purple"><i aria-hidden="true" class="fa-solid fa-clock-rotate-left"></i> Lifetime Alerts</span>
+            </div>
+          </div>
+        </div>
+
         <!-- 1-Click Quick Preset Strip -->
         <div class="push-presets-bar">
           <span class="preset-label"><i aria-hidden="true" class="fa-solid fa-bolt"></i> Quick Presets:</span>
@@ -12953,7 +12981,66 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
     `;
 
     wirePushComposerEvents(pane);
+    syncPushStatsFromCloud();
     loadPushBroadcastLogs();
+  }
+
+  async function syncPushStatsFromCloud() {
+    const devicesEl = document.getElementById('pushStatDevicesCount');
+    const studentsEl = document.getElementById('pushStatStudentsCount');
+    const deliveredEl = document.getElementById('pushStatDeliveredCount');
+
+    try {
+      const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pragyan_portal_token')) ||
+        (typeof localStorage !== 'undefined' && localStorage.getItem('pragyan_portal_token')) || null;
+
+      let subs = [];
+      let logs = [];
+
+      try {
+        const res = await fetch('/api/send-push', {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.success) {
+            if (devicesEl) devicesEl.textContent = Number(data.subscribers || 0).toLocaleString('en-IN');
+            if (data.recentLogs && Array.isArray(data.recentLogs)) {
+              logs = data.recentLogs;
+            }
+          }
+        }
+      } catch (_) {}
+
+      if (window.SupabaseSync && typeof window.SupabaseSync._apiDb === 'function') {
+        const [subRows, logRows] = await Promise.allSettled([
+          window.SupabaseSync._apiDb('push_subscriptions', 'select', { filters: { limit: 1000 } }),
+          window.SupabaseSync._apiDb('push_broadcast_logs', 'select', { filters: { limit: 100 } })
+        ]);
+
+        if (subRows.status === 'fulfilled' && Array.isArray(subRows.value)) {
+          subs = subRows.value;
+          const uniqueStudents = new Set(subs.map(s => s.student_id).filter(Boolean));
+          if (devicesEl) devicesEl.textContent = subs.length.toLocaleString('en-IN');
+          if (studentsEl) studentsEl.textContent = uniqueStudents.size.toLocaleString('en-IN');
+        }
+
+        if (logRows.status === 'fulfilled' && Array.isArray(logRows.value)) {
+          logs = logRows.value;
+        }
+      }
+
+      if (logs.length > 0) {
+        const totalDelivered = logs.reduce((sum, l) => sum + Number(l.delivered_count || 0), 0);
+        if (deliveredEl) deliveredEl.textContent = totalDelivered.toLocaleString('en-IN');
+      } else {
+        if (deliveredEl && (deliveredEl.textContent === '--' || deliveredEl.textContent === '')) deliveredEl.textContent = '0';
+      }
+      if (studentsEl && (studentsEl.textContent === '--' || studentsEl.textContent === '')) studentsEl.textContent = '0';
+      if (devicesEl && (devicesEl.textContent === '--' || devicesEl.textContent === '')) devicesEl.textContent = '0';
+    } catch (err) {
+      console.warn('[Push] Error syncing push stats:', err);
+    }
   }
 
   function wirePushComposerEvents(pane) {
@@ -13178,7 +13265,8 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
       btnDispatch.innerHTML = '<i aria-hidden="true" class="fa-solid fa-spinner fa-spin"></i> Broadcasting to Devices...';
 
       try {
-        const token = sessionStorage.getItem('pragyan_portal_token');
+        const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pragyan_portal_token')) ||
+          (typeof localStorage !== 'undefined' && localStorage.getItem('pragyan_portal_token')) || null;
         const res = await fetch('/api/send-push', {
           method: 'POST',
           headers: {
@@ -13198,6 +13286,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
         const data = await res.json();
         if (data.success) {
           showNotification(`🚀 Broadcast Dispatched! ${data.delivered} delivered (${data.audienceSize} target devices, ${data.pruned} pruned).`, 'success');
+          syncPushStatsFromCloud();
           loadPushBroadcastLogs();
         } else {
           showNotification(`Broadcast failed: ${data.error || 'Unknown error'}`, 'error');
@@ -13210,7 +13299,10 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
       }
     });
 
-    pane.querySelector('#btnRefreshPushLogs')?.addEventListener('click', loadPushBroadcastLogs);
+    pane.querySelector('#btnRefreshPushLogs')?.addEventListener('click', () => {
+      syncPushStatsFromCloud();
+      loadPushBroadcastLogs();
+    });
   }
 
   async function loadPushBroadcastLogs() {
@@ -13218,18 +13310,32 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
     if (!container) return;
 
     try {
-      if (!window.SupabaseSync || typeof window.SupabaseSync._apiDb !== 'function') {
-        container.innerHTML = '<div style="padding:1.5rem; text-align:center; color:#64748B;">Gateway sync is initializing...</div>';
-        return;
+      let logs = [];
+      if (window.SupabaseSync && typeof window.SupabaseSync._apiDb === 'function') {
+        try {
+          const res = await window.SupabaseSync._apiDb('push_broadcast_logs', 'select', {
+            filters: { limit: 25, ascending: false }
+          });
+          logs = Array.isArray(res) ? res : (res?.data || []);
+        } catch (dbErr) {
+          console.warn('[PushLogs] _apiDb failed, trying fallback:', dbErr);
+        }
       }
 
-      const res = await window.SupabaseSync._apiDb({
-        table: 'push_broadcast_logs',
-        operation: 'select',
-        filters: { limit: 15, ascending: false }
-      });
+      if (logs.length === 0) {
+        try {
+          const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pragyan_portal_token')) ||
+            (typeof localStorage !== 'undefined' && localStorage.getItem('pragyan_portal_token')) || null;
+          const res = await fetch('/api/send-push', {
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.recentLogs) logs = data.recentLogs;
+          }
+        } catch (_) {}
+      }
 
-      const logs = (res && res.data) || [];
       if (logs.length === 0) {
         container.innerHTML = `
           <div style="padding:2rem; text-align:center; color:#64748B;">
@@ -13278,7 +13384,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
                       ${Number(l.pruned_count || 0) > 0 ? `<small style="color:#DC2626; display:block;">(${l.pruned_count} pruned)</small>` : ''}
                     </td>
                     <td style="font-size:0.82rem; color:#475569;">${escapeHtml(l.dispatched_by || 'CHANDAN')}</td>
-                    <td><span class="${badgeClass}">${isSuccess ? 'Delivered' : 'Failed'}</span></td>
+                    <td><span class="${badgeClass}">${isSuccess ? 'Delivered' : (Number(l.audience_size || 0) === 0 ? '0 Audience' : 'Failed')}</span></td>
                   </tr>
                 `;
               }).join('')}

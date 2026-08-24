@@ -178,7 +178,7 @@
           endpoint: sub.endpoint,
           p256dh_key: p256dh,
           auth_key: auth,
-          student_id: student?.student_id || student?.id || null,
+          student_id: student?.student_id || student?.roll_no || student?.rollNo || (student?.id && !String(student.id).includes('-') ? student.id : null),
           batch_id: batchId,
           device_os: device.device_os,
           browser: device.browser,
@@ -187,13 +187,34 @@
         };
 
         if (window.SupabaseSync && typeof window.SupabaseSync._apiDb === 'function') {
-          await window.SupabaseSync._apiDb({
+          try {
+            await window.SupabaseSync._apiDb('push_subscriptions', 'upsert', {
+              data: payload,
+              filters: { conflict: 'endpoint' }
+            });
+            return true;
+          } catch (syncErr) {
+            console.warn('[PushClient] _apiDb failed, trying direct gateway:', syncErr);
+          }
+        }
+
+        const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pragyan_portal_token')) ||
+          (typeof localStorage !== 'undefined' && localStorage.getItem('pragyan_portal_token')) || null;
+        const resp = await fetch('/api/db', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({
             table: 'push_subscriptions',
             operation: 'upsert',
-            data: payload
-          });
-          return true;
-        }
+            data: payload,
+            filters: { conflict: 'endpoint' }
+          })
+        });
+        const resJson = await resp.json().catch(() => null);
+        return Boolean(resJson && resJson.success);
       } catch (err) {
         console.warn('[PushClient] Sync error:', err);
       }

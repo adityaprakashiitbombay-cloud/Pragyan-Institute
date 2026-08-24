@@ -453,7 +453,9 @@ export default async function handler(req, res) {
       result = await supabase.from(table).insert(rows(data)).select(readColumns(table));
     } else if (operation === 'upsert') {
       if (!filters.conflict) {
-        return res.status(400).json({ success: false, error: 'Missing conflict column for upsert' });
+        if (table === 'push_subscriptions') filters.conflict = 'endpoint';
+        else if (table === 'blog_posts') filters.conflict = 'slug';
+        else return res.status(400).json({ success: false, error: 'Missing conflict column for upsert' });
       }
       let upsertRows = rows(data);
       if (table === 'blog_posts' && filters.conflict === 'slug') {
