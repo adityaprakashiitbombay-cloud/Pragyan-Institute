@@ -6,9 +6,7 @@ node_modules
 .claude
 .gemini
 
-# Tests & Scripts
-tests
-scripts
+# Non-build files
 database_migrations
 *.sql
 *.md
