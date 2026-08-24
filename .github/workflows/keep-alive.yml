@@ -15,19 +15,18 @@ jobs:
         run: |
           echo "⏰ Sending keep-alive health check at $(date -u)..."
           
-          # 1. Ping GitHub Pages Live Portal
-          PAGES_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L "https://adityaprakashiitbombay-cloud.github.io/pragyan-institute-portal/")
-          echo "📡 Live Portal Status: $PAGES_STATUS"
-          if [ "$PAGES_STATUS" -ne 200 ]; then
-            echo "⚠️ Warning: Live portal returned HTTP $PAGES_STATUS"
+          # 1. Ping Pragyan Live Portal
+          PORTAL_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L "https://www.pragyaninstitute.com/")
+          echo "📡 Live Portal Status: $PORTAL_STATUS"
+          if [ "$PORTAL_STATUS" -ne 200 ]; then
+            echo "⚠️ Warning: Live portal returned HTTP $PORTAL_STATUS"
           else
             echo "✅ Live portal is healthy (HTTP 200)"
           fi
           
-          # 2. Ping Health Endpoint (if configured)
-          if [ -n "${{ secrets.VERCEL_PROJECT_URL }}" ]; then
-            API_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.VERCEL_PROJECT_URL }}/api/health")
-            echo "📡 API Health Check Status: $API_STATUS"
-          fi
+          # 2. Ping Health Endpoint
+          HEALTH_URL="${{ secrets.VERCEL_PROJECT_URL || 'https://www.pragyaninstitute.com' }}/api/health"
+          API_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L "$HEALTH_URL")
+          echo "📡 API Health Check Status: $API_STATUS"
           
           echo "✅ Keep-alive signal successfully dispatched! Project is 100% active."

@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { StreamChat } from 'stream-chat';
-import { getSupabase, requireSession, applyCors } from './_lib/auth.js';
+import { getSupabase, requireSession, optionalSession, applyCors } from './_lib/auth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -62,7 +62,8 @@ export default async function handler(req, res) {
 
   let showDetail = false;
   try {
-    showDetail = Boolean(requireSession(req, res, ['admin']));
+    const adminSession = optionalSession(req);
+    showDetail = Boolean(adminSession && adminSession.role === 'admin');
   } catch (_) {
     showDetail = false;
   }
