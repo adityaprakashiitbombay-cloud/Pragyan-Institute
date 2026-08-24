@@ -893,6 +893,9 @@
             delete rowObj.updatedAt;
             delete rowObj._local_id;
             delete rowObj.post_id;
+            if (rowObj.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rowObj.id)) {
+              delete rowObj.id;
+            }
           } else if (rowObj.id) {
             changedIds.push(rowObj.id);
           }

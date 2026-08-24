@@ -12159,9 +12159,9 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
   function blogReadLocal() {
     try {
       const stored = localStorage.getItem(BLOG_STORAGE_KEY);
-      if (stored) {
+      if (stored !== null) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
       const seeds = (typeof window !== 'undefined' && Array.isArray(window.SEED_BLOG_POSTS) && window.SEED_BLOG_POSTS.length)
         ? window.SEED_BLOG_POSTS
@@ -12201,7 +12201,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
       if (window.SupabaseSync && typeof window.SupabaseSync._apiDb === 'function') {
         try {
           const res = await window.SupabaseSync._apiDb('blog_posts', 'select', { filters: { limit: 100 } });
-          if (Array.isArray(res) && res.length > 0) livePosts = res;
+          if (Array.isArray(res)) livePosts = res;
         } catch (_) {}
       }
       if (!livePosts) {
@@ -12212,12 +12212,12 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
           body: JSON.stringify({ table: 'blog_posts', operation: 'select', filters: { limit: 100 } })
         });
         const json = await resp.json().catch(() => ({}));
-        if (json && json.success && Array.isArray(json.data) && json.data.length > 0) {
+        if (json && json.success && Array.isArray(json.data)) {
           livePosts = json.data;
         }
       }
 
-      // If database is empty on initial run, auto-seed default articles to cloud
+      // If database is completely uninitialized (0 rows), auto-seed default articles to cloud
       if (!livePosts || livePosts.length === 0) {
         try {
           const seeds = (typeof window !== 'undefined' && Array.isArray(window.SEED_BLOG_POSTS) && window.SEED_BLOG_POSTS.length)
@@ -12236,22 +12236,9 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
         }
       }
 
-      if (Array.isArray(livePosts) && livePosts.length > 0) {
-        const currentLocal = blogReadLocal();
-        const merged = livePosts.map(lp => {
-          const loc = currentLocal.find(x => x.id === lp.id || x.slug === lp.slug);
-          return {
-            ...loc,
-            ...lp,
-            views_count: Math.max(Number(lp.views_count) || 0, Number(loc?.views_count) || 0)
-          };
-        });
-        currentLocal.forEach(loc => {
-          if (!merged.some(m => m.id === loc.id || m.slug === loc.slug)) {
-            merged.push(loc);
-          }
-        });
-        blogWriteLocal(merged);
+      if (Array.isArray(livePosts)) {
+        // Canonical database truth: update local storage directly
+        blogWriteLocal(livePosts);
         renderAdminBlogTab(true);
         if (!silent) {
           showNotification('📊 Real-time view counts & articles synced from database!', 'success');
@@ -12406,7 +12393,10 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
         renderAdminBlogTab();
 
         try {
-          const result = await SupabaseSync.mutate('blog_posts', 'upsert', payload, { where: { id: post.id }, conflict: 'slug' });
+          let result = await SupabaseSync.mutate('blog_posts', 'update', payload, { where: { id: post.id } });
+          if (!result || result.success !== true) {
+            result = await SupabaseSync.mutate('blog_posts', 'upsert', payload, { conflict: 'slug' });
+          }
           if (!result || result.success !== true) {
             console.warn('[blog-toggle] Database sync note:', result?.error);
           }
@@ -12432,10 +12422,22 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
         if (!confirm(`DELETE "${post.title}" permanently?\n\nThis cannot be undone.`)) return;
         b.disabled = true;
         try {
-          await SupabaseSync.mutateOrThrow('blog_posts', 'delete', null, { where: { id: post.id } });
-          blogWriteLocal(blogReadLocal().filter(x => x.id !== post.id));
+          const deleteFilter = (post.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(post.id))
+            ? { id: post.id }
+            : { slug: post.slug };
+          await SupabaseSync.mutateOrThrow('blog_posts', 'delete', null, { where: deleteFilter });
+          const remaining = blogReadLocal().filter(x => x.id !== post.id && x.slug !== post.slug);
+          blogWriteLocal(remaining);
           renderAdminBlogTab();
-          showNotification('Article deleted.', 'success');
+
+          // Broadcast deletion across tabs
+          try {
+            const bc = new BroadcastChannel('pragyan_portal_sync');
+            bc.postMessage({ type: 'BLOG_POST_UPDATED', slug: post.slug, deleted: true });
+            bc.close();
+          } catch (_) {}
+
+          showNotification('Article deleted permanently from database.', 'success');
         } catch (err) {
           alert(`Delete failed: ${err.message}`);
           b.disabled = false;
@@ -12634,8 +12636,13 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
       const existingLive = blogReadLocal().find(x => x.id === values.id || x.slug === slug);
       const preservedViews = Math.max(Number(existingLive?.views_count) || 0, Number(values.views_count) || 0);
 
+      let postId = values.id;
+      if (!postId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(postId)) {
+        postId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : undefined;
+      }
+
       const payload = {
-        id: values.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : undefined),
+        id: postId,
         slug,
         title,
         excerpt: plainForExcerpt.slice(0, 180) || title,
@@ -12643,8 +12650,8 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
         cover_image_url: blogCoverUploadUrl || '',
         category,
         tags: modalEl.querySelector('#blogEdTags').value.split(',').map(t => t.trim()).filter(Boolean).slice(0, 8),
-        author_name: AppState.currentUser && AppState.currentUser.name || 'Chandan Kumar',
-        author_role: AppState.currentUser && AppState.currentUser.role || 'Science Lead & Head Admin',
+        author_name: (AppState.currentUser && AppState.currentUser.name) || 'Chandan Kumar',
+        author_role: (AppState.currentUser && AppState.currentUser.role) || 'Science Lead & Head Admin',
         is_published: publishNow,
         read_time_minutes: md.estimateReadingMinutes(bodyMd),
         views_count: preservedViews,
@@ -12652,23 +12659,38 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
         updated_at: new Date().toISOString(),
         created_at: values.created_at || new Date().toISOString()
       };
-      if (!payload.id) { showNotification('Could not mint an article id in this browser.', 'error'); return; }
+      if (!payload.id) delete payload.id;
 
       const saveBtns = modalEl.querySelectorAll('[data-blog-save]');
       saveBtns.forEach(b => { b.disabled = true; });
       try {
-        const result = await SupabaseSync.mutate(
-          'blog_posts',
-          isNew ? 'insert' : 'upsert',
-          payload,
-          isNew ? {} : { where: { id: values.id }, conflict: 'slug' }
-        );
-        if (!result || result.success !== true) throw new Error(result && result.error ? result.error : 'database rejected');
+        let result = null;
+        if (!isNew && values.id) {
+          result = await SupabaseSync.mutate('blog_posts', 'update', payload, { where: { id: values.id } });
+        }
+        if (!result || result.success !== true) {
+          result = await SupabaseSync.mutate('blog_posts', 'upsert', payload, { conflict: 'slug' });
+        }
+        if (!result || result.success !== true) {
+          throw new Error(result && result.error ? result.error : 'Database write rejected');
+        }
 
+        const savedRow = (Array.isArray(result.data) && result.data[0]) ? result.data[0] : payload;
         const list = blogReadLocal();
-        const idx = list.findIndex(x => x.id === payload.id || x.slug === payload.slug);
-        if (idx >= 0) list[idx] = Object.assign({}, list[idx], payload); else list.unshift(payload);
+        const idx = list.findIndex(x => (values.id && x.id === values.id) || x.slug === payload.slug || (savedRow.id && x.id === savedRow.id));
+        if (idx >= 0) {
+          list[idx] = Object.assign({}, list[idx], payload, savedRow);
+        } else {
+          list.unshift(Object.assign({}, payload, savedRow));
+        }
         blogWriteLocal(list);
+
+        // Broadcast across tabs and public home view
+        try {
+          const bc = new BroadcastChannel('pragyan_portal_sync');
+          bc.postMessage({ type: 'BLOG_POST_UPDATED', slug: payload.slug, is_published: payload.is_published });
+          bc.close();
+        } catch (_) {}
 
         dialog.close();
         renderAdminBlogTab();

@@ -1357,25 +1357,27 @@ function mergeStoredBlogViews(posts) {
   });
 }
 
-async function fetchPublishedPosts() {
+async function fetchPublishedPosts(forceRefresh = false) {
   const grid = document.getElementById('blogGrid');
-  if (!grid || grid.dataset.loading === '1') return;
+  if (!grid) return;
+  if (!forceRefresh && grid.dataset.loading === '1') return;
   grid.dataset.loading = '1';
-  grid.innerHTML = '<div class="blog-loading"><i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i> Loading articles…</div>';
   
-  // Try local sync store first for instant render
-  try {
-    if (window.SupabaseSync && typeof window.SupabaseSync.getAll === 'function') {
-      const cached = window.SupabaseSync.getAll('blog_posts');
-      if (Array.isArray(cached) && cached.length) {
-        blogPostsCache = cached.filter(p => p.is_published !== false);
+  // Try local sync store first for initial render if empty
+  if (!blogPostsCache.length) {
+    try {
+      if (window.SupabaseSync && typeof window.SupabaseSync.getAll === 'function') {
+        const cached = window.SupabaseSync.getAll('blog_posts');
+        if (Array.isArray(cached) && cached.length) {
+          blogPostsCache = cached.filter(p => p.is_published !== false);
+        }
       }
-    }
-  } catch (_) {}
+    } catch (_) {}
+  }
 
   try {
     const json = await blogApiPost({ table: 'blog_posts', operation: 'select', filters: { limit: 100 } });
-    if (json && json.success && Array.isArray(json.data) && json.data.length > 0) {
+    if (json && json.success && Array.isArray(json.data)) {
       blogPostsCache = json.data;
     } else if (!blogPostsCache.length) {
       blogPostsCache = SEED_BLOG_POSTS.map(x => ({ ...x }));
@@ -1651,7 +1653,7 @@ function initBlog() {
     blogBc.addEventListener('message', (e) => {
       if (e.data && (e.data.type === 'BLOG_VIEWS_UPDATED' || e.data.type === 'BLOG_POST_UPDATED')) {
         if (e.data.type === 'BLOG_POST_UPDATED') {
-          fetchPublishedPosts();
+          fetchPublishedPosts(true);
         } else if (e.data.slug) {
           saveBlogViewsMap(e.data.slug, Number(e.data.count) || 0);
           document.querySelectorAll(`[data-views-for="${e.data.slug}"]`).forEach(el => {

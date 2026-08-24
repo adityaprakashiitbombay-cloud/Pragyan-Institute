@@ -103,7 +103,8 @@ const ORDER_COLUMNS = {
   students: 'student_id', notices: 'created_at', fee_receipts: 'created_at',
   fee_billing_ledger: 'created_at', student_requests: 'created_at',
   batches: 'batch_id', admins: 'admin_id', audit_logs: 'created_at',
-  admin_sessions: 'last_active_at'
+  blog_posts: 'created_at', push_subscriptions: 'created_at',
+  push_broadcast_logs: 'created_at', admin_sessions: 'last_active_at'
 };
 
 // Descending by default where the UI shows newest-first lists.
@@ -438,7 +439,7 @@ export default async function handler(req, res) {
     if (operation === 'select') {
       const limit = Math.min(Math.max(Number(filters.limit) || 500, 1), 1000);
       const offset = Math.max(Number(filters.offset) || 0, 0);
-      const orderColumn = ORDER_COLUMNS[table];
+      const orderColumn = ORDER_COLUMNS[table] || 'created_at';
       const ascending = typeof filters.ascending === 'boolean'
         ? filters.ascending
         : !DEFAULT_DESCENDING.has(table);

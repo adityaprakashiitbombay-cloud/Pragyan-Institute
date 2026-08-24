@@ -132,8 +132,8 @@ export function runBlogTests(assert) {
     'T25.44: app.js and portal.js share matching canonical UUIDs for preloaded articles');
   assert(portalSrc.includes('DEFAULT_SEED_BLOG_POSTS') && portalSrc.includes('blogWriteLocal(seeds)'),
     'T25.45: portal.js preloads seed articles into local store when uninitialized');
-  assert(portalSrc.includes("conflict: 'slug'") && portalSrc.includes("isNew ? 'insert' : 'upsert'"),
-    'T25.46: admin blog save uses upsert with slug conflict key for seamless editing of seed articles');
+  assert(portalSrc.includes("conflict: 'slug'") && portalSrc.includes("SupabaseSync.mutate('blog_posts'"),
+    'T25.46: admin blog save uses SupabaseSync.mutate with slug conflict key for seamless editing and upserts');
 
   // --- 12. Real-Time View Count Cross-Device & Admin Tab Sync ---------------------
   assert(portalSrc.includes('syncAdminBlogPostsFromCloud') && portalSrc.includes('_isSyncingBlog'),
@@ -154,5 +154,9 @@ export function runBlogTests(assert) {
     'T25.53: SQL seed conflict update preserves monotonically increasing view counts');
   assert(portalSrc.includes("data-blog-toggle") && portalSrc.includes("goingLive"),
     'T25.54: portal.js implements publish/unpublish toggle with optimistic UI update');
+  assert(dbSrc.includes("blog_posts: 'created_at'") && dbSrc.includes("ORDER_COLUMNS[table] || 'created_at'"),
+    'T25.55: api/db.js explicitly maps blog_posts in ORDER_COLUMNS and falls back safely to created_at');
+  assert(portalSrc.includes("mutateOrThrow('blog_posts', 'delete'") && portalSrc.includes("BLOG_POST_UPDATED"),
+    'T25.56: portal.js permanently deletes articles from cloud database and broadcasts deletion event');
 }
 
