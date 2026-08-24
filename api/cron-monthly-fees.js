@@ -365,18 +365,21 @@ export default async function handler(req, res) {
     // Audit-log write is best-effort: it must never turn a successful billing
     // run into a 500, because the caller would retry a run that already charged.
     try {
-      await supabase.from('audit_logs').insert({
+      const actorName = session.isCron ? 'System Cron' : (session.name || 'Admin');
+      await supabase.from('audit_logs').insert([{
         log_id: `AUD-CRON-${monthKey}-${effectiveDay}-${Date.now()}`,
         timestamp: new Date().toISOString(),
-        actor: session.isCron ? 'System Cron' : (session.name || 'Admin'),
+        actor: actorName,
+        actor_name: actorName,
         action_type: schedule?.type === 'reminder' ? 'MONTHLY_FEE_REMINDER' : 'MONTHLY_FEE_GENERATION',
+        target: schedule?.label || 'Cron Queue',
         student_name: schedule?.label || 'Cron Queue',
         student_roll: 'N/A',
         description: schedule
           ? `Day ${effectiveDay} ${schedule.type === 'reminder' ? 'reminder sweep' : 'billing run'} for ${schedule.label} (${monthKey})`
           : `Day ${effectiveDay} rest state — retry sweep only (${monthKey})`,
         details: { summary, deferred, quotaError, results: results.slice(0, 200) }
-      });
+      }]);
     } catch (auditError) {
       console.error('[cron] audit log write failed:', auditError.message);
     }

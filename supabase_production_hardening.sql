@@ -331,10 +331,16 @@ ALTER TABLE public.admins              ADD COLUMN IF NOT EXISTS token_version in
 ALTER TABLE public.admins              ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
 ALTER TABLE public.admins              ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
 
+ALTER TABLE public.audit_logs          ADD COLUMN IF NOT EXISTS log_id text;
 ALTER TABLE public.audit_logs          ADD COLUMN IF NOT EXISTS action_type text;
+ALTER TABLE public.audit_logs          ADD COLUMN IF NOT EXISTS actor text;
 ALTER TABLE public.audit_logs          ADD COLUMN IF NOT EXISTS actor_name text;
 ALTER TABLE public.audit_logs          ADD COLUMN IF NOT EXISTS target text;
+ALTER TABLE public.audit_logs          ADD COLUMN IF NOT EXISTS student_name text;
+ALTER TABLE public.audit_logs          ADD COLUMN IF NOT EXISTS student_roll text;
+ALTER TABLE public.audit_logs          ADD COLUMN IF NOT EXISTS description text;
 ALTER TABLE public.audit_logs          ADD COLUMN IF NOT EXISTS details jsonb DEFAULT '{}'::jsonb;
+ALTER TABLE public.audit_logs          ADD COLUMN IF NOT EXISTS timestamp text;
 ALTER TABLE public.audit_logs          ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
 ALTER TABLE public.audit_logs          ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
 

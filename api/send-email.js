@@ -12,6 +12,8 @@ import {
   settleQuota,
   statusForSendResult,
   getQuotaStatus,
+  normaliseCategory,
+  dispatchWithQuota,
   EMAIL_CATEGORIES,
   DAILY_EMAIL_LIMIT,
   EmailQuotaUnavailableError
@@ -27,7 +29,9 @@ const CRITICAL_CATEGORIES = new Set([
 ]);
 
 function resolveCategory(raw, role) {
-  if (typeof raw === 'string' && Object.values(EMAIL_CATEGORIES).includes(raw)) return raw;
+  if (typeof raw === 'string' && raw.trim()) {
+    return normaliseCategory(raw);
+  }
   return role === 'student' ? EMAIL_CATEGORIES.RECEIPT : EMAIL_CATEGORIES.ADMIN;
 }
 
@@ -285,7 +289,7 @@ export default async function handler(req, res) {
   const session = requireSession(req, res, ['admin', 'student']);
   if (!session) return;
 
-  const { to, subject, html, text, student_id, category: rawCat } = req.body || {};
+  const { to, subject, html, text, student_id, ledger_id, reference, dedupeKey, category: rawCat } = req.body || {};
 
   const toList = Array.isArray(to) ? to : (typeof to === 'string' ? [to] : []);
   const cleanTo = toList.map(e => String(e || '').trim()).filter(e => EMAIL_PATTERN.test(e));
@@ -307,6 +311,7 @@ export default async function handler(req, res) {
 
   const category = resolveCategory(rawCat, session.role);
   const targetStudent = session.role === 'student' ? session.sub : (student_id || null);
+  const refKey = reference || (targetStudent ? `STUDENT-${targetStudent}` : null);
 
   const apiKey = process.env.RESEND_API_KEY;
   if (!isValidResendApiKey(apiKey)) {
@@ -318,75 +323,212 @@ export default async function handler(req, res) {
     return res.status(500).json({ success: false, error: 'Sender address must be from pragyaninstitute.com' });
   }
 
-  let reservation = null;
-  try {
-    reservation = await reserveQuota({
-      category,
-      recipients: cleanTo,
-      reference: targetStudent ? `STUDENT-${targetStudent}` : null
-    });
-  } catch (err) {
-    if (err instanceof EmailQuotaUnavailableError) {
-      return res.status(503).json({ success: false, error: 'Quota service unavailable: ' + err.message });
-    }
-    return res.status(500).json({ success: false, error: 'Quota reservation failed: ' + err.message });
-  }
+  const supabase = getSupabase();
 
-  if (!reservation || !Array.isArray(reservation.granted) || reservation.granted.length === 0) {
-    return res.status(429).json({
-      success: false,
-      error: 'Daily email quota exhausted (100/day limit reached)',
-      quota: {
-        limit: reservation?.limit ?? DAILY_EMAIL_LIMIT,
-        used: reservation?.used_before ?? 0,
-        remaining: reservation?.remaining_after ?? 0,
-        day: reservation?.day ?? null
+  // --- Single Recipient Fast Path ---
+  if (cleanTo.length === 1) {
+    const targetEmail = cleanTo[0];
+    const dedupeKeys = dedupeKey ? [String(dedupeKey)] : null;
+
+    let reservation = null;
+    try {
+      reservation = await reserveQuota({
+        category,
+        recipients: cleanTo,
+        reference: refKey,
+        dedupeKeys
+      });
+    } catch (err) {
+      if (err instanceof EmailQuotaUnavailableError) {
+        return res.status(503).json({ success: false, error: 'Quota service unavailable: ' + err.message });
       }
-    });
-  }
+      return res.status(500).json({ success: false, error: 'Quota reservation failed: ' + err.message });
+    }
 
-  const grantedRecipients = reservation.granted.map(g => g.recipient);
-  const dispatchIds = reservation.granted.map(g => g.dispatch_id).filter(id => Number.isFinite(Number(id)));
-  const targetEmail = grantedRecipients[0];
-  let sendResult = null;
-  let finalStatus = 'failed';
-  try {
-    sendResult = await sendEmailViaResend({
-      apiKey,
-      from: fromAddress,
-      to: [targetEmail],
-      subject: subject.trim(),
-      html: html || undefined,
-      text: text || undefined
-    });
-    finalStatus = statusForSendResult(sendResult);
-  } catch (err) {
-    sendResult = { success: false, error: { message: err.message } };
-    finalStatus = 'failed';
-  }
+    if (!reservation || !Array.isArray(reservation.granted) || reservation.granted.length === 0) {
+      if (Array.isArray(reservation?.duplicate) && reservation.duplicate.length > 0) {
+        return res.status(200).json({
+          success: true,
+          duplicate: true,
+          message: 'Email already dispatched today (duplicate suppressed to preserve quota)',
+          recipient: targetEmail,
+          quota: {
+            limit: reservation?.limit ?? DAILY_EMAIL_LIMIT,
+            used: reservation?.used_before ?? 0,
+            remaining: reservation?.remaining_after ?? 0,
+            day: reservation?.day ?? null
+          }
+        });
+      }
+      return res.status(429).json({
+        success: false,
+        error: 'Daily email quota exhausted (100/day limit reached). Quota resets at midnight IST.',
+        quota: {
+          limit: reservation?.limit ?? DAILY_EMAIL_LIMIT,
+          used: reservation?.used_before ?? 0,
+          remaining: reservation?.remaining_after ?? 0,
+          day: reservation?.day ?? null
+        }
+      });
+    }
 
-  try {
-    await settleQuota(dispatchIds, finalStatus, {
+    const dispatchId = reservation.granted[0]?.dispatch_id;
+    const dispatchIds = Number.isFinite(Number(dispatchId)) ? [Number(dispatchId)] : [];
+
+    let sendResult = null;
+    let finalStatus = 'failed';
+    try {
+      sendResult = await sendEmailViaResend({
+        apiKey,
+        from: fromAddress,
+        to: [targetEmail],
+        subject: subject.trim(),
+        html: html || undefined,
+        text: text || undefined,
+        headers: refKey ? { 'X-Entity-Ref-ID': refKey } : undefined
+      });
+      finalStatus = statusForSendResult(sendResult);
+    } catch (err) {
+      sendResult = { success: false, error: { message: err.message } };
+      finalStatus = 'failed';
+    }
+
+    try {
+      if (dispatchIds.length) {
+        await settleQuota(dispatchIds, finalStatus, {
+          messageId: sendResult?.data?.id || null,
+          error: sendResult?.success ? null : extractResendErrorMessage(sendResult?.error)
+        });
+      }
+    } catch (settleErr) {
+      console.error('Failed to settle email dispatch quota:', settleErr.message);
+    }
+
+    // Update fee_billing_ledger if ledger_id was provided
+    if (ledger_id && supabase) {
+      try {
+        await supabase.rpc('settle_ledger_email', {
+          p_ledger_id: ledger_id,
+          p_success: Boolean(sendResult?.success),
+          p_message_id: sendResult?.data?.id || null,
+          p_error: sendResult?.success ? null : extractResendErrorMessage(sendResult?.error).slice(0, 500)
+        });
+      } catch (ledgerErr) {
+        console.warn('[send-email] settle_ledger_email note:', ledgerErr.message);
+      }
+    }
+
+    // Write audit log entry
+    if (supabase) {
+      try {
+        const actorName = session.name || session.username || (session.role === 'admin' ? 'Chandan Kumar' : 'Student');
+        await supabase.from('audit_logs').insert([{
+          log_id: `AUD-EMAIL-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          action_type: category === EMAIL_CATEGORIES.BILLING ? 'EMAIL_INVOICE_SENT' : (category === EMAIL_CATEGORIES.REMINDER ? 'EMAIL_REMINDER_SENT' : 'EMAIL_DISPATCHED'),
+          actor_name: actorName,
+          actor: actorName,
+          target: targetStudent || targetEmail,
+          student_name: targetStudent ? `Student (${targetStudent})` : targetEmail,
+          student_roll: targetStudent || 'N/A',
+          description: `Email "${subject.trim().slice(0, 60)}" to ${targetEmail} [${finalStatus}]`,
+          details: {
+            recipient: targetEmail,
+            subject: subject.trim().slice(0, 150),
+            category,
+            dispatchId: dispatchIds[0] || null,
+            messageId: sendResult?.data?.id || null,
+            status: finalStatus,
+            error: sendResult?.success ? null : extractResendErrorMessage(sendResult?.error)
+          }
+        }]);
+      } catch (audErr) {
+        console.warn('[send-email] audit log write note:', audErr.message);
+      }
+    }
+
+    if (!sendResult?.success) {
+      return res.status(502).json({
+        success: false,
+        error: `Email delivery failed: ${extractResendErrorMessage(sendResult?.error)}`,
+        dispatchId: dispatchIds[0] || null,
+        dispatchIds
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
       messageId: sendResult?.data?.id || null,
-      error: sendResult?.success ? null : extractResendErrorMessage(sendResult?.error)
-    });
-  } catch (settleErr) {
-    console.error('Failed to settle email dispatch quota:', settleErr.message);
-  }
-
-  if (!sendResult?.success) {
-    return res.status(502).json({
-      success: false,
-      error: `Email delivery failed: ${extractResendErrorMessage(sendResult?.error)}`,
       dispatchId: dispatchIds[0] || null,
       dispatchIds
     });
   }
 
+  // --- Multi-Recipient Batch Path (Via dispatchWithQuota) ---
+  const batchItems = cleanTo.map(email => ({ email }));
+  let outcome = null;
+  try {
+    outcome = await dispatchWithQuota({
+      items: batchItems,
+      category,
+      getEmail: item => item.email,
+      reference: refKey || 'BATCH-CAMPAIGN',
+      send: async (item) => {
+        const result = await sendEmailViaResend({
+          apiKey,
+          from: fromAddress,
+          to: [item.email],
+          subject: subject.trim(),
+          html: html || undefined,
+          text: text || undefined,
+          headers: refKey ? { 'X-Entity-Ref-ID': `${refKey}-${item.email}` } : undefined
+        });
+        return {
+          result,
+          error: result?.success ? null : extractResendErrorMessage(result?.error),
+          report: { email: item.email, category }
+        };
+      }
+    });
+  } catch (batchErr) {
+    return res.status(500).json({ success: false, error: 'Batch dispatch failed: ' + batchErr.message });
+  }
+
+  const sentCount = outcome.results.filter(r => r.status === 'sent').length;
+  const failedCount = outcome.results.filter(r => r.status === 'failed' || r.status === 'unknown').length;
+
+  if (supabase) {
+    try {
+      const actorName = session.name || session.username || 'Chandan Kumar';
+      await supabase.from('audit_logs').insert([{
+        log_id: `AUD-CAMPAIGN-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        action_type: 'MASS_EMAIL_CAMPAIGN',
+        actor_name: actorName,
+        actor: actorName,
+        target: `${cleanTo.length} recipients`,
+        student_name: 'Mass Campaign',
+        student_roll: 'N/A',
+        description: `Dispatched "${subject.trim().slice(0, 60)}" to ${sentCount}/${cleanTo.length} recipients (${failedCount} failed)`,
+        details: {
+          category,
+          total: cleanTo.length,
+          sentCount,
+          failedCount,
+          deferred: outcome.deferred,
+          quotaError: outcome.quotaError || null
+        }
+      }]);
+    } catch (audErr) {
+      console.warn('[send-email] batch audit log note:', audErr.message);
+    }
+  }
+
   return res.status(200).json({
-    success: true,
-    messageId: sendResult?.data?.id || null,
-    dispatchId: dispatchIds[0] || null,
-    dispatchIds
+    success: sentCount > 0,
+    total: cleanTo.length,
+    sentCount,
+    failedCount,
+    deferred: outcome.deferred,
+    quotaError: outcome.quotaError || null,
+    results: outcome.results
   });
 }

@@ -42,8 +42,16 @@ export class EmailQuotaUnavailableError extends Error {
   }
 }
 
-function normaliseCategory(category) {
-  return VALID_CATEGORIES.has(category) ? category : EMAIL_CATEGORIES.OTHER;
+export function normaliseCategory(category) {
+  if (typeof category !== 'string') return EMAIL_CATEGORIES.OTHER;
+  const lower = category.trim().toLowerCase();
+  if (VALID_CATEGORIES.has(lower)) return lower;
+  if (lower === 'billing' || lower === 'invoice' || lower === 'monthly_invoice' || lower === 'fee_invoice') return EMAIL_CATEGORIES.BILLING;
+  if (lower === 'reminder' || lower === 'fee_reminder' || lower === 'dues' || lower === 'due_notice') return EMAIL_CATEGORIES.REMINDER;
+  if (lower === 'receipt' || lower === 'payment' || lower === 'payment_receipt' || lower === 'computerized_receipt') return EMAIL_CATEGORIES.RECEIPT;
+  if (lower === 'notice' || lower === 'circular' || lower === 'exam_circular' || lower === 'announcement') return EMAIL_CATEGORIES.NOTICE;
+  if (lower === 'admin' || lower === 'admin_manual' || lower === 'custom_announcement') return EMAIL_CATEGORIES.ADMIN;
+  return EMAIL_CATEGORIES.OTHER;
 }
 
 /**

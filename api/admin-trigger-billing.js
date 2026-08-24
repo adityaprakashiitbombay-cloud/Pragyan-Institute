@@ -379,16 +379,18 @@ export default async function handler(req, res) {
     }, {});
 
     try {
-      await supabase.from('audit_logs').insert({
+      await supabase.from('audit_logs').insert([{
         log_id: `AUD-MANUAL-${monthKey}-${Date.now()}`,
         timestamp: new Date().toISOString(),
         actor: adminUser,
+        actor_name: adminUser,
         action_type: action === 'reminder' ? 'MANUAL_FEE_REMINDER' : 'MANUAL_FEE_GENERATION',
+        target: wholeInstitute ? 'All Batches' : String(targetClass),
         student_name: wholeInstitute ? 'All Batches' : String(targetClass),
         student_roll: studentId && studentId !== 'all' ? String(studentId) : 'N/A',
         description: `Manual ${action} run for ${wholeInstitute ? 'all batches' : targetClass} (${monthKey}) by ${adminUser}`,
         details: { summary, deferred: deferredList, quotaError: quotaError || null, results: results.slice(0, 200) }
-      });
+      }]);
     } catch (auditError) {
       console.error('[admin-billing] audit log write failed:', auditError.message);
     }

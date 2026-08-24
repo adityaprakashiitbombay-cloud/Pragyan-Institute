@@ -932,7 +932,7 @@
   }
 
   // Server-only email dispatcher. API credentials must never be exposed in browser code.
-  async function sendLiveResendEmail(to, subject, html) {
+  async function sendLiveResendEmail(to, subject, html, options = {}) {
     if (!to) return { success: false, error: 'No recipient email specified' };
     try {
       const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pragyan_portal_token')) ||
@@ -947,20 +947,35 @@
       }
 
       if (!token || token.startsWith('token_')) {
-        return { success: false, error: 'A live session is required. Please sign out and sign in again.' };
+        return { success: false, error: 'A live signed-in session is required to dispatch emails. Please sign out and sign in again.' };
       }
+
+      const postBody = {
+        to: recipients,
+        subject,
+        html,
+        student_id: options.student_id || options.studentId || undefined,
+        ledger_id: options.ledger_id || options.ledgerId || undefined,
+        category: options.category || undefined,
+        reference: options.reference || undefined,
+        dedupeKey: options.dedupeKey || undefined
+      };
 
       const res = await fetch(getApiUrl('/api/send-email'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ to: recipients, subject, html })
+        body: JSON.stringify(postBody)
       });
       const contentType = res.headers.get('content-type') || '';
       const payload = contentType.includes('application/json')
         ? await res.json().catch(() => ({}))
         : { error: await res.text().catch(() => '') };
       if (res.ok && payload.success) return payload;
-      return { success: false, status: res.status, error: payload.error || `Email service returned HTTP ${res.status}` };
+      return {
+        success: false,
+        status: res.status,
+        error: payload.error || payload.message || `Email service returned HTTP ${res.status}`
+      };
     } catch (err) {
       console.warn('[Email Engine] Server dispatch failed:', err);
       return { success: false, error: err.message || 'Unable to reach the email service' };
@@ -8444,7 +8459,11 @@ function renderStudentDashboard() {
                   true
                 );
 
-                const emailResult = await sendLiveResendEmail(sEmail, subject, emailHtml);
+                const emailResult = await sendLiveResendEmail(sEmail, subject, emailHtml, {
+                  student_id: s.student_id || s.id || s.rollNo,
+                  category: action === 'invoice' ? 'billing' : 'reminder',
+                  reference: `${action === 'invoice' ? 'BILL' : 'REMIND'}-${s.student_id || s.rollNo || sId}`
+                });
                 if (emailResult.success) {
                   notifiedCount++;
                   studentStatus += ' -> Statement & Notice Synchronized ✅';
@@ -10038,7 +10057,6 @@ function renderStudentDashboard() {
 
     // Dynamic Computations & Indian Standard Time (IST) Quota Guards
     const ist = getISTDateParts();
-    const isBroadcastingPaused = (ist.day >= 1 && ist.day <= 4) || (ist.day >= 15 && ist.day <= 19);
     const MAX_DAILY_BROADCAST_LIMIT = 100;
 
     const totalCount = targetStudents.length;
@@ -10073,31 +10091,15 @@ function renderStudentDashboard() {
         </div>
 
         <!-- 🛡️ IST BROADCASTING SCHEDULE & QUOTA STATUS BANNER 🛡️ -->
-        ${isBroadcastingPaused ? `
-          <div style="margin-bottom: 1.25rem; background: #FEF2F2; border: 2px solid #F87171; border-radius: 12px; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 0.85rem;">
-            <div style="width: 44px; height: 44px; border-radius: 50%; background: #DC2626; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0;">
-              <i aria-hidden="true" class="fa-solid fa-ban"></i>
-            </div>
-            <div>
-              <div style="font-weight: 800; font-size: 0.95rem; color: #991B1B;">
-                🚫 Email Broadcasting Turned Off (Day ${ist.day} of Month — Indian Standard Time)
-              </div>
-              <div style="font-size: 0.83rem; color: #B91C1C; margin-top: 0.25rem; line-height: 1.45;">
-                Mass email broadcasting is <strong>turned off during Days 1–4</strong> (Automated Monthly Invoicing) and <strong>Days 15–19</strong> (Mid-Month Due Reminders) to protect daily delivery quotas. Broadcasting opens on all other days of the month with a strict limit of <strong>max 100 emails/day</strong>.
-              </div>
-            </div>
+        <div style="margin-bottom: 1.25rem; background: #F0FDF4; border: 1.5px solid #86EFAC; border-radius: 10px; padding: 0.85rem 1.15rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.6rem;">
+          <div style="font-size: 0.86rem; font-weight: 700; color: #166534; display: flex; align-items: center; gap: 0.5rem;">
+            <i aria-hidden="true" class="fa-solid fa-circle-check" style="color: #16A34A; font-size: 1.1rem;"></i>
+            <span>Broadcasting Window Active (Day ${ist.day}, IST) • Daily Limit: <strong>Max 100 Emails</strong></span>
           </div>
-        ` : `
-          <div style="margin-bottom: 1.25rem; background: #F0FDF4; border: 1.5px solid #86EFAC; border-radius: 10px; padding: 0.85rem 1.15rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.6rem;">
-            <div style="font-size: 0.86rem; font-weight: 700; color: #166534; display: flex; align-items: center; gap: 0.5rem;">
-              <i aria-hidden="true" class="fa-solid fa-circle-check" style="color: #16A34A; font-size: 1.1rem;"></i>
-              <span>Broadcasting Window Active (Day ${ist.day}, IST) • Daily Limit: <strong>Max 100 Emails</strong></span>
-            </div>
-            <div style="font-size: 0.82rem; font-weight: 800; color: ${validEmailCount > MAX_DAILY_BROADCAST_LIMIT ? '#DC2626' : '#15803D'}; background: ${validEmailCount > MAX_DAILY_BROADCAST_LIMIT ? '#FEE2E2' : '#DCFCE7'}; padding: 0.25rem 0.65rem; border-radius: 6px; border: 1px solid ${validEmailCount > MAX_DAILY_BROADCAST_LIMIT ? '#FCA5A5' : '#86EFAC'};">
-              ${validEmailCount > MAX_DAILY_BROADCAST_LIMIT ? `⚠️ Exceeds Limit (${validEmailCount} / 100 max)` : `✅ ${validEmailCount} / 100 max recipients`}
-            </div>
+          <div style="font-size: 0.82rem; font-weight: 800; color: ${validEmailCount > MAX_DAILY_BROADCAST_LIMIT ? '#DC2626' : '#15803D'}; background: ${validEmailCount > MAX_DAILY_BROADCAST_LIMIT ? '#FEE2E2' : '#DCFCE7'}; padding: 0.25rem 0.65rem; border-radius: 6px; border: 1px solid ${validEmailCount > MAX_DAILY_BROADCAST_LIMIT ? '#FCA5A5' : '#86EFAC'};">
+            ${validEmailCount > MAX_DAILY_BROADCAST_LIMIT ? `⚠️ Exceeds Limit (${validEmailCount} / 100 max)` : `✅ ${validEmailCount} / 100 max recipients`}
           </div>
-        `}
+        </div>
 
         <!-- Audience & Live Database Fee Statistics Grid -->
         <div class="admin-email-metrics-grid">
@@ -10218,11 +10220,7 @@ function renderStudentDashboard() {
               </button>
             </div>
 
-            ${isBroadcastingPaused ? `
-              <button type="submit" id="btnDispatchEmailCampaign" class="btn" disabled style="padding: 0.75rem 1.85rem; font-size: 0.92rem; font-weight: 800; border-radius: 8px; background: #9CA3AF; color: #fff; cursor: not-allowed; box-shadow: none;">
-                <i aria-hidden="true" class="fa-solid fa-ban"></i> Broadcasting Paused (Days 1–4 & 15–19 IST)
-              </button>
-            ` : (validEmailCount > MAX_DAILY_BROADCAST_LIMIT ? `
+            ${validEmailCount > MAX_DAILY_BROADCAST_LIMIT ? `
               <button type="submit" id="btnDispatchEmailCampaign" class="btn btn-emerald" style="padding: 0.75rem 1.85rem; font-size: 0.92rem; font-weight: 800; border-radius: 8px;">
                 <i aria-hidden="true" class="fa-solid fa-rocket"></i> Dispatch Capped (${MAX_DAILY_BROADCAST_LIMIT} of ${validEmailCount} Recipients)
               </button>
@@ -10230,7 +10228,7 @@ function renderStudentDashboard() {
               <button type="submit" id="btnDispatchEmailCampaign" class="btn btn-emerald" style="padding: 0.75rem 1.85rem; font-size: 0.92rem; font-weight: 800; border-radius: 8px;">
                 <i aria-hidden="true" class="fa-solid fa-rocket"></i> Dispatch Campaign (${validEmailCount} Recipients)
               </button>
-            `)}
+            `}
           </div>
         </form>
       </div>
@@ -10304,7 +10302,10 @@ function renderStudentDashboard() {
 
       try {
         showNotification(`🚀 Dispatched test email to ${promptEmail}... Connecting to Resend.`, 'success');
-        const res = await sendLiveResendEmail(promptEmail, subject, emailHtml);
+        const res = await sendLiveResendEmail(promptEmail, subject, emailHtml, {
+          category: adminEmailCampaignType,
+          reference: `TEST-${adminEmailCampaignType}`
+        });
         if (res.success) {
           showNotification(`✅ Test email successfully dispatched to ${promptEmail} via Resend!`, 'success');
         } else {
@@ -10322,7 +10323,6 @@ function renderStudentDashboard() {
       e.preventDefault();
 
       const currentIst = getISTDateParts();
-      const isAutomatedCycle = (currentIst.day >= 1 && currentIst.day <= 4) || (currentIst.day >= 15 && currentIst.day <= 19);
 
       if (validEmailCount === 0) {
         alert('⚠️ No valid email addresses found in the selected audience.');
@@ -10365,7 +10365,11 @@ function renderStudentDashboard() {
           const studentSub = replaceEmailPlaceholders(subject, student);
 
           try {
-            const res = await sendLiveResendEmail(student.email, studentSub, personalizedHtml);
+            const res = await sendLiveResendEmail(student.email, studentSub, personalizedHtml, {
+              student_id: student.student_id || student.id || student.rollNo,
+              category: adminEmailCampaignType,
+              reference: `CAMPAIGN-${adminEmailCampaignType}-${student.student_id || student.rollNo || (i + 1)}`
+            });
             if (res.success) {
               sentCount++;
               if (logBox) {
