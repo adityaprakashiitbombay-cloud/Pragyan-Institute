@@ -4233,18 +4233,18 @@ function renderStudentDashboard() {
                         ${notice.category === 'exam' ? '🎯 Exam' : notice.category === 'fees' ? '💳 Fees' : '📢 General'}
                       </span>
                       <span style="font-size: 0.8rem; color: var(--text-muted); background: rgba(0,0,0,0.04); padding: 0.15rem 0.5rem; border-radius: 4px;">
-                        Target: <strong>${notice.targetBatch || notice.target_batch || 'All Batches'}</strong>
+                        Target: <strong>${sanitizeInput(notice.targetBatch || notice.target_batch || 'All Batches')}</strong>
                       </span>
                     </div>
                     <span class="notice-date" style="font-size: 0.8rem; color: var(--text-muted);"><i aria-hidden="true" class="fa-regular fa-clock"></i> ${formatDate(notice.date)}</span>
                   </div>
                   <div class="notice-title" style="font-size: 1.05rem; font-weight: 700; color: var(--text-mahogany); margin-bottom: 0.4rem;">${sanitizeInput(notice.title)}</div>
-                  <div class="notice-body" style="font-size: 0.9rem; color: #374151; line-height: 1.6;">${notice.message}</div>
+                  <div class="notice-body" style="font-size: 0.9rem; color: #374151; line-height: 1.6;">${sanitizeInput(notice.message)}</div>
                   ${(notice.attachmentUrl || notice.attachment_url) ? `
                     <div style="margin-top:0.85rem;">
                       ${(/\.(png|jpe?g|webp|gif)(\?.*)?$/i.test(notice.attachmentUrl || notice.attachment_url) || (notice.attachmentUrl || notice.attachment_url).startsWith('data:image/'))
-                        ? `<img src="${notice.attachmentUrl || notice.attachment_url}" style="max-width:100%; max-height:280px; border-radius:8px; border:1px solid #E5E7EB; object-fit:cover; display:block;" alt="Notice Attachment">`
-                        : `<a href="${notice.attachmentUrl || notice.attachment_url}" target="_blank" style="display:inline-flex; align-items:center; gap:0.5rem; background:#065F46; color:#fff; padding:0.45rem 1rem; border-radius:6px; font-weight:700; font-size:0.82rem; text-decoration:none;">
+                        ? `<img src="${sanitizeUrl(notice.attachmentUrl || notice.attachment_url)}" style="max-width:100%; max-height:280px; border-radius:8px; border:1px solid #E5E7EB; object-fit:cover; display:block;" alt="Notice Attachment">`
+                        : `<a href="${sanitizeUrl(notice.attachmentUrl || notice.attachment_url)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:0.5rem; background:#065F46; color:#fff; padding:0.45rem 1rem; border-radius:6px; font-weight:700; font-size:0.82rem; text-decoration:none;">
                             <i aria-hidden="true" class="fa-solid fa-file-pdf"></i> View / Download Attached Document
                           </a>`
                       }
