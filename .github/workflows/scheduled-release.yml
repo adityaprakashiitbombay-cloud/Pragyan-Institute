@@ -1,0 +1,45 @@
+name: Scheduled Release to Production (Aug 27, 8:00 PM IST)
+
+on:
+  schedule:
+    # 14:30 UTC = 20:00 IST (8:00 PM IST) on August 27, 2026
+    - cron: '30 14 27 8 *'
+  # Allows manual one-click release anytime from the GitHub Actions tab
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  merge-and-deploy:
+    name: Merge Release Branch to Main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git Identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Merge release-aug27 into main
+        run: |
+          echo "Fetching all remote branches..."
+          git fetch origin
+          
+          echo "Checking out main..."
+          git checkout main
+          git pull origin main
+          
+          echo "Merging release-aug27 branch into main..."
+          git merge origin/release-aug27 -m "release: automated scheduled deployment for Aug 27 (8:00 PM IST)"
+          
+          echo "Pushing complete repository tree to origin/main..."
+          git push origin main
+          
+          echo "✅ Successfully merged and pushed to main! Vercel production deployment triggered."
