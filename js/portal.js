@@ -4563,37 +4563,39 @@ function renderStudentDashboard() {
       h.status === 'Adjusted' || (h.receiptNo && (h.receiptNo.startsWith('ADJ-') || h.receiptNo.startsWith('RATE-') || h.receiptNo.startsWith('DISC-') || h.receiptNo.startsWith('ADDON-')))
     );
 
+    const payUrl = `pay.html?amount=${s.pendingFee}&roll=${encodeURIComponent(s.rollNo || s.roll_no || s.student_id || '')}&name=${encodeURIComponent(s.name || '')}&batch=${encodeURIComponent(s.className || s.class_name || '')}&prev=${feeAcc.previousDue}&curr=${feeAcc.currentMonthFee}`;
+
     pane.innerHTML = `
       ${pendingPayReq ? `
-        <div style="background: #FEF3C7; border: 1px solid #F59E0B; border-radius: 8px; padding: 0.9rem 1.15rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
-          <div>
-            <div style="font-weight: 700; color: #92400E; font-size: 0.95rem;">
+        <div class="fee-pending-banner">
+          <div class="fee-pending-banner-text">
+            <div class="fee-pending-banner-title">
               <i aria-hidden="true" class="fa-solid fa-hourglass-half"></i> Online Payment Verification Request Pending
             </div>
-            <div style="font-size: 0.82rem; color: #78350F; margin-top: 0.2rem;">
-              Submitted ₹${(pendingPayReq.paymentDetails?.amount || 0).toLocaleString()} via ${pendingPayReq.paymentDetails?.mode || 'Online'} (UTR: <strong>${pendingPayReq.paymentDetails?.utr}</strong>). Admin verification in progress.
+            <div class="fee-pending-banner-desc">
+              Submitted ₹${(pendingPayReq.paymentDetails?.amount || 0).toLocaleString()} via ${escapeHtml(pendingPayReq.paymentDetails?.mode || 'Online')} (UTR: <strong>${escapeHtml(pendingPayReq.paymentDetails?.utr || '')}</strong>). Admin verification in progress.
             </div>
           </div>
-          <span class="status-badge" style="background: #F59E0B; color: #fff; font-weight: 700; font-size: 0.8rem;">⏳ Under Review</span>
+          <span class="status-badge" style="background: #F59E0B; color: #fff; font-weight: 700; font-size: 0.8rem; flex-shrink:0;">⏳ Under Review</span>
         </div>
       ` : ''}
 
       ${latestAdjustment ? `
-        <div style="background: linear-gradient(135deg, #FAF5FF 0%, #F3E8FF 100%); border: 1.5px solid #C4B5FD; border-left: 5px solid #7C3AED; border-radius: 10px; padding: 0.95rem 1.25rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.65rem; box-shadow: 0 3px 10px rgba(124, 58, 237, 0.08);">
-          <div style="display: flex; align-items: center; gap: 0.85rem;">
-            <div style="width: 40px; height: 40px; border-radius: 50%; background: #EDE9FE; color: #7C3AED; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; box-shadow: 0 2px 6px rgba(124, 58, 237, 0.15);">
+        <div class="fee-adjustment-banner">
+          <div class="fee-adjustment-banner-left">
+            <div class="fee-adjustment-icon-wrap">
               <i aria-hidden="true" class="fa-solid fa-scale-balanced"></i>
             </div>
             <div>
-              <div style="font-weight: 800; color: #581C87; font-size: 0.94rem;">
+              <div class="fee-adjustment-title">
                 ⚖️ Official Fee Structure / Dues Adjusted by Institute
               </div>
-              <div style="font-size: 0.83rem; color: #6B21A8; margin-top: 0.15rem; line-height: 1.45;">
-                <strong>${latestAdjustment.mode || 'Fee Adjustment'}</strong>: ${latestAdjustment.note || 'Special fee concession/adjustment approved'} (${latestAdjustment.date}) • Authorized by <strong>${latestAdjustment.by || 'Institute Admin'}</strong>
+              <div class="fee-adjustment-desc">
+                <strong>${escapeHtml(latestAdjustment.mode || 'Fee Adjustment')}</strong>: ${escapeHtml(latestAdjustment.note || 'Special fee concession/adjustment approved')} (${escapeHtml(latestAdjustment.date)}) • Authorized by <strong>${escapeHtml(latestAdjustment.by || 'Institute Admin')}</strong>
               </div>
             </div>
           </div>
-          <span style="background: #7C3AED; color: #fff; font-weight: 800; font-size: 0.8rem; padding: 0.35rem 0.8rem; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 2px 5px rgba(124, 58, 237, 0.25);">
+          <span class="fee-adjustment-badge">
             Verified Adjustment
           </span>
         </div>
@@ -4602,7 +4604,7 @@ function renderStudentDashboard() {
       <!-- Interactive SVG Circular Fee Clearance Radial Meter -->
       <div class="fee-radial-meter-container">
         <div class="fee-radial-svg-wrap">
-          <svg class="fee-radial-svg" viewBox="0 0 84 84">
+          <svg class="fee-radial-svg" viewBox="0 0 84 84" aria-hidden="true">
             <circle class="fee-radial-bg-circle" cx="42" cy="42" r="36"></circle>
             <circle class="fee-radial-progress-circle ${s.pendingFee > 0 ? 'has-dues' : ''}" cx="42" cy="42" r="36" style="stroke-dasharray: 226; stroke-dashoffset: ${strokeDashOffset};"></circle>
           </svg>
@@ -4617,48 +4619,59 @@ function renderStudentDashboard() {
         </div>
       </div>
 
-      <div class="fee-summary-cards-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+      <div class="fee-summary-cards-grid">
         <div class="fee-stat-box">
-          <div class="fee-stat-label">1. Earlier Unpaid Dues (Till Last Month)</div>
-          <div class="fee-stat-value" style="color: #475569;">₹${feeAcc.previousDue.toLocaleString()}</div>
-          <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">बकाया पिछले माह तक</div>
+          <div class="fee-stat-label">1. Earlier Unpaid Dues</div>
+          <div class="fee-stat-value">₹${feeAcc.previousDue.toLocaleString()}</div>
+          <div class="fee-stat-sub">बकाया पिछले माह तक</div>
         </div>
         <div class="fee-stat-box">
           <div class="fee-stat-label">2. This Month Tuition Fee</div>
-          <div class="fee-stat-value" style="color: var(--primary-emerald);">₹${feeAcc.currentMonthFee.toLocaleString()}</div>
-          <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">इस माह का शुल्क (${feeAcc.billingMonth})</div>
+          <div class="fee-stat-value emerald">₹${feeAcc.currentMonthFee.toLocaleString()}</div>
+          <div class="fee-stat-sub">इस माह का शुल्क (${escapeHtml(feeAcc.billingMonth || '')})</div>
         </div>
         <div class="fee-stat-box">
           <div class="fee-stat-label">Total Amount Paid</div>
           <div class="fee-stat-value emerald">₹${s.paidFee.toLocaleString()}</div>
-          <div style="font-size: 0.8rem; color: #059669; margin-top: 0.2rem;">Status: Active Paid</div>
+          <div class="fee-stat-sub" style="color:#059669; font-weight:600;">Status: Active Paid</div>
         </div>
-        <div class="fee-stat-box" style="border: 2px solid ${s.pendingFee > 0 ? '#EF4444' : '#10B981'}; background: ${s.pendingFee > 0 ? '#FEF2F2' : '#ECFDF5'};">
-          <div class="fee-stat-label" style="font-weight: 800; color: ${s.pendingFee > 0 ? '#991B1B' : '#065F46'};">TOTAL NET PAYABLE DUE</div>
-          <div class="fee-stat-value pending" style="color: ${s.pendingFee > 0 ? '#DC2626' : '#059669'}; font-size: 1.5rem;">₹${s.pendingFee.toLocaleString()}</div>
-          <div style="font-size: 0.8rem; color: ${s.pendingFee > 0 ? '#B91C1C' : '#065F46'}; margin-top: 0.2rem; font-weight: 700;">${s.pendingFee > 0 ? 'कुल देय राशि' : 'All Clear ✅'}</div>
+        <div class="fee-stat-box fee-stat-box-hero ${s.pendingFee > 0 ? 'hero-dues-pending' : 'hero-dues-cleared'}">
+          <div class="fee-hero-header">
+            <div class="fee-stat-label" style="font-weight: 800; color: ${s.pendingFee > 0 ? '#991B1B' : '#065F46'}; margin:0;">${s.pendingFee > 0 ? 'TOTAL NET PAYABLE DUE' : 'TUITION DUES STATUS'}</div>
+            <span class="fee-hero-badge ${s.pendingFee > 0 ? 'badge-due' : 'badge-cleared'}">
+              ${s.pendingFee > 0 ? '🔴 Pending Due' : '🟢 All Clear'}
+            </span>
+          </div>
+          <div class="fee-stat-value ${s.pendingFee > 0 ? 'pending' : 'emerald'}">₹${s.pendingFee.toLocaleString()}</div>
+          <div class="fee-stat-sub" style="color: ${s.pendingFee > 0 ? '#B91C1C' : '#065F46'}; font-weight: 600;">${s.pendingFee > 0 ? 'कुल देय राशि (Online UPI Supported)' : 'No Pending Dues • Privilege Pass Active ✅'}</div>
+          ${s.pendingFee > 0 ? `
+            <a href="${payUrl}" target="_blank" class="btn btn-hero-pay">
+              <i aria-hidden="true" class="fa-solid fa-bolt"></i> Pay Dues Online via UPI
+            </a>
+          ` : ''}
         </div>
       </div>
 
       <div class="dash-card">
         <div class="dash-card-header">
-          <div class="dash-card-title"><i aria-hidden="true" class="fa-solid fa-file-invoice-dollar"></i> Audited Fee Statement & Transaction History</div>
+          <div class="dash-card-title"><i aria-hidden="true" class="fa-solid fa-file-invoice-dollar"></i> Audited Fee Statement &amp; Transaction History</div>
           ${s.pendingFee > 0 ? `
-            <a href="pay.html?amount=${s.pendingFee}&roll=${encodeURIComponent(s.rollNo || s.roll_no || s.student_id)}&name=${encodeURIComponent(s.name)}&batch=${encodeURIComponent(s.className || s.class_name || '')}&prev=${feeAcc.previousDue}&curr=${feeAcc.currentMonthFee}" target="_blank" class="btn btn-emerald" style="padding: 0.45rem 1.15rem; font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.45rem;">
-              <i aria-hidden="true" class="fa-solid fa-bolt"></i> Click Here to Pay Online
+            <a href="${payUrl}" target="_blank" class="btn btn-emerald btn-dash-pay-online" style="padding: 0.45rem 1.15rem; font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.45rem;">
+              <i aria-hidden="true" class="fa-solid fa-bolt"></i> Pay Online via UPI
             </a>
           ` : '<span class="status-badge status-paid"><i aria-hidden="true" class="fa-solid fa-check-double"></i> All Fees Cleared</span>'}
         </div>
 
-        <div class="table-responsive">
+        <!-- Desktop Table View (visible on screen > 768px) -->
+        <div class="fee-table-desktop-wrap table-responsive">
           <table class="portal-table">
             <thead>
               <tr>
                 <th>Receipt / Ref ID</th>
-                <th>Date & Time</th>
+                <th>Date &amp; Time</th>
                 <th>Amount</th>
                 <th>Collector / Educator</th>
-                <th>Mode & Description</th>
+                <th>Mode &amp; Description</th>
                 <th>Status</th>
                 <th>Receipt Action</th>
               </tr>
@@ -4677,7 +4690,7 @@ function renderStudentDashboard() {
 
                 if (isDiscount) {
                   rowBg = 'background: #FAF5FF;';
-                  statusPillHtml = `<span class="status-badge" style="background: linear-gradient(135deg, #EDE9FE, #DDD6FE); color: #5B21B6; border: 1.5px solid #C4B5FD; font-weight: 800; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.3rem;"><i aria-hidden="true" class="fa-solid fa-tags"></i> 💜 CONCESSION / DISCOUNT</span>`;
+                  statusPillHtml = `<span class="status-badge" style="background: linear-gradient(135deg, #EDE9FE, #DDD6FE); color: #5B21B6; border: 1.5px solid #C4B5FD; font-weight: 800; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.3rem;"><i aria-hidden="true" class="fa-solid fa-tags"></i> 💜 CONCESSION</span>`;
                   amtDisplayHtml = `<strong style="color: #7C3AED; font-weight: 800;">- ₹${Math.abs(item.amount).toLocaleString()} <span style="font-size: 0.8rem; color: #8B5CF6;">(Waived)</span></strong>`;
                 } else if (isPenalty) {
                   rowBg = 'background: #FFFBEB;';
@@ -4689,7 +4702,7 @@ function renderStudentDashboard() {
                   amtDisplayHtml = `<strong style="color: #059669; font-weight: 800;">₹${item.amount.toLocaleString()}/mo</strong>`;
                 } else if (isAdjustment) {
                   rowBg = 'background: #F0F9FF;';
-                  statusPillHtml = `<span class="status-badge" style="background: #E0F2FE; color: #075985; border: 1.5px solid #7DD3FC; font-weight: 800; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.3rem;"><i aria-hidden="true" class="fa-solid fa-scale-balanced"></i> ⚖️ BALANCE ADJUSTED</span>`;
+                  statusPillHtml = `<span class="status-badge" style="background: #E0F2FE; color: #075985; border: 1.5px solid #7DD3FC; font-weight: 800; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.3rem;"><i aria-hidden="true" class="fa-solid fa-scale-balanced"></i> ⚖️ ADJUSTED</span>`;
                   amtDisplayHtml = `<strong style="color: #0284C7; font-weight: 800;">${item.amount < 0 ? `- ₹${Math.abs(item.amount).toLocaleString()}` : `₹${item.amount.toLocaleString()}`}</strong>`;
                 } else if (isOldDue) {
                   rowBg = 'background: #FEF2F2;';
@@ -4703,17 +4716,17 @@ function renderStudentDashboard() {
 
                 return `
                   <tr style="${rowBg}">
-                    <td><strong>${item.receiptNo}</strong></td>
-                    <td>${item.date}</td>
+                    <td><strong>${escapeHtml(item.receiptNo)}</strong></td>
+                    <td>${escapeHtml(item.date)}</td>
                     <td>${amtDisplayHtml}</td>
-                    <td><span style="font-size: 0.82rem; font-weight: 600; color: var(--text-mahogany);"><i aria-hidden="true" class="fa-solid fa-user-tie"></i> ${item.by || 'CHANDAN KUMAR (Director & Science Lead)'}</span></td>
+                    <td><span style="font-size: 0.82rem; font-weight: 600; color: var(--text-mahogany);"><i aria-hidden="true" class="fa-solid fa-user-tie"></i> ${escapeHtml(item.by || 'CHANDAN KUMAR (Director & Science Lead)')}</span></td>
                     <td>
-                      <div><strong>${item.mode}</strong></div>
+                      <div><strong>${escapeHtml(item.mode)}</strong></div>
                       ${item.note ? `<div style="font-size: 0.8rem; color: var(--text-muted);">${sanitizeInput(item.note)}</div>` : ''}
                     </td>
                     <td>${statusPillHtml}</td>
                     <td>
-                      <button class="btn btn-download-receipt" data-receipt="${item.receiptNo}" style="background: ${isAdjustment ? '#6D28D9' : '#064E3B'}; color: #fff; border: none; padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.8rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                      <button type="button" class="btn btn-download-receipt" data-receipt="${escapeHtml(item.receiptNo)}" style="background: ${isAdjustment ? '#6D28D9' : '#064E3B'}; color: #fff; border: none; padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.8rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                         <i aria-hidden="true" class="fa-solid fa-file-arrow-down"></i> ${isAdjustment ? 'Download Voucher' : 'Download Receipt'}
                       </button>
                     </td>
@@ -4730,7 +4743,7 @@ function renderStudentDashboard() {
                         : 'Your account has zero pending fees. When official receipts are issued, they will be archived here for instant PDF download.'}
                     </div>
                     ${s.pendingFee > 0 ? `
-                      <button class="btn btn-emerald" id="btnEmptyPayOnline" style="padding: 0.5rem 1.2rem; font-size: 0.85rem; font-weight: 700; border-radius: 6px; display: inline-flex; align-items: center; gap: 0.4rem;">
+                      <button type="button" class="btn btn-emerald" id="btnEmptyPayOnline" style="padding: 0.5rem 1.2rem; font-size: 0.85rem; font-weight: 700; border-radius: 6px; display: inline-flex; align-items: center; gap: 0.4rem;">
                         <i aria-hidden="true" class="fa-solid fa-credit-card"></i> Submit Online Payment Proof
                       </button>
                     ` : ''}
@@ -4740,28 +4753,116 @@ function renderStudentDashboard() {
             </tbody>
           </table>
         </div>
+
+        <!-- Mobile Card List View (visible on screen <= 768px) -->
+        <div class="fee-tx-mobile-list">
+          ${history.length > 0 ? history.map(item => {
+            const isAdjustment = item.status === 'Adjusted' || (item.receiptNo && (item.receiptNo.startsWith('ADJ-') || item.receiptNo.startsWith('RATE-') || item.receiptNo.startsWith('DISC-') || item.receiptNo.startsWith('ADDON-')));
+            const isOldDue = item.status === 'Pending Due' || (item.receiptNo && item.receiptNo.startsWith('OLD-DUE-'));
+            const isDiscount = isAdjustment && (item.amount < 0 || (item.mode && (item.mode.includes('Concession') || item.mode.includes('Discount') || item.mode.includes('Waiver'))));
+            const isPenalty = isAdjustment && (item.amount > 0 && (item.mode && (item.mode.includes('Fine') || item.mode.includes('Add-on') || item.mode.includes('Penalty'))));
+            const isRate = isAdjustment && (item.mode && item.mode.includes('Rate'));
+
+            let statusPillHtml = '';
+            let amtDisplayHtml = '';
+
+            if (isDiscount) {
+              statusPillHtml = `<span class="status-badge" style="background: linear-gradient(135deg, #EDE9FE, #DDD6FE); color: #5B21B6; border: 1.5px solid #C4B5FD; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.25rem;"><i aria-hidden="true" class="fa-solid fa-tags"></i> 💜 CONCESSION</span>`;
+              amtDisplayHtml = `<span style="color: #7C3AED; font-weight: 800;">- ₹${Math.abs(item.amount).toLocaleString()}</span> <small style="font-size: 0.75rem; color: #8B5CF6;">(Waived)</small>`;
+            } else if (isPenalty) {
+              statusPillHtml = `<span class="status-badge" style="background: #FEF3C7; color: #92400E; border: 1.5px solid #FCD34D; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.25rem;"><i aria-hidden="true" class="fa-solid fa-circle-plus"></i> 🧡 ADD-ON</span>`;
+              amtDisplayHtml = `<span style="color: #D97706; font-weight: 800;">+ ₹${item.amount.toLocaleString()}</span> <small style="font-size: 0.75rem; color: #B45309;">(Added)</small>`;
+            } else if (isRate) {
+              statusPillHtml = `<span class="status-badge" style="background: #DCFCE7; color: #166534; border: 1.5px solid #86EFAC; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.25rem;"><i aria-hidden="true" class="fa-solid fa-gem"></i> 💎 RATE</span>`;
+              amtDisplayHtml = `<span style="color: #059669; font-weight: 800;">₹${item.amount.toLocaleString()}/mo</span>`;
+            } else if (isAdjustment) {
+              statusPillHtml = `<span class="status-badge" style="background: #E0F2FE; color: #075985; border: 1.5px solid #7DD3FC; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.25rem;"><i aria-hidden="true" class="fa-solid fa-scale-balanced"></i> ⚖️ ADJUSTED</span>`;
+              amtDisplayHtml = `<span style="color: #0284C7; font-weight: 800;">${item.amount < 0 ? `- ₹${Math.abs(item.amount).toLocaleString()}` : `₹${item.amount.toLocaleString()}`}</span>`;
+            } else if (isOldDue) {
+              statusPillHtml = `<span class="status-badge" style="background: #FEE2E2; color: #991B1B; border: 1.5px solid #FCA5A5; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.25rem;"><i aria-hidden="true" class="fa-solid fa-clock-rotate-left"></i> 🔴 OLD DUE</span>`;
+              amtDisplayHtml = `<span style="color: #DC2626; font-weight: 800;">₹${item.amount.toLocaleString()}</span>`;
+            } else {
+              statusPillHtml = `<span class="status-badge" style="background: #D1FAE5; color: #065F46; border: 1.5px solid #6EE7B7; font-weight: 800; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 0.25rem;"><i aria-hidden="true" class="fa-solid fa-circle-check"></i> 🟢 PAID</span>`;
+              amtDisplayHtml = `<span style="color: #059669; font-weight: 800;">₹${item.amount.toLocaleString()}</span>`;
+            }
+
+            return `
+              <div class="fee-tx-card">
+                <div class="fee-tx-card-head">
+                  <span class="fee-tx-receipt-badge"><i aria-hidden="true" class="fa-solid fa-receipt"></i> ${escapeHtml(item.receiptNo)}</span>
+                  ${statusPillHtml}
+                </div>
+                <div class="fee-tx-card-main">
+                  <div class="fee-tx-amount-col">
+                    <span class="fee-tx-amount-label">Amount</span>
+                    <div class="fee-tx-amount-val">${amtDisplayHtml}</div>
+                  </div>
+                  <div class="fee-tx-date-col">
+                    <span class="fee-tx-date-label">Date</span>
+                    <div class="fee-tx-date-val"><i aria-hidden="true" class="fa-regular fa-calendar"></i> ${escapeHtml(item.date)}</div>
+                  </div>
+                </div>
+                <div class="fee-tx-card-details">
+                  <div class="fee-tx-detail-row">
+                    <span class="fee-tx-detail-key"><i aria-hidden="true" class="fa-solid fa-credit-card"></i> Mode:</span>
+                    <span class="fee-tx-detail-val">${escapeHtml(item.mode)}</span>
+                  </div>
+                  <div class="fee-tx-detail-row">
+                    <span class="fee-tx-detail-key"><i aria-hidden="true" class="fa-solid fa-user-tie"></i> Authorized:</span>
+                    <span class="fee-tx-detail-val">${escapeHtml(item.by || 'CHANDAN KUMAR')}</span>
+                  </div>
+                  ${item.note ? `
+                    <div class="fee-tx-detail-note">
+                      <i aria-hidden="true" class="fa-solid fa-circle-info"></i> ${sanitizeInput(item.note)}
+                    </div>
+                  ` : ''}
+                </div>
+                <div class="fee-tx-card-action">
+                  <button type="button" class="btn btn-download-receipt btn-tx-download" data-receipt="${escapeHtml(item.receiptNo)}" style="background: ${isAdjustment ? '#6D28D9' : '#064E3B'};">
+                    <i aria-hidden="true" class="fa-solid fa-file-arrow-down"></i> ${isAdjustment ? 'Download Voucher' : 'Download Receipt PDF'}
+                  </button>
+                </div>
+              </div>
+            `;
+          }).join('') : `
+            <div class="fee-tx-empty-state">
+              <div class="fee-tx-empty-icon"><i aria-hidden="true" class="fa-solid fa-receipt"></i></div>
+              <div class="fee-tx-empty-title">No Recorded Transactions Yet</div>
+              <p class="fee-tx-empty-desc">
+                ${s.pendingFee > 0 
+                  ? `You have a pending tuition fee balance of <strong>₹${s.pendingFee.toLocaleString()}</strong>. You can pay at the institute office or submit your UPI payment proof online.`
+                  : 'Your account has zero pending fees. When official receipts are issued, they will be archived here for instant PDF download.'}
+              </p>
+              ${s.pendingFee > 0 ? `
+                <button type="button" class="btn btn-emerald" id="btnEmptyPayOnlineMobile" style="width:100%; max-width:280px; margin:0 auto; padding:0.6rem 1.2rem; font-size:0.88rem; font-weight:700; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; gap:0.45rem;">
+                  <i aria-hidden="true" class="fa-solid fa-credit-card"></i> Submit Online Payment Proof
+                </button>
+              ` : ''}
+            </div>
+          `}
+        </div>
       </div>
     `;
 
-    // Bind Online Pay Modals (Header and Empty State)
+    // Bind Online Pay Modals (Header and Empty States)
     pane.querySelector('#btnPayOnlineModal')?.addEventListener('click', () => {
       openStudentPaymentRequestModal(s);
     });
     pane.querySelector('#btnEmptyPayOnline')?.addEventListener('click', () => {
       openStudentPaymentRequestModal(s);
     });
+    pane.querySelector('#btnEmptyPayOnlineMobile')?.addEventListener('click', () => {
+      openStudentPaymentRequestModal(s);
+    });
 
-    // LF5: Event delegation on table body for computerized PDF receipt downloads
-    const tbody = pane.querySelector('.portal-table tbody');
-    if (tbody) {
-      tbody.addEventListener('click', (e) => {
-        const dlBtn = e.target.closest('.btn-download-receipt');
-        if (dlBtn) {
-          const receiptNo = dlBtn.dataset.receipt;
-          downloadStudentReceiptPDF(s, receiptNo);
-        }
-      });
-    }
+    // Event delegation on pane for computerized PDF receipt downloads across desktop and mobile
+    pane.addEventListener('click', (e) => {
+      const dlBtn = e.target.closest('.btn-download-receipt');
+      if (dlBtn) {
+        const receiptNo = dlBtn.dataset.receipt;
+        downloadStudentReceiptPDF(s, receiptNo);
+      }
+    });
   }
 
   /* ==========================================================================
