@@ -771,32 +771,34 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 0.85rem;
+  padding-top: 0.75rem;
   border-top: 1px dashed var(--border-sand);
   margin-top: auto;
   gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .mentor-rating-widget {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-direction: row;
 }
 
 .interactive-stars {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 1px;
 }
 
 .star-btn {
   background: transparent;
   border: none;
-  padding: 3px;
+  padding: 2px 1px;
   margin: 0;
   cursor: pointer;
   color: #D1D5DB;
-  font-size: 0.95rem;
+  font-size: 0.88rem;
   line-height: 1;
   display: inline-flex;
   align-items: center;
@@ -806,7 +808,7 @@
 }
 
 .star-btn:hover {
-  transform: scale(1.28);
+  transform: scale(1.25);
   color: #F59E0B;
 }
 
@@ -820,19 +822,19 @@
 }
 
 .rating-info {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.25rem;
 }
 
 .rating-score {
   font-weight: 800;
-  font-size: 0.88rem;
+  font-size: 0.82rem;
   color: #B45309;
 }
 
 .rating-count {
-  font-size: 0.76rem;
+  font-size: 0.74rem;
   color: var(--text-muted);
   font-weight: 600;
 }
@@ -1169,44 +1171,19 @@
   display: none !important;
 }
 
-/* Smartphone & Touch Optimizations for Batch Cards & Stream Controls */
-@media (max-width: 480px) {
-  .batch-card {
-    padding: 1.5rem 1.15rem 1.35rem;
-    border-radius: var(--radius-md);
-  }
-  .batch-header {
-    margin-bottom: 1.1rem;
-    padding-bottom: 0.95rem;
-  }
-  .batch-class {
-    font-size: 1.25rem;
-  }
-  .batch-timing {
-    font-size: 0.8rem;
-  }
+/* Tablet & Mobile Optimizations for Stream Controls & Scholarship Policy */
+@media (max-width: 768px) {
   .stream-toggle-group {
     padding: 2px;
     gap: 2px;
   }
   .stream-btn {
-    padding: 0.35rem 0.75rem;
-    font-size: 0.76rem;
-    min-height: 36px;
+    padding: 0.25rem 0.65rem;
+    font-size: 0.75rem;
+    min-height: 32px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-  }
-  .batch-price {
-    font-size: 2.05rem;
-  }
-  .batch-features {
-    gap: 0.7rem;
-    margin-bottom: 1.4rem;
-  }
-  .batch-features li {
-    font-size: 0.88rem;
-    gap: 0.5rem;
   }
   .scholarship-policy-card {
     padding: 1.35rem 1.15rem !important;
@@ -1223,18 +1200,19 @@
 /* Mentor Star Rating Ergonomics on Touch / Smartphones */
 @media (pointer: coarse), (max-width: 600px) {
   .star-btn {
-    padding: 6px 5px;
-    min-width: 32px;
-    min-height: 38px;
-    font-size: 1.15rem;
+    padding: 3px 2px;
+    font-size: 0.88rem;
     touch-action: manipulation;
   }
   .interactive-stars {
-    gap: 4px;
+    gap: 1px;
   }
   .mentor-footer-row {
+    flex-direction: row;
     flex-wrap: wrap;
-    gap: 0.6rem;
+    gap: 0.45rem;
+    align-items: center;
+    justify-content: space-between;
   }
 }
 
@@ -1973,36 +1951,179 @@
     width: 100% !important;
     justify-content: center !important;
   }
+
+  /* Faculty & Mentors on Mobile: Perfect photo visibility + content-first layout */
   .mentor-compact-card {
     padding: 1.15rem 1rem !important;
+    border-radius: 16px !important;
   }
   .mentor-header-row {
-    gap: 0.75rem !important;
+    gap: 0.85rem !important;
+    margin-bottom: 0.65rem !important;
+    align-items: center !important;
   }
   .mentor-avatar-wrap {
-    width: 68px !important;
-    height: 68px !important;
-    min-width: 68px !important;
+    width: 90px !important;
+    height: 90px !important;
+    min-width: 90px !important;
+    max-width: 90px !important;
+    border-radius: 14px !important;
+    border: 2px solid var(--border-sand) !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+  }
+  .mentor-avatar-wrap img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    object-position: center 15% !important;
+  }
+  .mentor-role-badge {
+    font-size: 0.64rem !important;
+    padding: 2px 0 !important;
+    letter-spacing: 0.03em !important;
+    font-weight: 800 !important;
   }
   .mentor-name {
-    font-size: 1.12rem !important;
+    font-size: 1.15rem !important;
+    margin-bottom: 0.2rem !important;
+    line-height: 1.2 !important;
   }
   .exp-highlight-badge {
     font-size: 0.72rem !important;
-    padding: 0.2rem 0.5rem !important;
+    padding: 0.18rem 0.5rem !important;
+    margin-bottom: 0.35rem !important;
+  }
+  .degree-pallets-wrap {
+    gap: 0.25rem !important;
   }
   .degree-pill {
     font-size: 0.68rem !important;
-    padding: 0.18rem 0.45rem !important;
+    padding: 0.15rem 0.45rem !important;
   }
   .mentor-bio {
     font-size: 0.88rem !important;
-    margin-bottom: 0.85rem !important;
+    line-height: 1.5 !important;
+    margin-bottom: 0.65rem !important;
+    color: var(--text-charcoal) !important;
   }
   .mentor-footer-row {
-    flex-direction: column !important;
-    align-items: flex-start !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 0.45rem !important;
+    padding-top: 0.55rem !important;
+    flex-wrap: wrap !important;
+  }
+  .mentor-rating-widget {
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 0.3rem !important;
+  }
+  .interactive-stars {
+    gap: 1px !important;
+  }
+  .star-btn {
+    font-size: 0.82rem !important;
+    padding: 2px 1px !important;
+  }
+  .student-count {
+    font-size: 0.72rem !important;
+    padding: 0.18rem 0.45rem !important;
+    background: var(--secondary-sage-light) !important;
+    border-radius: 6px !important;
+    font-weight: 700 !important;
+    color: var(--secondary-sage-text) !important;
+  }
+
+  /* Batches Section on Mobile: Swipeable tabs + uncompressed cards */
+  .tabs-container {
+    display: flex !important;
+    justify-content: flex-start !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    scroll-snap-type: x mandatory !important;
+    padding: 0.25rem 0.25rem 0.65rem !important;
+    gap: 0.45rem !important;
+    margin-bottom: 1.25rem !important;
+    scrollbar-width: none !important;
+  }
+  .tabs-container::-webkit-scrollbar {
+    display: none !important;
+  }
+  .tab-btn {
+    scroll-snap-align: start !important;
+    white-space: nowrap !important;
+    padding: 0.45rem 1rem !important;
+    font-size: 0.84rem !important;
+    flex-shrink: 0 !important;
+  }
+  .billing-toggle-wrap {
+    margin-bottom: 1.5rem !important;
+    font-size: 0.88rem !important;
     gap: 0.65rem !important;
+  }
+  .batches-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1.25rem !important;
+    padding-top: 0.5rem !important;
+  }
+  .batch-card {
+    padding: 1.35rem 1.1rem 1.25rem !important;
+    border-radius: 16px !important;
+  }
+  .popular-tag {
+    top: -12px !important;
+    font-size: 0.72rem !important;
+    padding: 0.25rem 0.85rem !important;
+  }
+  .batch-header {
+    margin-bottom: 0.75rem !important;
+    padding-bottom: 0.65rem !important;
+  }
+  .batch-class {
+    font-size: 1.2rem !important;
+    line-height: 1.25 !important;
+  }
+  .batch-timing {
+    font-size: 0.78rem !important;
+    margin-top: 0.2rem !important;
+  }
+  .batch-price-row {
+    margin-bottom: 0.75rem !important;
+    gap: 0.25rem !important;
+  }
+  .batch-price {
+    font-size: 1.95rem !important;
+  }
+  .batch-period {
+    font-size: 0.8rem !important;
+  }
+  .batch-features {
+    gap: 0.5rem !important;
+    margin-bottom: 1.15rem !important;
+  }
+  .batch-features li {
+    font-size: 0.86rem !important;
+    line-height: 1.35 !important;
+    gap: 0.5rem !important;
+    align-items: flex-start !important;
+  }
+  .check-icon {
+    width: 17px !important;
+    height: 17px !important;
+    min-width: 17px !important;
+    font-size: 0.68rem !important;
+    margin-top: 2px !important;
+  }
+  .batch-card .btn {
+    width: 100% !important;
+    min-height: 44px !important;
+    padding: 0.6rem 1rem !important;
+    font-size: 0.88rem !important;
+    justify-content: center !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 0.45rem !important;
   }
 }
 
