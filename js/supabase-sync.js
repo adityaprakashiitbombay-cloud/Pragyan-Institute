@@ -15,6 +15,12 @@
 
   const REST_BASE = `${SUPABASE_URL}/rest/v1`;
 
+  // Authenticated data gateway (api/db.js). All table reads/writes route through
+  // this JWT-gated endpoint so Row Level Security can lock PostgREST down to
+  // public notices/batches only. The legacy REST_BASE above remains solely for
+  // pre-auth fallback paths that are being retired.
+  const API_BASE = (_cfg.API_BASE || (typeof window !== 'undefined' && window.PRAGYAN_API_BASE) || '').replace(/\/$/, '');
+
   // ── localStorage key map ────────────────────────────────────────────────────
   const KEY_MAP = {
     students:           'pragyan_db_students_master',
@@ -24,13 +30,15 @@
     student_requests:   'pragyan_db_requests_master',
     batches:            'pragyan_db_batches_master',
     admins:             'pragyan_db_admins_master',
-    audit_logs:         'pragyan_db_audit_logs_master'
+    audit_logs:         'pragyan_db_audit_logs_master',
+    blog_posts:         'pragyan_db_blog_master'
   };
 
   const ORDER_COLUMNS = {
     students: 'student_id', notices: 'id', fee_receipts: 'receipt_no',
     fee_billing_ledger: 'created_at', student_requests: 'created_at',
-    batches: 'batch_id', admins: 'admin_id', audit_logs: 'log_id'
+    batches: 'batch_id', admins: 'admin_id', audit_logs: 'log_id',
+    blog_posts: 'id'
   };
 
   const ALL_TABLES = Object.keys(KEY_MAP);
@@ -88,36 +96,98 @@
       this.isInitialized = true;
       this.sessionToken = sessionStorage.getItem('pragyan_portal_token') || localStorage.getItem('pragyan_portal_token') || null;
       this.sessionRole = sessionStorage.getItem('pragyan_portal_role') || localStorage.getItem('pragyan_portal_role') || null;
+      this._bindLifecycle();
       this._listenForConnectivity();
-
-      // Register cleanup on page unload
-      if (typeof window !== 'undefined') {
-        window.addEventListener('beforeunload', () => {
-          console.log('🔌 Page unloading - cleaning up Supabase connections...');
-          this.destroy();
-        });
-
-        // Also handle visibility change (tab switch)
-        document.addEventListener('visibilitychange', () => {
-          if (document.hidden) {
-            console.log('👁️ Tab hidden - pausing realtime sync');
-            // Don't destroy, just pause polling
-            if (this.pollTimer) {
-              clearInterval(this.pollTimer);
-              this.pollTimer = null;
-            }
-          } else {
-            console.log('👁️ Tab visible - resuming realtime sync');
-            this._listenForConnectivity();
-          }
-        });
-      }
 
       return this.pullAll();
     },
 
+    // ── Page lifecycle ───────────────────────────────────────────────────────
+    /**
+     * Binds the unload/restore handlers exactly once.
+     *
+     * The previous version registered a `visibilitychange` handler here in
+     * init() while _listenForConnectivity() registered a second one, and the
+     * "tab visible" branch called _listenForConnectivity() again — so every
+     * hide/show cycle added another copy of the online + focus +
+     * visibilitychange trio and another BroadcastChannel. On a phone, where
+     * backgrounding the browser fires visibilitychange constantly, the handler
+     * count grew without bound for as long as the portal stayed open.
+     */
+    _bindLifecycle() {
+      if (this._lifecycleBound || typeof window === 'undefined') return;
+      this._lifecycleBound = true;
+
+      // pagehide rather than beforeunload: mobile Safari and Chrome for
+      // Android routinely discard a backgrounded tab without ever firing
+      // beforeunload, which left the WebSocket to time out server-side.
+      // beforeunload also makes a page ineligible for the back/forward cache.
+      window.addEventListener('pagehide', (event) => {
+        if (event.persisted) {
+          // Bound for the back/forward cache, so the page can come back.
+          // Release the socket and timers but keep the registered subscribers:
+          // onChange() is called once at DOMContentLoaded and nothing
+          // re-registers it, so dropping them here would leave a restored page
+          // rendering permanently stale data.
+          this._suspend();
+        } else {
+          this.destroy();
+        }
+      });
+
+      window.addEventListener('pageshow', (event) => {
+        if (event.persisted) this._resume();
+      });
+    },
+
+    /** Release network resources without forgetting who is listening. */
+    _suspend() {
+      this._teardownInProgress = true;
+      if (this.pollTimer) {
+        clearInterval(this.pollTimer);
+        this.pollTimer = null;
+      }
+      if (this._pullDebounceTimer) {
+        clearTimeout(this._pullDebounceTimer);
+        this._pullDebounceTimer = null;
+      }
+      this._closeRealtimeChannel();
+      this._teardownInProgress = false;
+    },
+
+    /** Re-arm after a back/forward-cache restore. */
+    _resume() {
+      if (!this.isInitialized) return;
+      this._connectRealtime();
+      this._resetPollTimer();
+      this._schedulePull(150);
+    },
+
+    /**
+     * Unsubscribe and drop the realtime channel. Callers set
+     * _teardownInProgress first so the resulting CLOSED status is recognised
+     * as our own doing rather than logged as a connection failure.
+     */
+    _closeRealtimeChannel() {
+      if (!this._realtimeChannel || !this._supabaseClient) return;
+      try {
+        this._realtimeChannel.unsubscribe();
+        this._supabaseClient.removeChannel(this._realtimeChannel);
+      } catch (e) {
+        console.warn('[SupabaseSync] Realtime channel cleanup note:', e.message);
+        try {
+          this._supabaseClient.removeAllChannels();
+        } catch (forceErr) {
+          console.warn('[SupabaseSync] Force channel removal note:', forceErr.message);
+        }
+      }
+      this._realtimeChannel = null;
+      this._realtimeSubscribed = false;
+    },
+
     // ── S1: Clear poll timer and tear down connections ───────────────────────
     destroy() {
+      this._teardownInProgress = true;
       if (this.pollTimer) {
         clearInterval(this.pollTimer);
         this.pollTimer = null;
@@ -130,29 +200,16 @@
         try { this._pullAbort.abort(); } catch(e) {}
         this._pullAbort = null;
       }
-      if (this._realtimeChannel && this._supabaseClient) {
-        try {
-          // CORRECT: Unsubscribe first, then remove
-          this._realtimeChannel.unsubscribe();
-          this._supabaseClient.removeChannel(this._realtimeChannel);
-          console.log('✅ Realtime channel unsubscribed and removed');
-        } catch(e) {
-          console.error('❌ Realtime channel cleanup failed:', e.message);
-          // Force disconnect as fallback
-          try {
-            this._supabaseClient.removeAllChannels();
-          } catch(forceErr) {
-            console.error('❌ Force channel removal failed:', forceErr.message);
-          }
-        }
-        this._realtimeChannel = null;
-        this._realtimeSubscribed = false;
-      }
+      this._closeRealtimeChannel();
       if (this._bc) {
         try { this._bc.close(); } catch(e) {}
         this._bc = null;
       }
-      this.callbacks.clear();
+      // Subscribers registered through onChange() are deliberately kept. This
+      // is called on logout, and onChange() is only ever called once, from
+      // DOMContentLoaded — clearing the set here meant that logging out and
+      // back in without reloading the page left the dashboard unable to
+      // re-render on any subsequent database change.
       this.isInitialized = false;
       this.isSyncing = false;
       this._pullPromise = null;
@@ -165,6 +222,7 @@
       }
       this.sessionToken = null;
       this.sessionRole = null;
+      this._teardownInProgress = false;
     },
 
     // Debounced pull trigger: coalesces rapid events into a single execution
@@ -193,77 +251,42 @@
     },
 
     _listenForConnectivity() {
-      window.addEventListener('online', () => this._schedulePull(100));
-      window.addEventListener('focus', () => this._schedulePull(150));
-      document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) {
-          this._schedulePull(150);
-          this._resetPollTimer();
-        } else if (this.pollTimer) {
-          clearInterval(this.pollTimer);
-          this.pollTimer = null;
-        }
-      });
+      // Bound once for the life of the page. These are window/document
+      // listeners with no removal path, so re-registering them on every
+      // reconnect is a leak, not a refresh.
+      if (!this._connectivityBound) {
+        this._connectivityBound = true;
+        window.addEventListener('online', () => {
+          this._schedulePull(100);
+          this._flushOutbox().catch(() => {});
+        });
+        window.addEventListener('focus', () => this._schedulePull(150));
+        document.addEventListener('visibilitychange', () => {
+          if (!document.hidden) {
+            // Coming back to the foreground. A backgrounded phone often has
+            // its socket killed by the OS without a status callback, so the
+            // channel is re-established rather than assumed alive.
+            if (!this._realtimeSubscribed) this._connectRealtime();
+            this._schedulePull(150);
+            this._resetPollTimer();
+          } else if (this.pollTimer) {
+            clearInterval(this.pollTimer);
+            this.pollTimer = null;
+          }
+        });
+      }
 
       // 1. Instant Realtime WebSocket Subscription via Supabase Client
-      if (typeof window !== 'undefined' && window.supabase && !this._realtimeSubscribed) {
-        try {
-          // Reuse global client to prevent connection leaks
-          if (!window._pragyanSupabaseClient) {
-            console.log('🔌 Creating new Supabase client instance');
-            window._pragyanSupabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-              auth: {
-                persistSession: false,
-                autoRefreshToken: false,
-                detectSessionInUrl: false
-              },
-              realtime: {
-                params: {
-                  eventsPerSecond: 5 // Rate limit realtime events
-                }
-              },
-              db: {
-                schema: 'public'
-              },
-              global: {
-                headers: {
-                  'X-Client-Info': 'pragyan-portal-web'
-                }
-              }
-            });
-          }
-
-          this._supabaseClient = window._pragyanSupabaseClient;
-
-          this._realtimeChannel = this._supabaseClient.channel('pragyan_realtime_sync_all')
-            .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
-              console.log('⚡ [Supabase Realtime] Change received from database:', payload.table, payload.eventType);
-              this._schedulePull(150);
-            })
-            .subscribe((status) => {
-              console.log('⚡ [Supabase Realtime] Subscription status:', status);
-              if (status === 'SUBSCRIBED') {
-                this._realtimeSubscribed = true;
-                this.updateStatus('synced');
-                this._resetPollTimer();
-              }
-              if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-                console.error(`❌ Realtime connection ${status}`);
-                this._realtimeSubscribed = false;
-                this.updateStatus('local');
-                this._resetPollTimer();
-              }
-            });
-        } catch (rtErr) {
-          console.error('❌ Supabase Realtime setup failed:', rtErr.message);
-        }
-      }
+      this._connectRealtime();
 
       // 2. Start adaptive smart polling
       this._resetPollTimer();
 
-      // Cross-tab sync via BroadcastChannel (with tab echo suppression)
-      if (typeof BroadcastChannel !== 'undefined') {
+      // Cross-tab sync via BroadcastChannel (with tab echo suppression).
+      // Guarded on _bc so a reconnect reuses the open channel instead of
+      // orphaning it; destroy() nulls it out, which lets a fresh login on the
+      // same page open a new one.
+      if (typeof BroadcastChannel !== 'undefined' && !this._bc) {
         try {
           this._bc = new BroadcastChannel('pragyan_realtime_hub');
           this._bc.onmessage = (event) => {
@@ -280,24 +303,69 @@
       }
     },
 
-    updateStatus(status) {
-      if (typeof document === 'undefined') return;
-      const studentBadge = document.getElementById('studentCloudSyncBadge');
-      const adminBadge = document.getElementById('adminCloudSyncBadge');
-      const badges = [studentBadge, adminBadge].filter(Boolean);
-
-      badges.forEach(badge => {
-        badge.classList.remove('syncing', 'offline');
-        if (status === 'syncing') {
-          badge.classList.add('syncing');
-          badge.innerHTML = '<i class="fa-solid fa-arrows-rotate fa-spin" style="color: #F59E0B;"></i> <span>Syncing...</span>';
-        } else if (status === 'synced') {
-          badge.innerHTML = '<i class="fa-solid fa-cloud-arrow-up" style="color: #10B981;"></i> <span>Cloud Live</span>';
-        } else {
-          badge.classList.add('offline');
-          badge.innerHTML = '<i class="fa-solid fa-hard-drive" style="color: #6B7280;"></i> <span>Local Cache</span>';
+    /** Open the postgres_changes channel, unless one is already subscribed. */
+    _connectRealtime() {
+      if (typeof window === 'undefined' || !window.supabase) return;
+      if (this._realtimeSubscribed || this._realtimeChannel) return;
+      try {
+        // Reuse global client to prevent connection leaks
+        if (!window._pragyanSupabaseClient) {
+          window._pragyanSupabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            auth: {
+              persistSession: false,
+              autoRefreshToken: false,
+              detectSessionInUrl: false
+            },
+            realtime: {
+              params: {
+                eventsPerSecond: 5 // Rate limit realtime events
+              }
+            },
+            db: {
+              schema: 'public'
+            },
+            global: {
+              headers: {
+                'X-Client-Info': 'pragyan-portal-web'
+              }
+            }
+          });
         }
-      });
+
+        this._supabaseClient = window._pragyanSupabaseClient;
+
+        this._realtimeChannel = this._supabaseClient.channel('pragyan_realtime_sync_all')
+          .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
+            this._schedulePull(150);
+          })
+          .subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+              this._realtimeSubscribed = true;
+              this.updateStatus('synced');
+              this._resetPollTimer();
+              return;
+            }
+            // CLOSED is also how the server acknowledges our own unsubscribe,
+            // so during a deliberate teardown it is not a fault — logging it
+            // at error level put a red entry in the console on every page
+            // unload and every logout.
+            if (status === 'CLOSED' && this._teardownInProgress) return;
+            // TIMED_OUT was previously unhandled: the socket was gone but
+            // _realtimeSubscribed stayed true, so the badge kept claiming
+            // "Cloud synced" and polling stayed on the slow 60s cadence.
+            if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+              console.warn(`[SupabaseSync] Realtime ${status} — falling back to polling`);
+              this._realtimeSubscribed = false;
+              this._realtimeChannel = null;
+              this.updateStatus('local');
+              this._resetPollTimer();
+            }
+          });
+      } catch (rtErr) {
+        console.warn('[SupabaseSync] Realtime setup note:', rtErr.message);
+        this._realtimeChannel = null;
+        this._realtimeSubscribed = false;
+      }
     },
 
     // ── Direct Real-Time Supabase Authentication ────────────────────────────
@@ -346,15 +414,43 @@
       return text ? JSON.parse(text) : [];
     },
 
+    /**
+     * Authenticated gateway transport (POST /api/db).
+     * Resolves with the response `data` payload; throws on any failure with a
+     * message that keeps the HTTP status prefix so existing catch-site logging
+     * stays meaningful.
+     */
+    async _apiDb(table, operation, { data = null, filters = {}, options = {} } = {}) {
+      const token = this.sessionToken;
+      if (!token) {
+        throw new Error(`Gateway ${operation} ${table} failed (401): no active session`);
+      }
+      const response = await fetch(`${API_BASE}/api/db`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ table, operation, data, filters }),
+        signal: options?.signal
+      });
+      let json = null;
+      try { json = await response.json(); } catch (_) {}
+      if (!response.ok || !json || json.success !== true) {
+        const msg = json?.error || `HTTP ${response.status}`;
+        throw new Error(`Gateway ${operation} ${table} failed (${response.status}): ${String(msg).slice(0, 200)}`);
+      }
+      return Array.isArray(json.data) ? json.data : (json.data ?? []);
+    },
+
     // ── Read All Records from a Table ───────────────────────────────────────
     async readAll(table, extraQuery = '', options = {}) {
       const QUERY_TIMEOUT_MS = options.timeout || 15000; // 15 seconds default
-      const orderCol = ORDER_COLUMNS[table] || 'id';
-      const dir = (table === 'student_requests' || table === 'notices' || table === 'audit_logs') ? 'desc' : 'asc';
-      const pageSize = 1000;
+      const pageSize = 1000;                            // gateway hard cap per page
       const maxRows = options.maxRows || 10000;
       let offset = 0;
       let allRows = [];
+      const seenIds = new Set();                        // offset-paging drift guard
       const startTime = Date.now();
 
       while (offset < maxRows) {
@@ -364,9 +460,6 @@
           throw new Error(`Query timeout: ${table} took longer than ${QUERY_TIMEOUT_MS}ms`);
         }
 
-        let params = `select=*&order=${orderCol}.${dir}&limit=${pageSize}&offset=${offset}`;
-        if (extraQuery) params += `&${extraQuery}`;
-
         // Create AbortController for this page fetch
         const pageAbortController = new AbortController();
         const pageTimeout = setTimeout(() => {
@@ -375,14 +468,24 @@
         }, 5000); // 5 seconds per page
 
         try {
-          const page = await this._rest('GET', table, params, null, {}, {
-            ...options,
-            signal: pageAbortController.signal
+          // Row scoping (student role) is enforced server-side by the gateway;
+          // the legacy extraQuery filter string is no longer needed here.
+          const page = await this._apiDb(table, 'select', {
+            filters: { limit: pageSize, offset },
+            options: { signal: pageAbortController.signal }
           });
           clearTimeout(pageTimeout);
 
           if (!Array.isArray(page) || page.length === 0) break;
-          allRows.push(...page);
+          for (const row of page) {
+            const dedupeKey = row && typeof row === 'object'
+              ? (row.id ?? row.receipt_no ?? row.request_id ?? row.log_id ??
+                 row.student_id ?? row.batch_id ?? row.admin_id ?? JSON.stringify(row))
+              : row;
+            if (seenIds.has(dedupeKey)) continue;
+            seenIds.add(dedupeKey);
+            allRows.push(row);
+          }
           if (page.length < pageSize) break;
           offset += pageSize;
         } catch (err) {
@@ -419,42 +522,22 @@
           const currentStudent = (activeRole === 'student' && typeof AppState !== 'undefined' && AppState.currentUser) ? AppState.currentUser : null;
           const currentStudentId = currentStudent ? (currentStudent.id || currentStudent.student_id || currentStudent.rollNo) : null;
 
-          const tables = ALL_TABLES;
+          // Role-aware table set. Row scoping for signed-in roles is enforced
+          // SERVER-SIDE by the gateway; anonymous visitors may only pull the
+          // public catalogue — every other table would 401 and poison the
+          // failure accounting on the marketing site.
+          const hasSession = Boolean(this.sessionToken ||
+            sessionStorage.getItem('pragyan_portal_token') || localStorage.getItem('pragyan_portal_token'));
+          const tables = hasSession
+            ? ALL_TABLES
+            : ['notices', 'batches', 'blog_posts'];
 
-          // Fetch all tables in parallel with allSettled
+          // Fetch all tables in parallel with allSettled. Row scoping for the
+          // student role is applied by the gateway from the signed session —
+          // client-side filter strings are neither needed nor trusted.
           const fetchResults = await Promise.allSettled(
             tables.map(async table => {
-              let filter = '';
-              if (activeRole === 'student' && currentStudentId) {
-                // SECURITY: Sanitize all user input before using in queries
-                const sanitizedId = this._sanitizeForQuery(currentStudentId);
-                const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sanitizedId);
-                const sRoll = this._sanitizeForQuery(String(currentStudent.rollNo || currentStudent.roll_no || ''));
-                const sStuId = this._sanitizeForQuery(String(currentStudent.student_id || currentStudent.id || ''));
-
-                if (table === 'students') {
-                  if (isUuid) {
-                    filter = `or=(student_id.eq.${this._encodeFilterValue(sStuId || sanitizedId)},id.eq.${this._encodeFilterValue(sanitizedId)})`;
-                  } else {
-                    const clauses = [`student_id.eq.${this._encodeFilterValue(sanitizedId)}`];
-                    if (sRoll && sRoll !== sanitizedId) clauses.push(`roll_no.eq.${this._encodeFilterValue(sRoll)}`);
-                    filter = clauses.length > 1 ? `or=(${clauses.join(',')})` : clauses[0];
-                  }
-                } else if (table === 'fee_receipts') {
-                  const dbUuid = this._sanitizeForQuery(currentStudent.db_uuid || (isUuid ? sanitizedId : ''));
-                  if (dbUuid) {
-                    filter = `student_id.eq.${this._encodeFilterValue(dbUuid)}`;
-                  }
-                } else if (table === 'fee_billing_ledger') {
-                  const sStuId = this._sanitizeForQuery(String(currentStudent.student_id || currentStudent.id || sanitizedId));
-                  filter = `student_id.eq.${this._encodeFilterValue(sStuId)}`;
-                } else if (table === 'student_requests') {
-                  const clauses = [`student_id.eq.${this._encodeFilterValue(sanitizedId)}`];
-                  if (sRoll && sRoll !== sanitizedId) clauses.push(`roll_no.eq.${this._encodeFilterValue(sRoll)}`);
-                  filter = clauses.length > 1 ? `or=(${clauses.join(',')})` : clauses[0];
-                }
-              }
-              const rows = await this.readAll(table, filter);
+              const rows = await this.readAll(table);
               return { table, rows };
             })
           );
@@ -497,6 +580,11 @@
           this.updateLocalState(data);
           this._connected = true;
           this.updateStatus('synced');
+          // A successful sync proves the path to the server works — replay
+          // anything the outbox has been holding from an outage.
+          if (this._readOutbox().length) {
+            this._flushOutbox().catch(err => console.warn('[Outbox] flush after sync failed:', err.message));
+          }
           this.callbacks.forEach(cb => {
             try { cb('full_sync', data); } catch (e) { console.warn('Callback error:', e); }
           });
@@ -614,39 +702,58 @@
 
             // Strip any unsupported columns so Postgres doesn't throw 400
             delete rowObj.idempotency_key;
+            delete rowObj.idempotencyKey;
             delete rowObj.amount_paid;
             delete rowObj.balance_due;
+            delete rowObj.className;
             delete rowObj.class_name;
+            delete rowObj.studentName;
             delete rowObj.student_name;
+            delete rowObj.studentRoll;
             delete rowObj.student_roll;
+            delete rowObj.rollNo;
             delete rowObj.roll_no;
+            delete rowObj.receiptNo;
+            delete rowObj.studentId;
           } else if (table === 'fee_billing_ledger') {
             const lId = rowObj.id || rowObj.idempotency_key;
             if (lId) changedIds.push(lId);
-            if (rowObj.batchName && !rowObj.batch_label) {
-              rowObj.batch_label = rowObj.batchName;
+            if ((rowObj.batchName || rowObj.batchLabel || rowObj.className) && !rowObj.batch_label) {
+              rowObj.batch_label = rowObj.batchName || rowObj.batchLabel || rowObj.className;
             }
-            delete rowObj.batchName;
-            if (rowObj.className && !rowObj.batch_label) {
-              rowObj.batch_label = rowObj.className;
-            }
-            delete rowObj.className;
             if (rowObj.previousDue !== undefined && rowObj.previous_due === undefined) {
               rowObj.previous_due = Number(rowObj.previousDue);
             }
-            delete rowObj.previousDue;
             if (rowObj.updatedDue !== undefined && rowObj.updated_due === undefined) {
               rowObj.updated_due = Number(rowObj.updatedDue);
             }
-            delete rowObj.updatedDue;
             if (rowObj.billingMonth && !rowObj.billing_month) {
               rowObj.billing_month = rowObj.billingMonth;
             }
-            delete rowObj.billingMonth;
             if (rowObj.studentId && !rowObj.student_id) {
               rowObj.student_id = rowObj.studentId;
             }
+
+            // Strip virtual and camelCase fields
+            delete rowObj.batchName;
+            delete rowObj.batchLabel;
+            delete rowObj.className;
+            delete rowObj.previousDue;
+            delete rowObj.updatedDue;
+            delete rowObj.billingMonth;
             delete rowObj.studentId;
+            delete rowObj.studentName;
+            delete rowObj.student_name;
+            delete rowObj.rollNo;
+            delete rowObj.roll_no;
+            delete rowObj.currentMonthFee;
+            delete rowObj.current_month_fee;
+            delete rowObj.totalDue;
+            delete rowObj.total_due;
+            delete rowObj.paidThisMonth;
+            delete rowObj.paid_this_month;
+            delete rowObj.last_updated_at;
+            delete rowObj.idempotencyKey;
           } else if (table === 'student_requests') {
             const reqId = rowObj.request_id || rowObj.id;
             if (reqId) {
@@ -659,6 +766,9 @@
             delete rowObj.type;
             delete rowObj.paymentDetails;
             delete rowObj.date;
+            delete rowObj.studentName;
+            delete rowObj.studentRoll;
+            delete rowObj.className;
           } else if (table === 'students') {
             const sId = rowObj.student_id || rowObj.id || rowObj.rollNo;
             if (sId) {
@@ -715,6 +825,7 @@
             delete rowObj.notice_id;
             delete rowObj.date;
             delete rowObj.unread;
+            delete rowObj._local_id;
             // If notice id is not a standard UUID, strip it so Postgres auto-generates a valid UUID
             if (rowObj.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rowObj.id)) {
               delete rowObj.id;
@@ -753,32 +864,51 @@
           return rowObj;
         });
 
-        if (operation === 'insert') {
+        if (operation === 'insert' || operation === 'upsert') {
+          // Notices whose ids are client-minted non-UUIDs must go through a
+          // plain insert so Postgres generates a real uuid; everything else
+          // rides the conflict-targeted upsert (merge semantics preserved).
           const hasNonUuidNotice = table === 'notices' && rows.some(r => !r.id);
-          const params = (conflictCol && !hasNonUuidNotice) ? `on_conflict=${conflictCol}` : '';
-          result = await this._rest('POST', table, params, rows, {
-            'Prefer': 'return=representation,resolution=merge-duplicates'
-          });
-        } else if (operation === 'upsert') {
-          const hasNonUuidNotice = table === 'notices' && rows.some(r => !r.id);
-          const params = (conflictCol && !hasNonUuidNotice) ? `on_conflict=${conflictCol}` : '';
-          result = await this._rest('POST', table, params, rows, {
-            'Prefer': 'return=representation,resolution=merge-duplicates'
+          const gatewayOp = (operation === 'upsert' && !hasNonUuidNotice && conflictCol)
+            ? 'upsert'
+            : 'insert';
+          result = await this._apiDb(table, gatewayOp, {
+            data: rows,
+            filters: gatewayOp === 'upsert' ? { conflict: conflictCol } : {}
           });
         } else if (operation === 'update') {
           if (!filters.where || Object.keys(filters.where).length === 0) {
             return { success: false, error: 'Update requires a where clause' };
           }
-          const whereParams = Object.entries(filters.where)
-            .map(([col, val]) => `${col}=eq.${val}`).join('&');
-          result = await this._rest('PATCH', table, whereParams, data);
+          // Send the NORMALIZED row, not the raw caller object — the legacy
+          // path PATCHed camelCase/virtual fields straight through and every
+          // such write failed server-side with a silent 400.
+          result = await this._apiDb(table, 'update', {
+            data: rows.length ? rows[0] : {},
+            filters: { where: { ...filters.where } }
+          });
         } else if (operation === 'delete') {
-          if (!filters.where || Object.keys(filters.where).length === 0) {
-            return { success: false, error: 'Delete requires a where clause' };
+          if (filters.all === true) {
+            // Bulk purge: chunk by primary key so no unfiltered DELETE can ever
+            // reach the wire (the gateway rejects those outright).
+            const idCol = ORDER_COLUMNS[table] || 'id';
+            const allRows = await this._apiDb(table, 'select', {
+              filters: { columns: idCol, limit: 1000 }
+            });
+            const ids = (allRows || []).map(r => r?.[idCol]).filter(Boolean);
+            for (let i = 0; i < ids.length; i += 500) {
+              const chunk = ids.slice(i, i + 500);
+              await this._apiDb(table, 'delete', { filters: { where: { [idCol]: chunk } } });
+            }
+            result = ids;
+          } else {
+            if (!filters.where || Object.keys(filters.where).length === 0) {
+              return { success: false, error: 'Delete requires a where clause' };
+            }
+            result = await this._apiDb(table, 'delete', {
+              filters: { where: { ...filters.where } }
+            });
           }
-          const whereParams = Object.entries(filters.where)
-            .map(([col, val]) => `${col}=eq.${val}`).join('&');
-          result = await this._rest('DELETE', table, whereParams);
         } else {
           return { success: false, error: `Unknown operation: ${operation}` };
         }
@@ -787,15 +917,113 @@
         this.broadcastChange({ table, operation, changedIds, data: rows });
         return { success: true, data: result };
       } catch (error) {
-        console.warn(`Mutation failed [${table}:${operation}]:`, error.message);
+        // console.error, not warn: this function RETURNS its failures rather than
+        // throwing them, and 23 of the 32 call sites in portal.js bare-await it
+        // and discard the result. A caller that wrapped this in
+        // `try { await mutate(...) } catch { console.warn(...) }` has dead code —
+        // the catch never fires — and goes on to report success for a write that
+        // never landed. Until every call site is converted, the log is the only
+        // thing standing between a silent failure and a support call.
+        console.error(`[SupabaseSync] Mutation FAILED [${table}:${operation}] — the local copy and the database now disagree:`, error.message);
+        // Queue transient failures (network / 5xx / auth blips) for replay.
+        // Permanent 4xx rejections are NOT queued — they would fail forever.
+        const statusMatch = /\((\d{3})\):/.test(error.message) ? Number(RegExp.$1) : 0;
+        const isTransient = statusMatch === 0 || statusMatch === 401 || statusMatch === 429 || statusMatch >= 500;
+        if (isTransient && table !== 'audit_logs') {
+          this._enqueueOutbox({ table, operation, data, filters });
+        }
         return { success: false, error: error.message };
       }
+    },
+
+    /**
+     * mutate(), but a failure is raised instead of returned.
+     *
+     * For call sites where proceeding on a failed write would be a lie — a request
+     * marked Declined locally while the row is still Pending in the cloud, which
+     * the very next pullAll() will resurrect after the student has already been
+     * told it was declined. There is no outbox in this client: a mutation that
+     * fails is not retried by anything, so it must not be treated as pending.
+     */
+    async mutateOrThrow(table, operation, data, filters = {}) {
+      const result = await this.mutate(table, operation, data, filters);
+      if (!result || result.success !== true) {
+        throw new Error(result?.error || `Database rejected the ${operation} on ${table}`);
+      }
+      return result;
+    },
+
+    // ── Mutation outbox ──────────────────────────────────────────────────────
+    // A failed write used to be simply lost: nothing retried it and the next
+    // pullAll() overwrote the local claim with server truth. Failures that look
+    // transient (network / 5xx / auth blips) are now queued — capped, oldest-
+    // dropped — and replayed when connectivity or a successful sync returns.
+    OUTBOX_KEY: 'pragyan_mutation_outbox',
+    OUTBOX_MAX: 50,
+
+    _readOutbox() {
+      try {
+        const raw = localStorage.getItem(this.OUTBOX_KEY);
+        const arr = raw ? JSON.parse(raw) : [];
+        return Array.isArray(arr) ? arr : [];
+      } catch (_) { return []; }
+    },
+
+    _writeOutbox(entries) {
+      try {
+        localStorage.setItem(this.OUTBOX_KEY, JSON.stringify(entries.slice(-this.OUTBOX_MAX)));
+        return true;
+      } catch (e) {
+        console.warn('[Outbox] could not persist queue:', e.message);
+        return false;
+      }
+    },
+
+    _enqueueOutbox(entry) {
+      const entries = this._readOutbox();
+      // Collapse exact duplicates (same table+op+key) so a flapping loop does
+      // not fill the cap with copies of one write.
+      const sig = JSON.stringify([entry.table, entry.operation, entry.filters, entry.data]);
+      const deduped = entries.filter(e => JSON.stringify([e.table, e.operation, e.filters, e.data]) !== sig);
+      deduped.push({ ...entry, queuedAt: new Date().toISOString() });
+      return this._writeOutbox(deduped);
+    },
+
+    async _flushOutbox() {
+      const entries = this._readOutbox();
+      if (!entries.length || this._outboxFlushing) return 0;
+      this._outboxFlushing = true;
+      let delivered = 0;
+      try {
+        const remaining = [];
+        for (const entry of entries) {
+          try {
+            const result = await this.mutate(entry.table, entry.operation, entry.data, entry.filters || {});
+            if (result && result.success === true) { delivered++; continue; }
+            // Permanent rejections (validation/permission/not-found) will never
+            // succeed on retry — drop them rather than clogging the queue.
+            if (/\((400|401|403|404|409)\):/.test(result?.error || '')) continue;
+            remaining.push(entry);
+          } catch (_) {
+            remaining.push(entry);
+          }
+        }
+        this._writeOutbox(remaining);
+        if (delivered > 0) {
+          console.log(`[Outbox] delivered ${delivered} queued mutation(s); ${remaining.length} still pending.`);
+          this.broadcastChange({ type: 'OUTBOX_FLUSHED', delivered });
+        }
+      } finally {
+        this._outboxFlushing = false;
+      }
+      return delivered;
     },
 
     // ── Normalize & Store Pulled Data ────────────────────────────────────────
     updateLocalState(data) {
       const normalized = {
-        students:           Array.isArray(data.students)           ? data.students.map(r => this.normalizeStudent(r)).filter(Boolean)  : undefined,
+        blog_posts:         Array.isArray(data.blog_posts)      ? data.blog_posts.map(r => this.normalizeBlogPost(r)).filter(Boolean) : undefined,
+    students:           Array.isArray(data.students)           ? data.students.map(r => this.normalizeStudent(r)).filter(Boolean)  : undefined,
         notices:            Array.isArray(data.notices)            ? data.notices.map(r => this.normalizeNotice(r)).filter(Boolean)     : undefined,
         fee_receipts:       Array.isArray(data.fee_receipts)       ? data.fee_receipts.map(r => this.normalizeReceipt(r)).filter(Boolean) : undefined,
         fee_billing_ledger: Array.isArray(data.fee_billing_ledger) ? data.fee_billing_ledger.map(r => this.normalizeLedger(r)).filter(Boolean) : undefined,
@@ -855,8 +1083,22 @@
       Object.entries(normalized).forEach(([table, rows]) => {
         if (Array.isArray(rows)) this.safeStore(KEY_MAP[table], rows);
       });
-      if (typeof AppState !== 'undefined' && AppState.invalidateCaches) {
-        AppState.invalidateCaches();
+      if (typeof AppState !== 'undefined') {
+        if (AppState.invalidateCaches) AppState.invalidateCaches();
+        if (AppState._lastSavedStudentsMap && Array.isArray(normalized.students)) {
+          AppState._lastSavedStudentsMap.clear();
+          normalized.students.forEach(s => {
+            const id = s.id || s.student_id || s.rollNo;
+            if (id) AppState._lastSavedStudentsMap.set(id, { ...s });
+          });
+        }
+        if (AppState._lastSavedReceiptsSet && Array.isArray(normalized.fee_receipts)) {
+          AppState._lastSavedReceiptsSet.clear();
+          normalized.fee_receipts.forEach(r => {
+            const rNo = r.receiptNo || r.receipt_no;
+            if (rNo) AppState._lastSavedReceiptsSet.add(rNo);
+          });
+        }
       }
     },
 
@@ -872,7 +1114,12 @@
         'pragyan_portal_role',
         'pragyan_session',
         'pragyan_portal_open',
-        'pragyan_last_local_mutation'
+        'pragyan_last_local_mutation',
+        // Money-adjacent queues: storage pressure must never destroy a payment
+        // that has not reached the office yet.
+        'pragyan_mutation_outbox',
+        'pragyan_undelivered_payment_submissions',
+        'pragyan_db_blog_master'
       ]);
 
       try {
@@ -1016,20 +1263,60 @@
       return { ...n, id, notice_id: id, targetBatch: n.target_batch || n.targetBatch || 'All Batches', date: n.created_at || n.date || '', attachmentUrl: n.attachment_url || n.attachmentUrl || '' };
     },
 
-    // S4: Normalize receipts with consistent studentId
+    // Prefixes that mark a ledger entry rather than money that changed hands:
+    // a monthly billing accrual, an opening carryover, a concession, a rate
+    // change, an add-on. Kept in one place so this list and the portal's
+    // isRealCollectedPayment() cannot drift apart.
+    NON_CASH_RECEIPT_PREFIXES: ['REC-BILL-', 'OLD-DUE', 'ADJ-', 'RATE-', 'EDIT-', 'DUE-', 'NTC-', 'DISC-', 'ADDON-'],
+
+    /**
+     * S4: Normalize a receipt row, tagging non-cash entries instead of deleting
+     * them.
+     *
+     * This used to `return null` for every adjustment, carryover and billing
+     * accrual, and updateLocalState() then filtered those nulls out — so a row
+     * that existed in fee_receipts in the cloud was erased from the local cache
+     * on every pullAll(). The student fee history renders those rows with their
+     * own badges (the "Adjusted" and "Pending Due" branches in portal.js), so a
+     * concession the admin recorded was visible until the next sync and then
+     * silently disappeared, leaving a balance nobody could account for.
+     *
+     * The exclusion itself is correct — a concession is not collected revenue —
+     * but it belongs at the point where money is summed, not at the point where
+     * data is cached. Every summing site in portal.js already calls
+     * isRealCollectedPayment(), so the flag below is what those sites need and
+     * the row survives for the history view.
+     */
     normalizeReceipt(r) {
       if (!r) return null;
       const receiptNo = r.receipt_no || r.receiptNo;
       if (!receiptNo) return null;
+      const recUpper = String(receiptNo).toUpperCase().trim();
+      const mode = String(r.payment_mode || r.mode || '').toLowerCase();
+      const isNonCash =
+        this.NON_CASH_RECEIPT_PREFIXES.some(p => recUpper.startsWith(p)) ||
+        mode.includes('non-cash') ||
+        mode.includes('carryover') ||
+        mode.includes('adjustment') ||
+        mode.includes('waiver') ||
+        mode.includes('concession');
+
       const studentId = (r.student_id || r.studentId || '').toString().trim();
       return {
         receiptNo,
+        receipt_no: receiptNo,
         studentId,
+        student_id: studentId,
         date: r.payment_date || r.date || '',
         mode: r.payment_mode || r.mode || 'Cash',
         amount: Number(r.amount || 0),
+        status: r.status || 'Paid',
         by: r.collected_by || r.by || '',
-        note: r.note || ''
+        note: r.note || '',
+        // Both spellings: the portal reads camelCase, a row round-tripped to the
+        // cloud keeps the snake_case copy readable.
+        isNonCash,
+        is_non_cash: isNonCash
       };
     },
 
@@ -1090,8 +1377,53 @@
 
     normalizeBatch(b) {
       if (!b) return null;
-      const id = b.batch_id || b.id;
-      return { ...b, id, batch_id: id, name: b.name || b.batch_name || '', monthlyFee: Number(b.monthly_fee ?? b.monthlyFee ?? 0), timing: b.timing || b.schedule || '', room: b.room || b.room_no || '' };
+      const id = b.batch_id || b.id || '';
+      const name = b.name || b.className || b.batch_name || b.batchName || '';
+
+      // The canonical batch behind this row, matched on id first and then on the
+      // stored class name. Every default below comes from it, because the ones
+      // that used to be hardcoded here were the Class 10th batch's values applied
+      // to all twelve: `?? 1000` re-rated the four ₹1,500 senior batches down by
+      // a third on every pull, the timing claimed "4:00 PM – 6:30 PM" for batches
+      // that sit in the afternoon, and the teacher list named CHANDAN KUMAR &
+      // RAVI RANJAN on the three Special English batches that ADITI SINGH
+      // teaches alone.
+      const cfg = (typeof window !== 'undefined' && window.PRAGYAN_ACADEMIC) || null;
+      const canon = cfg ? (cfg.resolveBatch(id) || cfg.resolveBatch(name)) : null;
+
+      const storedFee = Number(b.monthly_fee ?? b.monthlyFee ?? NaN);
+      // 0, not a guess: an unbillable ₹0 is visible to the admin, a plausible
+      // wrong rate is not.
+      const fee = Number.isFinite(storedFee) && storedFee > 0
+        ? storedFee
+        : (canon ? canon.monthlyFee : 0);
+
+      // Left blank when unknown — every display site already falls back to
+      // "As per timetable" rather than printing a window nobody teaches.
+      const timing = b.timing || b.timings || b.schedule || '';
+      const room = b.room || b.room_no || '';
+
+      const roster = Array.isArray(b.teachers) && b.teachers.length > 0
+        ? b.teachers
+        : (canon ? canon.teachers.map(t => ({ name: t, subject: '' })) : []);
+      const teacher = b.teacher || roster.map(t => t.name || t).join(' & ');
+
+      return {
+        ...b,
+        id: id || (canon ? canon.batchId : ''),
+        batch_id: id || (canon ? canon.batchId : ''),
+        name: name || (canon ? canon.name : ''),
+        className: name || (canon ? canon.className : ''),
+        batchName: name || (canon ? canon.name : ''),
+        batch_name: name || (canon ? canon.name : ''),
+        monthlyFee: fee,
+        monthly_fee: fee,
+        timing: timing,
+        timings: timing,
+        room: room,
+        teacher: teacher,
+        teachers: roster
+      };
     },
 
     normalizeAdmin(a) {
@@ -1124,6 +1456,31 @@
         studentRoll: l.student_roll || l.studentRoll || 'N/A',
         description: l.description || '',
         details: l.details || null
+      };
+    },
+
+    // Blog & Academic Insights: snake_case row -> portal-friendly object.
+    normalizeBlogPost(b) {
+      if (!b) return null;
+      const id = b.id || b.post_id;
+      if (!id || !b.slug) return null;
+      return {
+        id,
+        slug: String(b.slug || ''),
+        title: b.title || '',
+        excerpt: b.excerpt || '',
+        content_markdown: b.content_markdown || b.contentMarkdown || '',
+        cover_image_url: b.cover_image_url || b.coverImageUrl || '',
+        category: b.category || 'Study Tips',
+        tags: Array.isArray(b.tags) ? b.tags : [],
+        author_name: b.author_name || b.authorName || 'Chandan Kumar',
+        author_role: b.author_role || b.authorRole || 'Science Lead & Head Admin',
+        is_published: Boolean(b.is_published),
+        read_time_minutes: Number(b.read_time_minutes ?? b.readTimeMinutes ?? 3),
+        views_count: Number(b.views_count ?? b.viewsCount ?? 0),
+        published_at: b.published_at || b.publishedAt || null,
+        created_at: b.created_at || b.createdAt || '',
+        updated_at: b.updated_at || b.updatedAt || ''
       };
     },
 
@@ -1313,124 +1670,8 @@
       }
     },
 
-    // ── Direct Real-Time Database Authentication ────────────────────────────
-    _normalizeDob(d) {
-      if (!d) return [];
-      const str = String(d).trim();
-      const results = [];
 
-      // 1. ISO format: YYYY-MM-DD
-      if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
-        results.push(str);
-      }
 
-      // 2. 8 continuous digits: DDMMYYYY (Primary) or YYYYMMDD
-      if (/^\d{8}$/.test(str)) {
-        // DDMMYYYY
-        const day = str.slice(0, 2);
-        const month = str.slice(2, 4);
-        const year = str.slice(4, 8);
-        const yNum = parseInt(year, 10);
-        const mNum = parseInt(month, 10);
-        const dNum = parseInt(day, 10);
-        if (yNum >= 1970 && yNum <= 2035 && mNum >= 1 && mNum <= 12 && dNum >= 1 && dNum <= 31) {
-          results.push(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
-        }
-
-        // YYYYMMDD
-        const y2 = str.slice(0, 4);
-        const m2 = str.slice(4, 6);
-        const d2 = str.slice(6, 8);
-        const yNum2 = parseInt(y2, 10);
-        const mNum2 = parseInt(m2, 10);
-        const dNum2 = parseInt(d2, 10);
-        if (yNum2 >= 1970 && yNum2 <= 2035 && mNum2 >= 1 && mNum2 <= 12 && dNum2 >= 1 && dNum2 <= 31) {
-          results.push(`${y2}-${m2.padStart(2, '0')}-${d2.padStart(2, '0')}`);
-        }
-      }
-
-      // 3. Separator-based dates: DD-MM-YYYY, DD/MM/YYYY, YYYY-MM-DD, etc.
-      const parts = str.split(/[-/.]/);
-      if (parts.length === 3) {
-        if (parts[2].length === 4) {
-          const y = parts[2];
-          const m = parts[1].padStart(2, '0');
-          const day = parts[0].padStart(2, '0');
-          results.push(`${y}-${m}-${day}`);
-        } else if (parts[0].length === 4) {
-          const y = parts[0];
-          const m = parts[1].padStart(2, '0');
-          const day = parts[2].padStart(2, '0');
-          results.push(`${y}-${m}-${day}`);
-        }
-      }
-
-      // 4. Standard Date parse
-      const parsed = new Date(str);
-      if (!isNaN(parsed.getTime())) {
-        try {
-          results.push(parsed.toISOString().split('T')[0]);
-        } catch(e) {}
-      }
-
-      return [...new Set(results)];
-    },
-
-    _dobMatches(inputDob, studentDob) {
-      if (!inputDob || !studentDob) return false;
-      const inputStr = String(inputDob).trim().toLowerCase();
-      const stuStr = String(studentDob).trim().toLowerCase();
-      if (inputStr === stuStr) return true;
-
-      const inputNorms = this._normalizeDob(inputDob);
-      const studentNorms = this._normalizeDob(studentDob);
-      if (inputNorms.some(i => studentNorms.includes(i))) return true;
-
-      const inputDigits = inputStr.replace(/\D/g, '');
-      const stuDigits = stuStr.replace(/\D/g, '');
-      if (inputDigits && stuDigits) {
-        if (inputDigits === stuDigits) return true;
-
-        const stuNorm = studentNorms[0];
-        if (stuNorm && /^\d{4}-\d{2}-\d{2}$/.test(stuNorm)) {
-          const [y, m, d] = stuNorm.split('-');
-          const stuDDMMYYYY = `${d}${m}${y}`;
-          const stuYYYYMMDD = `${y}${m}${d}`;
-          if (inputDigits === stuDDMMYYYY || inputDigits === stuYYYYMMDD) return true;
-        }
-      }
-      return false;
-    },
-
-    async _verifyPasswordHash(password, storedHash) {
-      if (!password || !storedHash) return false;
-      if (String(password).trim() === String(storedHash).trim()) return true;
-
-      // 1. Check bcrypt hash if bcryptjs is loaded
-      if (storedHash.startsWith('$2')) {
-        try {
-          if (typeof dcodeIO !== 'undefined' && dcodeIO.bcrypt) {
-            return dcodeIO.bcrypt.compareSync(String(password), storedHash);
-          }
-          if (typeof window !== 'undefined' && window.bcrypt && window.bcrypt.compareSync) {
-            return window.bcrypt.compareSync(String(password), storedHash);
-          }
-        } catch (_) {}
-      }
-
-      // 2. Check SHA-256 hex hash (64 characters) via Web Crypto API
-      if (/^[a-f0-9]{64}$/i.test(storedHash)) {
-        try {
-          const msgBuffer = new TextEncoder().encode(String(password));
-          const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-          const hashArray = Array.from(new Uint8Array(hashBuffer));
-          const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-          return hashHex.toLowerCase() === storedHash.toLowerCase();
-        } catch (_) {}
-      }
-
-      return false;
-    },
 
     async login(role, identifier, credential) {
       // SECURITY: Sanitize all inputs before processing
@@ -1442,13 +1683,15 @@
       }
 
       // ── PRIMARY AUTH PATH: Secure Verification via Serverless Endpoint ──
+      let authRes = null;
+      let authData = {};
       try {
-        const authRes = await fetch('/api/auth-login', {
+        authRes = await fetch('/api/auth-login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ role, identifier: cleanId, credential: cleanCred })
         });
-        const authData = await authRes.json().catch(() => ({}));
+        authData = await authRes.json().catch(() => ({}));
         if (authRes.ok && authData.success && authData.token) {
           this.isOfflineFallback = false;
           if (typeof sessionStorage !== 'undefined') {
@@ -1470,196 +1713,18 @@
           return { success: false, error: authData.error || 'Authentication failed. Please check your credentials.' };
         }
       } catch (apiErr) {
-        console.warn('API /api/auth-login unreachable, evaluating direct database auth fallback:', apiErr.message);
+        console.warn('API /api/auth-login unreachable:', apiErr.message);
       }
 
-      // ── FALLBACK AUTH PATH: Direct Database Query Authentication ──
-      if (role === 'admin') {
-        try {
-          const sanitizedId = this._sanitizeForQuery(cleanId);
-          const encoded = this._encodeFilterValue(sanitizedId);
-          const filter = `or=(username.ilike.${encoded},email.ilike.${encoded},mobile.eq.${encoded},admin_id.ilike.${encoded})&select=*&limit=5`;
-          const admins = await this._rest('GET', 'admins', filter);
-          if (Array.isArray(admins) && admins.length > 0) {
-            for (const admin of admins) {
-              const hash = admin.password_hash || admin.passwordHash || '';
-              let isMatch = false;
-              if (hash) {
-                isMatch = await this._verifyPasswordHash(cleanCred, hash);
-              }
-              if (!isMatch && admin.password) {
-                isMatch = (String(admin.password).trim() === cleanCred);
-              }
-              if (isMatch) {
-                const norm = this.normalizeAdmin(admin);
-                const token = `token_adm_${admin.id || admin.admin_id}_${Date.now()}`;
-                this.isOfflineFallback = true;
-                if (typeof sessionStorage !== 'undefined') {
-                  sessionStorage.setItem('pragyan_offline_fallback', 'true');
-                }
-                await this.setSession(token, 'admin');
-                await this.pullAll().catch(() => {});
-                return {
-                  success: true,
-                  user: norm,
-                  token,
-                  isFallback: true
-                };
-              }
-            }
-          }
-        } catch (e) {
-          console.warn('Live admin auth query note:', e.message);
-        }
-
-        // Local Admin Check using password_hash and password fallback
-        const localAdmins = (typeof AppState !== 'undefined' && AppState.getAdmins) ? AppState.getAdmins() : [];
-        for (const a of localAdmins) {
-          const idMatch = (
-            a.username?.toLowerCase() === cleanId.toLowerCase() || 
-            a.email?.toLowerCase() === cleanId.toLowerCase() || 
-            a.mobile === cleanId ||
-            (a.id || a.admin_id)?.toLowerCase() === cleanId.toLowerCase()
-          );
-          if (idMatch) {
-            const hash = a.password_hash || a.passwordHash || '';
-            let isMatch = false;
-            if (hash) {
-              isMatch = await this._verifyPasswordHash(cleanCred, hash);
-            }
-            if (!isMatch && a.password) {
-              isMatch = (String(a.password).trim() === cleanCred);
-            }
-            if (isMatch) {
-              const cleanUser = this.normalizeAdmin(a) || a;
-              const token = `token_adm_${a.id || a.admin_id || 'ADM'}_${Date.now()}`;
-              this.isOfflineFallback = true;
-              if (typeof sessionStorage !== 'undefined') {
-                sessionStorage.setItem('pragyan_offline_fallback', 'true');
-              }
-              await this.setSession(token, 'admin');
-              await this.pullAll().catch(() => {});
-              return {
-                success: true,
-                user: cleanUser,
-                token,
-                isFallback: true
-              };
-            }
-          }
-        }
-        return { success: false, error: 'Incorrect Admin Username, Email or Password.' };
-      }
-
-      // Student Role:
-      try {
-        const sanitizedId = this._sanitizeForQuery(cleanId);
-        const filter = `or=(mobile.eq.${this._encodeFilterValue(sanitizedId)},roll_no.ilike.${this._encodeFilterValue(sanitizedId)},student_id.ilike.${this._encodeFilterValue(sanitizedId)})&select=*&limit=5`;
-        const students = await this._rest('GET', 'students', filter);
-        if (Array.isArray(students) && students.length > 0) {
-          let matched = null;
-          for (const s of students) {
-            const sId = this._sanitizeForQuery(s.student_id || s.id);
-            const rollNo = this._sanitizeForQuery(s.roll_no || sId);
-            try {
-              const reqFilter = `req_type=eq.PASSWORD_UPDATE&or=(student_id.eq.${this._encodeFilterValue(sId)},student_id.eq.${this._encodeFilterValue(rollNo)},roll_no.eq.${this._encodeFilterValue(rollNo)})&order=created_at.desc&limit=1`;
-              const pwdReqs = await this._rest('GET', 'student_requests', reqFilter);
-              const activeReq = pwdReqs && pwdReqs[0] && pwdReqs[0].status === 'Active' ? pwdReqs[0] : null;
-              if (activeReq && activeReq.new_data) {
-                const newD = typeof activeReq.new_data === 'string' ? JSON.parse(activeReq.new_data) : activeReq.new_data;
-                const hash = newD.password_hash || newD.passwordHash || '';
-                const isPwdMatch = hash ? (await this._verifyPasswordHash(cleanCred, hash)) : (newD.password === cleanCred);
-                if (isPwdMatch) {
-                  matched = s;
-                  break;
-                }
-              }
-            } catch (_) {}
-
-            if (this._dobMatches(cleanCred, s.dob)) {
-              matched = s;
-              break;
-            }
-          }
-
-          if (matched) {
-            const token = `token_stu_${matched.id || matched.student_id}_${Date.now()}`;
-            this.isOfflineFallback = true;
-            if (typeof sessionStorage !== 'undefined') {
-              sessionStorage.setItem('pragyan_offline_fallback', 'true');
-            }
-            await this.setSession(token, 'student');
-            await this.pullAll().catch(() => {});
-            let norm = this.normalizeStudent(matched);
-            if (typeof AppState !== 'undefined' && AppState.getStudents) {
-              const fresh = AppState.getStudents().find(st => st.id === matched.id || st.student_id === matched.student_id || st.rollNo === matched.roll_no);
-              if (fresh) norm = fresh;
-            }
-            return {
-              success: true,
-              user: norm,
-              token,
-              isFallback: true,
-              warning: 'Offline session: Server-dependent operations require an active internet connection.'
-            };
-          }
-          return { success: false, error: 'Incorrect Password or Date of Birth for this student.' };
-        }
-      } catch (e) {
-        console.warn('Live student auth query failed, checking local state:', e.message);
-      }
-
-      // Local Student Check
-      const localStudents = (typeof AppState !== 'undefined' && AppState.getStudents) ? AppState.getStudents() : [];
-      const localRequests = (typeof AppState !== 'undefined' && AppState.getRequests) ? AppState.getRequests() : [];
-
-      let matchedStudent = null;
-      for (const s of localStudents) {
-        const idMatch = (s.mobile === cleanId || s.rollNo?.toLowerCase() === cleanId.toLowerCase() || s.student_id?.toLowerCase() === cleanId.toLowerCase() || s.id?.toLowerCase() === cleanId.toLowerCase());
-        if (!idMatch) continue;
-
-        const sId = s.student_id || s.id;
-        const rollNo = s.rollNo || s.roll_no || sId;
-        const pwdReq = localRequests.find(r =>
-          (r.req_type === 'PASSWORD_UPDATE' || r.type === 'PASSWORD_UPDATE') &&
-          r.status === 'Active' &&
-          (r.studentId === sId || r.student_id === sId || r.rollNo === rollNo || r.roll_no === rollNo)
-        );
-
-        const hash = pwdReq?.newData?.password_hash || pwdReq?.newData?.passwordHash || s.password_hash || '';
-        if (hash && (await this._verifyPasswordHash(cleanCred, hash))) {
-          matchedStudent = s;
-          break;
-        }
-        if (this._dobMatches(cleanCred, s.dob)) {
-          matchedStudent = s;
-          break;
-        }
-      }
-
-      if (matchedStudent) {
-        const token = `token_stu_${matchedStudent.id || 'STU'}_${Date.now()}`;
-        this.isOfflineFallback = true;
-        if (typeof sessionStorage !== 'undefined') {
-          sessionStorage.setItem('pragyan_offline_fallback', 'true');
-        }
-        await this.setSession(token, 'student');
-        await this.pullAll().catch(() => {});
-        let norm = this.normalizeStudent(matchedStudent) || matchedStudent;
-        if (typeof AppState !== 'undefined' && AppState.getStudents) {
-          const fresh = AppState.getStudents().find(st => st.id === matchedStudent.id || st.student_id === matchedStudent.student_id || st.rollNo === matchedStudent.rollNo);
-          if (fresh) norm = fresh;
-        }
-        return {
-          success: true,
-          user: norm,
-          token,
-          isFallback: true,
-          warning: 'Offline session: Server-dependent operations require an active internet connection.'
-        };
-      }
-
-      return { success: false, error: 'Student record not found. Please check your registered Mobile number / Roll No and Password or Date of Birth.' };
+      // ── SECURITY: FAIL CLOSED ──────────────────────────────────────────
+      // There is deliberately NO client-side fallback authentication. Any
+      // browser-side bcrypt/plaintext check against anon-fetched hashes, or
+      // locally minted session tokens, is forgeable by definition. If the
+      // server endpoint cannot be reached or fails, fail closed securely.
+      return {
+        success: false,
+        error: (authData && authData.error) || 'Authentication service temporarily unavailable. Please check your connection and try again.'
+      };
     },
 
     setSessionToken(token, role) {
@@ -1667,25 +1732,85 @@
     },
 
     // ── UI Status Badge ─────────────────────────────────────────────────────
+    /**
+     * Reflects sync state on the header badge.
+     *
+     * Two versions of this method used to be declared on the object literal;
+     * the later one silently won and it only ever recoloured the icon. The
+     * .syncing / .offline classes that css/portal.css styles the pill with were
+     * therefore never applied, so a badge reading "Offline cache" kept the
+     * green "live" background. The class is the source of truth for the visual
+     * state here, and the icon colour follows from it.
+     *
+     * The badge deliberately is not a live region. It flips syncing -> synced on
+     * every poll, so announcing it would interrupt a screen-reader user roughly
+     * twice a minute while they read a fee table. Only crossing into or out of
+     * the offline state is worth saying out loud, and that goes through the
+     * separate polite announcer below.
+     */
     updateStatus(status) {
       if (typeof document === 'undefined') return;
+      const STATES = {
+        synced:  { icon: 'fa-cloud-arrow-up',        text: 'Cloud synced',  title: 'All data is live from the Supabase database' },
+        syncing: { icon: 'fa-arrows-rotate fa-spin', text: 'Syncing…',      title: 'Downloading the latest data from the cloud…' },
+        local:   { icon: 'fa-cloud-xmark',           text: 'Offline cache', title: 'Could not reach Supabase. Showing cached data.' }
+      };
+      const key = STATES[status] ? status : 'local';
+      const state = STATES[key];
+      const stateClass = key === 'syncing' ? 'syncing' : (key === 'synced' ? '' : 'offline');
+
       document.querySelectorAll('#adminCloudSyncBadge, #studentCloudSyncBadge').forEach(badge => {
-        const icon = badge.querySelector('i');
-        const span = badge.querySelector('span');
-        if (status === 'synced') {
-          if (icon) { icon.className = 'fa-solid fa-cloud-arrow-up'; icon.style.color = '#34D399'; }
-          if (span) span.textContent = 'Cloud synced';
-          badge.title = 'All data is live from Supabase database';
-        } else if (status === 'syncing') {
-          if (icon) { icon.className = 'fa-solid fa-arrows-rotate fa-spin'; icon.style.color = '#FBBF24'; }
-          if (span) span.textContent = 'Syncing…';
-          badge.title = 'Downloading latest data from cloud…';
-        } else {
-          if (icon) { icon.className = 'fa-solid fa-cloud-xmark'; icon.style.color = '#EF4444'; }
-          if (span) span.textContent = 'Offline cache';
-          badge.title = 'Could not reach Supabase. Using cached data.';
+        badge.classList.remove('syncing', 'offline');
+        if (stateClass) badge.classList.add(stateClass);
+
+        // The markup ships with an <i> and a <span>; recreate them if a
+        // previous render or an innerHTML overwrite elsewhere removed them,
+        // otherwise the state change would be silently dropped.
+        let icon = badge.querySelector('i');
+        let span = badge.querySelector('span');
+        if (!icon) {
+          icon = document.createElement('i');
+          badge.insertBefore(icon, badge.firstChild);
         }
+        if (!span) {
+          span = document.createElement('span');
+          badge.appendChild(span);
+        }
+        icon.className = `fa-solid ${state.icon}`;
+        // Decorative: the adjacent <span> already carries the state as text,
+        // and a Font Awesome glyph reads out as noise otherwise.
+        icon.setAttribute('aria-hidden', 'true');
+        span.textContent = state.text;
+        badge.title = state.title;
       });
+
+      this._announceOfflineTransition(key);
+    },
+
+    /** Say something only when the connection is actually lost or restored. */
+    _announceOfflineTransition(key) {
+      // 'syncing' is transient and tells the user nothing new either way.
+      if (key === 'syncing') return;
+      const isOffline = key === 'local';
+      // The badge ships in a connected-looking state, so "was online" is the
+      // right baseline — arriving offline really is a change from what the page
+      // first showed the user.
+      if (isOffline === (this._lastAnnouncedOffline === true)) return;
+      this._lastAnnouncedOffline = isOffline;
+
+      let announcer = document.getElementById('syncAnnouncer');
+      if (!announcer) {
+        if (!document.body) return;
+        announcer = document.createElement('p');
+        announcer.id = 'syncAnnouncer';
+        announcer.className = 'sr-only';
+        announcer.setAttribute('role', 'status');
+        announcer.setAttribute('aria-live', 'polite');
+        document.body.appendChild(announcer);
+      }
+      announcer.textContent = isOffline
+        ? 'Connection lost. Showing saved data — any changes you make will be sent when you are back online.'
+        : 'Connection restored. Showing live data.';
     },
 
     updateRealtimeBadge(connected) { if (connected) this.updateStatus('synced'); }

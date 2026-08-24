@@ -17,7 +17,7 @@
 
 ### 1. Monthly Fee Cron Billing
 - **Path**: `GET /api/cron-monthly-fees`
-- **Schedule**: `0 0 1,10,15,20,25 * *` (Runs on scheduled batch billing dates)
+- **Schedule**: `0 4 1-10 * *` via vercel.json — days 1-6 staggered billing, days 7-10 reminders (see AGENTS.md; the GH Actions schedule was removed, that workflow is a manual backstop)
 - **Headers**: `Authorization: Bearer <CRON_SECRET>`
 - **Functionality**: Idempotent batch billing that charges active students according to batch rates and records entries in `fee_billing_ledger`.
 
@@ -43,7 +43,7 @@ SUPABASE_SERVICE_ROLE_KEY=<SUPABASE_SERVICE_ROLE_SECRET>
 # Automation & Email
 CRON_SECRET=<SECURE_CRON_SECRET>
 RESEND_API_KEY=<RESEND_API_KEY>
-RESEND_FROM_EMAIL=billing@pragyaninstitute.in
+RESEND_FROM_EMAIL=Pragyan Institute <noreply@pragyaninstitute.com>
 ```
 
 ---

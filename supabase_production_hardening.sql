@@ -1635,7 +1635,7 @@ CREATE TRIGGER trg_push_sub_updated_at
 DO $do$
 DECLARE p record;
 BEGIN
-  FOR p IN SELECT schemaname, tablename, policyname FROM pg_policies
+  FOR p IN SELECT policyname FROM pg_policies
            WHERE schemaname='public' AND tablename IN ('push_subscriptions','push_broadcast_logs')
   LOOP
     EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', p.policyname, p.schemaname, p.tablename);

@@ -3,6 +3,26 @@
   "outputDirectory": ".",
   "rewrites": [
     {
+      "source": "/api/admin-password",
+      "destination": "/api/password"
+    },
+    {
+      "source": "/api/student-password",
+      "destination": "/api/password"
+    },
+    {
+      "source": "/api/email-quota",
+      "destination": "/api/send-email"
+    },
+    {
+      "source": "/api/stream-token",
+      "destination": "/api/health"
+    },
+    {
+      "source": "/api/student-id",
+      "destination": "/api/upload-file"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },
@@ -52,23 +72,20 @@
       ]
     },
     {
-      "source": "/api/(.*)",
+      "source": "/manifest.json",
       "headers": [
         {
-          "key": "Access-Control-Allow-Origin",
-          "value": "https://pragyaninstitute.com"
-        },
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)\\.html",
+      "headers": [
         {
-          "key": "Access-Control-Allow-Methods",
-          "value": "GET, POST, OPTIONS"
-        },
-        {
-          "key": "Access-Control-Allow-Headers",
-          "value": "Content-Type, Authorization, apikey"
-        },
-        {
-          "key": "Vary",
-          "value": "Origin"
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
         }
       ]
     }
@@ -76,7 +93,7 @@
   "crons": [
     {
       "path": "/api/cron-monthly-fees",
-      "schedule": "0 4 1,2,3,4,15,16,17,18 * *"
+      "schedule": "0 4 1-10 * *"
     }
   ]
 }

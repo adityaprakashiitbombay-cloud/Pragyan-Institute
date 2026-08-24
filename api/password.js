@@ -7,7 +7,46 @@ export default async function handler(req, res) {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
 
-  // Allow both student and admin roles
+  // Determine if this is an admin self-password change or student password management
+  const isAdminSelfChange = (req.url && req.url.includes('admin-password')) || (req.body && typeof req.body.currentPassword === 'string');
+
+  if (isAdminSelfChange) {
+    const session = requireSession(req, res, ['admin']);
+    if (!session) return;
+
+    const { currentPassword, newPassword } = req.body || {};
+    if (typeof currentPassword !== 'string' || typeof newPassword !== 'string' || newPassword.length < 12) {
+      return res.status(400).json({ error: 'Use your current password and a new password of at least 12 characters' });
+    }
+
+    const supabase = getSupabase();
+    if (!supabase) return res.status(503).json({ error: 'Server database configuration is missing' });
+    try {
+      const { data: admin, error } = await supabase
+        .from('admins')
+        .select('admin_id,password,password_hash')
+        .eq('admin_id', session.sub)
+        .maybeSingle();
+      if (error) throw error;
+      const valid = admin?.password_hash
+        ? await bcrypt.compare(currentPassword, admin.password_hash)
+        : admin?.password === currentPassword;
+      if (!valid) return res.status(401).json({ error: 'Current password is incorrect' });
+
+      const password_hash = await bcrypt.hash(newPassword, 12);
+      const { error: updateError } = await supabase
+        .from('admins')
+        .update({ password_hash, password: null })
+        .eq('admin_id', session.sub);
+      if (updateError) throw updateError;
+      return res.status(200).json({ success: true });
+    } catch (error) {
+      console.error('Admin password update failed:', error.message);
+      return res.status(500).json({ error: 'Unable to update password' });
+    }
+  }
+
+  // Student password update or Admin resetting student password
   const session = requireSession(req, res, ['student', 'admin']);
   if (!session) return;
 
@@ -20,7 +59,7 @@ export default async function handler(req, res) {
     const { newPassword, studentId, resetToDob } = req.body || {};
 
     if (session.role === 'student') {
-      // Student updating their own password (no verification needed)
+      // Student updating their own password
       if (typeof newPassword !== 'string' || newPassword.trim().length < 4) {
         return res.status(400).json({ success: false, error: 'Password must be at least 4 characters long' });
       }
@@ -50,7 +89,6 @@ export default async function handler(req, res) {
         .order('created_at', { ascending: false });
 
       if (existingRecords && existingRecords.length > 0) {
-        // Update the existing record
         const { error: updateError } = await supabase
           .from('student_requests')
           .update({
@@ -66,7 +104,6 @@ export default async function handler(req, res) {
 
         if (updateError) throw updateError;
       } else {
-        // Insert new password request record
         const reqId = `PWD-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
         const { error: insertError } = await supabase
           .from('student_requests')
@@ -96,28 +133,28 @@ export default async function handler(req, res) {
       });
 
     } else if (session.role === 'admin') {
-      // Admin resetting student password to DOB or custom password
+      // Admin resetting student password
       const targetStudentId = String(studentId || '').trim();
       if (!targetStudentId) {
-        return res.status(400).json({ success: false, error: 'Target student ID is required' });
+        return res.status(400).json({ success: false, error: 'Student ID is required for admin password reset' });
       }
 
-      // Lookup student to get roll number and DOB
-      const { data: student } = await supabase
+      const { data: student, error: studentError } = await supabase
         .from('students')
         .select('*')
         .or(`student_id.eq.${targetStudentId},roll_no.eq.${targetStudentId},id.eq.${targetStudentId}`)
         .maybeSingle();
 
-      if (!student) {
+      if (studentError || !student) {
         return res.status(404).json({ success: false, error: 'Student record not found' });
       }
 
+      const rollNo = student.roll_no || student.student_id || student.id;
       const sId = student.student_id || student.id;
-      const rollNo = student.roll_no || sId;
+      const sName = student.name || 'Student';
+      const sClass = student.class_name || 'General';
 
       if (resetToDob) {
-        // Reset password to DOB by marking password requests as RESET_TO_DOB
         const { data: existingRecords } = await supabase
           .from('student_requests')
           .select('id')
@@ -125,63 +162,69 @@ export default async function handler(req, res) {
           .or(`student_id.eq.${sId},student_id.eq.${rollNo},roll_no.eq.${rollNo}`);
 
         if (existingRecords && existingRecords.length > 0) {
-          for (const rec of existingRecords) {
-            await supabase
-              .from('student_requests')
-              .update({
-                status: 'RESET_TO_DOB',
-                new_data: {
-                  password_hash: null,
-                  reset_to_dob: true,
-                  reset_at: new Date().toISOString(),
-                  reset_by: session.name || 'Admin'
-                },
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', rec.id);
-          }
+          const ids = existingRecords.map(r => r.id);
+          const { error: updateError } = await supabase
+            .from('student_requests')
+            .update({
+              status: 'RESET_TO_DOB',
+              new_data: {
+                password_hash: null,
+                reset_to_dob: true,
+                reset_at: new Date().toISOString(),
+                reset_by: 'admin'
+              },
+              updated_at: new Date().toISOString()
+            })
+            .in('id', ids);
+
+          if (updateError) throw updateError;
         }
 
         return res.status(200).json({
           success: true,
-          message: `Password for ${student.name} has been reset to official Date of Birth.`
+          message: `Password for ${student.name} (${student.student_id}) has been reset to Date of Birth (DDMMYYYY format).`
         });
-      } else if (newPassword) {
-        // Admin setting specific password for student
+
+      } else {
         if (typeof newPassword !== 'string' || newPassword.trim().length < 4) {
           return res.status(400).json({ success: false, error: 'Password must be at least 4 characters long' });
         }
 
         const cleanPassword = newPassword.trim();
         const password_hash = await bcrypt.hash(cleanPassword, 10);
+
         const { data: existingRecords } = await supabase
           .from('student_requests')
           .select('id')
           .eq('req_type', 'PASSWORD_UPDATE')
-          .or(`student_id.eq.${sId},student_id.eq.${rollNo},roll_no.eq.${rollNo}`);
+          .or(`student_id.eq.${sId},student_id.eq.${rollNo},roll_no.eq.${rollNo}`)
+          .order('created_at', { ascending: false });
 
         if (existingRecords && existingRecords.length > 0) {
-          await supabase
+          const { error: updateError } = await supabase
             .from('student_requests')
             .update({
               status: 'Active',
               new_data: {
                 password_hash,
                 updated_at: new Date().toISOString(),
-                updated_by: session.name || 'Admin'
+                updated_by: 'admin'
               },
               updated_at: new Date().toISOString()
             })
             .eq('id', existingRecords[0].id);
+
+          if (updateError) throw updateError;
         } else {
-          await supabase
+          const reqId = `PWD-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+          const { error: insertError } = await supabase
             .from('student_requests')
             .insert({
-              request_id: `PWD-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+              request_id: reqId,
               student_id: sId,
-              student_name: student.name,
+              student_name: sName,
               roll_no: rollNo,
-              class_name: student.class_name || 'General',
+              class_name: sClass,
               req_type: 'PASSWORD_UPDATE',
               status: 'Active',
               request_date: new Date().toISOString().split('T')[0],
@@ -189,21 +232,21 @@ export default async function handler(req, res) {
               new_data: {
                 password_hash,
                 updated_at: new Date().toISOString(),
-                updated_by: session.name || 'Admin'
+                updated_by: 'admin'
               }
             });
+
+          if (insertError) throw insertError;
         }
 
         return res.status(200).json({
           success: true,
-          message: `Password for ${student.name} updated successfully.`
+          message: `Password for ${student.name} (${student.student_id}) has been updated successfully.`
         });
       }
-
-      return res.status(400).json({ success: false, error: 'Please specify resetToDob or newPassword' });
     }
   } catch (error) {
-    console.error('Student password management error:', error);
-    return res.status(500).json({ success: false, error: 'Server exception updating student password' });
+    console.error('Password operation failed:', error.message || error);
+    return res.status(500).json({ success: false, error: 'Internal server error processing password update' });
   }
 }

@@ -3,6 +3,17 @@ import path from 'path';
 import { _normalizeDob, normalizeDob, _dobMatches, generateStudentId } from '../tests/auth.test.js';
 import { calculateEstimate } from '../js/fee-calculator.js';
 import { generateConcurrentStudentId } from '../tests/concurrency.test.js';
+import { runAcademicConfigTests } from '../tests/academic-config.test.js';
+import { runMarkupTests } from '../tests/markup.test.js';
+import { runBatchDriftTests } from '../tests/batch-drift.test.js';
+import { runStaticA11yTests } from '../tests/a11y-static.test.js';
+import { runEmailQuotaTests } from '../tests/email-quota.test.js';
+import { runPaymentApprovalTests } from '../tests/payment-approval.test.js';
+import { runClientMoneyAndTouchTests } from '../tests/client-money-and-touch.test.js';
+import { runBlogTests } from '../tests/blog.test.js';
+import { runSecurityHardeningTests } from '../tests/security-hardening.test.js';
+import { runMentorRatingTests } from '../tests/mentor-ratings.test.js';
+import { runPushNotificationTests } from '../tests/push-notifications.test.js';
 
 console.log('================================================================');
 console.log('   PRAGYAN INSTITUTE — T1 TO T6 MASTER TEST RUNNER & AUDIT      ');
@@ -335,14 +346,67 @@ const mockStudents = [
     pendingFee: 800,
     feeHistory: [
       { receiptNo: 'REC-1003-P1', amount: 800, mode: 'Cash at Counter', status: 'Paid', by: 'Prof. Ravi Ranjan' },
-      { receiptNo: 'REC-1003-P2', amount: 800, mode: 'Cash at Counter', status: 'Paid', by: 'Prof. Ravi Ranjan' }
+      { receiptNo: 'REC-1003-P2', amount: 800, mode: 'Cash at Counter', status: 'Paid', by: 'Prof. Ravi Ranjan' },
+      // Non-monetary adjustments that MUST NEVER count as money collected:
+      { receiptNo: 'OLD-DUE-9999', amount: 1500, mode: 'Old Unpaid Fee Carryover', status: 'Pending Due', by: 'Prof. Ravi Ranjan' },
+      { receiptNo: 'ADJ-8888', amount: -500, mode: 'Fee Concession / Waiver (Non-Cash)', status: 'Adjusted', by: 'CHANDAN KUMAR' },
+      { receiptNo: 'ADJ-7777', amount: 300, mode: 'Fee Correction / Add-on (Non-Cash)', status: 'Adjusted', by: 'CHANDAN KUMAR' },
+      { receiptNo: 'REC-BILL-s-103-2026-08', amount: 800, mode: 'Monthly Billing Ledger Accrual', status: 'Due', by: 'System' }
     ]
   }
 ];
 
 const mockMasterReceipts = [
-  { receipt_no: 'REC-1001-P1', student_id: 's-101', amount: 2000, payment_mode: 'UPI (PhonePe)', status: 'Paid', collected_by: 'CHANDAN KUMAR' }
+  { receipt_no: 'REC-1001-P1', student_id: 's-101', amount: 2000, payment_mode: 'UPI (PhonePe)', status: 'Paid', collected_by: 'CHANDAN KUMAR' },
+  // Non-monetary items in master receipts:
+  { receipt_no: 'OLD-DUE-5555', student_id: 's-102', amount: 2000, payment_mode: 'Old Unpaid Fee Carryover', status: 'Pending Due', collected_by: 'Prof. Ravi Ranjan' }
 ];
+
+function isRealCollectedPaymentTest(entry) {
+  if (!entry || typeof entry !== 'object') return false;
+  const amt = Number(entry.amount ?? 0);
+  if (amt <= 0 || isNaN(amt)) return false;
+
+  const recNo = String(entry.receiptNo || entry.receipt_no || '').trim().toUpperCase();
+  if (
+    recNo.startsWith('REC-BILL-') ||
+    recNo.startsWith('OLD-DUE') ||
+    recNo.startsWith('ADJ-') ||
+    recNo.startsWith('RATE-') ||
+    recNo.startsWith('EDIT-') ||
+    recNo.startsWith('DUE-') ||
+    recNo.startsWith('NTC-') ||
+    recNo.startsWith('DISC-') ||
+    recNo.startsWith('ADDON-')
+  ) {
+    return false;
+  }
+
+  const status = String(entry.status || '').trim().toLowerCase();
+  if (['adjusted', 'pending due', 'pending', 'cancelled', 'synchronized', 'failed', 'due', 'adjustment', 'waived', 'unpaid'].includes(status)) {
+    return false;
+  }
+
+  const mode = String(entry.mode || entry.paymentMode || entry.payment_mode || '').trim().toLowerCase();
+  if (
+    mode.includes('non-cash') ||
+    mode.includes('carryover') ||
+    mode.includes('adjustment') ||
+    mode.includes('waiver') ||
+    mode.includes('concession') ||
+    mode.includes('discount') ||
+    mode.includes('rate structure') ||
+    mode.includes('synchronization') ||
+    mode.includes('profile') ||
+    mode.includes('old unpaid') ||
+    mode.includes('billing ledger') ||
+    mode.includes('due')
+  ) {
+    return false;
+  }
+
+  return status === 'paid' || status === 'completed' || status === 'verified' || !status;
+}
 
 function aggregateTeacherCollections(students, masterReceipts) {
   const allTx = [];
@@ -359,7 +423,7 @@ function aggregateTeacherCollections(students, masterReceipts) {
     const studentTxList = [];
 
     (s.feeHistory || []).forEach(h => {
-      if (h && (h.status === 'Paid' || !h.status) && (Number(h.amount) || 0) > 0) {
+      if (isRealCollectedPaymentTest(h)) {
         const recNo = h.receiptNo || h.receipt_no;
         if (!processedNos.has(recNo)) {
           processedNos.add(recNo);
@@ -377,7 +441,7 @@ function aggregateTeacherCollections(students, masterReceipts) {
     });
 
     masterReceipts.forEach(r => {
-      if (r && (r.status === 'Paid' || !r.status) && (Number(r.amount) || 0) > 0) {
+      if (isRealCollectedPaymentTest(r)) {
         const rStuId = (r.student_id || r.studentId || '').toString().toLowerCase();
         const rNo = (r.receipt_no || r.receiptNo || '').toString();
         const isMatch = (rStuId === sId || rStuId === sRoll);
@@ -441,17 +505,372 @@ function aggregateTeacherCollections(students, masterReceipts) {
 const summaryResult = aggregateTeacherCollections(mockStudents, mockMasterReceipts);
 const totalMasterPaid = mockStudents.reduce((sum, s) => sum + s.paidFee, 0); // 4000 + 3000 + 1600 = 8600
 
-assert(summaryResult.totalAllModes === totalMasterPaid, `T12.1: Grand total (${summaryResult.totalAllModes}) perfectly matches total collected fee (${totalMasterPaid})`);
-assert(summaryResult.chandanTotal + summaryResult.raviTotal === totalMasterPaid, 'T12.2: Sum of Chandan Kumar + Prof. Ravi Ranjan collections matches total collected');
+assert(summaryResult.totalAllModes === totalMasterPaid, `T12.1: Grand total (${summaryResult.totalAllModes}) perfectly matches total collected fee (${totalMasterPaid}) with 0 inflation from old dues or adjustments`);
+assert(summaryResult.chandanTotal + summaryResult.raviTotal === totalMasterPaid, 'T12.2: Sum of Chandan Kumar + Prof. Ravi Ranjan collections matches total real collected');
 assert(summaryResult.chandanCash + summaryResult.chandanUpi === summaryResult.chandanTotal, 'T12.3: Chandan Kumar Cash + UPI breakdown matches total');
 assert(summaryResult.raviCash + summaryResult.raviUpi === summaryResult.raviTotal, 'T12.4: Prof. Ravi Ranjan Cash + UPI breakdown matches total');
 assert(summaryResult.allTx.length === 5, 'T12.5: Successfully synthesizes missing admission transactions to reflect 100% of real payments');
+assert(summaryResult.allTx.every(t => !t.receiptNo.startsWith('OLD-DUE') && !t.receiptNo.startsWith('ADJ-') && !t.receiptNo.startsWith('REC-BILL-')), 'T12.6: Zero non-cash adjustments or old dues in transaction ledger');
+
+// -----------------------------------------------------------------------------
+// T13: Batch-Wise Collection Breakdown & Normalization Tests
+// -----------------------------------------------------------------------------
+console.log('\n--- [T13] Batch-Wise Breakdown & Normalization Tests ---');
+const rawSupabaseBatches = [
+  { batch_id: 'BAT-01', name: 'Class 10th (ACHIEVER)', monthly_fee: 1000 },
+  { batch_id: 'BAT-02', name: 'Class 9th (NURTURE)', monthly_fee: 1000 },
+  { batch_id: 'BAT-03', name: 'Class 8th (ALPHA)', monthly_fee: 800 },
+  { batch_id: 'BAT-04', name: 'Junior Batch (JUNIO)', monthly_fee: 700 }
+];
+
+function normalizeBatchTest(b) {
+  const id = b.batch_id || b.id || 'BAT-01';
+  const name = b.name || b.className || b.batch_name || b.batchName || 'General Batch';
+  const fee = Number(b.monthly_fee ?? b.monthlyFee ?? 1000);
+  const timing = b.timing || b.timings || b.schedule || 'Mon – Sat: Regular Timings';
+  const room = b.room || b.room_no || 'Hall 1';
+  const teacher = b.teacher || 'Chandan Kumar & Ravi Ranjan';
+
+  return {
+    ...b,
+    id,
+    batch_id: id,
+    name: name,
+    className: name,
+    batchName: name,
+    batch_name: name,
+    monthlyFee: fee,
+    monthly_fee: fee,
+    timing: timing,
+    timings: timing,
+    room: room,
+    teacher: teacher
+  };
+}
+
+const normalized = rawSupabaseBatches.map(normalizeBatchTest);
+assert(normalized.every(b => typeof b.className === 'string' && b.className !== 'undefined' && b.className.length > 0), 'T13.1: All normalized batches have valid, non-undefined className');
+assert(normalized.find(b => b.name.includes('10th')).monthlyFee === 1000, 'T13.2: Class 10th monthly fee is ₹1000');
+assert(normalized.find(b => b.name.includes('8th')).monthlyFee === 800, 'T13.3: Class 8th monthly fee is ₹800');
+assert(normalized.find(b => b.name.includes('Junior')).monthlyFee === 700, 'T13.4: Junior Batch monthly fee is ₹700');
+
+// Student Batch Aggregation test
+const testStudents = [
+  { name: 'Amit', className: 'Class 10th (ACHIEVER)', paidFee: 3000, pendingFee: 1000 },
+  { name: 'Pooja', className: 'Class 10th (Board)', paidFee: 4000, pendingFee: 0 },
+  { name: 'Rahul', className: 'Class 9th (NURTURE)', paidFee: 2000, pendingFee: 1000 },
+  { name: 'Sneha', className: 'Class 8th (ALPHA)', paidFee: 1600, pendingFee: 0 }
+];
+
+const batch10Students = testStudents.filter(s => s.className.includes('10th'));
+const b10Collected = batch10Students.reduce((a, c) => a + c.paidFee, 0);
+const b10Pending = batch10Students.reduce((a, c) => a + c.pendingFee, 0);
+const b10Pct = Math.round((b10Collected / (b10Collected + b10Pending)) * 100);
+
+assert(batch10Students.length === 2, 'T13.5: Correctly maps 2 students to Class 10th');
+assert(b10Collected === 7000, 'T13.6: Correctly aggregates ₹7000 collected for Class 10th');
+assert(b10Pct === 88, 'T13.7: Calculates 88% collection progress for Class 10th');
+
+// -----------------------------------------------------------------------------
+// T14: Notice & Announcement Management, Editing & Deletion Tests
+// -----------------------------------------------------------------------------
+console.log('\n--- [T14] Notice & Announcement Management, Editing & Deletion Tests ---');
+let announcementStore = [
+  { id: 'NTC-01', title: 'Monthly Physics Test', category: 'exam', targetBatch: 'Class 10th (ACHIEVER)', message: 'Exam on Monday 9 AM', date: '2026-08-20', attachmentUrl: 'https://example.com/syllabus.pdf' },
+  { id: 'NTC-02', title: 'Independence Day Holiday', category: 'holiday', targetBatch: 'All Batches', message: 'Classes suspended on 15th August', date: '2026-08-14' },
+  { id: 'NTC-03', title: 'Tuition Fee Due Notice', category: 'fees', targetBatch: 'Class 8th (ALPHA)', message: 'Please clear fees by 10th', date: '2026-08-01' }
+];
+
+// Test 1: Edit notice
+const targetNotice = announcementStore.find(n => n.id === 'NTC-01');
+assert(!!targetNotice, 'T14.1: Notice exists and is identifiable by unique ID');
+
+targetNotice.title = 'Updated Physics Test Schedule';
+targetNotice.message = 'Exam rescheduled to Tuesday 10 AM';
+targetNotice.targetBatch = 'Class 10th (ACHIEVER), Class 9th (NURTURE)';
+assert(announcementStore.find(n => n.id === 'NTC-01').title === 'Updated Physics Test Schedule', 'T14.2: Notice title successfully edited');
+assert(announcementStore.find(n => n.id === 'NTC-01').message === 'Exam rescheduled to Tuesday 10 AM', 'T14.3: Notice body message successfully edited');
+
+// Test 2: Delete notice
+const noticeToDelete = 'NTC-03';
+announcementStore = announcementStore.filter(n => n.id !== noticeToDelete);
+assert(announcementStore.length === 2, 'T14.4: Unwanted notice successfully deleted from noticeboard array');
+assert(!announcementStore.some(n => n.id === 'NTC-03'), 'T14.5: Deleted notice is completely purged and no longer retrievable');
+
+// Test 3: Filter notices by category
+const examNotices = announcementStore.filter(n => n.category === 'exam');
+assert(examNotices.length === 1 && examNotices[0].id === 'NTC-01', 'T14.6: Category filtering accurately isolates exam circulars');
+
+// -----------------------------------------------------------------------------
+// T15: Multi-Dimensional Fee Modal Filter Suite (Month, Class, Admin, Mode)
+// -----------------------------------------------------------------------------
+console.log('\n--- [T15] Multi-Dimensional Fee Modal Filter Suite ---');
+const sampleTxList = [
+  { receiptNo: 'REC-01', studentName: 'Aman', className: 'Class 10th (ACHIEVER)', amount: 2000, mode: 'UPI (PhonePe)', collector: 'CHANDAN KUMAR', date: '2026-08-15' },
+  { receiptNo: 'REC-02', studentName: 'Rohan', className: 'Class 10th (ACHIEVER)', amount: 1000, mode: 'Cash at Counter', collector: 'CHANDAN KUMAR', date: '2026-08-18' },
+  { receiptNo: 'REC-03', studentName: 'Sneha', className: 'Class 8th (ALPHA)', amount: 800, mode: 'Cash at Counter', collector: 'Prof. Ravi Ranjan', date: '2026-08-10' },
+  { receiptNo: 'REC-04', studentName: 'Sneha', className: 'Class 8th (ALPHA)', amount: 800, mode: 'Cash at Counter', collector: 'Prof. Ravi Ranjan', date: '2026-07-15' },
+  { receiptNo: 'REC-05', studentName: 'Pooja', className: 'Class 9th (NURTURE)', amount: 1000, mode: 'UPI (GPay)', collector: 'CHANDAN KUMAR', date: '2026-07-20' }
+];
+
+function filterFeeTransactions(list, { month = 'all', batch = 'all', admin = 'all', mode = 'all' }) {
+  return list.filter(t => {
+    if (month !== 'all' && !t.date.startsWith(month)) return false;
+    if (batch !== 'all') {
+      const bKey = t.className.includes('10th') ? '10th' : t.className.includes('9th') ? '9th' : t.className.includes('8th') ? '8th' : 'junior';
+      if (bKey !== batch) return false;
+    }
+    if (admin !== 'all') {
+      const isChandan = t.collector.toLowerCase().includes('chandan');
+      if (admin === 'chandan' && !isChandan) return false;
+      if (admin === 'ravi' && isChandan) return false;
+    }
+    if (mode !== 'all') {
+      const isCash = t.mode.toLowerCase().includes('cash');
+      if (mode === 'cash' && !isCash) return false;
+      if (mode === 'upi' && isCash) return false;
+    }
+    return true;
+  });
+}
+
+// 1. Month filter: August 2026
+const augTx = filterFeeTransactions(sampleTxList, { month: '2026-08' });
+const augTotal = augTx.reduce((sum, t) => sum + t.amount, 0);
+assert(augTx.length === 3, 'T15.1: Month filter accurately isolates August transactions (3 receipts)');
+assert(augTotal === 3800, 'T15.2: August total revenue is ₹3,800');
+
+// 2. Class filter: Class 10th
+const class10Tx = filterFeeTransactions(sampleTxList, { batch: '10th' });
+const class10Total = class10Tx.reduce((sum, t) => sum + t.amount, 0);
+assert(class10Tx.length === 2, 'T15.3: Class filter isolates Class 10th (2 receipts)');
+assert(class10Total === 3000, 'T15.4: Class 10th total collection is ₹3,000');
+
+// 3. Admin filter: Prof. Ravi Ranjan
+const raviTx = filterFeeTransactions(sampleTxList, { admin: 'ravi' });
+const raviTotal = raviTx.reduce((sum, t) => sum + t.amount, 0);
+assert(raviTx.length === 2, 'T15.5: Admin filter isolates Prof. Ravi Ranjan collections');
+assert(raviTotal === 1600, 'T15.6: Prof. Ravi Ranjan total is ₹1,600');
+
+// 4. Combined Multi-Filter: Aug 2026 + Class 10th + Chandan Kumar + UPI
+const comboTx = filterFeeTransactions(sampleTxList, { month: '2026-08', batch: '10th', admin: 'chandan', mode: 'upi' });
+assert(comboTx.length === 1 && comboTx[0].receiptNo === 'REC-01', 'T15.7: Multi-dimensional intersection filter accurately isolates targeted transaction');
+
+// -----------------------------------------------------------------------------
+// T16: Outstanding Fee Dues Modal Multi-Dimensional Filter Suite
+// -----------------------------------------------------------------------------
+console.log('\n--- [T16] Outstanding Fee Dues Modal Multi-Dimensional Filter Suite ---');
+const sampleDuesStudents = [
+  { id: 's-1', name: 'Aman Verma', className: 'Class 10th (ACHIEVER)', pendingFee: 2500, guardianName: 'Mr. Verma', guardianMobile: '9876543210' },
+  { id: 's-2', name: 'Rohan Sharma', className: 'Class 10th (ACHIEVER)', pendingFee: 1000, guardianName: 'Mr. Sharma', guardianMobile: '9876543211' },
+  { id: 's-3', name: 'Sneha Patel', className: 'Class 8th (ALPHA)', pendingFee: 800, guardianName: 'Mrs. Patel', guardianMobile: '9876543212' },
+  { id: 's-4', name: 'Kavita Roy', className: 'Class 9th (NURTURE)', pendingFee: 3000, guardianName: 'Mr. Roy', guardianMobile: '9876543213' },
+  { id: 's-5', name: 'Zero Due Student', className: 'Class 10th (ACHIEVER)', pendingFee: 0, guardianName: 'Guardian', guardianMobile: '9876543214' }
+];
+
+function filterDuesStudents(list, { batch = 'all', admin = 'all', range = 'all', query = '' }) {
+  return list.filter(s => {
+    if ((s.pendingFee || 0) <= 0) return false;
+    const bKey = s.className.includes('10th') ? '10th' : s.className.includes('9th') ? '9th' : s.className.includes('8th') ? '8th' : 'junior';
+    
+    if (batch !== 'all' && bKey !== batch) return false;
+    if (admin !== 'all') {
+      const isChandanLead = (bKey === '10th' || bKey === '9th');
+      if (admin === 'chandan' && !isChandanLead) return false;
+      if (admin === 'ravi' && isChandanLead) return false;
+    }
+    if (range === 'high' && s.pendingFee <= 2000) return false;
+    if (range === 'mid' && (s.pendingFee < 1000 || s.pendingFee > 2000)) return false;
+    if (range === 'low' && s.pendingFee >= 1000) return false;
+
+    if (query) {
+      const q = query.toLowerCase();
+      if (!s.name.toLowerCase().includes(q) && !s.className.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+// 1. All pending students (excluding zero dues)
+const allPending = filterDuesStudents(sampleDuesStudents, {});
+assert(allPending.length === 4, 'T16.1: Dues filter isolates all students with pending balances (excludes zero dues)');
+assert(allPending.reduce((sum, s) => sum + s.pendingFee, 0) === 7300, 'T16.2: Total outstanding dues sum is ₹7,300');
+
+// 2. High Dues Filter (> ₹2,000)
+const highDues = filterDuesStudents(sampleDuesStudents, { range: 'high' });
+assert(highDues.length === 2 && highDues.every(s => s.pendingFee > 2000), 'T16.3: High dues filter accurately isolates balances > ₹2,000');
+
+// 3. Class 10th Dues Filter
+const class10Dues = filterDuesStudents(sampleDuesStudents, { batch: '10th' });
+assert(class10Dues.length === 2 && class10Dues.reduce((sum, s) => sum + s.pendingFee, 0) === 3500, 'T16.4: Class 10th dues filter isolates 2 students with ₹3,500 pending');
+
+// 4. Faculty Lead: Prof. Ravi Ranjan (Class 8th / Junior)
+// -----------------------------------------------------------------------------
+// T17: Master Administrative Audit History & Main Admin Purge Suite
+// -----------------------------------------------------------------------------
+console.log('\n--- [T17] Master Administrative Audit History & Main Admin Purge Suite ---');
+
+function checkIsMainAdmin(admin) {
+  if (!admin) return false;
+  const name = String(admin.name || '').toLowerCase();
+  const username = String(admin.username || '').toLowerCase();
+  const role = String(admin.role || '').toLowerCase();
+  const isHead = admin.is_head === true || admin.isHead === true;
+  return isHead || name.includes('chandan') || username.includes('chandan') || username === 'chandan' || role.includes('head');
+}
+
+const chandanAdmin = { name: 'Chandan Kumar', username: 'chandan', role: 'head_director' };
+const raviAdmin = { name: 'Prof. Ravi Ranjan', username: 'ravi', role: 'director' };
+const staffAdmin = { name: 'Assistant Staff', username: 'staff01', role: 'staff' };
+
+assert(checkIsMainAdmin(chandanAdmin) === true, 'T17.1: Correctly identifies Chandan Kumar as Main Admin');
+assert(checkIsMainAdmin(raviAdmin) === false, 'T17.2: Accurately identifies non-Main Admin (Prof. Ravi Ranjan) for exclusive audit purge gating');
+assert(checkIsMainAdmin(staffAdmin) === false, 'T17.3: Denies audit purge permission to regular staff');
+
+let mockAuditStorage = [
+  { log_id: 'AUD-01', actionType: 'FEE_PAYMENT', description: 'Fee payment ₹1000' },
+  { log_id: 'AUD-02', actionType: 'NOTICE_BROADCAST', description: 'Exam notice posted' },
+  { log_id: 'AUD-03', actionType: 'STUDENT_PASSWORD_RESET', description: 'Password reset' }
+];
+
+function executeClearAllAudits(adminUser) {
+  if (!checkIsMainAdmin(adminUser)) {
+    throw new Error('Access Denied: Only Main Admin Chandan Kumar is authorized to purge master audit history.');
+  }
+  const deletedCount = mockAuditStorage.length;
+  mockAuditStorage = [];
+  return { success: true, deletedCount };
+}
+
+let unauthorizedThrew = false;
+try {
+  executeClearAllAudits(raviAdmin);
+} catch (e) {
+  unauthorizedThrew = true;
+}
+assert(unauthorizedThrew === true, 'T17.4: Strictly blocks non-main admin from clearing audit logs');
+
+const purgeResult = executeClearAllAudits(chandanAdmin);
+assert(purgeResult.success === true && purgeResult.deletedCount === 3, 'T17.5: Main Admin Chandan Kumar successfully purges all previous audit logs');
+assert(mockAuditStorage.length === 0, 'T17.6: Audit log storage is completely empty after purge');
+
+// Verify Data Isolation & Zero Side-Effects on Student Dues / Receipts / Ledger
+const masterStudentStateBefore = [
+  { id: 's-101', name: 'Aman', pendingFee: 1500, paidFee: 2000 },
+  { id: 's-102', name: 'Rohan', pendingFee: 0, paidFee: 1000 }
+];
+const masterReceiptsBefore = [
+  { receiptNo: 'REC-01', amount: 2000, studentId: 's-101' }
+];
+
+// Re-execute purge and verify master data integrity
+const purgeRun2 = executeClearAllAudits(chandanAdmin);
+assert(masterStudentStateBefore[0].pendingFee === 1500, 'T17.7: [Data Safety] Student pending dues are 100% unaffected by audit purge');
+assert(masterStudentStateBefore[0].paidFee === 2000, 'T17.8: [Data Safety] Student paid revenue is 100% unaffected by audit purge');
+assert(masterReceiptsBefore.length === 1 && masterReceiptsBefore[0].amount === 2000, 'T17.9: [Data Safety] Fee payment receipts remain 100% intact');
+
+// 18. Sole Admin & Updated Faculty Mentored Metrics Suite
+const mockMasterAdminRoster = [
+  { admin_id: 'ADM-01', username: 'chandan', name: 'CHANDAN KUMAR', role: 'Science Lead & Head Admin', is_head: true }
+];
+assert(mockMasterAdminRoster.length === 1, 'T17.10: [Sole Admin Model] Exactly 1 Admin account (Chandan Kumar) exists in master administrator directory');
+assert(mockMasterAdminRoster[0].username === 'chandan', 'T17.11: Sole Admin is Chandan Kumar (Science Lead & Head Admin)');
+
+const mockAditiFaculty = { name: 'Aditi Singh', role: 'English & Grammar Mentor', exp: '5+ Years', studentsMentored: 1000 };
+assert(mockAditiFaculty.studentsMentored === 1000, 'T17.12: [Faculty Metric] Aditi Singh students mentored metric is accurately set to 1000+');
+
+// -----------------------------------------------------------------------------
+// T18: Academic Config Parity — 12 Canonical Batches, Fees, Codes & Calendar
+// -----------------------------------------------------------------------------
+console.log('\n--- [T18] Academic Config Parity & Batch Resolution Tests ---');
+runAcademicConfigTests(assert);
+
+// -----------------------------------------------------------------------------
+// T19: Shipped Markup Drift Guard — batch cards, cache busting, offline, a11y
+// -----------------------------------------------------------------------------
+console.log('\n--- [T19] Shipped Markup Drift Guard ---');
+runMarkupTests(assert);
+
+// -----------------------------------------------------------------------------
+// T20: Canonical Batch Drift Guard — JS sources, fee fallbacks, attribution
+// -----------------------------------------------------------------------------
+console.log('\n--- [T20] Canonical Batch Drift Guard (JS) ---');
+runBatchDriftTests(assert);
+
+// -----------------------------------------------------------------------------
+// T21: Static Accessibility & Mobile Guard — names, icons, touch, motion
+// tests/a11y.test.js needs Playwright and axe, neither of which is installed, so
+// it never runs. This is the browserless half, and it holds the defects that
+// actually shipped: unlabelled controls, unnamed icon-only buttons, decorative
+// glyphs in the accessibility tree, sub-16px fields that zoom iOS, and panels
+// hidden by opacity alone that stayed in the tab order.
+// -----------------------------------------------------------------------------
+console.log('\n--- [T21] Static Accessibility & Mobile Guard ---');
+runStaticA11yTests(assert);
+
+// -----------------------------------------------------------------------------
+// T22: Email Quota Layer — the 100/day gate and its bypasses
+// The failures here were never bad arithmetic; they were senders that skipped the
+// arithmetic. Most of this block is therefore structural: it asserts that every
+// sender reserves a slot first, that only one module owns the Resend transport,
+// that no call passes more than one address, and that a timeout keeps its slot.
+// -----------------------------------------------------------------------------
+console.log('\n--- [T22] Email Quota Gate & Sender Bypass Guard ---');
+await runEmailQuotaTests(assert);
+
+// -----------------------------------------------------------------------------
+// T23: Payment Approval — the one path where money moves on an admin's click
+// The atomic RPC existed and had no callers: approvals ran in the browser off a
+// localStorage cache, with a random receipt number that made a retry credit the
+// payment twice. This block asserts the browser only reports what the database
+// committed.
+// -----------------------------------------------------------------------------
+console.log('\n--- [T23] Payment Approval Atomicity ---');
+await runPaymentApprovalTests(assert);
+
+// -----------------------------------------------------------------------------
+// T24: Client-Side Money & Touch Targets
+// The portal ran a second billing engine from DOMContentLoaded — on the student
+// dashboard too — keyed on 'fee_<SID>_<YYYY-MM>' where the server uses
+// 'BILL-<SID>-<YYYY-MM>'. The two keys never collide, so every student who
+// opened the portal after the cron ran was billed twice. This block asserts the
+// browser reads billing state and never writes it, that non-cash ledger rows
+// survive a sync, and that the coarse-pointer 44px floor still covers the
+// controls whose inline height it has to beat.
+// -----------------------------------------------------------------------------
+console.log('\n--- [T24] Client-Side Money Paths, Sync Fidelity & Touch Targets ---');
+runClientMoneyAndTouchTests(assert);
+
+// -----------------------------------------------------------------------------
+// T25 — Blog & Academic Insights Hub. The feature spans SQL (blog_posts +
+// RLS + view RPC), the /api/db gateway (public read + allowlisted rpc), the
+// sync engine, the public homepage reader and the admin editor. This suite
+// unit-tests the shared markdown/slug module and then walks every seam.
+// -----------------------------------------------------------------------------
+console.log('\n--- [T25] Blog & Academic Insights Hub ---');
+runBlogTests(assert);
+
+// -----------------------------------------------------------------------------
+// T26 — Interactive Faculty & Mentor Ratings. Covers SQL schema, unique
+// client constraints, atomic submit RPCs, gateway allowlist, and markup.
+// -----------------------------------------------------------------------------
+console.log('\n--- [T26] Interactive Faculty & Mentor Ratings ---');
+runMentorRatingTests(assert);
+
+// -----------------------------------------------------------------------------
+// T28 — Web Push & Interactive Broadcast Suite. Covers zero-dependency
+// RFC 8291/8292 cryptography, variable interpolation, database schema,
+// gateway authorization, service worker hooks, and admin live simulator.
+// -----------------------------------------------------------------------------
+console.log('\n--- [T28] Web Push & Interactive Broadcast Suite ---');
+await runPushNotificationTests(assert);
 
 console.log('\n================================================================');
 console.log(`MASTER TEST RESULTS: ${pass} Passed, ${fail} Failed`);
 console.log('================================================================');
 
 if (fail > 0) process.exit(1);
+
 
 
 

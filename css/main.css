@@ -363,5 +363,329 @@ a:not(.btn-terracotta):not(.btn-emerald):focus-visible,
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    /* Delay too, not just duration. Several panels here hide themselves with
+       `transition: visibility 0s linear 0.3s` so the fade-out finishes before
+       the element leaves the accessibility tree. Zeroing only the duration left
+       that delay intact, so with reduced motion on, a dismissed panel snapped
+       invisible but stayed focusable for the full delay — the exact tab-order
+       trap the visibility toggle exists to prevent. */
+    transition-delay: 0s !important;
+    animation-delay: 0s !important;
+  }
+}
+
+/* ==========================================================================
+   ACCESSIBILITY & MOBILE LAYOUT CORRECTIONS
+   --------------------------------------------------------------------------
+   Everything below supports behaviour in js/app.js. Grouped here rather than
+   scattered through components.css so the a11y contract is readable in one
+   place.
+   ========================================================================== */
+
+/* --- Screen-reader-only text (live regions, status announcements) --------- */
+.sr-only {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- Skip link: the first tab stop on the page ---------------------------- */
+.skip-to-content {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -120%);
+  z-index: 2000;
+  padding: 0.75rem 1.5rem;
+  background-color: var(--primary-emerald, #064E3B);
+  color: #ffffff;
+  font-weight: 700;
+  text-decoration: none;
+  border-radius: 0 0 10px 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  transition: transform 0.18s ease-out;
+}
+
+.skip-to-content:focus,
+.skip-to-content:focus-visible {
+  transform: translate(-50%, 0);
+  outline: 3px solid var(--primary-terracotta, #C2410C);
+  outline-offset: 2px;
+}
+
+/* Skip targets are sections, which get tabindex="-1" to receive focus. They
+   should not then draw a focus ring around the whole viewport. */
+section[tabindex="-1"]:focus {
+  outline: none;
+}
+
+/* --- Reference-counted scroll lock (drawer / lightbox / portal modal) -----
+   Set on <html> by window.PragyanUI.lockScroll(). Locking <html> as well as
+   <body> is what actually holds iOS Safari still. */
+html.scroll-locked,
+html.scroll-locked body {
+  overflow: hidden;
+}
+
+/* --- Batch filtering ------------------------------------------------------
+   A class instead of an inline style, so filtering never overwrites the card's
+   own display mode. */
+.batch-card.is-filtered-out {
+  display: none !important;
+}
+
+/* --- Form validation messaging ------------------------------------------- */
+.form-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-muted, #6B7280);
+}
+
+.form-error-text {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #B42318;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
+.form-error-text[hidden] {
+  display: none;
+}
+
+.form-input[aria-invalid="true"],
+.form-select[aria-invalid="true"],
+.form-textarea[aria-invalid="true"] {
+  border-color: #B42318;
+  box-shadow: 0 0 0 3px rgba(180, 35, 24, 0.12);
+}
+
+/* --- Toast ---------------------------------------------------------------
+   Centred at the bottom and lifted clear of the floating call/WhatsApp
+   buttons on small screens, which the old fixed `bottom: 6rem` overlapped. */
+.site-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 1.25rem;
+  z-index: 1100;
+  transform: translate(-50%, 160%);
+  max-width: min(430px, calc(100vw - 2rem));
+  padding: 0.9rem 1.35rem;
+  border-radius: 12px;
+  background-color: var(--primary-emerald, #064E3B);
+  color: #ffffff;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.45;
+  text-align: center;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.32s ease;
+}
+
+.site-toast.is-visible {
+  transform: translate(-50%, 0);
+  opacity: 1;
+}
+
+.site-toast.is-error {
+  background-color: #7F1D1D;
+}
+
+/* --- FAQ accordion -------------------------------------------------------
+   The headers are now <button>s. UA chrome reset lives with the full
+   .faq-header style in components.css (single source; this file previously
+   carried a duplicate that drifted). */
+.faq-wrap .faq-item.open .faq-body {
+  max-height: 2400px;
+}
+
+/* --- Slideshow controls -------------------------------------------------- */
+.slide-play-pause {
+  position: absolute;
+  bottom: 0.85rem;
+  left: 1.25rem;
+  z-index: 5;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background-color: rgba(240, 230, 216, 0.85);
+  color: var(--text-mahogany, #4A2C2A);
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.22);
+  transition: background-color var(--transition-fast, 0.2s ease), color var(--transition-fast, 0.2s ease);
+}
+
+.slide-play-pause:hover {
+  background-color: var(--primary-terracotta, #C2410C);
+  color: #ffffff;
+}
+
+/* The dots are real <button>s now; strip UA chrome and give them a hit area
+   larger than the 9px visual (WCAG 2.5.8). */
+.hero-slide-dots .dot {
+  position: relative;
+  padding: 0;
+  border: 0;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.hero-slide-dots .dot::after {
+  content: "";
+  position: absolute;
+  inset: -7px -3px;
+}
+
+/* --- Tab strip -----------------------------------------------------------
+   Six filters no longer fit one mobile row; wrapping produced a three-line
+   block that pushed the grid below the fold. */
+.tab-btn {
+  min-height: 44px;
+}
+
+@media (max-width: 768px) {
+  .tabs-container {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    padding: 0.25rem 1.25rem 0.85rem;
+    margin-inline: -1.25rem;
+    scrollbar-width: thin;
+  }
+
+  .tabs-container .tab-btn {
+    flex: 0 0 auto;
+    scroll-snap-align: center;
+  }
+}
+
+/* --- Coarse pointers ----------------------------------------------------- */
+@media (hover: none), (pointer: coarse) {
+  .hero-slide-dots {
+    gap: 0.8rem;
+  }
+
+  .hero-slide-dots .dot::after {
+    inset: -9px -6px;
+  }
+
+  .slide-play-pause {
+    width: 44px;
+    height: 44px;
+    font-size: 0.9rem;
+    opacity: 1;
+  }
+
+  /* Hover-only reveals never fire on touch, so the arrows stayed at 0.6 opacity. */
+  .hero-slideshow-container .slide-nav-btn {
+    opacity: 0.9;
+  }
+}
+
+@media (max-width: 576px) {
+  .site-toast {
+    /* Clear of the two 48px floating action buttons. */
+    bottom: calc(1.25rem + 108px);
+  }
+}
+
+/* --- Keyboard focus for the gallery thumbnails (now role="button") ------- */
+.gallery-card:focus-visible {
+  outline: 3px solid var(--primary-terracotta, #C2410C);
+  outline-offset: 3px;
+}
+
+
+/* ==========================================================================
+   TOUCH-DEVICE FORM CONTROL FLOOR — iOS auto-zoom
+   --------------------------------------------------------------------------
+   Mobile Safari zooms the whole viewport whenever a focused input, select or
+   textarea has a computed font-size below 16px, and it does not zoom back out
+   when the field is blurred. Every form control in this app was under that
+   threshold — .form-input 15.2px, .portal-input 14.72px, .search-input-field
+   14px, .filter-select-mobile 13.12px — so on a phone, tapping the student
+   search box, a fee filter or a payment amount zoomed the dashboard and left it
+   scrolled sideways with the action buttons off-screen. The admin then had to
+   pinch back out after every single field.
+
+   Scoped to `pointer: coarse` so desktop density is untouched, and one rule
+   rather than a dozen edits so a new control cannot reintroduce the bug.
+   !important is deliberate: several of the declarations this has to beat live
+   inside their own narrower media queries and are themselves !important.
+
+   Checkbox, radio and range are excluded — font-size does not affect their
+   rendering and they are not text-entry targets.
+   ========================================================================== */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* --- Minimum touch target -------------------------------------------------
+   WCAG 2.5.8 (AA) asks for 24x24 CSS px; 44px is Apple's and Google's
+   comfortable minimum. Small icon-only controls — modal close crosses, table
+   row actions, filter chips — were rendering between 24px and 30px, which is
+   inside the error rate where a thumb hits the neighbouring row instead. Only
+   applied on coarse pointers, and only as a floor, so nothing shrinks. */
+@media (pointer: coarse) {
+  button,
+  [role="button"],
+  [role="tab"],
+  .btn-icon,
+  .modal-close-btn,
+  .close-modal-btn,
+  /* Anchors styled as buttons. 31 of them across the site — the primary CTAs,
+     the WhatsApp and call floats, the UPI pay button — and none was covered by
+     the `button` selector above. They all carry an inline-flex display from .btn
+     and friends, which is what makes min-height apply to them at all. */
+  a.btn,
+  a.app-btn,
+  a.action-btn,
+  a.float-btn,
+  a.upi-btn-main,
+  /* Form controls are tap targets too. The admin request queue and the fee and
+     audit filter bars set `height: 36px` / `height: 38px` inline on their
+     selects, which the font-size floor above does nothing about: a 36px select
+     is a 36px target. min-height is the right property rather than height —
+     min-height clamps the used height, so it beats the inline declaration
+     without !important and without stopping a taller control from being taller. */
+  select,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]),
+  textarea,
+  /* Not interactive, but it shares a flex row with the approve/decline buttons
+     and carries the same inline height: 38px. Without this it stays 38px while
+     they grow to 44px, leaving the row visibly ragged on a phone. */
+  .req-verifier-chip {
+    min-height: 44px;
+  }
+
+  /* Icon-only controls need the width too, or they stay a thin vertical strip. */
+  button.btn-icon,
+  button.modal-close-btn,
+  button.close-modal-btn,
+  .icon-only-btn {
+    min-width: 44px;
   }
 }

@@ -4,6 +4,19 @@ import { getSupabase, createSession, publicAdmin, applyCors } from './_lib/auth.
 // In-memory rate limiter (use Redis in production for multi-instance deployments)
 const loginAttempts = new Map(); // key: identifier, value: { count, resetTime }
 
+/**
+ * Canonical rate-limit key: strips formatting so `98765-43210`,
+ * `+91 98765 43210`, ` 9876543210 ` and mixed-case usernames all land in
+ * ONE bucket per real identity. Applied ONLY to limiter keys; credential
+ * comparison still uses the raw sanitized input.
+ */
+function normalizeRateLimitKey(identifier) {
+  const raw = String(identifier || '').trim().toLowerCase();
+  // Keep a leading + for international numbers, strip every other separator.
+  const compact = raw.startsWith('+') ? '+' + raw.slice(1).replace(/[\s\-()]/g, '') : raw.replace(/[\s\-()]/g, '');
+  return compact || raw;
+}
+
 function cleanupExpiredAttempts() {
   const now = Date.now();
   if (loginAttempts.size > 50) {
@@ -60,12 +73,12 @@ export default async function handler(req, res) {
     const safeId = String(identifier || '').replace(/[\r\n,()"']/g, '').trim();
 
     // Check rate limit
-    const rateLimitCheck = checkRateLimit(safeId);
+    const rateLimitCheck = checkRateLimit(normalizeRateLimitKey(safeId));
     if (!rateLimitCheck.allowed) {
       return res.status(429).json({ success: false, error: rateLimitCheck.message });
     }
 
-    const supabase = getSupabase({ allowAnon: true });
+    const supabase = getSupabase();
     if (!supabase) {
       return res.status(503).json({ success: false, error: 'Database configuration missing' });
     }
@@ -100,7 +113,7 @@ export default async function handler(req, res) {
       }
 
       // Reset rate limit on successful login
-      resetRateLimit(safeId);
+      resetRateLimit(normalizeRateLimitKey(safeId));
 
       const adminId = admin.admin_id || admin.id;
       const token = createSession({ sub: adminId, role: 'admin', name: admin.name });
@@ -232,10 +245,13 @@ export default async function handler(req, res) {
         }
 
         // 2. Check Date of Birth (DOB) as default / fallback (with DDMMYYYY support)
+        // SECURITY: comparison must be EXACT. A substring test here
+        // (`dobDigits.includes(inputDigits)`) let any 6+ consecutive digits of
+        // a student's DOB authenticate — a ~6-guess credential.
         const studentNorms = normalizeDob(s.dob);
         const dobMatch = inputNorms.some(i => studentNorms.includes(i));
         const dobDigits = String(s.dob || '').replace(/\D/g, '');
-        let rawDigitsMatch = inputDigits.length >= 6 && (inputDigits === dobDigits || dobDigits.includes(inputDigits));
+        let rawDigitsMatch = inputDigits.length >= 6 && inputDigits === dobDigits;
 
         // Check if input DDMMYYYY digits match student's DOB
         const stuNorm = studentNorms[0];
@@ -264,7 +280,7 @@ export default async function handler(req, res) {
       }
 
       // Reset rate limit on successful login
-      resetRateLimit(safeId);
+      resetRateLimit(normalizeRateLimitKey(safeId));
 
       const student = matchedStudent;
       const studentId = student.student_id || student.id;
