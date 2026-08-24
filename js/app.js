@@ -1225,16 +1225,18 @@ function blogCatClass(category) {
 
 const SEED_BLOG_POSTS = [
   {
-    id: 'seed-post-1',
+    id: '00000000-0000-0000-0000-000000000001',
     slug: 'class-10-cbse-bseb-board-exam-strategy-2026',
     title: 'Top 5 Strategies to Score 95%+ in Class 10th Board Exams (CBSE & BSEB)',
     excerpt: 'A step-by-step revision routine by Chandan Sir covering NCERT mastery, time management in 3-hour papers, and daily self-assessment.',
     category: 'Board Exams',
+    tags: ['class-10', 'board-exams', 'revision-strategy', 'toppers-guide'],
     author_name: 'Chandan Kumar',
     author_role: 'Science Lead & Head Admin',
     read_time_minutes: 4,
     views_count: 0,
     published_at: '2026-08-20T10:00:00Z',
+    created_at: '2026-08-20T10:00:00Z',
     is_published: true,
     content_markdown: `### The Golden Formula for Board Exam Success
 
@@ -1263,16 +1265,18 @@ Take full 80-mark mock tests every Sunday. Analyze your silly mistakes in a sepa
 `
   },
   {
-    id: 'seed-post-2',
+    id: '00000000-0000-0000-0000-000000000002',
     slug: 'spoken-english-confidence-guide-for-school-students',
     title: 'How to Speak English Fluently Without Fear: A Guide for Hindi Medium Students',
     excerpt: 'Overcoming hesitations in group discussions, building daily 10-minute vocabulary habits, and practical conversational drills.',
     category: 'English Speaking',
+    tags: ['spoken-english', 'personality-development', 'communication-skills'],
     author_name: 'Aditi Singh',
     author_role: 'Language Mentor',
     read_time_minutes: 3,
     views_count: 0,
     published_at: '2026-08-21T12:00:00Z',
+    created_at: '2026-08-21T12:00:00Z',
     is_published: true,
     content_markdown: `### Overcoming the Hesitation Barrier
 
@@ -1291,16 +1295,18 @@ Fluency is not about using complex words — it is about expressing your ideas c
 `
   },
   {
-    id: 'seed-post-3',
+    id: '00000000-0000-0000-0000-000000000003',
     slug: 'class-12-pcm-higher-mathematics-calculus-blueprint',
     title: 'Class 12th PCM: How to Master Calculus & Differential Equations',
     excerpt: 'Prof. Ravi Ranjan explains the highest weightage calculus topics, standard integration patterns, and shortcut methods for competitive exams.',
     category: 'Board Exams',
+    tags: ['class-12', 'mathematics', 'calculus', 'integration'],
     author_name: 'Prof. Ravi Ranjan',
     author_role: 'Higher Mathematics Specialist',
     read_time_minutes: 5,
     views_count: 0,
     published_at: '2026-08-22T14:30:00Z',
+    created_at: '2026-08-22T14:30:00Z',
     is_published: true,
     content_markdown: `### Calculus Accounts for 35%+ of Higher Mathematics
 
@@ -1319,6 +1325,9 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
 `
   }
 ];
+if (typeof window !== 'undefined') {
+  window.SEED_BLOG_POSTS = SEED_BLOG_POSTS;
+}
 
 function getBlogViewsMap() {
   try {

@@ -123,5 +123,16 @@ export function runBlogTests(assert) {
     'T25.41: blog editor includes .blog-editor-actions-bar for responsive submit actions');
   assert(portalCss.includes('.blog-editor-actions-bar') && portalCss.includes('.btn-blog-publish-main'),
     'T25.42: portal.css includes mobile responsive rules for blog editor submit buttons and sticky action bar');
+
+  // --- 11. Preloaded Seed Articles Database Integration ---------------------------
+  const appSrc = read('js/app.js');
+  assert(sqlSrc.includes('INSERT INTO public.blog_posts') && sqlSrc.includes('class-10-cbse-bseb-board-exam-strategy-2026'),
+    'T25.43: hardening SQL inserts canonical preloaded seed blog posts');
+  assert(appSrc.includes('00000000-0000-0000-0000-000000000001') && portalSrc.includes('00000000-0000-0000-0000-000000000001'),
+    'T25.44: app.js and portal.js share matching canonical UUIDs for preloaded articles');
+  assert(portalSrc.includes('DEFAULT_SEED_BLOG_POSTS') && portalSrc.includes('blogWriteLocal(seeds)'),
+    'T25.45: portal.js preloads seed articles into local store when uninitialized');
+  assert(portalSrc.includes("conflict: 'slug'") && portalSrc.includes("isNew ? 'insert' : 'upsert'"),
+    'T25.46: admin blog save uses upsert with slug conflict key for seamless editing of seed articles');
 }
 

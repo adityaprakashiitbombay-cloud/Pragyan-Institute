@@ -1444,6 +1444,56 @@ $fn$;
 REVOKE ALL ON FUNCTION public.increment_blog_views(text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.increment_blog_views(text) TO service_role;
 
+-- Canonical Preloaded Articles (Editable & Deletable by Admin)
+INSERT INTO public.blog_posts (id, slug, title, excerpt, content_markdown, category, tags, author_name, author_role, is_published, read_time_minutes, views_count, published_at)
+VALUES
+  (
+    '00000000-0000-0000-0000-000000000001',
+    'class-10-cbse-bseb-board-exam-strategy-2026',
+    'Top 5 Strategies to Score 95%+ in Class 10th Board Exams (CBSE & BSEB)',
+    'A step-by-step revision routine by Chandan Sir covering NCERT mastery, time management in 3-hour papers, and daily self-assessment.',
+    E'### The Golden Formula for Board Exam Success\n\nEvery year, students ask: *"How many hours should I study to get 95%+ in Class 10th?"*\nThe truth is that **strategy beats sheer hours**. Here is the exact roadmap we follow at Pragyan Institute.\n\n---\n\n#### 1. Master NCERT Exemplar & Concept Clarity\n- **Science**: Focus heavily on Chemical Reactions, Electricity numericals, and Life Processes diagrams.\n- **Maths**: Solve every single NCERT exercise problem twice before touching reference books.\n\n:::tip\nAlways practice with a real stopwatch. Completing the paper 15 minutes before time gives you crucial revision margin.\n:::\n\n#### 2. Weekly Timed Mock Tests\nTake full 80-mark mock tests every Sunday. Analyze your silly mistakes in a separate **Error Notebook**.\n\n> "Mistakes made in practice are lessons; mistakes made in final exams are lost marks."\n\n#### 3. Answer Presentation Matters\n- Write in clean bullet points.\n- Highlight final numerical answers with neat boxes.\n- Draw diagrams with sharp pencils and clear labels.',
+    'Board Exams',
+    ARRAY['class-10', 'board-exams', 'revision-strategy', 'toppers-guide'],
+    'Chandan Kumar',
+    'Science Lead & Head Admin',
+    true,
+    4,
+    0,
+    '2026-08-20 10:00:00+05:30'
+  ),
+  (
+    '00000000-0000-0000-0000-000000000002',
+    'spoken-english-confidence-guide-for-school-students',
+    'How to Speak English Fluently Without Fear: A Guide for Hindi Medium Students',
+    'Overcoming hesitations in group discussions, building daily 10-minute vocabulary habits, and practical conversational drills.',
+    E'### Overcoming the Hesitation Barrier\n\nMost students understand written English well, but when asked to speak in front of a class, fear of grammatical mistakes takes over.\n\n---\n\n#### 3 Simple Daily Habits for Fluency:\n1. **The 2-Minute Mirror Drill**: Pick any topic (e.g. *"My favorite science topic"*) and speak continuously for 2 minutes without stopping.\n2. **Think in English**: Instead of translating Hindi sentences in your mind, practice naming objects and thoughts directly in simple English.\n3. **Weekly Group Discussions**: Participate actively in Pragyan''s free Saturday GD sessions.\n\n:::info\nFluency is not about using complex words — it is about expressing your ideas clearly and confidently.\n:::',
+    'English Speaking',
+    ARRAY['spoken-english', 'personality-development', 'communication-skills'],
+    'Aditi Singh',
+    'Language Mentor',
+    true,
+    3,
+    0,
+    '2026-08-21 12:00:00+05:30'
+  ),
+  (
+    '00000000-0000-0000-0000-000000000003',
+    'class-12-pcm-higher-mathematics-calculus-blueprint',
+    'Class 12th PCM: How to Master Calculus & Differential Equations',
+    'Prof. Ravi Ranjan explains the highest weightage calculus topics, standard integration patterns, and shortcut methods for competitive exams.',
+    E'### Calculus Accounts for 35%+ of Higher Mathematics\n\nIn Class 12th board exams, Calculus carries the highest single weightage. If you master differentiation and integration fundamentals, scoring 90+ in Maths becomes guaranteed.\n\n---\n\n#### Focus Areas for 12th Board Exams:\n- **Definite Integrals**: Properties of definite integrals are guaranteed 5-mark questions.\n- **Differential Equations**: Linear differential equations with integrating factors.\n- **Application of Derivatives**: Maxima & Minima word problems.\n\n:::tip\nDraw rough sketches for Area Under Curves problems — it prevents coordinate sign errors!\n:::',
+    'Board Exams',
+    ARRAY['class-12', 'mathematics', 'calculus', 'integration'],
+    'Prof. Ravi Ranjan',
+    'Higher Mathematics Specialist',
+    true,
+    5,
+    0,
+    '2026-08-22 14:30:00+05:30'
+  )
+ON CONFLICT (slug) DO NOTHING;
+
 -- Verification:
 SELECT count(*) AS blog_posts_ready FROM pg_tables
  WHERE schemaname='public' AND tablename='blog_posts';

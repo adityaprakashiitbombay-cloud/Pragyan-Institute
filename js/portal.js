@@ -11929,9 +11929,121 @@ function renderStudentDashboard() {
   let blogAdminFilter = 'all';
   let blogCoverUploadUrl = '';
 
+  const DEFAULT_SEED_BLOG_POSTS = [
+    {
+      id: '00000000-0000-0000-0000-000000000001',
+      slug: 'class-10-cbse-bseb-board-exam-strategy-2026',
+      title: 'Top 5 Strategies to Score 95%+ in Class 10th Board Exams (CBSE & BSEB)',
+      excerpt: 'A step-by-step revision routine by Chandan Sir covering NCERT mastery, time management in 3-hour papers, and daily self-assessment.',
+      category: 'Board Exams',
+      tags: ['class-10', 'board-exams', 'revision-strategy', 'toppers-guide'],
+      author_name: 'Chandan Kumar',
+      author_role: 'Science Lead & Head Admin',
+      read_time_minutes: 4,
+      views_count: 0,
+      published_at: '2026-08-20T10:00:00Z',
+      created_at: '2026-08-20T10:00:00Z',
+      is_published: true,
+      content_markdown: `### The Golden Formula for Board Exam Success
+
+Every year, students ask: *"How many hours should I study to get 95%+ in Class 10th?"*
+The truth is that **strategy beats sheer hours**. Here is the exact roadmap we follow at Pragyan Institute.
+
+---
+
+#### 1. Master NCERT Exemplar & Concept Clarity
+- **Science**: Focus heavily on Chemical Reactions, Electricity numericals, and Life Processes diagrams.
+- **Maths**: Solve every single NCERT exercise problem twice before touching reference books.
+
+:::tip
+Always practice with a real stopwatch. Completing the paper 15 minutes before time gives you crucial revision margin.
+:::
+
+#### 2. Weekly Timed Mock Tests
+Take full 80-mark mock tests every Sunday. Analyze your silly mistakes in a separate **Error Notebook**.
+
+> "Mistakes made in practice are lessons; mistakes made in final exams are lost marks."
+
+#### 3. Answer Presentation Matters
+- Write in clean bullet points.
+- Highlight final numerical answers with neat boxes.
+- Draw diagrams with sharp pencils and clear labels.`
+    },
+    {
+      id: '00000000-0000-0000-0000-000000000002',
+      slug: 'spoken-english-confidence-guide-for-school-students',
+      title: 'How to Speak English Fluently Without Fear: A Guide for Hindi Medium Students',
+      excerpt: 'Overcoming hesitations in group discussions, building daily 10-minute vocabulary habits, and practical conversational drills.',
+      category: 'English Speaking',
+      tags: ['spoken-english', 'personality-development', 'communication-skills'],
+      author_name: 'Aditi Singh',
+      author_role: 'Language Mentor',
+      read_time_minutes: 3,
+      views_count: 0,
+      published_at: '2026-08-21T12:00:00Z',
+      created_at: '2026-08-21T12:00:00Z',
+      is_published: true,
+      content_markdown: `### Overcoming the Hesitation Barrier
+
+Most students understand written English well, but when asked to speak in front of a class, fear of grammatical mistakes takes over.
+
+---
+
+#### 3 Simple Daily Habits for Fluency:
+1. **The 2-Minute Mirror Drill**: Pick any topic (e.g. *"My favorite science topic"*) and speak continuously for 2 minutes without stopping.
+2. **Think in English**: Instead of translating Hindi sentences in your mind, practice naming objects and thoughts directly in simple English.
+3. **Weekly Group Discussions**: Participate actively in Pragyan's free Saturday GD sessions.
+
+:::info
+Fluency is not about using complex words — it is about expressing your ideas clearly and confidently.
+:::`
+    },
+    {
+      id: '00000000-0000-0000-0000-000000000003',
+      slug: 'class-12-pcm-higher-mathematics-calculus-blueprint',
+      title: 'Class 12th PCM: How to Master Calculus & Differential Equations',
+      excerpt: 'Prof. Ravi Ranjan explains the highest weightage calculus topics, standard integration patterns, and shortcut methods for competitive exams.',
+      category: 'Board Exams',
+      tags: ['class-12', 'mathematics', 'calculus', 'integration'],
+      author_name: 'Prof. Ravi Ranjan',
+      author_role: 'Higher Mathematics Specialist',
+      read_time_minutes: 5,
+      views_count: 0,
+      published_at: '2026-08-22T14:30:00Z',
+      created_at: '2026-08-22T14:30:00Z',
+      is_published: true,
+      content_markdown: `### Calculus Accounts for 35%+ of Higher Mathematics
+
+In Class 12th board exams, Calculus carries the highest single weightage. If you master differentiation and integration fundamentals, scoring 90+ in Maths becomes guaranteed.
+
+---
+
+#### Focus Areas for 12th Board Exams:
+- **Definite Integrals**: Properties of definite integrals are guaranteed 5-mark questions.
+- **Differential Equations**: Linear differential equations with integrating factors.
+- **Application of Derivatives**: Maxima & Minima word problems.
+
+:::tip
+Draw rough sketches for Area Under Curves problems — it prevents coordinate sign errors!
+:::`
+    }
+  ];
+
   function blogReadLocal() {
-    try { return JSON.parse(localStorage.getItem(BLOG_STORAGE_KEY) || '[]'); }
-    catch (_) { return []; }
+    try {
+      const stored = localStorage.getItem(BLOG_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      const seeds = (typeof window !== 'undefined' && Array.isArray(window.SEED_BLOG_POSTS) && window.SEED_BLOG_POSTS.length)
+        ? window.SEED_BLOG_POSTS
+        : DEFAULT_SEED_BLOG_POSTS;
+      blogWriteLocal(seeds);
+      return seeds;
+    } catch (_) {
+      return DEFAULT_SEED_BLOG_POSTS;
+    }
   }
   function blogWriteLocal(list) {
     AppState.safeSetItem(BLOG_STORAGE_KEY, list);
@@ -12053,7 +12165,7 @@ function renderStudentDashboard() {
           updated_at: new Date().toISOString()
         };
         delete payload._local_id;
-        const result = await SupabaseSync.mutate('blog_posts', 'update', payload, { where: { id: post.id } });
+        const result = await SupabaseSync.mutate('blog_posts', 'upsert', payload, { where: { id: post.id }, conflict: 'slug' });
         if (!result || result.success !== true) {
           alert(`Could not update "${post.title}": ${result?.error || 'database rejected'}. Nothing changed.`);
           b.disabled = false;
@@ -12278,14 +12390,14 @@ function renderStudentDashboard() {
       try {
         const result = await SupabaseSync.mutate(
           'blog_posts',
-          isNew ? 'insert' : 'update',
+          isNew ? 'insert' : 'upsert',
           payload,
-          isNew ? {} : { where: { id: values.id } }
+          isNew ? {} : { where: { id: values.id }, conflict: 'slug' }
         );
         if (!result || result.success !== true) throw new Error(result && result.error ? result.error : 'database rejected');
 
         const list = blogReadLocal();
-        const idx = list.findIndex(x => x.id === payload.id);
+        const idx = list.findIndex(x => x.id === payload.id || x.slug === payload.slug);
         if (idx >= 0) list[idx] = Object.assign({}, list[idx], payload); else list.unshift(payload);
         blogWriteLocal(list);
 
