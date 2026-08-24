@@ -88,4 +88,12 @@ export async function runPushNotificationTests(assert) {
   // --- 9. Payment Approval Hook ---
   const approveJs = read('api/approve-payment-request.js');
   assert(approveJs.includes("Fee Payment Verified"), 'T28.32: api/approve-payment-request sends instant push receipt upon approval');
+
+  // --- 10. Mobile Responsiveness Suite ---
+  const portalCss = read('css/portal.css');
+  assert(portalCss.includes('.push-grid-2col'), 'T28.33: portal.css contains push-grid-2col responsive layout rules');
+  assert(portalCss.includes('.push-presets-bar') && portalCss.includes('scroll-snap-type'), 'T28.34: portal.css implements touch-friendly swipeable push-presets-bar with scroll-snap');
+  assert(portalCss.includes('.push-radio-label') && portalCss.includes('min-height: 44px'), 'T28.35: portal.css implements 44px min-height push-radio-label touch targets');
+  assert(portalCss.includes('.push-logs-scroll-wrap'), 'T28.36: portal.css implements push-logs-scroll-wrap for responsive horizontal table view');
 }
+

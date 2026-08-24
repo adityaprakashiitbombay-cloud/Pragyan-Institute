@@ -12402,40 +12402,40 @@ function renderStudentDashboard() {
               </div>
 
               <!-- Action Buttons Grid -->
-              <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:0.95rem;">
+              <div class="push-grid-2col push-actions-grid">
                 <div>
-                  <label for="pushAction1Title" style="font-size:0.8rem; font-weight:700; color:#334155;">Action 1 (Label)</label>
+                  <label for="pushAction1Title" class="push-sub-label">Action 1 (Label)</label>
                   <input type="text" id="pushAction1Title" aria-label="Action 1 (Label)" class="portal-input" value="💳 Pay Fees">
                 </div>
                 <div>
-                  <label for="pushAction1Url" style="font-size:0.8rem; font-weight:700; color:#334155;">Action 1 (Target URL)</label>
+                  <label for="pushAction1Url" class="push-sub-label">Action 1 (Target URL)</label>
                   <input type="text" id="pushAction1Url" aria-label="Action 1 (Target URL)" class="portal-input" value="/pay.html">
                 </div>
               </div>
 
-              <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:0.95rem;">
+              <div class="push-grid-2col push-actions-grid">
                 <div>
-                  <label for="pushAction2Title" style="font-size:0.8rem; font-weight:700; color:#334155;">Action 2 (Label - Optional)</label>
+                  <label for="pushAction2Title" class="push-sub-label">Action 2 (Label - Optional)</label>
                   <input type="text" id="pushAction2Title" aria-label="Action 2 (Label - Optional)" class="portal-input" placeholder="e.g. 📄 View Notice">
                 </div>
                 <div>
-                  <label for="pushAction2Url" style="font-size:0.8rem; font-weight:700; color:#334155;">Action 2 (Target URL)</label>
+                  <label for="pushAction2Url" class="push-sub-label">Action 2 (Target URL)</label>
                   <input type="text" id="pushAction2Url" aria-label="Action 2 (Target URL)" class="portal-input" placeholder="/#notices">
                 </div>
               </div>
 
               <!-- Options Grid: Priority & TTL -->
-              <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:1.25rem;">
+              <div class="push-grid-2col push-options-grid">
                 <div>
-                  <label for="pushPrioritySelect" style="font-size:0.8rem; font-weight:700; color:#334155;">Urgency &amp; Sound</label>
-                  <select id="pushPrioritySelect" aria-label="Urgency & Sound" class="portal-input" style="padding:0 0.65rem;">
+                  <label for="pushPrioritySelect" class="push-sub-label">Urgency &amp; Sound</label>
+                  <select id="pushPrioritySelect" aria-label="Urgency & Sound" class="portal-input">
                     <option value="high" selected>🚨 High Priority (Chime + Dual Vibration)</option>
                     <option value="normal">🔔 Normal Priority (Standard Alert)</option>
                   </select>
                 </div>
                 <div>
-                  <label for="pushTtlSelect" style="font-size:0.8rem; font-weight:700; color:#334155;">Expiry (Time-To-Live)</label>
-                  <select id="pushTtlSelect" aria-label="Expiry (Time-To-Live)" class="portal-input" style="padding:0 0.65rem;">
+                  <label for="pushTtlSelect" class="push-sub-label">Expiry (Time-To-Live)</label>
+                  <select id="pushTtlSelect" aria-label="Expiry (Time-To-Live)" class="portal-input">
                     <option value="24" selected>24 Hours</option>
                     <option value="6">6 Hours (Time-sensitive)</option>
                     <option value="72">3 Days (Important notices)</option>
@@ -12444,8 +12444,8 @@ function renderStudentDashboard() {
               </div>
 
               <!-- Dispatch Action -->
-              <div style="margin-top:1rem;">
-                <button type="button" class="btn btn-primary" id="btnDispatchPush" style="width:100%; justify-content:center; padding:0.85rem 1.5rem; font-size:0.95rem;">
+              <div class="push-dispatch-wrap">
+                <button type="button" class="btn btn-primary btn-dispatch-push-main" id="btnDispatchPush">
                   <i aria-hidden="true" class="fa-solid fa-paper-plane"></i> Broadcast Push Notification
                 </button>
               </div>
@@ -12788,48 +12788,50 @@ function renderStudentDashboard() {
       }
 
       container.innerHTML = `
-        <table class="portal-table" style="width:100%;">
-          <thead>
-            <tr>
-              <th>Date &amp; Time</th>
-              <th>Notification Title &amp; Message</th>
-              <th>Target Audience</th>
-              <th>Sent / Delivered</th>
-              <th>Sender</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${logs.map(l => {
-              const dt = new Date(l.created_at || Date.now()).toLocaleString('en-IN', {
-                day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-              });
-              const targetStr = l.target_type === 'ALL' ? '🌐 All Students' :
-                l.target_type === 'BATCHES' ? '🎓 Batches' :
-                l.target_type === 'DUES' ? '💰 Dues Filter' : '👤 Student Direct';
+        <div class="push-logs-scroll-wrap">
+          <table class="portal-table push-logs-table">
+            <thead>
+              <tr>
+                <th>Date &amp; Time</th>
+                <th>Notification Title &amp; Message</th>
+                <th>Target Audience</th>
+                <th>Sent / Delivered</th>
+                <th>Sender</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${logs.map(l => {
+                const dt = new Date(l.created_at || Date.now()).toLocaleString('en-IN', {
+                  day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                });
+                const targetStr = l.target_type === 'ALL' ? '🌐 All Students' :
+                  l.target_type === 'BATCHES' ? '🎓 Batches' :
+                  l.target_type === 'DUES' ? '💰 Dues Filter' : '👤 Student Direct';
 
-              const isSuccess = Number(l.delivered_count || 0) > 0;
-              const badgeClass = isSuccess ? 'status-pill status-verified' : 'status-pill status-danger';
+                const isSuccess = Number(l.delivered_count || 0) > 0;
+                const badgeClass = isSuccess ? 'status-pill status-verified' : 'status-pill status-danger';
 
-              return `
-                <tr>
-                  <td style="white-space:nowrap; font-size:0.82rem; color:#64748B;">${dt}</td>
-                  <td>
-                    <strong style="color:#0F172A; display:block;">${escapeHtml(l.title)}</strong>
-                    <span style="font-size:0.8rem; color:#475569;">${escapeHtml(l.body).slice(0, 90)}${l.body.length > 90 ? '...' : ''}</span>
-                  </td>
-                  <td><span class="status-pill status-adjusted">${targetStr}</span></td>
-                  <td style="font-weight:700; font-size:0.85rem;">
-                    <span style="color:#065F46;">${l.delivered_count || 0}</span> / ${l.audience_size || l.sent_count || 0}
-                    ${Number(l.pruned_count || 0) > 0 ? `<small style="color:#DC2626; display:block;">(${l.pruned_count} pruned)</small>` : ''}
-                  </td>
-                  <td style="font-size:0.82rem; color:#475569;">${escapeHtml(l.dispatched_by || 'CHANDAN')}</td>
-                  <td><span class="${badgeClass}">${isSuccess ? 'Delivered' : 'Failed'}</span></td>
-                </tr>
-              `;
-            }).join('')}
-          </tbody>
-        </table>
+                return `
+                  <tr>
+                    <td style="white-space:nowrap; font-size:0.82rem; color:#64748B;">${dt}</td>
+                    <td>
+                      <strong style="color:#0F172A; display:block;">${escapeHtml(l.title)}</strong>
+                      <span style="font-size:0.8rem; color:#475569;">${escapeHtml(l.body).slice(0, 90)}${l.body.length > 90 ? '...' : ''}</span>
+                    </td>
+                    <td><span class="status-pill status-adjusted">${targetStr}</span></td>
+                    <td style="font-weight:700; font-size:0.85rem;">
+                      <span style="color:#065F46;">${l.delivered_count || 0}</span> / ${l.audience_size || l.sent_count || 0}
+                      ${Number(l.pruned_count || 0) > 0 ? `<small style="color:#DC2626; display:block;">(${l.pruned_count} pruned)</small>` : ''}
+                    </td>
+                    <td style="font-size:0.82rem; color:#475569;">${escapeHtml(l.dispatched_by || 'CHANDAN')}</td>
+                    <td><span class="${badgeClass}">${isSuccess ? 'Delivered' : 'Failed'}</span></td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
       `;
     } catch (err) {
       container.innerHTML = `<div style="padding:1rem; color:#DC2626; text-align:center;">Failed to load logs: ${escapeHtml(err.message)}</div>`;

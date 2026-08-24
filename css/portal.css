@@ -5310,4 +5310,299 @@ button, a, input, select, textarea {
   font-size: 0.9rem;
   font-weight: 700;
   color: #065F46;
+}
+
+/* ==========================================================================
+ * PUSH ALERTS & BROADCAST SUITE RESPONSIVE ENHANCEMENTS
+ * ========================================================================== */
+
+.push-grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 0.95rem;
+}
+
+.push-sub-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 0.35rem;
+}
+
+.push-dispatch-wrap {
+  margin-top: 1rem;
+}
+
+.btn-dispatch-push-main {
+  width: 100%;
+  justify-content: center;
+  padding: 0.85rem 1.5rem;
+  font-size: 0.96rem;
+  font-weight: 800;
+  min-height: 48px;
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(6, 78, 59, 0.25);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  touch-action: manipulation;
+}
+
+.btn-dispatch-push-main:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(6, 78, 59, 0.35);
+}
+
+.btn-dispatch-push-main:active {
+  transform: scale(0.98);
+}
+
+.push-logs-scroll-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 8px;
+  border: 1px solid #E2E8F0;
+  background: #FFFFFF;
+}
+
+.push-logs-table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+}
+
+/* Touch & Mobile Responsiveness for Push Alerts Hub */
+@media (max-width: 768px) {
+  .admin-push-hub {
+    gap: 1rem;
+  }
+
+  .push-hub-header {
+    padding: 1rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .push-hub-title {
+    font-size: clamp(1.1rem, 4vw, 1.3rem);
+    line-height: 1.25;
+  }
+
+  .push-hub-subtitle {
+    font-size: 0.82rem;
+    line-height: 1.4;
+  }
+
+  .push-hub-status-badge {
+    font-size: 0.75rem;
+    padding: 0.3rem 0.7rem;
+  }
+
+  /* Swipeable Presets Strip on Mobile */
+  .push-presets-bar {
+    padding: 0.6rem 0.75rem;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+    gap: 0.45rem;
+  }
+
+  .push-presets-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .preset-label {
+    flex-shrink: 0;
+    font-size: 0.78rem;
+  }
+
+  .btn-preset {
+    flex-shrink: 0;
+    min-height: 38px;
+    padding: 0.4rem 0.85rem;
+    font-size: 0.8rem;
+    scroll-snap-align: start;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
+  }
+
+  .btn-preset:active {
+    background: #D1FAE5;
+    border-color: #059669;
+    transform: scale(0.96);
+  }
+
+  .push-card {
+    padding: 1rem;
+  }
+
+  .push-card-heading {
+    font-size: 0.98rem;
+    margin-bottom: 0.85rem;
+  }
+
+  /* Audience Options with Touch-Friendly Hitboxes */
+  .push-audience-options {
+    gap: 0.5rem;
+  }
+
+  .push-radio-label {
+    padding: 0.65rem 0.75rem;
+    border: 1.5px solid #E2E8F0;
+    border-radius: 8px;
+    font-size: 0.84rem;
+    min-height: 44px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+  }
+
+  .push-radio-label:active {
+    background: #ECFDF5;
+    border-color: #10B981;
+  }
+
+  .push-radio-label input[type="radio"] {
+    width: 1.25rem;
+    height: 1.25rem;
+    flex-shrink: 0;
+  }
+
+  .push-chip {
+    min-height: 38px;
+    padding: 0.4rem 0.85rem;
+    font-size: 0.8rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
+  }
+
+  /* Horizontal Swipe Bar for Emojis */
+  .push-emoji-bar {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding: 0.4rem 0.5rem;
+    gap: 0.35rem;
+  }
+
+  .push-emoji-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .emoji-btn {
+    min-width: 36px;
+    min-height: 36px;
+    font-size: 1.25rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border-radius: 6px;
+  }
+
+  .emoji-btn:active {
+    background: #CBD5E1;
+    transform: scale(1.25);
+  }
+
+  /* Horizontal Swipe Bar for Dynamic Variables */
+  .push-vars-bar {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding: 0.4rem 0.5rem;
+    gap: 0.4rem;
+  }
+
+  .push-vars-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .btn-var-tag {
+    min-height: 36px;
+    padding: 0.35rem 0.65rem;
+    font-size: 0.78rem;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+    touch-action: manipulation;
+  }
+
+  .btn-var-tag:active {
+    background: #BFDBFE;
+    transform: scale(0.96);
+  }
+
+  /* Lockscreen Mockup Fluid Scaling */
+  .phone-mockup-frame {
+    max-width: 300px;
+    border-width: 8px;
+    border-radius: 26px;
+    padding: 1.15rem 0.75rem 1.5rem 0.75rem;
+  }
+
+  .phone-lockscreen-time {
+    font-size: 1.85rem;
+  }
+
+  .phone-lockscreen-date {
+    font-size: 0.75rem;
+    margin-bottom: 1.15rem;
+  }
+
+  .phone-notif-card {
+    padding: 0.75rem;
+    border-radius: 12px;
+  }
+
+  .sim-notif-title {
+    font-size: 0.8rem;
+  }
+
+  .sim-notif-body {
+    font-size: 0.74rem;
+  }
+
+  .sim-action-btn {
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .push-grid-2col {
+    grid-template-columns: 1fr;
+    gap: 0.6rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .push-prompt-actions {
+    margin-left: 0;
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .push-prompt-actions .btn {
+    width: 100%;
+    justify-content: center;
+    min-height: 42px;
+  }
 }
