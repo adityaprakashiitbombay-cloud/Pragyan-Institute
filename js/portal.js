@@ -1091,6 +1091,8 @@
   const STORAGE_KEY_REQUESTS = 'pragyan_db_requests_master';
   const STORAGE_KEY_AUDIT_LOGS = 'pragyan_db_audit_logs_master';
   const STORAGE_KEY_SESSION = 'pragyan_current_session_master';
+  const STORAGE_KEY_SCHEDULES = 'pragyan_db_class_schedules_master';
+  const STORAGE_KEY_HOLIDAYS = 'pragyan_db_institute_holidays_master';
 
   // Legacy Storage Migration: Migrate any existing data from v1/v2/v3 keys automatically
   function migrateLegacyLocalStorageData() {
@@ -1815,6 +1817,8 @@
       this._noticesCache = null;
       this._requestsCache = null;
       this._batchesCache = null;
+      this._classSchedulesCache = null;
+      this._instituteHolidaysCache = null;
     },
     getFeeReceipts() {
       if (this._receiptsCache) return this._receiptsCache;
@@ -2190,6 +2194,116 @@
         }
       } catch(e) { console.warn('saveBatches Supabase error:', e); }
     },
+    getClassSchedules() {
+      if (this._classSchedulesCache) return this._classSchedulesCache;
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_SCHEDULES);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            this._classSchedulesCache = parsed;
+            return this._classSchedulesCache;
+          }
+        }
+      } catch (e) { this._classSchedulesCache = []; }
+
+      // Seed initial canonical schedule for all 12 batches Mon-Sat
+      const initialSchedules = [];
+      const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const batchIds = Object.keys(BATCH_SUBJECTS);
+
+      batchIds.forEach(batchId => {
+        const subjects = BATCH_SUBJECTS[batchId] || [];
+        const slots = BATCH_SLOTS[batchId] || [];
+        const cfg = (typeof window !== 'undefined' && window.PRAGYAN_ACADEMIC) ? window.PRAGYAN_ACADEMIC.resolveBatch(batchId) : null;
+        const teachers = cfg?.teachers?.map(titleCaseName) || ['Prof. Ravi Ranjan', 'Chandan Kumar'];
+
+        days.forEach(day => {
+          subjects.forEach((subj, idx) => {
+            const timeStr = slots[idx] || '04:00 PM – 05:00 PM';
+            const parts = timeStr.split(/[–-]/).map(t => t.trim());
+            const startTime = parts[0] || '04:00 PM';
+            const endTime = parts[1] || '05:00 PM';
+            const teacher = teachers[idx % teachers.length] || 'Faculty';
+
+            initialSchedules.push({
+              id: `SCHED-${batchId}-${day.slice(0,3).toUpperCase()}-${idx+1}`,
+              batch_id: batchId,
+              day_of_week: day,
+              subject: subj,
+              start_time: startTime,
+              end_time: endTime,
+              teacher: teacher,
+              room: 'Classroom ' + ((idx % 3) + 1),
+              is_cancelled: false,
+              sort_order: idx + 1
+            });
+          });
+        });
+      });
+
+      this._classSchedulesCache = initialSchedules;
+      this.safeSetItem(STORAGE_KEY_SCHEDULES, initialSchedules);
+      return this._classSchedulesCache;
+    },
+
+    async saveClassSchedules(schedules) {
+      this._classSchedulesCache = schedules;
+      this.safeSetItem(STORAGE_KEY_SCHEDULES, schedules);
+      this.markMutation();
+      try {
+        if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate && Array.isArray(schedules) && schedules.length > 0) {
+          const payload = schedules.map(s => ({
+            id: s.id || `SCHED-${s.batch_id || 'BAT-01'}-${(s.day_of_week || 'MON').slice(0,3).toUpperCase()}-${s.sort_order || 1}`,
+            batch_id: s.batch_id || s.batchId || 'BAT-10',
+            day_of_week: s.day_of_week || s.dayOfWeek || 'Monday',
+            subject: s.subject || 'Lecture',
+            start_time: s.start_time || s.startTime || '04:00 PM',
+            end_time: s.end_time || s.endTime || '05:00 PM',
+            teacher: s.teacher || 'Faculty',
+            room: s.room || 'Classroom 1',
+            is_cancelled: !!s.is_cancelled,
+            sort_order: Number(s.sort_order) || 1
+          }));
+          const r = await SupabaseSync.mutate('class_schedules', 'upsert', payload, { conflict: 'id' });
+          if (!r?.success) console.warn('saveClassSchedules cloud write note:', r?.error);
+        }
+      } catch (e) {
+        console.warn('saveClassSchedules error:', e);
+      }
+    },
+
+    getInstituteHolidays() {
+      if (this._instituteHolidaysCache) return this._instituteHolidaysCache;
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_HOLIDAYS);
+        this._instituteHolidaysCache = raw ? JSON.parse(raw) : [];
+      } catch (e) { this._instituteHolidaysCache = []; }
+      return this._instituteHolidaysCache || [];
+    },
+
+    async saveInstituteHolidays(holidays) {
+      this._instituteHolidaysCache = holidays;
+      this.safeSetItem(STORAGE_KEY_HOLIDAYS, holidays);
+      this.markMutation();
+      try {
+        if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate && Array.isArray(holidays) && holidays.length > 0) {
+          const payload = holidays.map(h => ({
+            id: h.id || `HOL-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            title: h.title || 'Holiday',
+            start_date: h.start_date || h.startDate || new Date().toISOString().split('T')[0],
+            end_date: h.end_date || h.endDate || new Date().toISOString().split('T')[0],
+            target_batch: h.target_batch || h.targetBatch || 'ALL',
+            description: h.description || ''
+          }));
+          const r = await SupabaseSync.mutate('institute_holidays', 'upsert', payload, { conflict: 'id' });
+          if (!r?.success) console.warn('saveInstituteHolidays cloud write note:', r?.error);
+        }
+      } catch (e) {
+        console.warn('saveInstituteHolidays error:', e);
+      }
+    },
+
     getRequests() {
       if (this._requestsCache) return this._requestsCache;
       try {
@@ -4114,40 +4228,81 @@ function renderStudentDashboard() {
       return bKey && (bKey === studentBatchKey);
     }) || batches[0] || {};
 
-    const canonicalOwn = ACADEMIC ? ACADEMIC.resolveBatch(myBatch.batch_id || myBatch.id || studentBatch || '') : null;
+    const batchId = myBatch.id || myBatch.batch_id || (typeof ACADEMIC !== 'undefined' && ACADEMIC.resolveBatch ? (ACADEMIC.resolveBatch(studentBatch)?.id || 'BAT-10') : 'BAT-10');
+    const canonicalOwn = ACADEMIC ? ACADEMIC.resolveBatch(batchId || studentBatch || '') : null;
     const batchName    = myBatch.name || myBatch.batch_name || studentBatch || 'Your Batch';
     const batchTiming  = myBatch.timing || myBatch.timings || 'Contact Institute';
     const batchRoom    = myBatch.room || myBatch.room_no || 'As allotted';
     const batchFee     = Number(myBatch.monthlyFee ?? myBatch.monthly_fee) || (canonicalOwn ? canonicalOwn.monthlyFee : 0);
-    // Faculty comes from the batch's own roster. The old fallback named
-    // Prof. Ravi Ranjan for every batch, including the three Special English
-    // batches, which Aditi Singh teaches alone.
     const batchTeacher = myBatch.teacher
       || (canonicalOwn ? canonicalOwn.teachers.map(titleCaseName).join(' & ') : 'Faculty Mentors');
 
-    // Parse teacher string into array for display
     const teacherList = batchTeacher.split(/[&,]/).map(t => t.trim()).filter(Boolean);
-
-    // Build distinct daily subject timings from batch grade
-    // Daily subjects for this student's own batch, from the canonical maps.
-    const subjectList = BATCH_SUBJECTS[studentBatchKey] || [];
-    const slotList = BATCH_SLOTS[studentBatchKey] || [];
-    const scheduleItems = subjectList.map((subject, i) => ({
-      subject,
-      time: slotList[i] || batchTiming
-    }));
-
     const enrolledInBatchCount = AppState.getStudents().filter(st => getBatchCategoryKey(st.className || st.batchName || '') === studentBatchKey).length;
+
+    // Determine current day in IST
+    const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    let todayIst = 'Monday';
+    try {
+      todayIst = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' }).format(new Date());
+    } catch(e) {}
+    if (!AppState._activeStudentScheduleDay) {
+      AppState._activeStudentScheduleDay = todayIst;
+    }
+    const currentSelectedDay = AppState._activeStudentScheduleDay;
+
+    // Check for active holidays affecting this student
+    const allHolidays = AppState.getInstituteHolidays ? AppState.getInstituteHolidays() : [];
+    const todayDateStr = new Date().toISOString().split('T')[0];
+    const activeHolidays = allHolidays.filter(h => {
+      const target = (h.target_batch || h.targetBatch || 'ALL').toUpperCase();
+      const matchBatch = target === 'ALL' || target === (batchId || '').toUpperCase() || target === (studentBatchKey || '').toUpperCase();
+      const sDate = h.start_date || h.startDate || '';
+      const eDate = h.end_date || h.endDate || sDate;
+      return matchBatch && sDate <= todayDateStr && todayDateStr <= eDate;
+    });
+
+    // Fetch dynamic schedules from database / AppState
+    const allSchedules = AppState.getClassSchedules ? AppState.getClassSchedules() : [];
+    let daySchedules = allSchedules.filter(sch => {
+      const matchB = (sch.batch_id || sch.batchId) === batchId || getBatchCategoryKey(sch.batch_id || '') === studentBatchKey;
+      const matchD = (sch.day_of_week || sch.dayOfWeek || '').toLowerCase() === currentSelectedDay.toLowerCase();
+      return matchB && matchD;
+    });
+
+    daySchedules.sort((a, b) => (Number(a.sort_order || a.sortOrder || 1) - Number(b.sort_order || b.sortOrder || 1)));
+
+    // Fallback to canonical subject slots if no custom DB entries for this day yet
+    let renderedScheduleItems = [];
+    if (daySchedules.length > 0) {
+      renderedScheduleItems = daySchedules.map(sch => ({
+        subject: sch.subject,
+        time: (sch.start_time && sch.end_time) ? `${sch.start_time} – ${sch.end_time}` : (sch.start_time || batchTiming),
+        teacher: sch.teacher || 'Assigned Faculty',
+        room: sch.room || batchRoom,
+        isCancelled: !!sch.is_cancelled
+      }));
+    } else if (currentSelectedDay !== 'Sunday') {
+      const subjectList = BATCH_SUBJECTS[studentBatchKey] || [];
+      const slotList = BATCH_SLOTS[studentBatchKey] || [];
+      renderedScheduleItems = subjectList.map((subject, i) => ({
+        subject,
+        time: slotList[i] || batchTiming,
+        teacher: teacherList[i % teacherList.length] || 'Faculty Mentors',
+        room: batchRoom,
+        isCancelled: false
+      }));
+    }
 
     pane.innerHTML = `
       <div class="dash-card batch-overview-card">
         <div class="batch-info-header">
           <div>
             <span class="section-tag" style="margin-bottom: 0.4rem;"><i aria-hidden="true" class="fa-solid fa-chalkboard-user"></i> Enrolled Batch</span>
-            <div class="batch-title-tag">${batchName}</div>
+            <div class="batch-title-tag">${escapeHtml(batchName)}</div>
             <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem;">
-              <i aria-hidden="true" class="fa-solid fa-clock" style="color: var(--primary-emerald);"></i> ${batchTiming} &nbsp;|&nbsp; 
-              <i aria-hidden="true" class="fa-solid fa-door-open" style="color: var(--primary-emerald);"></i> Classroom: ${batchRoom}
+              <i aria-hidden="true" class="fa-solid fa-clock" style="color: var(--primary-emerald);"></i> ${escapeHtml(batchTiming)} &nbsp;|&nbsp; 
+              <i aria-hidden="true" class="fa-solid fa-door-open" style="color: var(--primary-emerald);"></i> Classroom: ${escapeHtml(batchRoom)}
             </p>
           </div>
           <span class="pill-item pill-emerald"><i aria-hidden="true" class="fa-solid fa-user-check"></i> Active Session</span>
@@ -4160,7 +4315,7 @@ function renderStudentDashboard() {
           </div>
           <div style="background:var(--bg-surface-cream); border-radius:10px; padding:0.75rem 1.1rem; flex:1; min-width:140px;">
             <div style="font-size: 0.8rem; color:var(--text-muted); font-weight:600;">BATCH CODE</div>
-            <div style="font-size:1.1rem; font-weight:800; color:var(--text-mahogany);">${(myBatch.id || myBatch.batch_id || 'BAT-01')}</div>
+            <div style="font-size:1.1rem; font-weight:800; color:var(--text-mahogany);">${escapeHtml(batchId)}</div>
           </div>
           <div style="background:var(--bg-surface-cream); border-radius:10px; padding:0.75rem 1.1rem; flex:1; min-width:140px;">
             <div style="font-size: 0.8rem; color:var(--text-muted); font-weight:600;">STUDENTS IN BATCH</div>
@@ -4169,25 +4324,71 @@ function renderStudentDashboard() {
         </div>
       </div>
 
+      ${activeHolidays.length > 0 ? `
+        <div class="schedule-holiday-banner" style="background: linear-gradient(135deg, #FEF3C7 0%, #FFFBEB 100%); border: 1.5px solid #F59E0B; border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 1rem;">
+          <div style="font-size: 2rem;">🏖️</div>
+          <div>
+            <div style="font-weight: 800; font-size: 1.05rem; color: #92400E;">
+              ${escapeHtml(activeHolidays[0].title || 'Institute Holiday')}
+            </div>
+            <div style="font-size: 0.86rem; color: #B45309; margin-top: 0.15rem;">
+              ${escapeHtml(activeHolidays[0].description || 'Official Institute holiday declared by administration.')}
+              ${activeHolidays[0].start_date ? ` &bull; <strong>${activeHolidays[0].start_date} to ${activeHolidays[0].end_date || activeHolidays[0].start_date}</strong>` : ''}
+            </div>
+          </div>
+        </div>
+      ` : ''}
+
       <div class="profile-grid-layout">
         <div class="dash-card">
-          <div class="dash-card-header">
-            <div class="dash-card-title"><i aria-hidden="true" class="fa-solid fa-calendar-days"></i> Daily Class Schedule</div>
+          <div class="dash-card-header" style="flex-direction: column; align-items: stretch; gap: 0.75rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div class="dash-card-title"><i aria-hidden="true" class="fa-solid fa-calendar-days"></i> Daily Class Timetable</div>
+              <span style="font-size: 0.8rem; color: var(--text-muted); background: #FAF9F6; padding: 0.2rem 0.5rem; border-radius: 6px; border: 1px solid var(--border-sand); font-weight: 600;">
+                <i aria-hidden="true" class="fa-solid fa-bolt" style="color: var(--primary-emerald);"></i> Live Supabase Cloud
+              </span>
+            </div>
+
+            <!-- Day Selector Tabs -->
+            <div class="schedule-day-tabs" style="display: flex; gap: 0.4rem; overflow-x: auto; padding-bottom: 0.25rem;">
+              ${daysOfWeek.map(d => {
+                const isActive = d.toLowerCase() === currentSelectedDay.toLowerCase();
+                const isToday = d.toLowerCase() === todayIst.toLowerCase();
+                return `
+                  <button type="button" class="btn btn-day-tab ${isActive ? 'active' : ''}" data-day="${d}" aria-label="Select ${d}" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; font-weight: 700; border-radius: 99px; border: 1.5px solid ${isActive ? 'var(--primary-emerald)' : 'var(--border-sand)'}; background: ${isActive ? 'var(--primary-emerald)' : '#fff'}; color: ${isActive ? '#fff' : 'var(--text-mahogany)'}; cursor: pointer; white-space: nowrap;">
+                    ${d.slice(0, 3)} ${isToday ? '•' : ''}
+                  </button>
+                `;
+              }).join('')}
+            </div>
           </div>
+
           <div class="schedule-list">
-            ${scheduleItems.length === 0 ? `
-              <div class="schedule-row">
-                <div class="schedule-subject">
-                  <i class="fa-solid fa-circle-info" aria-hidden="true"></i> Timetable not published for this batch yet
+            ${renderedScheduleItems.length === 0 ? `
+              <div class="schedule-row" style="text-align: center; justify-content: center; padding: 2rem; color: var(--text-muted);">
+                <div>
+                  <i aria-hidden="true" class="fa-solid fa-bed" style="font-size: 1.8rem; margin-bottom: 0.5rem; display: block; color: var(--text-sand);"></i>
+                  <strong>No Classes Scheduled for ${escapeHtml(currentSelectedDay)}</strong>
+                  <div style="font-size: 0.82rem; margin-top: 0.25rem;">Enjoy your break or revise previous lecture topics!</div>
                 </div>
-                <div class="schedule-time">${batchTiming}</div>
               </div>
-            ` : scheduleItems.map(item => `
-              <div class="schedule-row">
+            ` : renderedScheduleItems.map(item => `
+              <div class="schedule-row ${item.isCancelled ? 'schedule-row-cancelled' : ''}" style="${item.isCancelled ? 'background: #FEF2F2; border-left: 3px solid #EF4444; opacity: 0.85;' : ''}">
                 <div class="schedule-subject">
-                  <i class="fa-solid fa-book-bookmark" aria-hidden="true"></i> ${item.subject}
+                  <i class="${item.isCancelled ? 'fa-solid fa-ban' : 'fa-solid fa-book-bookmark'}" aria-hidden="true" style="color: ${item.isCancelled ? '#DC2626' : 'var(--primary-emerald)'};"></i>
+                  <div style="display: inline-block; vertical-align: middle;">
+                    <div style="${item.isCancelled ? 'text-decoration: line-through; color: #991B1B;' : ''}">
+                      <strong>${escapeHtml(item.subject)}</strong>
+                    </div>
+                    <div style="font-size: 0.78rem; color: var(--text-muted); font-weight: normal;">
+                      <i aria-hidden="true" class="fa-solid fa-chalkboard-user"></i> ${escapeHtml(item.teacher)} &bull; <i aria-hidden="true" class="fa-solid fa-door-open"></i> ${escapeHtml(item.room)}
+                    </div>
+                  </div>
                 </div>
-                <div class="schedule-time">${item.time}</div>
+                <div style="text-align: right;">
+                  <div class="schedule-time" style="${item.isCancelled ? 'color: #991B1B;' : ''}">${escapeHtml(item.time)}</div>
+                  ${item.isCancelled ? '<span style="font-size: 0.75rem; font-weight: 700; color: #DC2626; background: #FEE2E2; padding: 0.1rem 0.4rem; border-radius: 4px;">🚫 Class Off</span>' : ''}
+                </div>
               </div>
             `).join('')}
           </div>
@@ -4204,8 +4405,8 @@ function renderStudentDashboard() {
                   ${t.charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <div style="font-weight: 700; font-size: 0.92rem; color: var(--text-mahogany);">${t}</div>
-                  <div style="font-size: 0.8rem; color: var(--text-muted);">Faculty — ${batchName}</div>
+                  <div style="font-weight: 700; font-size: 0.92rem; color: var(--text-mahogany);">${escapeHtml(t)}</div>
+                  <div style="font-size: 0.8rem; color: var(--text-muted);">Faculty — ${escapeHtml(batchName)}</div>
                 </div>
               </div>
             `).join('')}
@@ -4213,6 +4414,14 @@ function renderStudentDashboard() {
         </div>
       </div>
     `;
+
+    // Attach day tab change listeners
+    pane.querySelectorAll('.btn-day-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        AppState._activeStudentScheduleDay = btn.dataset.day;
+        renderStudentBatchTab();
+      });
+    });
   }
 
   // 3. Student Tab: Notification Tab
@@ -5577,6 +5786,8 @@ function renderStudentDashboard() {
       renderAdminSettingsTab();
     } else if (tabName === 'blog') {
       renderAdminBlogTab();
+    } else if (tabName === 'schedule') {
+      renderAdminScheduleTab();
     } else if (tabName === 'push') {
       renderAdminPushTab();
     }
@@ -13440,6 +13651,657 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
     } catch (err) {
       container.innerHTML = `<div style="padding:1rem; color:#DC2626; text-align:center;">Failed to load logs: ${escapeHtml(err.message)}</div>`;
     }
+  }
+
+  /* ==========================================================================
+   * 19. ADMIN CLASS TIMETABLE & INSTITUTE HOLIDAYS MANAGER
+   * ========================================================================== */
+  let activeAdminScheduleBatchId = 'BAT-10';
+  let activeAdminScheduleDay = 'Monday';
+
+  async function seedDefaultScheduleForBatchAndDay(batchId, day) {
+    const allSchedules = AppState.getClassSchedules ? AppState.getClassSchedules() : [];
+    const bKey = getBatchCategoryKey(batchId);
+    const subjects = BATCH_SUBJECTS[bKey] || ['Mathematics', 'Science', 'English'];
+    const slots = BATCH_SLOTS[bKey] || ['04:00 PM - 05:00 PM', '05:00 PM - 06:00 PM', '06:00 PM - 07:00 PM'];
+    const batchObj = (typeof ACADEMIC !== 'undefined' && ACADEMIC.resolveBatch) ? ACADEMIC.resolveBatch(batchId) : null;
+    const teacher = batchObj ? batchObj.teachers.map(titleCaseName).join(' & ') : 'Faculty Mentors';
+    const room = batchObj?.room || 'Main Hall';
+
+    // Remove existing for this batch & day
+    const filtered = allSchedules.filter(s => !(s.batch_id === batchId && s.day_of_week.toLowerCase() === day.toLowerCase()));
+    
+    subjects.forEach((subj, idx) => {
+      const slot = slots[idx] || '04:00 PM - 05:00 PM';
+      const parts = slot.split('-').map(p => p.trim());
+      const startTime = parts[0] || '04:00 PM';
+      const endTime = parts[1] || '05:00 PM';
+
+      filtered.push({
+        id: `SCHED-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        batch_id: batchId,
+        day_of_week: day,
+        subject: subj,
+        start_time: startTime,
+        end_time: endTime,
+        teacher: teacher,
+        room: room,
+        is_cancelled: false,
+        sort_order: idx + 1,
+        created_at: new Date().toISOString()
+      });
+    });
+
+    await AppState.saveClassSchedules(filtered);
+    renderAdminScheduleTab();
+  }
+
+  async function replicateDayScheduleAcrossWeek(batchId, sourceDay) {
+    const allSchedules = AppState.getClassSchedules ? AppState.getClassSchedules() : [];
+    const sourcePeriods = allSchedules.filter(s => (s.batch_id || s.batchId) === batchId && (s.day_of_week || s.dayOfWeek || '').toLowerCase() === sourceDay.toLowerCase());
+
+    if (sourcePeriods.length === 0) {
+      alert(`⚠️ No periods found for ${sourceDay}. Please add periods before replicating across the week.`);
+      return;
+    }
+
+    if (!confirm(`⚡ Replicate ${sourceDay}'s schedule to all weekdays (Monday through Saturday) for batch ${batchId}?\n\nThis will apply ${sourcePeriods.length} period(s) to Monday, Tuesday, Wednesday, Thursday, Friday, and Saturday.`)) {
+      return;
+    }
+
+    const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    // Remove old periods for these weekdays for this batch
+    let updated = allSchedules.filter(s => !((s.batch_id || s.batchId) === batchId && weekdays.map(w => w.toLowerCase()).includes((s.day_of_week || s.dayOfWeek || '').toLowerCase())));
+
+    weekdays.forEach(targetDay => {
+      sourcePeriods.forEach((sp, idx) => {
+        updated.push({
+          id: `SCHED-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${targetDay.slice(0, 3)}`,
+          batch_id: batchId,
+          day_of_week: targetDay,
+          subject: sp.subject,
+          start_time: sp.start_time,
+          end_time: sp.end_time,
+          teacher: sp.teacher || 'Faculty Mentors',
+          room: sp.room || 'Main Hall',
+          is_cancelled: false,
+          sort_order: sp.sort_order || (idx + 1),
+          created_at: new Date().toISOString()
+        });
+      });
+    });
+
+    await AppState.saveClassSchedules(updated);
+    alert(`✅ Weekly timetable successfully replicated for ${batchId} (Mon–Sat) and synced with cloud database!`);
+    renderAdminScheduleTab();
+  }
+
+  async function toggleEntireDayOff(batchId, day, shouldCancel) {
+    const allSchedules = AppState.getClassSchedules ? AppState.getClassSchedules() : [];
+    let affected = 0;
+    allSchedules.forEach(s => {
+      if ((s.batch_id || s.batchId) === batchId && (s.day_of_week || s.dayOfWeek || '').toLowerCase() === day.toLowerCase()) {
+        s.is_cancelled = shouldCancel;
+        affected++;
+      }
+    });
+
+    if (affected === 0) {
+      alert(`No periods found for ${day}. Please add periods first.`);
+      return;
+    }
+
+    await AppState.saveClassSchedules(allSchedules);
+    renderAdminScheduleTab();
+  }
+
+  function openAddEditPeriodModal(existingPeriod = null) {
+    const isEdit = !!existingPeriod;
+    const modalId = 'adminAddEditPeriodModal';
+    const existingModal = document.getElementById(modalId);
+    if (existingModal) existingModal.remove();
+
+    const batches = (typeof ACADEMIC !== 'undefined' && ACADEMIC.BATCHES) ? ACADEMIC.BATCHES : AppState.getBatches();
+    const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+    const modalHtml = `
+      <div id="${modalId}" class="portal-modal-backdrop" style="display:flex; align-items:center; justify-content:center; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:9999; padding:1rem;">
+        <div class="inner-modal-content" style="background:#fff; border-radius:14px; max-width:520px; width:100%; max-height:90vh; overflow-y:auto; padding:1.5rem; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
+          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #E5E7EB; padding-bottom:0.75rem; margin-bottom:1.25rem;">
+            <h4 style="font-weight:800; font-size:1.15rem; color:var(--text-mahogany); margin:0;">
+              ${isEdit ? '✏️ Edit Class Period' : '➕ Add New Class Period'}
+            </h4>
+            <button type="button" id="btnClosePeriodModal" class="btn" aria-label="Close dialog" style="background:none; border:none; font-size:1.2rem; cursor:pointer; color:var(--text-muted);">&times;</button>
+          </div>
+
+          <form id="formAddEditPeriod" style="display:flex; flex-direction:column; gap:1rem;">
+            <div>
+              <label for="periodFormBatch" style="font-weight:700; font-size:0.85rem; color:var(--text-mahogany); display:block; margin-bottom:0.3rem;">Target Batch</label>
+              <select id="periodFormBatch" class="form-input" aria-label="Target Batch" style="width:100%; padding:0.5rem; border-radius:8px;" required>
+                ${batches.map(b => {
+                  const bId = b.id || b.batch_id;
+                  const bName = b.name || b.batch_name || bId;
+                  const sel = isEdit ? ((existingPeriod.batch_id || existingPeriod.batchId) === bId) : (bId === activeAdminScheduleBatchId);
+                  return `<option value="${escapeHtml(bId)}" ${sel ? 'selected' : ''}>${escapeHtml(bName)} (${escapeHtml(bId)})</option>`;
+                }).join('')}
+              </select>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+              <div>
+                <label for="periodFormDay" style="font-weight:700; font-size:0.85rem; color:var(--text-mahogany); display:block; margin-bottom:0.3rem;">Day of Week</label>
+                <select id="periodFormDay" class="form-input" aria-label="Day of Week" style="width:100%; padding:0.5rem; border-radius:8px;" required>
+                  ${daysOfWeek.map(d => {
+                    const sel = isEdit ? ((existingPeriod.day_of_week || existingPeriod.dayOfWeek || '').toLowerCase() === d.toLowerCase()) : (d.toLowerCase() === activeAdminScheduleDay.toLowerCase());
+                    return `<option value="${d}" ${sel ? 'selected' : ''}>${d}</option>`;
+                  }).join('')}
+                </select>
+              </div>
+              <div>
+                <label for="periodFormSort" style="font-weight:700; font-size:0.85rem; color:var(--text-mahogany); display:block; margin-bottom:0.3rem;">Sort / Period #</label>
+                <input type="number" id="periodFormSort" class="form-input" aria-label="Sort or Period Number" style="width:100%; padding:0.5rem; border-radius:8px;" min="1" max="10" value="${existingPeriod?.sort_order || 1}" required />
+              </div>
+            </div>
+
+            <div>
+              <label for="periodFormSubject" style="font-weight:700; font-size:0.85rem; color:var(--text-mahogany); display:block; margin-bottom:0.3rem;">Subject Title</label>
+              <input type="text" id="periodFormSubject" class="form-input" aria-label="Subject Title" style="width:100%; padding:0.5rem; border-radius:8px;" placeholder="e.g. Mathematics, Science (Physics), English" value="${escapeHtml(existingPeriod?.subject || '')}" required />
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+              <div>
+                <label for="periodFormStartTime" style="font-weight:700; font-size:0.85rem; color:var(--text-mahogany); display:block; margin-bottom:0.3rem;">Start Time</label>
+                <input type="text" id="periodFormStartTime" class="form-input" aria-label="Start Time" style="width:100%; padding:0.5rem; border-radius:8px;" placeholder="e.g. 04:00 PM" value="${escapeHtml(existingPeriod?.start_time || '04:00 PM')}" required />
+              </div>
+              <div>
+                <label for="periodFormEndTime" style="font-weight:700; font-size:0.85rem; color:var(--text-mahogany); display:block; margin-bottom:0.3rem;">End Time</label>
+                <input type="text" id="periodFormEndTime" class="form-input" aria-label="End Time" style="width:100%; padding:0.5rem; border-radius:8px;" placeholder="e.g. 05:00 PM" value="${escapeHtml(existingPeriod?.end_time || '05:00 PM')}" required />
+              </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+              <div>
+                <label for="periodFormTeacher" style="font-weight:700; font-size:0.85rem; color:var(--text-mahogany); display:block; margin-bottom:0.3rem;">Teacher / Faculty</label>
+                <input type="text" id="periodFormTeacher" class="form-input" aria-label="Teacher or Faculty" style="width:100%; padding:0.5rem; border-radius:8px;" placeholder="e.g. Prof. Ravi Ranjan" value="${escapeHtml(existingPeriod?.teacher || 'Prof. Ravi Ranjan')}" />
+              </div>
+              <div>
+                <label for="periodFormRoom" style="font-weight:700; font-size:0.85rem; color:var(--text-mahogany); display:block; margin-bottom:0.3rem;">Classroom / Hall</label>
+                <input type="text" id="periodFormRoom" class="form-input" aria-label="Classroom or Hall" style="width:100%; padding:0.5rem; border-radius:8px;" placeholder="e.g. Room 1" value="${escapeHtml(existingPeriod?.room || 'Main Hall')}" />
+              </div>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:0.6rem; padding:0.5rem; background:#FAF9F6; border-radius:8px;">
+              <input type="checkbox" id="periodFormIsCancelled" aria-label="Mark as Cancelled or Class Off" style="width:18px; height:18px; cursor:pointer;" ${existingPeriod?.is_cancelled ? 'checked' : ''} />
+              <label for="periodFormIsCancelled" style="font-size:0.88rem; font-weight:700; color:#DC2626; cursor:pointer;">
+                Mark as Cancelled / Class Off for this period
+              </label>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:0.5rem; border-top:1px solid #E5E7EB; padding-top:1rem;">
+              <button type="button" id="btnCancelPeriodModal" class="btn" style="background:#F3F4F6; color:var(--text-mahogany); font-weight:700; border-radius:8px; padding:0.5rem 1rem;">Cancel</button>
+              <button type="submit" class="btn" style="background:var(--primary-emerald); color:#fff; font-weight:700; border-radius:8px; padding:0.5rem 1.25rem;">
+                <i aria-hidden="true" class="fa-solid fa-cloud-arrow-up"></i> ${isEdit ? 'Save Period Changes' : 'Create & Sync Period'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const modalEl = document.getElementById(modalId);
+    const dialog = wireModalA11y(modalEl, { closeOnBackdrop: false });
+
+    modalEl.querySelector('#btnClosePeriodModal')?.addEventListener('click', () => dialog.close());
+    modalEl.querySelector('#btnCancelPeriodModal')?.addEventListener('click', () => dialog.close());
+
+    modalEl.querySelector('#formAddEditPeriod')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const allSchedules = AppState.getClassSchedules ? AppState.getClassSchedules() : [];
+      const batch_id = modalEl.querySelector('#periodFormBatch').value;
+      const day_of_week = modalEl.querySelector('#periodFormDay').value;
+      const sort_order = Number(modalEl.querySelector('#periodFormSort').value) || 1;
+      const subject = modalEl.querySelector('#periodFormSubject').value.trim();
+      const start_time = modalEl.querySelector('#periodFormStartTime').value.trim();
+      const end_time = modalEl.querySelector('#periodFormEndTime').value.trim();
+      const teacher = modalEl.querySelector('#periodFormTeacher').value.trim();
+      const room = modalEl.querySelector('#periodFormRoom').value.trim();
+      const is_cancelled = modalEl.querySelector('#periodFormIsCancelled').checked;
+
+      if (isEdit) {
+        const idx = allSchedules.findIndex(p => p.id === existingPeriod.id);
+        if (idx !== -1) {
+          allSchedules[idx] = {
+            ...allSchedules[idx],
+            batch_id,
+            day_of_week,
+            sort_order,
+            subject,
+            start_time,
+            end_time,
+            teacher,
+            room,
+            is_cancelled,
+            updated_at: new Date().toISOString()
+          };
+        }
+      } else {
+        allSchedules.push({
+          id: `SCHED-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          batch_id,
+          day_of_week,
+          sort_order,
+          subject,
+          start_time,
+          end_time,
+          teacher,
+          room,
+          is_cancelled,
+          created_at: new Date().toISOString()
+        });
+      }
+
+      await AppState.saveClassSchedules(allSchedules);
+      dialog.close();
+      renderAdminScheduleTab();
+    });
+  }
+
+  function openAddHolidayModal() {
+    const modalId = 'adminAddHolidayModal';
+    const existingModal = document.getElementById(modalId);
+    if (existingModal) existingModal.remove();
+
+    const batches = (typeof ACADEMIC !== 'undefined' && ACADEMIC.BATCHES) ? ACADEMIC.BATCHES : AppState.getBatches();
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const modalHtml = `
+      <div id="${modalId}" class="portal-modal-backdrop" style="display:flex; align-items:center; justify-content:center; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:9999; padding:1rem;">
+        <div class="inner-modal-content" style="background:#fff; border-radius:14px; max-width:480px; width:100%; max-height:90vh; overflow-y:auto; padding:1.5rem; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
+          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #E5E7EB; padding-bottom:0.75rem; margin-bottom:1.25rem;">
+            <h4 style="font-weight:800; font-size:1.15rem; color:#92400E; margin:0;">
+              🏖️ Declare Official Holiday / Break
+            </h4>
+            <button type="button" id="btnCloseHolidayModal" class="btn" aria-label="Close dialog" style="background:none; border:none; font-size:1.2rem; cursor:pointer; color:var(--text-muted);">&times;</button>
+          </div>
+
+          <form id="formAddHoliday" style="display:flex; flex-direction:column; gap:1rem;">
+            <div>
+              <label for="holidayFormTitle" style="font-weight:700; font-size:0.85rem; color:var(--text-mahogany); display:block; margin-bottom:0.3rem;">Holiday / Vacation Title</label>
+              <input type="text" id="holidayFormTitle" class="form-input" aria-label="Holiday Title" style="width:100%; padding:0.5rem; border-radius:8px;" placeholder="e.g. Diwali Break, Holi Festival, Independence Day" required />
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+              <div>
+                <label for="holidayFormStartDate" style="font-weight:700; font-size:0.85rem; color:var(--text-mahogany); display:block; margin-bottom:0.3rem;">Start Date</label>
+                <input type="date" id="holidayFormStartDate" class="form-input" aria-label="Start Date" style="width:100%; padding:0.5rem; border-radius:8px;" value="${todayStr}" required />
+              </div>
+              <div>
+                <label for="holidayFormEndDate" style="font-weight:700; font-size:0.85rem; color:var(--text-mahogany); display:block; margin-bottom:0.3rem;">End Date</label>
+                <input type="date" id="holidayFormEndDate" class="form-input" aria-label="End Date" style="width:100%; padding:0.5rem; border-radius:8px;" value="${todayStr}" required />
+              </div>
+            </div>
+
+            <div>
+              <label for="holidayFormBatch" style="font-weight:700; font-size:0.85rem; color:var(--text-mahogany); display:block; margin-bottom:0.3rem;">Target Batch Scope</label>
+              <select id="holidayFormBatch" class="form-input" aria-label="Target Batch Scope" style="width:100%; padding:0.5rem; border-radius:8px;">
+                <option value="ALL">🌐 All Batches (Entire Institute Closed)</option>
+                ${batches.map(b => {
+                  const bId = b.id || b.batch_id;
+                  const bName = b.name || b.batch_name || bId;
+                  return `<option value="${escapeHtml(bId)}">🎓 ${escapeHtml(bName)} (${escapeHtml(bId)}) Only</option>`;
+                }).join('')}
+              </select>
+            </div>
+
+            <div>
+              <label for="holidayFormDesc" style="font-weight:700; font-size:0.85rem; color:var(--text-mahogany); display:block; margin-bottom:0.3rem;">Description / Notice</label>
+              <textarea id="holidayFormDesc" class="form-input" aria-label="Holiday Description" rows="2" style="width:100%; padding:0.5rem; border-radius:8px;" placeholder="e.g. Institute will remain closed on account of festival celebrations. Regular classes resume Monday."></textarea>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:0.5rem; border-top:1px solid #E5E7EB; padding-top:1rem;">
+              <button type="button" id="btnCancelHolidayModal" class="btn" style="background:#F3F4F6; color:var(--text-mahogany); font-weight:700; border-radius:8px; padding:0.5rem 1rem;">Cancel</button>
+              <button type="submit" class="btn" style="background:#D97706; color:#fff; font-weight:700; border-radius:8px; padding:0.5rem 1.25rem;">
+                <i aria-hidden="true" class="fa-solid fa-cloud-arrow-up"></i> Publish Holiday
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const modalEl = document.getElementById(modalId);
+    const dialog = wireModalA11y(modalEl, { closeOnBackdrop: false });
+
+    modalEl.querySelector('#btnCloseHolidayModal')?.addEventListener('click', () => dialog.close());
+    modalEl.querySelector('#btnCancelHolidayModal')?.addEventListener('click', () => dialog.close());
+
+    modalEl.querySelector('#formAddHoliday')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const allHolidays = AppState.getInstituteHolidays ? AppState.getInstituteHolidays() : [];
+      const title = modalEl.querySelector('#holidayFormTitle').value.trim();
+      const start_date = modalEl.querySelector('#holidayFormStartDate').value;
+      const end_date = modalEl.querySelector('#holidayFormEndDate').value || start_date;
+      const target_batch = modalEl.querySelector('#holidayFormBatch').value;
+      const description = modalEl.querySelector('#holidayFormDesc').value.trim();
+
+      allHolidays.push({
+        id: `HOL-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        title,
+        start_date,
+        end_date,
+        target_batch,
+        description,
+        created_at: new Date().toISOString()
+      });
+
+      await AppState.saveInstituteHolidays(allHolidays);
+      dialog.close();
+      renderAdminScheduleTab();
+    });
+  }
+
+  function renderAdminScheduleTab() {
+    const pane = document.getElementById('adminTabPane-schedule');
+    if (!pane) return;
+
+    const batches = (typeof ACADEMIC !== 'undefined' && ACADEMIC.BATCHES) ? ACADEMIC.BATCHES : AppState.getBatches();
+    const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+    const allSchedules = AppState.getClassSchedules ? AppState.getClassSchedules() : [];
+    const allHolidays = AppState.getInstituteHolidays ? AppState.getInstituteHolidays() : [];
+
+    // Filter periods for selected batch & day
+    const currentPeriods = allSchedules.filter(sch => {
+      const matchB = (sch.batch_id || sch.batchId) === activeAdminScheduleBatchId;
+      const matchD = (sch.day_of_week || sch.dayOfWeek || '').toLowerCase() === activeAdminScheduleDay.toLowerCase();
+      return matchB && matchD;
+    });
+
+    currentPeriods.sort((a, b) => (Number(a.sort_order || a.sortOrder || 1) - Number(b.sort_order || b.sortOrder || 1)));
+
+    const isAllOff = currentPeriods.length > 0 && currentPeriods.every(p => !!p.is_cancelled);
+    const selectedBatchObj = (typeof ACADEMIC !== 'undefined' && ACADEMIC.resolveBatch) ? ACADEMIC.resolveBatch(activeAdminScheduleBatchId) : null;
+    const batchDisplayName = selectedBatchObj ? `${selectedBatchObj.name} (${selectedBatchObj.timing})` : activeAdminScheduleBatchId;
+
+    pane.innerHTML = `
+      <div class="dash-card schedule-header-card" style="margin-bottom: 1.25rem;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
+          <div>
+            <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.35rem;">
+              <span class="section-tag"><i aria-hidden="true" class="fa-solid fa-calendar-week"></i> Academic Scheduling</span>
+              <span class="pill-item pill-emerald"><i aria-hidden="true" class="fa-solid fa-cloud-arrow-up"></i> Supabase Cloud Synced</span>
+            </div>
+            <h3 style="font-size:1.35rem; font-weight:800; color:var(--text-mahogany); margin:0;">
+              Class Timetable, Weekly Repeating & Holiday Controls
+            </h3>
+            <p style="color:var(--text-muted); font-size:0.88rem; margin:0.3rem 0 0 0;">
+              Configure daily periods, replicate standard timetables across the entire week with 1 click, toggle sudden class-offs, and declare official holidays.
+            </p>
+          </div>
+          
+          <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+            <button type="button" class="btn" id="btnAdminAddPeriod" style="background:var(--primary-emerald); color:#fff; font-weight:700; border-radius:8px; padding:0.6rem 1rem;">
+              <i aria-hidden="true" class="fa-solid fa-plus"></i> Add Period
+            </button>
+            <button type="button" class="btn" id="btnAdminAddHoliday" style="background:#F59E0B; color:#fff; font-weight:700; border-radius:8px; padding:0.6rem 1rem;">
+              <i aria-hidden="true" class="fa-solid fa-umbrella-beach"></i> Declare Holiday
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls & Filter Toolbar -->
+      <div class="dash-card schedule-toolbar" style="margin-bottom: 1.25rem; background: #FFFFFF;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1rem;">
+          <!-- Batch Selector -->
+          <div class="schedule-batch-selector-wrap" style="display:flex; align-items:center; gap:0.6rem;">
+            <label for="adminScheduleBatchSelect" style="font-weight:700; font-size:0.9rem; color:var(--text-mahogany); white-space:nowrap;">
+              <i aria-hidden="true" class="fa-solid fa-users-rectangle" style="color:var(--primary-emerald);"></i> Select Batch:
+            </label>
+            <select id="adminScheduleBatchSelect" class="form-input schedule-batch-select" aria-label="Select Batch" style="min-width:240px; font-weight:700; padding:0.45rem 0.75rem; border-radius:8px;">
+              ${batches.map(b => {
+                const bId = b.id || b.batch_id;
+                const bName = b.name || b.batch_name || bId;
+                return `<option value="${escapeHtml(bId)}" ${bId === activeAdminScheduleBatchId ? 'selected' : ''}>${escapeHtml(bName)} (${escapeHtml(bId)})</option>`;
+              }).join('')}
+            </select>
+          </div>
+
+          <!-- Quick Action Buttons: Repeat Week & Class Off -->
+          <div class="schedule-quick-actions-bar">
+            <button type="button" class="btn" id="btnReplicateWeek" style="background:#EFF6FF; border:1.5px solid #3B82F6; color:#1D4ED8; font-weight:700; border-radius:8px; padding:0.45rem 0.85rem; font-size:0.85rem;" title="Copy this day's timetable to all other days (Monday to Saturday)">
+              <i aria-hidden="true" class="fa-solid fa-bolt"></i> ⚡ Repeat for Whole Week (Mon–Sat)
+            </button>
+            <button type="button" class="btn" id="btnToggleDayOff" style="background:${isAllOff ? '#ECFDF5' : '#FEF2F2'}; border:1.5px solid ${isAllOff ? '#10B981' : '#EF4444'}; color:${isAllOff ? '#047857' : '#B91C1C'}; font-weight:700; border-radius:8px; padding:0.45rem 0.85rem; font-size:0.85rem;">
+              <i aria-hidden="true" class="${isAllOff ? 'fa-solid fa-circle-check' : 'fa-solid fa-ban'}"></i> ${isAllOff ? 'Resume All Classes' : '🚫 Mark Entire Day as Class Off'}
+            </button>
+          </div>
+        </div>
+
+        <!-- Days of the Week Selector Pills -->
+        <div class="student-schedule-week-bar" style="margin-bottom:0;">
+          ${daysOfWeek.map(d => {
+            const isActive = d.toLowerCase() === activeAdminScheduleDay.toLowerCase();
+            const periodsForD = allSchedules.filter(s => (s.batch_id || s.batchId) === activeAdminScheduleBatchId && (s.day_of_week || s.dayOfWeek || '').toLowerCase() === d.toLowerCase());
+            const hasOff = periodsForD.length > 0 && periodsForD.every(p => !!p.is_cancelled);
+            return `
+              <button type="button" class="student-week-chip ${isActive ? 'active' : ''}" data-day="${d}" aria-label="Day ${d}">
+                ${d} (${periodsForD.length}) ${hasOff ? '🚫' : ''}
+              </button>
+            `;
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- Periods Grid Section -->
+      <div class="dash-card" style="margin-bottom: 1.5rem;">
+        <div class="dash-card-header" style="margin-bottom:1.15rem;">
+          <div class="dash-card-title">
+            <i aria-hidden="true" class="fa-solid fa-clock-rotate-left"></i> Periods for ${escapeHtml(activeAdminScheduleDay)} — ${escapeHtml(batchDisplayName)}
+          </div>
+          <span style="font-size:0.85rem; font-weight:700; color:var(--text-muted);">
+            Total: <strong>${currentPeriods.length}</strong> period${currentPeriods.length === 1 ? '' : 's'}
+          </span>
+        </div>
+
+        ${currentPeriods.length === 0 ? `
+          <div style="text-align:center; padding:3rem 1.5rem; background:var(--bg-surface-cream); border-radius:12px; border:1.5px dashed var(--border-sand);">
+            <i aria-hidden="true" class="fa-solid fa-calendar-xmark" style="font-size:2.4rem; color:var(--text-sand); margin-bottom:0.75rem; display:block;"></i>
+            <h4 style="font-size:1.1rem; font-weight:800; color:var(--text-mahogany); margin-bottom:0.35rem;">No Periods Scheduled for ${escapeHtml(activeAdminScheduleDay)}</h4>
+            <p style="color:var(--text-muted); font-size:0.88rem; max-width:480px; margin:0 auto 1.25rem auto;">
+              Create periods one-by-one or use standard template to quickly seed the batch timetable.
+            </p>
+            <div style="display:flex; justify-content:center; gap:0.75rem; flex-wrap:wrap;">
+              <button type="button" class="btn" id="btnAdminEmptyAddPeriod" style="background:var(--primary-emerald); color:#fff; font-weight:700; padding:0.5rem 1.1rem; border-radius:8px;">
+                <i aria-hidden="true" class="fa-solid fa-plus"></i> Add First Period
+              </button>
+              <button type="button" class="btn" id="btnAdminSeedDefault" style="background:#FAF9F6; border:1.5px solid var(--border-sand); color:var(--text-mahogany); font-weight:700; padding:0.5rem 1.1rem; border-radius:8px;">
+                <i aria-hidden="true" class="fa-solid fa-wand-magic-sparkles" style="color:var(--primary-emerald);"></i> Auto-Populate Standard Subjects
+              </button>
+            </div>
+          </div>
+        ` : `
+          <div class="schedule-periods-grid">
+            ${currentPeriods.map((p, idx) => `
+              <div class="schedule-period-card ${p.is_cancelled ? 'is-off' : ''}" data-period-id="${escapeHtml(p.id)}">
+                <div>
+                  <div class="period-top-row">
+                    <span class="period-number-badge">Period #${p.sort_order || (idx + 1)}</span>
+                    <span class="period-time-badge">
+                      <i aria-hidden="true" class="fa-regular fa-clock"></i> ${(p.start_time && p.end_time) ? `${escapeHtml(p.start_time)} – ${escapeHtml(p.end_time)}` : escapeHtml(p.start_time || 'Timing TBA')}
+                    </span>
+                  </div>
+
+                  <div class="period-subject-title">
+                    <i aria-hidden="true" class="${p.is_cancelled ? 'fa-solid fa-ban' : 'fa-solid fa-book-bookmark'}" style="color:${p.is_cancelled ? '#DC2626' : 'var(--primary-emerald)'};"></i>
+                    <span style="${p.is_cancelled ? 'text-decoration:line-through; color:#991B1B;' : ''}">${escapeHtml(p.subject)}</span>
+                  </div>
+
+                  <div class="period-meta-row" style="margin-top:0.75rem;">
+                    <div class="period-meta-item">
+                      <i aria-hidden="true" class="fa-solid fa-chalkboard-user"></i>
+                      <span><strong>Teacher:</strong> ${escapeHtml(p.teacher || 'Not Assigned')}</span>
+                    </div>
+                    <div class="period-meta-item">
+                      <i aria-hidden="true" class="fa-solid fa-door-open"></i>
+                      <span><strong>Classroom:</strong> ${escapeHtml(p.room || 'Main Hall')}</span>
+                    </div>
+                    <div class="period-meta-item">
+                      <i aria-hidden="true" class="fa-solid fa-signal"></i>
+                      <span><strong>Status:</strong> ${p.is_cancelled ? '<span style="color:#DC2626; font-weight:800;">🚫 Cancelled / Class Off</span>' : '<span style="color:#047857; font-weight:800;">🟢 Active & Scheduled</span>'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="period-card-actions">
+                  <button type="button" class="btn btn-sm btn-edit-period" data-id="${escapeHtml(p.id)}" aria-label="Edit period" style="background:#F3F4F6; border:1px solid #D1D5DB; color:var(--text-mahogany); font-weight:700; border-radius:6px; padding:0.35rem 0.65rem; font-size:0.8rem;">
+                    <i aria-hidden="true" class="fa-solid fa-pen-to-square"></i> Edit
+                  </button>
+                  <button type="button" class="btn btn-sm btn-toggle-period-off" data-id="${escapeHtml(p.id)}" aria-label="Toggle class off" style="background:${p.is_cancelled ? '#ECFDF5' : '#FEF2F2'}; border:1px solid ${p.is_cancelled ? '#A7F3D0' : '#FECACA'}; color:${p.is_cancelled ? '#047857' : '#DC2626'}; font-weight:700; border-radius:6px; padding:0.35rem 0.65rem; font-size:0.8rem;">
+                    <i aria-hidden="true" class="${p.is_cancelled ? 'fa-solid fa-rotate-left' : 'fa-solid fa-ban'}"></i> ${p.is_cancelled ? 'Resume' : 'Class Off'}
+                  </button>
+                  <button type="button" class="btn btn-sm btn-delete-period" data-id="${escapeHtml(p.id)}" aria-label="Delete period" style="background:#FFF1F2; border:1px solid #FECDD3; color:#E11D48; font-weight:700; border-radius:6px; padding:0.35rem 0.65rem; font-size:0.8rem;">
+                    <i aria-hidden="true" class="fa-solid fa-trash"></i>
+                  </button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `}
+      </div>
+
+      <!-- Institute Holidays & Breaks Section -->
+      <div class="dash-card">
+        <div class="dash-card-header">
+          <div>
+            <div class="dash-card-title"><i aria-hidden="true" class="fa-solid fa-umbrella-beach"></i> Official Institute Holidays & Breaks</div>
+            <div style="font-size:0.82rem; color:var(--text-muted); margin-top:0.2rem;">
+              Holidays automatically display banners across student portals and indicate day-off alerts.
+            </div>
+          </div>
+          <button type="button" class="btn" id="btnAdminSectionAddHoliday" style="background:#F59E0B; color:#fff; font-weight:700; border-radius:8px; padding:0.4rem 0.85rem; font-size:0.85rem;">
+            <i aria-hidden="true" class="fa-solid fa-plus"></i> New Holiday
+          </button>
+        </div>
+
+        ${allHolidays.length === 0 ? `
+          <div style="padding:1.5rem; text-align:center; color:var(--text-muted); background:var(--bg-surface-cream); border-radius:8px;">
+            <i aria-hidden="true" class="fa-solid fa-sun" style="font-size:1.8rem; opacity:0.6; display:block; margin-bottom:0.4rem;"></i>
+            No active holidays or breaks configured. Click "New Holiday" to declare one.
+          </div>
+        ` : `
+          <div class="holiday-list-grid">
+            ${allHolidays.map(h => `
+              <div class="holiday-item-card">
+                <div>
+                  <div class="holiday-title">
+                    <span>🏖️ ${escapeHtml(h.title || 'Institute Holiday')}</span>
+                  </div>
+                  <div class="holiday-dates" style="margin-top:0.35rem;">
+                    <i aria-hidden="true" class="fa-regular fa-calendar"></i> ${escapeHtml(h.start_date || '')} ${h.end_date && h.end_date !== h.start_date ? `to ${escapeHtml(h.end_date)}` : ''}
+                  </div>
+                  <div style="font-size:0.82rem; color:var(--text-muted); margin-top:0.35rem;">
+                    <strong>Target:</strong> ${h.target_batch === 'ALL' || !h.target_batch ? '<span class="status-pill status-verified" style="font-size:0.75rem;">All Batches</span>' : `<span class="status-pill status-adjusted" style="font-size:0.75rem;">${escapeHtml(h.target_batch)}</span>`}
+                  </div>
+                  ${h.description ? `<div style="font-size:0.8rem; color:#475569; margin-top:0.4rem; font-style:italic;">"${escapeHtml(h.description)}"</div>` : ''}
+                </div>
+                <div style="display:flex; justify-content:flex-end; border-top:1px dashed #FDE68A; padding-top:0.6rem; margin-top:0.6rem;">
+                  <button type="button" class="btn btn-sm btn-delete-holiday" data-id="${escapeHtml(h.id)}" aria-label="Remove holiday" style="background:#FEF2F2; color:#DC2626; border:1px solid #FECACA; font-weight:700; border-radius:6px; padding:0.25rem 0.6rem; font-size:0.78rem;">
+                    <i aria-hidden="true" class="fa-solid fa-trash"></i> Remove Holiday
+                  </button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `}
+      </div>
+    `;
+
+    // Attach Event Listeners
+    // Batch Selector
+    pane.querySelector('#adminScheduleBatchSelect')?.addEventListener('change', (e) => {
+      activeAdminScheduleBatchId = e.target.value;
+      renderAdminScheduleTab();
+    });
+
+    // Day chips
+    pane.querySelectorAll('.student-week-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        activeAdminScheduleDay = chip.dataset.day;
+        renderAdminScheduleTab();
+      });
+    });
+
+    // Add Period Buttons
+    pane.querySelector('#btnAdminAddPeriod')?.addEventListener('click', () => openAddEditPeriodModal());
+    pane.querySelector('#btnAdminEmptyAddPeriod')?.addEventListener('click', () => openAddEditPeriodModal());
+
+    // Add Holiday Buttons
+    pane.querySelector('#btnAdminAddHoliday')?.addEventListener('click', () => openAddHolidayModal());
+    pane.querySelector('#btnAdminSectionAddHoliday')?.addEventListener('click', () => openAddHolidayModal());
+
+    // Seed Standard Subjects
+    pane.querySelector('#btnAdminSeedDefault')?.addEventListener('click', () => {
+      seedDefaultScheduleForBatchAndDay(activeAdminScheduleBatchId, activeAdminScheduleDay);
+    });
+
+    // Replicate for Whole Week
+    pane.querySelector('#btnReplicateWeek')?.addEventListener('click', () => {
+      replicateDayScheduleAcrossWeek(activeAdminScheduleBatchId, activeAdminScheduleDay);
+    });
+
+    // Toggle Entire Day Off
+    pane.querySelector('#btnToggleDayOff')?.addEventListener('click', () => {
+      toggleEntireDayOff(activeAdminScheduleBatchId, activeAdminScheduleDay, !isAllOff);
+    });
+
+    // Edit Period
+    pane.querySelectorAll('.btn-edit-period').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const pId = btn.dataset.id;
+        const period = allSchedules.find(p => p.id === pId);
+        if (period) openAddEditPeriodModal(period);
+      });
+    });
+
+    // Toggle Single Period Off
+    pane.querySelectorAll('.btn-toggle-period-off').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const pId = btn.dataset.id;
+        const period = allSchedules.find(p => p.id === pId);
+        if (period) {
+          period.is_cancelled = !period.is_cancelled;
+          await AppState.saveClassSchedules(allSchedules);
+          renderAdminScheduleTab();
+        }
+      });
+    });
+
+    // Delete Single Period
+    pane.querySelectorAll('.btn-delete-period').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const pId = btn.dataset.id;
+        if (confirm('Delete this period from schedule?')) {
+          const updated = allSchedules.filter(p => p.id !== pId);
+          await AppState.saveClassSchedules(updated);
+          renderAdminScheduleTab();
+        }
+      });
+    });
+
+    // Delete Holiday
+    pane.querySelectorAll('.btn-delete-holiday').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const hId = btn.dataset.id;
+        if (confirm('Remove this official holiday?')) {
+          const updatedHolidays = allHolidays.filter(h => h.id !== hId);
+          await AppState.saveInstituteHolidays(updatedHolidays);
+          renderAdminScheduleTab();
+        }
+      });
+    });
   }
 
   // Expose AppState to window for sync and testing

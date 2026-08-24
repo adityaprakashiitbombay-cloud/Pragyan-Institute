@@ -16,9 +16,10 @@ import { runMentorRatingTests } from '../tests/mentor-ratings.test.js';
 import { runPushNotificationTests } from '../tests/push-notifications.test.js';
 import { runAdminLogoutAllTests } from '../tests/admin-logout-all.test.js';
 import { runVipPassCardTests } from '../tests/vip-pass-card.test.js';
+import { runClassScheduleTests } from '../tests/class-schedule.test.js';
 
 console.log('================================================================');
-console.log('   PRAGYAN INSTITUTE — T1 TO T6 MASTER TEST RUNNER & AUDIT      ');
+console.log('   PRAGYAN INSTITUTE — T1 TO T31 MASTER TEST RUNNER & AUDIT     ');
 console.log('================================================================\n');
 
 let pass = 0;
@@ -882,6 +883,14 @@ runAdminLogoutAllTests(assert);
 // -----------------------------------------------------------------------------
 console.log('\n--- [T30] 3D Metallic VIP Pass & Student Card Suite ---');
 runVipPassCardTests(assert);
+
+// -----------------------------------------------------------------------------
+// T31 — Dynamic Cloud Class Schedules & Holidays Suite. Covers database schema,
+// gateway allowlisting, client sync, admin weekly replication & class-off controls,
+// and student responsive timetable with holiday alerts.
+// -----------------------------------------------------------------------------
+console.log('\n--- [T31] Dynamic Cloud Class Schedules & Holidays Suite ---');
+runClassScheduleTests(assert);
 
 console.log('\n================================================================');
 console.log(`MASTER TEST RESULTS: ${pass} Passed, ${fail} Failed`);

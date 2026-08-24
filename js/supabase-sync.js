@@ -31,14 +31,17 @@
     batches:            'pragyan_db_batches_master',
     admins:             'pragyan_db_admins_master',
     audit_logs:         'pragyan_db_audit_logs_master',
-    blog_posts:         'pragyan_db_blog_master'
+    blog_posts:         'pragyan_db_blog_master',
+    class_schedules:    'pragyan_db_class_schedules_master',
+    institute_holidays: 'pragyan_db_institute_holidays_master'
   };
 
   const ORDER_COLUMNS = {
     students: 'student_id', notices: 'id', fee_receipts: 'receipt_no',
     fee_billing_ledger: 'created_at', student_requests: 'created_at',
     batches: 'batch_id', admins: 'admin_id', audit_logs: 'log_id',
-    blog_posts: 'id'
+    blog_posts: 'id', class_schedules: 'sort_order',
+    institute_holidays: 'start_date'
   };
 
   const ALL_TABLES = Object.keys(KEY_MAP);

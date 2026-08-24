@@ -1782,4 +1782,90 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.admin_sessions TO authenticated;
 
 -- Final Hardening Verification:
 SELECT tablename FROM pg_tables WHERE schemaname='public'
-  AND tablename IN ('push_subscriptions','push_broadcast_logs','admin_sessions');
+  AND tablename IN ('push_subscriptions','push_broadcast_logs','admin_sessions','class_schedules','institute_holidays');
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- SECTION 18: DYNAMIC CLASS TIMETABLES & INSTITUTE HOLIDAYS
+-- ----------------------------------------------------------------------------
+-- Manages day-wise class schedules for all batches with whole-week repetition,
+-- day-off/class cancellation toggles, teacher assignments, and institute holidays.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS public.class_schedules (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  batch_id      text NOT NULL,
+  day_of_week   text NOT NULL,
+  subject       text NOT NULL,
+  start_time    text NOT NULL,
+  end_time      text NOT NULL,
+  teacher       text DEFAULT '',
+  room          text DEFAULT 'Classroom 1',
+  is_cancelled  boolean NOT NULL DEFAULT false,
+  sort_order    integer NOT NULL DEFAULT 0,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.institute_holidays (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  title         text NOT NULL,
+  start_date    date NOT NULL,
+  end_date      date NOT NULL,
+  target_batch  text NOT NULL DEFAULT 'ALL',
+  description   text DEFAULT '',
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_class_schedules_batch_day ON public.class_schedules(batch_id, day_of_week, sort_order);
+CREATE INDEX IF NOT EXISTS idx_institute_holidays_dates ON public.institute_holidays(start_date, end_date);
+
+ALTER TABLE public.class_schedules ADD COLUMN IF NOT EXISTS batch_id text;
+ALTER TABLE public.class_schedules ADD COLUMN IF NOT EXISTS day_of_week text;
+ALTER TABLE public.class_schedules ADD COLUMN IF NOT EXISTS subject text;
+ALTER TABLE public.class_schedules ADD COLUMN IF NOT EXISTS start_time text;
+ALTER TABLE public.class_schedules ADD COLUMN IF NOT EXISTS end_time text;
+ALTER TABLE public.class_schedules ADD COLUMN IF NOT EXISTS teacher text DEFAULT '';
+ALTER TABLE public.class_schedules ADD COLUMN IF NOT EXISTS room text DEFAULT 'Classroom 1';
+ALTER TABLE public.class_schedules ADD COLUMN IF NOT EXISTS is_cancelled boolean NOT NULL DEFAULT false;
+ALTER TABLE public.class_schedules ADD COLUMN IF NOT EXISTS sort_order integer NOT NULL DEFAULT 0;
+
+ALTER TABLE public.institute_holidays ADD COLUMN IF NOT EXISTS title text;
+ALTER TABLE public.institute_holidays ADD COLUMN IF NOT EXISTS start_date date;
+ALTER TABLE public.institute_holidays ADD COLUMN IF NOT EXISTS end_date date;
+ALTER TABLE public.institute_holidays ADD COLUMN IF NOT EXISTS target_batch text DEFAULT 'ALL';
+ALTER TABLE public.institute_holidays ADD COLUMN IF NOT EXISTS description text DEFAULT '';
+
+DROP TRIGGER IF EXISTS trg_class_schedules_updated_at ON public.class_schedules;
+CREATE TRIGGER trg_class_schedules_updated_at
+  BEFORE UPDATE ON public.class_schedules
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_institute_holidays_updated_at ON public.institute_holidays;
+CREATE TRIGGER trg_institute_holidays_updated_at
+  BEFORE UPDATE ON public.institute_holidays
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+DO $do$
+DECLARE p record;
+BEGIN
+  FOR p IN SELECT schemaname, tablename, policyname FROM pg_policies
+           WHERE schemaname='public' AND tablename IN ('class_schedules', 'institute_holidays')
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', p.policyname, p.schemaname, p.tablename);
+  END LOOP;
+END $do$;
+
+ALTER TABLE public.class_schedules  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.class_schedules  FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.institute_holidays ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.institute_holidays FORCE ROW LEVEL SECURITY;
+
+CREATE POLICY "service_role_full_schedules" ON public.class_schedules FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "service_role_full_holidays"  ON public.institute_holidays FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+REVOKE ALL ON public.class_schedules  FROM anon, authenticated;
+REVOKE ALL ON public.institute_holidays FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.class_schedules  TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.institute_holidays TO authenticated;

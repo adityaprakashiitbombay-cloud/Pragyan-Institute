@@ -23,17 +23,20 @@ const TABLES = new Set([
   'students', 'notices', 'fee_receipts', 'fee_billing_ledger',
   'student_requests', 'batches', 'admins', 'audit_logs',
   'blog_posts', 'push_subscriptions', 'push_broadcast_logs',
-  'admin_sessions'
+  'admin_sessions', 'class_schedules', 'institute_holidays'
 ]);
 
 // Readable without a session, because the marketing site renders before login.
 const PUBLIC_TABLES = new Set(['notices', 'batches', 'blog_posts']);
+PUBLIC_TABLES.add('class_schedules');
+PUBLIC_TABLES.add('institute_holidays');
 
 // Reachable at all by a student session. email_dispatch_log is absent from
 // TABLES entirely: the email quota ledger is server-only bookkeeping.
 const STUDENT_TABLES = new Set([
   'students', 'notices', 'fee_receipts', 'fee_billing_ledger',
-  'student_requests', 'batches', 'admins', 'push_subscriptions'
+  'student_requests', 'batches', 'admins', 'push_subscriptions',
+  'class_schedules', 'institute_holidays'
 ]);
 
 // Allowlisted server-side functions callable through this gateway's rpc
@@ -104,7 +107,8 @@ const ORDER_COLUMNS = {
   fee_billing_ledger: 'created_at', student_requests: 'created_at',
   batches: 'batch_id', admins: 'admin_id', audit_logs: 'created_at',
   blog_posts: 'created_at', push_subscriptions: 'created_at',
-  push_broadcast_logs: 'created_at', admin_sessions: 'last_active_at'
+  push_broadcast_logs: 'created_at', admin_sessions: 'last_active_at',
+  class_schedules: 'sort_order', institute_holidays: 'start_date'
 };
 
 // Descending by default where the UI shows newest-first lists.

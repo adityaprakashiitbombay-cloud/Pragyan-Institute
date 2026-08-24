@@ -47,11 +47,11 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
   <!-- CSS Design System -->
-  <link rel="stylesheet" href="./css/variables.css?v=90.0.6c03cfe7">
-  <link rel="stylesheet" href="./css/main.css?v=90.0.6c03cfe7">
-  <link rel="stylesheet" href="./css/components.css?v=90.0.6c03cfe7">
-  <link rel="stylesheet" href="./css/animations.css?v=90.0.6c03cfe7">
-  <link rel="stylesheet" href="./css/portal.css?v=90.0.6c03cfe7">
+  <link rel="stylesheet" href="./css/variables.css?v=90.0.83839489">
+  <link rel="stylesheet" href="./css/main.css?v=90.0.83839489">
+  <link rel="stylesheet" href="./css/components.css?v=90.0.83839489">
+  <link rel="stylesheet" href="./css/animations.css?v=90.0.83839489">
+  <link rel="stylesheet" href="./css/portal.css?v=90.0.83839489">
 
   <!-- Schema.org JSON-LD Structured Data for Google Top Ranking & Knowledge Graph -->
   <script type="application/ld+json">
@@ -1488,6 +1488,9 @@
           <button class="dash-tab-btn admin-tab-btn" data-tab="post-notice">
             <i aria-hidden="true" class="fa-solid fa-bullhorn"></i> Noticeboard & Announcements
           </button>
+          <button class="dash-tab-btn admin-tab-btn" data-tab="schedule" id="adminTabBtnSchedule">
+            <i aria-hidden="true" class="fa-solid fa-calendar-week"></i> Class Timetable &amp; Holidays
+          </button>
           <button class="dash-tab-btn admin-tab-btn" data-tab="push" id="adminTabBtnPush">
             <i aria-hidden="true" class="fa-solid fa-tower-broadcast"></i> Push Alerts & Broadcasts
           </button>
@@ -1510,6 +1513,7 @@
           <div class="tab-pane admin-tab-pane" id="adminTabPane-email"></div>
           <div class="tab-pane admin-tab-pane" id="adminTabPane-requests"></div>
           <div class="tab-pane admin-tab-pane" id="adminTabPane-post-notice"></div>
+          <div class="tab-pane admin-tab-pane" id="adminTabPane-schedule"></div>
           <div class="tab-pane admin-tab-pane" id="adminTabPane-push"></div>
           <div class="tab-pane admin-tab-pane" id="adminTabPane-history"></div>
           <div class="tab-pane admin-tab-pane" id="adminTabPane-settings"></div>
@@ -1522,22 +1526,22 @@
   <!-- Application Scripts -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
-  <script defer src="./js/config.js?v=90.0.6c03cfe7"></script>
+  <script defer src="./js/config.js?v=90.0.83839489"></script>
   <!-- Canonical batch/fee/faculty table. Must load before app.js and portal.js,
        which read window.PRAGYAN_ACADEMIC instead of keeping their own copies. -->
-  <script defer src="./js/academic-config.js?v=90.0.6c03cfe7"></script>
-  <script defer src="./js/supabase-sync.js?v=90.0.6c03cfe7"></script>
-  <script type="module" src="./js/blog-markdown.js?v=90.0.6c03cfe7"></script>
-  <script defer src="./js/push-client.js?v=90.0.6c03cfe7"></script>
-  <script defer src="./js/chat.js?v=90.0.6c03cfe7"></script>
-  <script defer src="./js/app.js?v=90.0.6c03cfe7"></script>
-  <script defer src="./js/portal.js?v=90.0.6c03cfe7"></script>
+  <script defer src="./js/academic-config.js?v=90.0.83839489"></script>
+  <script defer src="./js/supabase-sync.js?v=90.0.83839489"></script>
+  <script type="module" src="./js/blog-markdown.js?v=90.0.83839489"></script>
+  <script defer src="./js/push-client.js?v=90.0.83839489"></script>
+  <script defer src="./js/chat.js?v=90.0.83839489"></script>
+  <script defer src="./js/app.js?v=90.0.83839489"></script>
+  <script defer src="./js/portal.js?v=90.0.83839489"></script>
 
   <!-- PWA Service Worker Registration for Instant Offline Caching -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=90.0.6c03cfe7').then(reg => {
+        navigator.serviceWorker.register('./sw.js?v=90.0.83839489').then(reg => {
           reg.update().catch(() => {});
         }).catch(err => console.log('SW reg error:', err));
       });

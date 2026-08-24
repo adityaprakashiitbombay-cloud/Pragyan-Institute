@@ -6223,4 +6223,360 @@ button, a, input, select, textarea {
     justify-content: center;
     min-height: 42px;
   }
-}
+}
+
+/* ==========================================================================
+ * DYNAMIC CLASS TIMETABLES & INSTITUTE HOLIDAYS MANAGEMENT STYLES
+ * ========================================================================== */
+
+.schedule-admin-hub {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.schedule-header-card {
+  background: linear-gradient(135deg, #064E3B 0%, #04382B 60%, #02261D 100%);
+  border: 1.5px solid rgba(245, 158, 11, 0.4);
+  border-radius: 14px;
+  padding: 1.35rem 1.5rem;
+  color: #FFFFFF;
+  box-shadow: 0 4px 18px rgba(6, 78, 59, 0.25);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.schedule-header-title {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #FCD34D;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.schedule-header-sub {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.8);
+  margin-top: 0.35rem;
+  max-width: 650px;
+  line-height: 1.45;
+}
+
+.schedule-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  background: #FFFFFF;
+  border: 1.5px solid var(--border-sand, #E2E8F0);
+  border-radius: 12px;
+  padding: 0.95rem 1.15rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.schedule-batch-selector-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.schedule-batch-select {
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  border: 1.5px solid var(--primary-emerald, #064E3B);
+  background: #FAF9F6;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text-mahogany, #1E293B);
+  cursor: pointer;
+  outline: none;
+  min-height: 42px;
+}
+
+.schedule-day-tabs-bar {
+  display: flex;
+  gap: 0.45rem;
+  overflow-x: auto;
+  padding: 0.25rem 0.1rem;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.schedule-day-tab {
+  padding: 0.5rem 0.95rem;
+  border-radius: 8px;
+  border: 1.5px solid var(--border-sand, #E2E8F0);
+  background: #F8FAFC;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--text-muted, #64748B);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+  min-height: 40px;
+}
+
+.schedule-day-tab:hover {
+  background: #F1F5F9;
+  border-color: #CBD5E1;
+  color: var(--text-mahogany, #1E293B);
+}
+
+.schedule-day-tab.active {
+  background: var(--primary-emerald, #064E3B);
+  border-color: var(--primary-emerald, #064E3B);
+  color: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(6, 78, 59, 0.2);
+}
+
+.schedule-day-tab.day-is-off {
+  border-color: #FCA5A5;
+  background: #FEF2F2;
+  color: #DC2626;
+}
+
+.schedule-day-tab.day-is-off.active {
+  background: #DC2626;
+  border-color: #DC2626;
+  color: #FFFFFF;
+}
+
+.schedule-quick-actions-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.schedule-periods-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.15rem;
+}
+
+.schedule-period-card {
+  background: #FFFFFF;
+  border: 1.5px solid var(--border-sand, #E2E8F0);
+  border-radius: 12px;
+  padding: 1.15rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.9rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.schedule-period-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+}
+
+.schedule-period-card.is-off {
+  background: #FFFBFB;
+  border-color: #F87171;
+  opacity: 0.88;
+}
+
+.period-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.period-number-badge {
+  background: #ECFDF5;
+  color: #065F46;
+  border: 1px solid #A7F3D0;
+  padding: 0.25rem 0.55rem;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+}
+
+.period-subject-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text-mahogany, #1E293B);
+  margin-top: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.period-time-badge {
+  background: #FEF3C7;
+  color: #92400E;
+  border: 1px solid #FCD34D;
+  padding: 0.35rem 0.75rem;
+  border-radius: 99px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.period-meta-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  color: var(--text-muted, #64748B);
+  border-top: 1px dashed var(--border-sand, #E2E8F0);
+  padding-top: 0.75rem;
+}
+
+.period-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.period-meta-item i {
+  color: var(--primary-emerald, #064E3B);
+  width: 16px;
+  text-align: center;
+}
+
+.period-card-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  border-top: 1px solid #F1F5F9;
+  padding-top: 0.75rem;
+}
+
+.holiday-banner-alert {
+  background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%);
+  border: 1.5px solid #F59E0B;
+  border-radius: 12px;
+  padding: 1.1rem 1.25rem;
+  color: #92400E;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  box-shadow: 0 3px 12px rgba(245, 158, 11, 0.15);
+}
+
+.holiday-list-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.95rem;
+  margin-top: 1rem;
+}
+
+.holiday-item-card {
+  background: #FFFFFF;
+  border: 1.5px solid #FDE68A;
+  border-left: 4px solid #D97706;
+  border-radius: 10px;
+  padding: 0.95rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.65rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.holiday-title {
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: #92400E;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.holiday-dates {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #B45309;
+}
+
+.student-schedule-week-bar {
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+  padding: 0.4rem 0;
+  margin-bottom: 1rem;
+  scrollbar-width: thin;
+}
+
+.student-week-chip {
+  padding: 0.4rem 0.85rem;
+  border-radius: 8px;
+  border: 1.5px solid var(--border-sand, #E2E8F0);
+  background: var(--bg-surface-cream, #FAF9F6);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted, #64748B);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.student-week-chip.active {
+  background: var(--primary-emerald, #064E3B);
+  color: #FFFFFF;
+  border-color: var(--primary-emerald, #064E3B);
+}
+
+.student-week-chip.is-today {
+  border-color: #F59E0B;
+  color: #B45309;
+}
+
+.student-week-chip.is-today.active {
+  background: #D97706;
+  border-color: #D97706;
+  color: #FFFFFF;
+}
+
+@media (max-width: 768px) {
+  .schedule-header-card {
+    padding: 1rem;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .schedule-toolbar {
+    padding: 0.75rem;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .schedule-batch-selector-wrap {
+    width: 100%;
+  }
+  .schedule-batch-select {
+    width: 100%;
+  }
+  .schedule-quick-actions-bar {
+    width: 100%;
+    flex-direction: column;
+  }
+  .schedule-quick-actions-bar .btn {
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
+  }
+  .schedule-periods-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
