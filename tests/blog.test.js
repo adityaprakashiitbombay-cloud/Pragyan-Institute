@@ -97,7 +97,7 @@ export function runBlogTests(assert) {
   assert(tabIndex.includes('data-tab="blog"'), 'T25.29: admin dashboard has the Articles & Blog tab button');
   assert(tabIndex.includes('id="adminTabPane-blog"'), 'T25.30: admin dashboard has the blog tab pane target');
   assert(portalSrc.includes("uploadFile(file, 'blog_covers')"), 'T25.31: cover uploads go to pragyan-media/blog_covers/');
-  assert(portalSrc.includes("SupabaseSync.mutate(\n          'blog_posts',"), 'T25.32: editor persists through SupabaseSync.mutate (offline-first path)');
+  assert(/SupabaseSync\.mutate\(\s*['"]blog_posts['"]/.test(portalSrc), 'T25.32: editor persists through SupabaseSync.mutate (offline-first path)');
   assert(portalSrc.includes("is_published: publishNow"), 'T25.33: draft vs publish toggle drives is_published');
 
   // --- 8. Upload endpoint whitelist ------------------------------------------------
