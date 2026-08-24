@@ -12236,9 +12236,20 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
         }
       }
 
-      if (Array.isArray(livePosts)) {
-        // Canonical database truth: update local storage directly
-        blogWriteLocal(livePosts);
+      if (Array.isArray(livePosts) && livePosts.length > 0) {
+        // Also merge any local view counts from pragyan_blog_views_cache if higher
+        let viewsMap = {};
+        try {
+          const rawV = localStorage.getItem('pragyan_blog_views_cache');
+          if (rawV) viewsMap = JSON.parse(rawV);
+        } catch (_) {}
+
+        const synced = livePosts.map(lp => ({
+          ...lp,
+          views_count: Math.max(Number(lp.views_count) || 0, Number(viewsMap[lp.slug]) || 0)
+        }));
+
+        blogWriteLocal(synced);
         renderAdminBlogTab(true);
         if (!silent) {
           showNotification('📊 Real-time view counts & articles synced from database!', 'success');
@@ -12334,7 +12345,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
               </tr></thead>
               <tbody>
                 ${filtered.map(p => `
-                  <tr data-blog-row="${p.id}">
+                  <tr data-blog-row="${p.id || p.slug}">
                     <td>${p.cover_image_url
                       ? `<img src="${sanitizeInput(p.cover_image_url)}" alt="" style="width:64px;height:40px;object-fit:cover;border-radius:6px;border:1px solid var(--border-sand);">`
                       : `<span style="display:inline-flex;width:64px;height:40px;border-radius:6px;background:linear-gradient(135deg,var(--primary-emerald),#022C22);color:#fff;align-items:center;justify-content:center;font-weight:800;">${escapeHtml((p.title || 'B').charAt(0))}</span>`}</td>
@@ -12345,10 +12356,10 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
                     <td>${(p.published_at || p.created_at) ? new Date(p.published_at || p.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</td>
                     <td>
                       <div style="display:flex;gap:0.35rem;flex-wrap:wrap;">
-                        <button type="button" class="btn-action" data-blog-edit="${p.id}" aria-label="Edit article ${sanitizeInput(p.title)}" title="Edit"><i aria-hidden="true" class="fa-solid fa-pen"></i></button>
-                        <button type="button" class="btn-action" data-blog-toggle="${p.id}" aria-label="${p.is_published ? 'Unpublish' : 'Publish'} article ${sanitizeInput(p.title)}" title="${p.is_published ? 'Unpublish' : 'Publish Live'}">
+                        <button type="button" class="btn-action" data-blog-edit="${p.id || p.slug}" aria-label="Edit article ${sanitizeInput(p.title)}" title="Edit"><i aria-hidden="true" class="fa-solid fa-pen"></i></button>
+                        <button type="button" class="btn-action" data-blog-toggle="${p.id || p.slug}" aria-label="${p.is_published ? 'Unpublish' : 'Publish'} article ${sanitizeInput(p.title)}" title="${p.is_published ? 'Unpublish' : 'Publish Live'}">
                           <i aria-hidden="true" class="fa-solid ${p.is_published ? 'fa-eye-slash' : 'fa-paper-plane'}"></i></button>
-                        <button type="button" class="btn-action" data-blog-delete="${p.id}" aria-label="Delete article ${sanitizeInput(p.title)}" title="Delete" style="color:#DC2626;"><i aria-hidden="true" class="fa-solid fa-trash"></i></button>
+                        <button type="button" class="btn-action" data-blog-delete="${p.id || p.slug}" aria-label="Delete article ${sanitizeInput(p.title)}" title="Delete" style="color:#DC2626;"><i aria-hidden="true" class="fa-solid fa-trash"></i></button>
                       </div>
                     </td>
                   </tr>`).join('')}
@@ -12359,7 +12370,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
 
     pane.querySelector('#blogAdminFilter')?.addEventListener('change', (e) => {
       blogAdminFilter = e.target.value;
-      renderAdminBlogTab();
+      renderAdminBlogTab(true);
     });
     pane.querySelector('#btnRefreshBlogViews')?.addEventListener('click', () => syncAdminBlogPostsFromCloud(false));
     pane.querySelector('#btnNewBlogPost')?.addEventListener('click', () => openBlogEditor(null));
@@ -12368,14 +12379,14 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
     pane.querySelectorAll('[data-blog-edit]').forEach(b => {
       if (b.dataset.blogEdit === 'new') return;
       b.addEventListener('click', () => {
-        const post = blogReadLocal().find(x => x.id === b.dataset.blogEdit);
+        const post = blogReadLocal().find(x => x.id === b.dataset.blogEdit || x.slug === b.dataset.blogEdit);
         if (post) openBlogEditor(post);
       });
     });
 
     pane.querySelectorAll('[data-blog-toggle]').forEach(b => {
       b.addEventListener('click', async () => {
-        const post = blogReadLocal().find(x => x.id === b.dataset.blogToggle);
+        const post = blogReadLocal().find(x => x.id === b.dataset.blogToggle || x.slug === b.dataset.blogToggle);
         if (!post) return;
         const goingLive = !post.is_published;
         if (goingLive && !confirm(`Publish "${post.title}" live to the website now?`)) return;
@@ -12388,17 +12399,28 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
         };
         delete payload._local_id;
 
-        // Immediately update local storage and re-render admin UI
-        blogWriteLocal(blogReadLocal().map(x => x.id === post.id ? payload : x));
-        renderAdminBlogTab();
+        // Immediately update local storage and re-render admin UI stably
+        const updatedList = blogReadLocal().map(x => (x.id === post.id || x.slug === post.slug) ? payload : x);
+        blogWriteLocal(updatedList);
+        renderAdminBlogTab(true);
 
         try {
-          let result = await SupabaseSync.mutate('blog_posts', 'update', payload, { where: { id: post.id } });
-          if (!result || result.success !== true) {
+          let result = null;
+          if (post.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(post.id)) {
+            result = await SupabaseSync.mutate('blog_posts', 'update', payload, { where: { id: post.id } });
+          }
+          if (!result || result.success !== true || (Array.isArray(result.data) && result.data.length === 0)) {
+            result = await SupabaseSync.mutate('blog_posts', 'update', payload, { where: { slug: post.slug } });
+          }
+          if (!result || result.success !== true || (Array.isArray(result.data) && result.data.length === 0)) {
             result = await SupabaseSync.mutate('blog_posts', 'upsert', payload, { conflict: 'slug' });
           }
-          if (!result || result.success !== true) {
-            console.warn('[blog-toggle] Database sync note:', result?.error);
+
+          if (result && result.success && Array.isArray(result.data) && result.data[0]) {
+            const savedRow = result.data[0];
+            const current = blogReadLocal().map(x => (x.id === post.id || x.slug === post.slug) ? { ...x, ...savedRow } : x);
+            blogWriteLocal(current);
+            renderAdminBlogTab(true);
           }
         } catch (err) {
           console.warn('[blog-toggle] Database error:', err.message);
@@ -12417,7 +12439,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
 
     pane.querySelectorAll('[data-blog-delete]').forEach(b => {
       b.addEventListener('click', async () => {
-        const post = blogReadLocal().find(x => x.id === b.dataset.blogDelete);
+        const post = blogReadLocal().find(x => x.id === b.dataset.blogDelete || x.slug === b.dataset.blogDelete);
         if (!post) return;
         if (!confirm(`DELETE "${post.title}" permanently?\n\nThis cannot be undone.`)) return;
         b.disabled = true;
@@ -12425,10 +12447,15 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
           const deleteFilter = (post.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(post.id))
             ? { id: post.id }
             : { slug: post.slug };
-          await SupabaseSync.mutateOrThrow('blog_posts', 'delete', null, { where: deleteFilter });
+          let res = await SupabaseSync.mutate('blog_posts', 'delete', null, { where: deleteFilter });
+          if (!res || res.success !== true || (Array.isArray(res.data) && res.data.length === 0)) {
+            if (post.slug && (!deleteFilter.slug)) {
+              await SupabaseSync.mutate('blog_posts', 'delete', null, { where: { slug: post.slug } });
+            }
+          }
           const remaining = blogReadLocal().filter(x => x.id !== post.id && x.slug !== post.slug);
           blogWriteLocal(remaining);
-          renderAdminBlogTab();
+          renderAdminBlogTab(true);
 
           // Broadcast deletion across tabs
           try {
@@ -12665,10 +12692,14 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
       saveBtns.forEach(b => { b.disabled = true; });
       try {
         let result = null;
-        if (!isNew && values.id) {
+        if (!isNew && values.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(values.id)) {
           result = await SupabaseSync.mutate('blog_posts', 'update', payload, { where: { id: values.id } });
         }
-        if (!result || result.success !== true) {
+        if (!result || result.success !== true || (Array.isArray(result.data) && result.data.length === 0)) {
+          const targetSlug = values.slug || slug;
+          result = await SupabaseSync.mutate('blog_posts', 'update', payload, { where: { slug: targetSlug } });
+        }
+        if (!result || result.success !== true || (Array.isArray(result.data) && result.data.length === 0)) {
           result = await SupabaseSync.mutate('blog_posts', 'upsert', payload, { conflict: 'slug' });
         }
         if (!result || result.success !== true) {
@@ -12677,7 +12708,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
 
         const savedRow = (Array.isArray(result.data) && result.data[0]) ? result.data[0] : payload;
         const list = blogReadLocal();
-        const idx = list.findIndex(x => (values.id && x.id === values.id) || x.slug === payload.slug || (savedRow.id && x.id === savedRow.id));
+        const idx = list.findIndex(x => (values.id && x.id === values.id) || x.slug === payload.slug || (values.slug && x.slug === values.slug) || (savedRow.id && x.id === savedRow.id));
         if (idx >= 0) {
           list[idx] = Object.assign({}, list[idx], payload, savedRow);
         } else {
@@ -12693,7 +12724,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
         } catch (_) {}
 
         dialog.close();
-        renderAdminBlogTab();
+        renderAdminBlogTab(true);
         showNotification(publishNow ? `"${title}" is LIVE on the website!` : `"${title}" saved as draft.`, 'success');
       } catch (err) {
         saveBtns.forEach(b => { b.disabled = false; });

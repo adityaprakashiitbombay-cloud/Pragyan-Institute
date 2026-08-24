@@ -156,7 +156,7 @@ export function runBlogTests(assert) {
     'T25.54: portal.js implements publish/unpublish toggle with optimistic UI update');
   assert(dbSrc.includes("blog_posts: 'created_at'") && dbSrc.includes("ORDER_COLUMNS[table] || 'created_at'"),
     'T25.55: api/db.js explicitly maps blog_posts in ORDER_COLUMNS and falls back safely to created_at');
-  assert(portalSrc.includes("mutateOrThrow('blog_posts', 'delete'") && portalSrc.includes("BLOG_POST_UPDATED"),
+  assert(portalSrc.includes("mutate('blog_posts', 'delete'") && portalSrc.includes("BLOG_POST_UPDATED"),
     'T25.56: portal.js permanently deletes articles from cloud database and broadcasts deletion event');
 }
 

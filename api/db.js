@@ -455,14 +455,29 @@ export default async function handler(req, res) {
       if (!filters.conflict) {
         return res.status(400).json({ success: false, error: 'Missing conflict column for upsert' });
       }
+      let upsertRows = rows(data);
+      if (table === 'blog_posts' && filters.conflict === 'slug') {
+        upsertRows = upsertRows.map(r => {
+          if (!r || typeof r !== 'object') return r;
+          const rowCopy = { ...r };
+          if (rowCopy.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rowCopy.id)) {
+            delete rowCopy.id;
+          }
+          return rowCopy;
+        });
+      }
       result = await supabase.from(table)
-        .upsert(rows(data), { onConflict: filters.conflict })
+        .upsert(upsertRows, { onConflict: filters.conflict })
         .select(readColumns(table));
     } else if (operation === 'update') {
       if (!filters.where || Object.keys(filters.where).length === 0) {
         return res.status(400).json({ success: false, error: 'An update filter is required' });
       }
-      result = await addWhere(supabase.from(table).update(data), filters.where).select(readColumns(table));
+      const updateData = (data && typeof data === 'object' && !Array.isArray(data)) ? { ...data } : data;
+      if (updateData && typeof updateData === 'object' && table === 'blog_posts') {
+        delete updateData.id;
+      }
+      result = await addWhere(supabase.from(table).update(updateData), filters.where).select(readColumns(table));
     } else {
       if (!filters.where || Object.keys(filters.where).length === 0) {
         // An unfiltered delete would empty the table.

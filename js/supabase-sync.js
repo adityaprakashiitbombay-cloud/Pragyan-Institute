@@ -421,16 +421,22 @@
      * stays meaningful.
      */
     async _apiDb(table, operation, { data = null, filters = {}, options = {} } = {}) {
-      const token = this.sessionToken;
+      const token = this.sessionToken ||
+        (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pragyan_portal_token')) ||
+        (typeof localStorage !== 'undefined' && localStorage.getItem('pragyan_portal_token')) ||
+        (typeof AppState !== 'undefined' && AppState.token) || null;
       if (!token) {
-        throw new Error(`Gateway ${operation} ${table} failed (401): no active session`);
+        // If public table read, anonymous access is permitted by /api/db
+        const isPublicRead = (table === 'notices' || table === 'batches' || table === 'blog_posts') && operation === 'select';
+        if (!isPublicRead) {
+          throw new Error(`Gateway ${operation} ${table} failed (401): no active session`);
+        }
       }
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
       const response = await fetch(`${API_BASE}/api/db`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers,
         body: JSON.stringify({ table, operation, data, filters }),
         signal: options?.signal
       });
