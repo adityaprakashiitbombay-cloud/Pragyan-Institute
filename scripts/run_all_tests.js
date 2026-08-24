@@ -15,6 +15,7 @@ import { runSecurityHardeningTests } from '../tests/security-hardening.test.js';
 import { runMentorRatingTests } from '../tests/mentor-ratings.test.js';
 import { runPushNotificationTests } from '../tests/push-notifications.test.js';
 import { runAdminLogoutAllTests } from '../tests/admin-logout-all.test.js';
+import { runVipPassCardTests } from '../tests/vip-pass-card.test.js';
 
 console.log('================================================================');
 console.log('   PRAGYAN INSTITUTE — T1 TO T6 MASTER TEST RUNNER & AUDIT      ');
@@ -873,6 +874,14 @@ await runPushNotificationTests(assert);
 // -----------------------------------------------------------------------------
 console.log('\n--- [T29] Admin Multi-Device Session Revocation & Device Logout ---');
 runAdminLogoutAllTests(assert);
+
+// -----------------------------------------------------------------------------
+// T30 — 3D Metallic VIP Pass & Student ID Card Suite. Covers card dimensions,
+// elevation, mobile responsive height, glowing emerald status badge,
+// accurate fee ledger resolution (no ₹1 dues bug), dual signatories, and location.
+// -----------------------------------------------------------------------------
+console.log('\n--- [T30] 3D Metallic VIP Pass & Student Card Suite ---');
+runVipPassCardTests(assert);
 
 console.log('\n================================================================');
 console.log(`MASTER TEST RESULTS: ${pass} Passed, ${fail} Failed`);

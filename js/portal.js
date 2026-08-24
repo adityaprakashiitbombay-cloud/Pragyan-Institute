@@ -3288,6 +3288,21 @@ function renderStudentDashboard() {
     const pane = document.getElementById('studentTabPane-details');
     if (!pane || !s) return;
 
+    // Calculate accurate ledger amounts
+    const resolvedBatch = (window.PRAGYAN_ACADEMIC && typeof window.PRAGYAN_ACADEMIC.resolveBatch === 'function')
+      ? window.PRAGYAN_ACADEMIC.resolveBatch(s.className || s.class_name || s.batchName)
+      : null;
+    const batchStandardFee = resolvedBatch?.fee || (window.PRAGYAN_ACADEMIC?.monthlyFeeFor ? window.PRAGYAN_ACADEMIC.monthlyFeeFor(s.className || s.class_name) : 1000);
+    const rawPaid = Number(s.paidFee ?? s.paid_fee ?? 0);
+    const pendingFee = Number(s.pendingFee ?? s.pending_fee ?? 0);
+    const isFeeCleared = pendingFee <= 0;
+
+    let displayTotalFee = Number(s.totalFee ?? s.total_fee ?? 0);
+    if (displayTotalFee <= 1) {
+      displayTotalFee = (rawPaid + pendingFee > 0) ? (rawPaid + pendingFee) : batchStandardFee;
+    }
+    const displayPaidFee = isFeeCleared ? (rawPaid > 0 ? rawPaid : displayTotalFee) : rawPaid;
+
     const requests = AppState.getRequests();
     const pendingReq = requests.find(r => isStudentRequestMatch(r, s) && String(r.status || '').toLowerCase() === 'pending');
 
@@ -3375,9 +3390,23 @@ function renderStudentDashboard() {
 
             <div class="metallic-id-details-row">
               <div><span>Roll:</span> <strong>#${s.rollNo}</strong></div>
-              <div><span>Status:</span> <strong class="fee-status-badge ${s.pendingFee > 0 ? 'status-due' : 'status-cleared'}"><i aria-hidden="true" class="fa-solid ${s.pendingFee > 0 ? 'fa-circle-exclamation' : 'fa-circle-check'}"></i> ${s.pendingFee > 0 ? `₹${s.pendingFee.toLocaleString()} Due` : '🟢 CLEARED'}</strong></div>
+              <div class="metallic-status-cell">
+                <span>Status:</span>
+                ${isFeeCleared ? `
+                  <span class="metallic-status-pill pill-cleared">
+                    <span class="status-pulsing-gem"></span>
+                    <i aria-hidden="true" class="fa-solid fa-shield-check"></i>
+                    <span>ACTIVE · CLEARED</span>
+                  </span>
+                ` : `
+                  <span class="metallic-status-pill pill-due">
+                    <i aria-hidden="true" class="fa-solid fa-triangle-exclamation"></i>
+                    <span>₹${pendingFee.toLocaleString('en-IN')} DUE</span>
+                  </span>
+                `}
+              </div>
               <div><span>Contact:</span> <strong>${sanitizeInput(s.mobile)}</strong></div>
-              <div><span>Guardian:</span> <strong>${sanitizeInput(s.guardianName)}</strong></div>
+              <div><span>Guardian:</span> <strong>${sanitizeInput(s.guardianName || 'Parent/Guardian')}</strong></div>
             </div>
 
             <div class="metallic-id-barcode-wrap">
@@ -3412,28 +3441,38 @@ function renderStudentDashboard() {
               </div>
               <div class="back-meta-item">
                 <span class="back-label">Enrolled Batch:</span>
-                <span class="back-val">${s.batchName || s.className}</span>
+                <span class="back-val">${sanitizeInput(s.batchName || s.className)}</span>
               </div>
               <div class="back-meta-item highlight-dues-box">
                 <span class="back-label">Tuition Clearance:</span>
-                <span class="back-dues-pill ${s.pendingFee > 0 ? 'has-dues' : 'no-dues'}">
-                  <i aria-hidden="true" class="fa-solid ${s.pendingFee > 0 ? 'fa-triangle-exclamation' : 'fa-circle-check'}"></i>
-                  ${s.pendingFee > 0 ? `₹${s.pendingFee.toLocaleString()} Pending Balance` : '🟢 100% Fee Cleared (No Dues)'}
+                <span class="back-dues-pill ${isFeeCleared ? 'no-dues' : 'has-dues'}">
+                  <i aria-hidden="true" class="fa-solid ${isFeeCleared ? 'fa-circle-check' : 'fa-triangle-exclamation'}"></i>
+                  ${isFeeCleared ? '100% Fee Cleared · Active Pass' : `₹${pendingFee.toLocaleString('en-IN')} Pending Balance`}
                 </span>
               </div>
               <div class="back-meta-grid">
-                <div><span>Total Fee:</span> <strong>₹${(s.totalFee || 0).toLocaleString()}</strong></div>
-                <div><span>Total Paid:</span> <strong style="color: #34D399;">₹${(s.paidFee || 0).toLocaleString()}</strong></div>
+                <div><span>Total Fee:</span> <strong>₹${displayTotalFee.toLocaleString('en-IN')}</strong></div>
+                <div><span>Total Paid:</span> <strong style="color: #34D399;">₹${displayPaidFee.toLocaleString('en-IN')}</strong></div>
               </div>
             </div>
 
             <div class="back-card-footer">
-              <div class="back-signatory">
-                <span>Authorized Signatories</span>
-                <div class="signature-script">Chandan Kumar • Ravi Ranjan</div>
+              <div class="back-signatories-row">
+                <div class="back-sign-block">
+                  <span class="back-sign-title">DIRECTOR</span>
+                  <div class="signature-script">Chandan Kumar</div>
+                </div>
+                <div class="back-seal-center" title="Pragyan Seal">
+                  <i aria-hidden="true" class="fa-solid fa-stamp"></i>
+                </div>
+                <div class="back-sign-block" style="text-align: right;">
+                  <span class="back-sign-title">ACADEMIC HEAD</span>
+                  <div class="signature-script">Prof. Ravi Ranjan</div>
+                </div>
               </div>
               <div class="back-contact-help">
-                <i aria-hidden="true" class="fa-solid fa-location-dot"></i> At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj
+                <i aria-hidden="true" class="fa-solid fa-location-dot"></i>
+                <span>Moti Market, Near Jagdamba Sthan, Lalganj, Vaishali, Bihar 844121</span>
               </div>
             </div>
           </div>
@@ -4282,9 +4321,15 @@ function renderStudentDashboard() {
     const feeAcc = AppState.getStudentFeeAccount(s.id || s.student_id || s.rollNo, s);
     const pendingPayReq = AppState.getRequests().find(r => isStudentRequestMatch(r, s) && (r.type === 'payment' || r.req_type === 'PAYMENT_VERIFICATION') && String(r.status || '').toLowerCase() === 'pending');
 
-    const totalCourseFee = Number(s.totalFee ?? s.total_fee ?? 0) || 1;
+    const resolvedBatch = (window.PRAGYAN_ACADEMIC && typeof window.PRAGYAN_ACADEMIC.resolveBatch === 'function')
+      ? window.PRAGYAN_ACADEMIC.resolveBatch(s.className || s.class_name || s.batchName)
+      : null;
+    const batchStandardFee = resolvedBatch?.fee || (window.PRAGYAN_ACADEMIC?.monthlyFeeFor ? window.PRAGYAN_ACADEMIC.monthlyFeeFor(s.className || s.class_name) : 1000);
     const paidAmount = Number(s.paidFee ?? s.paid_fee ?? 0);
     const pendingAmount = feeAcc.totalDue;
+    const totalCourseFee = Number(s.totalFee ?? s.total_fee ?? 0) > 1
+      ? Number(s.totalFee ?? s.total_fee)
+      : (paidAmount + pendingAmount > 0 ? (paidAmount + pendingAmount) : batchStandardFee);
     s.totalFee = totalCourseFee;
     s.paidFee = paidAmount;
     s.pendingFee = pendingAmount;
