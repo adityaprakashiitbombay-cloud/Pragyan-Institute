@@ -1398,7 +1398,7 @@ function renderBlogGrid() {
   if (!grid) return;
   const conf = BLOG_CATEGORIES.find(c => c.key === blogActiveCategory) || BLOG_CATEGORIES[0];
   const list = blogPostsCache
-    .filter(p => !conf.match || p.category === conf.match)
+    .filter(p => (!conf.match || p.category === conf.match) && p.is_published !== false)
     .sort((a, b) => String(b.published_at || '').localeCompare(String(a.published_at || '')));
 
   blogReaderList = list.map(p => p.slug);

@@ -415,7 +415,7 @@ export default async function handler(req, res) {
     if (await isSessionRevoked(session, supabase)) {
       return res.status(401).json({ success: false, error: 'Your session has been logged out from another device. Please sign in again.' });
     }
-  } else if (isAnonymousPushRegister) {
+  } else {
     session = optionalSession(req);
     if (session && await isSessionRevoked(session, supabase)) {
       session = null;

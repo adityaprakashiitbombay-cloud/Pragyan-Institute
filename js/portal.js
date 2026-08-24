@@ -12650,6 +12650,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
 
         const synced = livePosts.map(lp => ({
           ...lp,
+          is_published: !!lp.is_published,
           views_count: Math.max(Number(lp.views_count) || 0, Number(viewsMap[lp.slug]) || 0)
         }));
 
