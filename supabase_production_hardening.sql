@@ -1711,3 +1711,66 @@ GRANT SELECT ON public.push_broadcast_logs TO authenticated;
 -- Verification:
 SELECT tablename FROM pg_tables WHERE schemaname='public'
   AND tablename IN ('push_subscriptions','push_broadcast_logs');
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- SECTION 17: ADMIN ACTIVE DEVICE SESSIONS (public.admin_sessions)
+-- ----------------------------------------------------------------------------
+-- Maintains active device login roster for administrator profiles with IP,
+-- browser, OS, and timestamp metadata. Supports single-device and multi-device revocation.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS public.admin_sessions (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id      text UNIQUE NOT NULL,
+  admin_id        text NOT NULL,
+  device_name     text NOT NULL DEFAULT 'Unknown Device',
+  device_type     text NOT NULL DEFAULT 'desktop',
+  browser         text NOT NULL DEFAULT 'Web Browser',
+  os              text NOT NULL DEFAULT 'Unknown OS',
+  ip_address      text,
+  user_agent      text,
+  is_revoked      boolean NOT NULL DEFAULT false,
+  last_active_at  timestamptz NOT NULL DEFAULT now(),
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  updated_at      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_sessions_admin_active ON public.admin_sessions(admin_id, last_active_at DESC) WHERE NOT is_revoked;
+CREATE INDEX IF NOT EXISTS idx_admin_sessions_sid ON public.admin_sessions(session_id);
+
+ALTER TABLE public.admin_sessions ADD COLUMN IF NOT EXISTS device_name text NOT NULL DEFAULT 'Unknown Device';
+ALTER TABLE public.admin_sessions ADD COLUMN IF NOT EXISTS device_type text NOT NULL DEFAULT 'desktop';
+ALTER TABLE public.admin_sessions ADD COLUMN IF NOT EXISTS browser text NOT NULL DEFAULT 'Web Browser';
+ALTER TABLE public.admin_sessions ADD COLUMN IF NOT EXISTS os text NOT NULL DEFAULT 'Unknown OS';
+ALTER TABLE public.admin_sessions ADD COLUMN IF NOT EXISTS ip_address text;
+ALTER TABLE public.admin_sessions ADD COLUMN IF NOT EXISTS user_agent text;
+ALTER TABLE public.admin_sessions ADD COLUMN IF NOT EXISTS is_revoked boolean NOT NULL DEFAULT false;
+ALTER TABLE public.admin_sessions ADD COLUMN IF NOT EXISTS last_active_at timestamptz NOT NULL DEFAULT now();
+
+DROP TRIGGER IF EXISTS trg_admin_sessions_updated_at ON public.admin_sessions;
+CREATE TRIGGER trg_admin_sessions_updated_at
+  BEFORE UPDATE ON public.admin_sessions
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+DO $do$
+DECLARE p record;
+BEGIN
+  FOR p IN SELECT policyname FROM pg_policies
+           WHERE schemaname='public' AND tablename='admin_sessions'
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', p.policyname, p.schemaname, p.tablename);
+  END LOOP;
+END $do$;
+
+ALTER TABLE public.admin_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.admin_sessions FORCE ROW LEVEL SECURITY;
+
+CREATE POLICY "service_role_full_admin_sessions" ON public.admin_sessions FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+REVOKE ALL ON public.admin_sessions FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.admin_sessions TO authenticated;
+
+-- Final Hardening Verification:
+SELECT tablename FROM pg_tables WHERE schemaname='public'
+  AND tablename IN ('push_subscriptions','push_broadcast_logs','admin_sessions');

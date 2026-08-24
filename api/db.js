@@ -22,7 +22,8 @@ import { getSupabase, publicAdmin, requireSession, applyCors } from './_lib/auth
 const TABLES = new Set([
   'students', 'notices', 'fee_receipts', 'fee_billing_ledger',
   'student_requests', 'batches', 'admins', 'audit_logs',
-  'blog_posts', 'push_subscriptions', 'push_broadcast_logs'
+  'blog_posts', 'push_subscriptions', 'push_broadcast_logs',
+  'admin_sessions'
 ]);
 
 // Readable without a session, because the marketing site renders before login.
@@ -43,7 +44,9 @@ const STUDENT_TABLES = new Set([
 // The DB-side checks (published-only, slug format) are authoritative; this
 // just blunts scripted hammering between cold starts.
 const ANON_RPC_LIMITS = {
-  increment_blog_views: { windowMs: 60 * 60 * 1000, max: 8 }
+  increment_blog_views: { max: 120, windowMs: 60_000 },
+  submit_mentor_rating: { max: 20,  windowMs: 60_000 },
+  get_mentor_ratings:   { max: 120, windowMs: 60_000 }
 };
 const anonRpcBuckets = new Map(); // `${fn}:${ip}:${argKey}` -> { count, windowStart }
 
@@ -99,11 +102,12 @@ const OPERATIONS = new Set(['select', 'insert', 'upsert', 'update', 'delete', 'r
 const ORDER_COLUMNS = {
   students: 'student_id', notices: 'created_at', fee_receipts: 'created_at',
   fee_billing_ledger: 'created_at', student_requests: 'created_at',
-  batches: 'batch_id', admins: 'admin_id', audit_logs: 'created_at'
+  batches: 'batch_id', admins: 'admin_id', audit_logs: 'created_at',
+  admin_sessions: 'last_active_at'
 };
 
 // Descending by default where the UI shows newest-first lists.
-const DEFAULT_DESCENDING = new Set(['notices', 'fee_receipts', 'fee_billing_ledger', 'student_requests', 'audit_logs', 'blog_posts', 'push_subscriptions', 'push_broadcast_logs']);
+const DEFAULT_DESCENDING = new Set(['notices', 'fee_receipts', 'fee_billing_ledger', 'student_requests', 'audit_logs', 'blog_posts', 'push_subscriptions', 'push_broadcast_logs', 'admin_sessions']);
 
 // Columns a student may see on the institute's own admin records. This is the
 // payment identity shown on pay.html — never the credential columns.
@@ -291,6 +295,27 @@ async function isSessionRevoked(session, supabase) {
       return true;
     }
   } catch (_) {}
+
+  // Check if this specific device session ID was explicitly revoked
+  if (session.sid) {
+    try {
+      const { data: sesRow } = await supabase
+        .from('admin_sessions')
+        .select('is_revoked')
+        .eq('session_id', session.sid)
+        .single();
+      if (sesRow && sesRow.is_revoked) {
+        return true;
+      }
+      // Keep session activity fresh
+      supabase
+        .from('admin_sessions')
+        .update({ last_active_at: new Date().toISOString() })
+        .eq('session_id', session.sid)
+        .then(() => {})
+        .catch(() => {});
+    } catch (_) {}
+  }
   return false;
 }
 

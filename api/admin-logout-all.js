@@ -39,6 +39,22 @@ export default async function handler(req, res) {
 
     if (updateErr) throw updateErr;
 
+    // Revoke all other active device session records in database
+    try {
+      if (session.sid) {
+        await supabase
+          .from('admin_sessions')
+          .update({ is_revoked: true, updated_at: new Date().toISOString() })
+          .eq('admin_id', adminId)
+          .neq('session_id', session.sid);
+      } else {
+        await supabase
+          .from('admin_sessions')
+          .update({ is_revoked: true, updated_at: new Date().toISOString() })
+          .eq('admin_id', adminId);
+      }
+    } catch (_) {}
+
     // Log the security event to audit trail
     try {
       await supabase.from('audit_logs').insert([{
@@ -60,7 +76,8 @@ export default async function handler(req, res) {
       sub: adminId,
       role: 'admin',
       name: session.name || admin?.name,
-      tv: newVersion
+      tv: newVersion,
+      sid: session.sid
     });
 
     return res.status(200).json({

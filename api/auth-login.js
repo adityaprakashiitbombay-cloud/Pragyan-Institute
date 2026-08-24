@@ -1,5 +1,7 @@
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { getSupabase, createSession, publicAdmin, applyCors } from './_lib/auth.js';
+import { parseDeviceInfo, getClientIp } from './_lib/device-parser.js';
 
 // In-memory rate limiter (use Redis in production for multi-instance deployments)
 const loginAttempts = new Map(); // key: identifier, value: { count, resetTime }
@@ -117,7 +119,37 @@ export default async function handler(req, res) {
 
       const adminId = admin.admin_id || admin.id;
       const tokenVersion = Number(admin.token_version) || 1;
-      const token = createSession({ sub: adminId, role: 'admin', name: admin.name, tv: tokenVersion });
+      const sessionId = 'ADM-SES-' + crypto.randomUUID();
+      const ip = getClientIp(req);
+      const userAgent = req.headers['user-agent'] || '';
+      const device = parseDeviceInfo(userAgent, ip);
+
+      // Record active device session in public.admin_sessions table
+      try {
+        await supabase.from('admin_sessions').insert([{
+          session_id: sessionId,
+          admin_id: adminId,
+          device_name: device.name,
+          device_type: device.type,
+          browser: device.browser,
+          os: device.os,
+          ip_address: device.ip,
+          user_agent: userAgent.slice(0, 500),
+          is_revoked: false,
+          last_active_at: new Date().toISOString(),
+          created_at: new Date().toISOString()
+        }]);
+      } catch (sesErr) {
+        console.warn('[auth-login] Failed to record admin_session:', sesErr.message);
+      }
+
+      const token = createSession({
+        sub: adminId,
+        role: 'admin',
+        name: admin.name,
+        tv: tokenVersion,
+        sid: sessionId
+      });
       return res.status(200).json({
         success: true,
         role: 'admin',

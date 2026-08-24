@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { parseDeviceInfo } from '../api/_lib/device-parser.js';
 
 export function runAdminLogoutAllTests(assert) {
   const sqlContent = fs.readFileSync(path.resolve('supabase_production_hardening.sql'), 'utf8');
@@ -64,5 +65,51 @@ export function runAdminLogoutAllTests(assert) {
   assert(
     portalCssContent.includes('.admin-session-security-card') && portalCssContent.includes('.btn-logout-all-devices'),
     'T29.11: css/portal.css contains styling for .admin-session-security-card and .btn-logout-all-devices'
+  );
+
+  // 7. Active Device Sessions Table in SQL Hardening
+  assert(
+    sqlContent.includes('CREATE TABLE IF NOT EXISTS public.admin_sessions') &&
+    sqlContent.includes('session_id') &&
+    sqlContent.includes('is_revoked'),
+    'T29.12: supabase_production_hardening.sql declares public.admin_sessions table with revocation tracking'
+  );
+
+  // 8. Device Parser Helper Unit Verification
+  const parserPath = path.resolve('api/_lib/device-parser.js');
+  assert(fs.existsSync(parserPath), 'T29.13: api/_lib/device-parser.js exists');
+
+  const desktopInfo = parseDeviceInfo('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36', '103.21.244.18');
+  assert(desktopInfo.type === 'desktop' && desktopInfo.browser.includes('Chrome') && desktopInfo.os.includes('Windows'), 'T29.14: parseDeviceInfo correctly identifies Windows desktop Chrome');
+
+  const iphoneInfo = parseDeviceInfo('Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1', '103.21.244.18');
+  assert(iphoneInfo.type === 'mobile' && iphoneInfo.os.includes('iOS') && iphoneInfo.browser.includes('Safari'), 'T29.15: parseDeviceInfo correctly identifies iPhone mobile Safari');
+
+  const ipadInfo = parseDeviceInfo('Mozilla/5.0 (iPad; CPU OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1', '103.21.244.18');
+  assert(ipadInfo.type === 'tablet', 'T29.16: parseDeviceInfo correctly identifies tablet devices');
+
+  // 9. Auth Login and Gateway Integration
+  assert(
+    authLoginContent.includes('admin_sessions') && authLoginContent.includes('sid: sessionId'),
+    'T29.17: api/auth-login.js persists session in admin_sessions and embeds sid in JWT'
+  );
+  assert(
+    dbApiContent.includes('admin_sessions') && dbApiContent.includes('is_revoked'),
+    'T29.18: api/db.js validates session revocation state against admin_sessions'
+  );
+
+  // 10. Admin Sessions API & UI Integration
+  const adminSessionsApiContent = fs.readFileSync(path.resolve('api/admin-sessions.js'), 'utf8');
+  assert(
+    adminSessionsApiContent.includes('revoke_device') && adminSessionsApiContent.includes('revoke_other'),
+    'T29.19: api/admin-sessions.js supports both individual device revocation and logout all others'
+  );
+  assert(
+    portalJsContent.includes('adminDeviceListContainer') &&
+    portalJsContent.includes('loadAndRenderAdminDevices') &&
+    portalJsContent.includes('btn-revoke-device') &&
+    portalCssContent.includes('.admin-device-card') &&
+    portalCssContent.includes('.btn-revoke-device'),
+    'T29.20: js/portal.js and portal.css implement responsive real-time active device list and per-device termination'
   );
 }

@@ -5739,15 +5739,22 @@ function renderStudentDashboard() {
                 <div class="admin-session-box">
                   <div class="admin-session-status-row">
                     <div class="session-status-icon">
-                      <i aria-hidden="true" class="fa-solid fa-circle-check" style="color: #059669;"></i>
+                      <i aria-hidden="true" class="fa-solid fa-shield-halved" style="color: #059669;"></i>
                     </div>
                     <div>
-                      <strong style="color: #0F172A; font-size: 0.92rem;">Current Device Session: Active</strong>
-                      <p class="admin-field-hint" style="margin: 0.2rem 0 0;">This browser session is securely authenticated with token-version verification.</p>
+                      <strong style="color: #0F172A; font-size: 0.92rem;">Active Logged-in Devices</strong>
+                      <p class="admin-field-hint" style="margin: 0.2rem 0 0;">Manage and view all phones, tablets, and computers currently authenticated with your Admin profile.</p>
                     </div>
                   </div>
 
-                  <div class="admin-session-action-wrap">
+                  <!-- Real-time Active Devices Container -->
+                  <div id="adminDeviceListContainer" class="admin-device-list-wrap">
+                    <div class="admin-device-loading">
+                      <i aria-hidden="true" class="fa-solid fa-circle-notch fa-spin"></i> Loading active devices…
+                    </div>
+                  </div>
+
+                  <div class="admin-session-action-wrap" style="margin-top: 1rem; border-top: 1px solid #E2E8F0; padding-top: 1rem;">
                     <p style="font-size: 0.88rem; color: #475569; line-height: 1.5; margin: 0 0 0.85rem 0;">
                       Logged into your Admin account on a shared computer, mobile phone, or previous device? You can instantly invalidate and terminate all other active login tokens worldwide with one click.
                     </p>
@@ -5837,9 +5844,9 @@ function renderStudentDashboard() {
       // Form Submit Listener
       pane.querySelector('#adminSettingsForm')?.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const currentPassInput = pane.querySelector('#adminSettingCurrentPass').value;
-        const newPassInput = pane.querySelector('#adminSettingNewPass').value;
-        const confirmPassInput = pane.querySelector('#adminSettingConfirmPass').value;
+        const currentPassInput = pane.querySelector('#adminSettingCurrentPass')?.value || '';
+        const newPassInput = pane.querySelector('#adminSettingNewPass')?.value || '';
+        const confirmPassInput = pane.querySelector('#adminSettingConfirmPass')?.value || '';
 
         const adminsList = AppState.getAdmins();
         const targetAdminIdx = adminsList.findIndex(a => a.id === admin.id);
@@ -5905,6 +5912,125 @@ function renderStudentDashboard() {
         renderAdminDashboard();
       });
 
+      // Active Devices Loader & Real-time Render
+      async function loadAndRenderAdminDevices() {
+        const container = pane.querySelector('#adminDeviceListContainer');
+        if (!container) return;
+
+        try {
+          const token = sessionStorage.getItem('pragyan_portal_token') || localStorage.getItem('pragyan_portal_token') || AppState.token;
+          const res = await fetch('/api/admin-sessions', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const data = await res.json();
+          const sessions = (data.success && Array.isArray(data.sessions)) ? data.sessions : [];
+
+          if (!sessions.length) {
+            container.innerHTML = `
+              <div class="admin-device-card is-current">
+                <div class="device-icon-wrap"><i aria-hidden="true" class="fa-solid fa-laptop"></i></div>
+                <div class="device-info-wrap">
+                  <div class="device-title-row">
+                    <span class="device-name">Current Web Browser</span>
+                    <span class="device-badge device-badge-current"><i aria-hidden="true" class="fa-solid fa-circle-check"></i> This Device (Active)</span>
+                  </div>
+                  <div class="device-meta-row">
+                    <span><i aria-hidden="true" class="fa-solid fa-network-wired"></i> Authenticated Session</span>
+                  </div>
+                </div>
+              </div>
+            `;
+            return;
+          }
+
+          container.innerHTML = `
+            <div class="admin-devices-grid">
+              ${sessions.map(s => {
+                let iconClass = 'fa-laptop';
+                if (s.device_type === 'mobile') iconClass = 'fa-mobile-screen-button';
+                else if (s.device_type === 'tablet') iconClass = 'fa-tablet-screen-button';
+
+                const isCur = Boolean(s.is_current);
+                const activeDate = s.last_active_at ? new Date(s.last_active_at) : new Date();
+                const activeFormatted = isCur ? 'Active Now' : ('Last active ' + activeDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) + ' at ' + activeDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }));
+
+                return `
+                  <div class="admin-device-card ${isCur ? 'is-current' : 'is-remote'}" data-session-id="${escapeHtml(s.session_id)}">
+                    <div class="device-icon-wrap">
+                      <i aria-hidden="true" class="fa-solid ${iconClass}"></i>
+                    </div>
+                    <div class="device-info-wrap">
+                      <div class="device-title-row">
+                        <span class="device-name">${escapeHtml(s.device_name || (s.browser + ' on ' + s.os))}</span>
+                        ${isCur ? `
+                          <span class="device-badge device-badge-current"><i aria-hidden="true" class="fa-solid fa-circle-check"></i> This Device (Active)</span>
+                        ` : `
+                          <span class="device-badge device-badge-remote"><i aria-hidden="true" class="fa-regular fa-clock"></i> ${escapeHtml(activeFormatted)}</span>
+                        `}
+                      </div>
+                      <div class="device-meta-row">
+                        <span><i aria-hidden="true" class="fa-solid fa-network-wired"></i> IP: ${escapeHtml(s.ip_address || '—')}</span>
+                        ${!isCur && s.created_at ? `<span>• Logged in: ${new Date(s.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>` : ''}
+                      </div>
+                    </div>
+                    <div class="device-action-wrap">
+                      ${!isCur ? `
+                        <button type="button" class="btn-revoke-device" data-revoke-sid="${escapeHtml(s.session_id)}" title="Terminate session on this device">
+                          <i aria-hidden="true" class="fa-solid fa-ban"></i> <span class="btn-revoke-text">Log Out</span>
+                        </button>
+                      ` : `
+                        <span class="device-current-pill">Current Session</span>
+                      `}
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+
+          // Wire individual revoke buttons
+          container.querySelectorAll('.btn-revoke-device').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+              e.preventDefault();
+              const sid = btn.dataset.revokeSid;
+              if (!sid) return;
+              if (!confirm('Log out this specific device now?\n\nThis will immediately terminate the session on that device.')) return;
+              btn.disabled = true;
+              btn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-spinner fa-spin"></i>';
+              try {
+                const revRes = await fetch('/api/admin-sessions', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                  },
+                  body: JSON.stringify({ action: 'revoke_device', session_id: sid })
+                });
+                const revData = await revRes.json();
+                if (revData.success) {
+                  showNotification('Device session terminated successfully.', 'success');
+                  loadAndRenderAdminDevices();
+                } else {
+                  showNotification(`Failed: ${revData.error || 'Unknown error'}`, 'error');
+                  btn.disabled = false;
+                  btn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-ban"></i> Log Out';
+                }
+              } catch (err) {
+                showNotification(`Error: ${err.message}`, 'error');
+                btn.disabled = false;
+                btn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-ban"></i> Log Out';
+              }
+            });
+          });
+
+        } catch (err) {
+          container.innerHTML = `<div class="admin-device-err"><i aria-hidden="true" class="fa-solid fa-circle-exclamation"></i> Could not load device list: ${escapeHtml(err.message)}</div>`;
+        }
+      }
+
+      // Initial device load
+      loadAndRenderAdminDevices();
+
       // Logout from all other devices handler
       const btnLogoutAll = pane.querySelector('#btnAdminLogoutAllDevices');
       btnLogoutAll?.addEventListener('click', async (e) => {
@@ -5937,6 +6063,7 @@ function renderStudentDashboard() {
               }
             }
             showNotification('🔒 All other device sessions have been logged out successfully! This device remains active.', 'success');
+            loadAndRenderAdminDevices();
           } else {
             showNotification(`Failed to revoke sessions: ${data.error || 'Unknown error'}`, 'error');
           }
