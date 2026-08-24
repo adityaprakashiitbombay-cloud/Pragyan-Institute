@@ -858,6 +858,41 @@
             delete rowObj.isHead;
             delete rowObj.password;
             delete rowObj.passcode;
+          } else if (table === 'blog_posts') {
+            const pId = rowObj.id || rowObj.post_id;
+            if (pId) changedIds.push(pId);
+            if (rowObj.slug) changedIds.push(rowObj.slug);
+            if (rowObj.contentMarkdown && !rowObj.content_markdown) rowObj.content_markdown = rowObj.contentMarkdown;
+            if (rowObj.coverImageUrl && !rowObj.cover_image_url) rowObj.cover_image_url = rowObj.coverImageUrl;
+            if (rowObj.authorName && !rowObj.author_name) rowObj.author_name = rowObj.authorName;
+            if (rowObj.authorRole && !rowObj.author_role) rowObj.author_role = rowObj.authorRole;
+            if (rowObj.isPublished !== undefined && rowObj.is_published === undefined) rowObj.is_published = Boolean(rowObj.isPublished);
+            if (rowObj.readTimeMinutes !== undefined && rowObj.read_time_minutes === undefined) rowObj.read_time_minutes = Number(rowObj.readTimeMinutes);
+            if (rowObj.viewsCount !== undefined && rowObj.views_count === undefined) rowObj.views_count = Number(rowObj.viewsCount);
+            if (rowObj.publishedAt && !rowObj.published_at) rowObj.published_at = rowObj.publishedAt;
+            if (rowObj.createdAt && !rowObj.created_at) rowObj.created_at = rowObj.createdAt;
+            if (rowObj.updatedAt && !rowObj.updated_at) rowObj.updated_at = rowObj.updatedAt;
+
+            rowObj.views_count = Math.max(Number(rowObj.views_count) || 0, 0);
+            rowObj.read_time_minutes = Math.min(Math.max(Number(rowObj.read_time_minutes) || 3, 1), 120);
+            if (typeof rowObj.tags === 'string') {
+              rowObj.tags = rowObj.tags.split(',').map(t => t.trim()).filter(Boolean);
+            } else if (!Array.isArray(rowObj.tags)) {
+              rowObj.tags = [];
+            }
+
+            delete rowObj.contentMarkdown;
+            delete rowObj.coverImageUrl;
+            delete rowObj.authorName;
+            delete rowObj.authorRole;
+            delete rowObj.isPublished;
+            delete rowObj.readTimeMinutes;
+            delete rowObj.viewsCount;
+            delete rowObj.publishedAt;
+            delete rowObj.createdAt;
+            delete rowObj.updatedAt;
+            delete rowObj._local_id;
+            delete rowObj.post_id;
           } else if (rowObj.id) {
             changedIds.push(rowObj.id);
           }

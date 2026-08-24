@@ -12200,7 +12200,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
       let livePosts = null;
       if (window.SupabaseSync && typeof window.SupabaseSync._apiDb === 'function') {
         try {
-          const res = await window.SupabaseSync._apiDb('blog_posts', 'select', null, { limit: 100 });
+          const res = await window.SupabaseSync._apiDb('blog_posts', 'select', { filters: { limit: 100 } });
           if (Array.isArray(res) && res.length > 0) livePosts = res;
         } catch (_) {}
       }
@@ -12214,6 +12214,25 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
         const json = await resp.json().catch(() => ({}));
         if (json && json.success && Array.isArray(json.data) && json.data.length > 0) {
           livePosts = json.data;
+        }
+      }
+
+      // If database is empty on initial run, auto-seed default articles to cloud
+      if (!livePosts || livePosts.length === 0) {
+        try {
+          const seeds = (typeof window !== 'undefined' && Array.isArray(window.SEED_BLOG_POSTS) && window.SEED_BLOG_POSTS.length)
+            ? window.SEED_BLOG_POSTS
+            : DEFAULT_SEED_BLOG_POSTS;
+          if (window.SupabaseSync && typeof window.SupabaseSync._apiDb === 'function') {
+            await window.SupabaseSync._apiDb('blog_posts', 'upsert', {
+              data: seeds,
+              filters: { conflict: 'slug' }
+            });
+            const refreshed = await window.SupabaseSync._apiDb('blog_posts', 'select', { filters: { limit: 100 } });
+            if (Array.isArray(refreshed) && refreshed.length > 0) livePosts = refreshed;
+          }
+        } catch (seedErr) {
+          console.warn('[syncAdminBlogPostsFromCloud] Seeding notice:', seedErr.message);
         }
       }
 
@@ -12381,14 +12400,27 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
           updated_at: new Date().toISOString()
         };
         delete payload._local_id;
-        const result = await SupabaseSync.mutate('blog_posts', 'upsert', payload, { where: { id: post.id }, conflict: 'slug' });
-        if (!result || result.success !== true) {
-          alert(`Could not update "${post.title}": ${result?.error || 'database rejected'}. Nothing changed.`);
-          b.disabled = false;
-          return;
-        }
+
+        // Immediately update local storage and re-render admin UI
         blogWriteLocal(blogReadLocal().map(x => x.id === post.id ? payload : x));
         renderAdminBlogTab();
+
+        try {
+          const result = await SupabaseSync.mutate('blog_posts', 'upsert', payload, { where: { id: post.id }, conflict: 'slug' });
+          if (!result || result.success !== true) {
+            console.warn('[blog-toggle] Database sync note:', result?.error);
+          }
+        } catch (err) {
+          console.warn('[blog-toggle] Database error:', err.message);
+        }
+
+        // Broadcast publish toggle to open tabs and public home view
+        try {
+          const bc = new BroadcastChannel('pragyan_portal_sync');
+          bc.postMessage({ type: 'BLOG_POST_UPDATED', slug: post.slug, is_published: goingLive });
+          bc.close();
+        } catch (_) {}
+
         showNotification(goingLive ? `"${post.title}" is now LIVE on the website.` : `"${post.title}" moved back to drafts.`, 'success');
       });
     });

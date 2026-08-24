@@ -1384,10 +1384,16 @@ CREATE TABLE IF NOT EXISTS public.blog_posts (
   CONSTRAINT blog_read_time_sane CHECK (read_time_minutes BETWEEN 1 AND 120)
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS uq_blog_posts_slug
+  ON public.blog_posts (slug);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_blog_posts_id
+  ON public.blog_posts (id);
 CREATE INDEX IF NOT EXISTS idx_blog_published_feed
   ON public.blog_posts (published_at DESC) WHERE is_published;
 CREATE INDEX IF NOT EXISTS idx_blog_category
   ON public.blog_posts (category) WHERE is_published;
+
+ALTER TABLE public.blog_posts ADD COLUMN IF NOT EXISTS views_count integer NOT NULL DEFAULT 0;
 
 DROP TRIGGER IF EXISTS trg_blog_posts_updated_at ON public.blog_posts;
 CREATE TRIGGER trg_blog_posts_updated_at
@@ -1398,10 +1404,10 @@ CREATE TRIGGER trg_blog_posts_updated_at
 DO $do$
 DECLARE p record;
 BEGIN
-  FOR p IN SELECT policyname FROM pg_policies
+  FOR p IN SELECT schemaname, tablename, policyname FROM pg_policies
            WHERE schemaname='public' AND tablename='blog_posts'
   LOOP
-    EXECUTE format('DROP POLICY IF EXISTS %I ON public.blog_posts', p.policyname);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', p.policyname, p.schemaname, p.tablename);
   END LOOP;
 END $do$;
 
@@ -1437,7 +1443,6 @@ BEGIN
   UPDATE public.blog_posts
      SET views_count = views_count + 1
    WHERE slug = btrim(p_slug)
-     AND is_published
   RETURNING views_count INTO v_views;
   RETURN COALESCE(v_views, 0);
 END;
@@ -1469,7 +1474,7 @@ VALUES
     'spoken-english-confidence-guide-for-school-students',
     'How to Speak English Fluently Without Fear: A Guide for Hindi Medium Students',
     'Overcoming hesitations in group discussions, building daily 10-minute vocabulary habits, and practical conversational drills.',
-    E'### Overcoming the Hesitation Barrier\n\nMost students understand written English well, but when asked to speak in front of a class, fear of grammatical mistakes takes over.\n\n---\n\n#### 3 Simple Daily Habits for Fluency:\n1. **The 2-Minute Mirror Drill**: Pick any topic (e.g. *"My favorite science topic"*) and speak continuously for 2 minutes without stopping.\n2. **Think in English**: Instead of translating Hindi sentences in your mind, practice naming objects and thoughts directly in simple English.\n3. **Weekly Group Discussions**: Participate actively in Pragyan''s free Saturday GD sessions.\n\n:::info\nFluency is not about using complex words — it is about expressing your ideas clearly and confidently.\n:::',
+    E'### Overcoming the Hesitation Barrier\n\nMost students understand written English well, but when asked to speak in front of a class, fear of grammatical mistakes takes over.\n\n---\n\n#### 3 Simple Daily Habits for Fluency:\n1. **The 2-Minute Mirror Drill**: Pick any topic (e.g. *"My favorite science topic"*) and speak continuously for 2 minutes without stopping.\n2. **Think in English**: Instead of translating Hindi sentences in your mind, practice naming objects and thoughts directly in simple English.\n3. **Weekly Group Discussions**: Participate actively in Pragyan\'s free Saturday GD sessions.\n\n:::info\nFluency is not about using complex words — it is about expressing your ideas clearly and confidently.\n:::',
     'English Speaking',
     ARRAY['spoken-english', 'personality-development', 'communication-skills'],
     'Aditi Singh',
@@ -1494,7 +1499,9 @@ VALUES
     0,
     '2026-08-22 14:30:00+05:30'
   )
-ON CONFLICT (slug) DO NOTHING;
+ON CONFLICT (slug) DO UPDATE SET
+  views_count = GREATEST(blog_posts.views_count, EXCLUDED.views_count),
+  updated_at = now();
 
 -- Verification:
 SELECT count(*) AS blog_posts_ready FROM pg_tables

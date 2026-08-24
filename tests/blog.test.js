@@ -144,5 +144,15 @@ export function runBlogTests(assert) {
     'T25.49: portal.js preserves live views_count on admin article save');
   assert(appSrc.includes('BLOG_VIEWS_UPDATED') && portalSrc.includes('BLOG_VIEWS_UPDATED'),
     'T25.50: app.js and portal.js sync view counts across browser tabs via BroadcastChannel');
+
+  // --- 13. Hardening & Sync Guarantees for Blog Mutations ----------------------
+  assert(syncSrc.includes("table === 'blog_posts'") && syncSrc.includes("rowObj.views_count = Math.max"),
+    'T25.51: SupabaseSync.mutate explicitly normalizes blog_posts and sanitizes views_count');
+  assert(sqlSrc.includes("uq_blog_posts_slug") && sqlSrc.includes("uq_blog_posts_id"),
+    'T25.52: SQL defines explicit unique indexes on blog_posts(slug) and blog_posts(id) for conflict-safe upserts');
+  assert(sqlSrc.includes("GREATEST(blog_posts.views_count, EXCLUDED.views_count)"),
+    'T25.53: SQL seed conflict update preserves monotonically increasing view counts');
+  assert(portalSrc.includes("data-blog-toggle") && portalSrc.includes("goingLive"),
+    'T25.54: portal.js implements publish/unpublish toggle with optimistic UI update');
 }
 

@@ -1646,6 +1646,22 @@ function initBlog() {
   restoreBlogCategoryFromHash();
   handleHashForBlog();
 
+  try {
+    const blogBc = new BroadcastChannel('pragyan_portal_sync');
+    blogBc.addEventListener('message', (e) => {
+      if (e.data && (e.data.type === 'BLOG_VIEWS_UPDATED' || e.data.type === 'BLOG_POST_UPDATED')) {
+        if (e.data.type === 'BLOG_POST_UPDATED') {
+          fetchPublishedPosts();
+        } else if (e.data.slug) {
+          saveBlogViewsMap(e.data.slug, Number(e.data.count) || 0);
+          document.querySelectorAll(`[data-views-for="${e.data.slug}"]`).forEach(el => {
+            el.textContent = `👁 ${Number(e.data.count).toLocaleString('en-IN')}`;
+          });
+        }
+      }
+    });
+  } catch (_) {}
+
   fetchPublishedPosts();
 }
 
