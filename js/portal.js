@@ -13754,7 +13754,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
         }
       }
 
-      if (logs.length === 0) {
+      if (!logs || logs.length === 0) {
         try {
           const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pragyan_portal_token')) ||
             (typeof localStorage !== 'undefined' && localStorage.getItem('pragyan_portal_token')) || null;
@@ -13763,12 +13763,16 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
           });
           if (res.ok) {
             const data = await res.json();
-            if (data && data.recentLogs) logs = data.recentLogs;
+            if (data && data.recentLogs && Array.isArray(data.recentLogs)) {
+              logs = data.recentLogs;
+            }
           }
-        } catch (_) {}
+        } catch (fetchErr) {
+          console.warn('[PushLogs] fallback /api/send-push failed:', fetchErr);
+        }
       }
 
-      if (logs.length === 0) {
+      if (!logs || logs.length === 0) {
         container.innerHTML = `
           <div style="padding:2rem; text-align:center; color:#64748B;">
             <i aria-hidden="true" class="fa-solid fa-bell-slash" style="font-size:1.8rem; margin-bottom:0.5rem; display:block; opacity:0.6;"></i>

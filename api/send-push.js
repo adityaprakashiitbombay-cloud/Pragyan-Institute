@@ -56,7 +56,7 @@ export default async function handler(req, res) {
         .from('push_broadcast_logs')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(10);
+        .limit(25);
 
       return res.status(200).json({
         success: true,
@@ -72,7 +72,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ success: false, error: 'Method Not Allowed' });
   }
 
-  const body = req.body || {};
+  let body = req.body || {};
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch (_) { body = {}; }
+  }
   const rawTitle = stripTags(body.title || 'Pragyan Institute Update').slice(0, 100);
   const rawBody = stripTags(body.body || '').slice(0, 300);
   if (!rawBody) {

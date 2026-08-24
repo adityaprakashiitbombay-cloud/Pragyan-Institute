@@ -338,10 +338,15 @@ export default async function handler(req, res) {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
 
-  const body = req.body || {};
-  let { table, operation, data } = body;
+  let body = req.body || {};
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch (_) { body = {}; }
+  }
+  let table = typeof body.table === 'string' ? body.table.trim() : body.table;
+  let operation = typeof body.operation === 'string' ? body.operation.trim() : (body.operation || 'select');
+  let data = body.data;
   const filters = { ...(body.filters || {}) };
-  const rpcFn = typeof body.fn === 'string' ? body.fn : null;
+  const rpcFn = typeof body.fn === 'string' ? body.fn.trim() : null;
 
   // ---- Allowlisted RPC passthrough (table-independent) ---------------------
   if (operation === 'rpc') {

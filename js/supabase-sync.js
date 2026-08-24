@@ -424,18 +424,37 @@
      * stays meaningful.
      */
     async _apiDb(tableOrConfig, operationArg, opts = {}) {
-      let table = tableOrConfig;
-      let operation = operationArg;
-      let data = opts.data !== undefined ? opts.data : null;
-      let filters = opts.filters || {};
-      let options = opts.options || {};
+      let table = null;
+      let operation = 'select';
+      let data = null;
+      let filters = {};
+      let options = {};
 
       if (tableOrConfig && typeof tableOrConfig === 'object' && !Array.isArray(tableOrConfig)) {
-        table = tableOrConfig.table;
-        operation = tableOrConfig.operation;
-        data = tableOrConfig.data !== undefined ? tableOrConfig.data : data;
-        filters = tableOrConfig.filters || filters;
-        options = tableOrConfig.options || options;
+        table = typeof tableOrConfig.table === 'string' ? tableOrConfig.table.trim() : tableOrConfig.table;
+        operation = typeof tableOrConfig.operation === 'string' ? tableOrConfig.operation.trim() : (tableOrConfig.operation || 'select');
+        data = tableOrConfig.data !== undefined ? tableOrConfig.data : null;
+        filters = tableOrConfig.filters || {};
+        options = tableOrConfig.options || {};
+      } else {
+        table = typeof tableOrConfig === 'string' ? tableOrConfig.trim() : tableOrConfig;
+        if (typeof operationArg === 'object' && operationArg !== null && !Array.isArray(operationArg)) {
+          // Signature: _apiDb(table, { operation, filters, data, options })
+          operation = typeof operationArg.operation === 'string' ? operationArg.operation.trim() : (operationArg.operation || 'select');
+          data = operationArg.data !== undefined ? operationArg.data : (opts.data !== undefined ? opts.data : null);
+          filters = operationArg.filters || opts.filters || {};
+          options = operationArg.options || opts.options || {};
+        } else {
+          // Signature: _apiDb(table, operation, opts)
+          operation = typeof operationArg === 'string' ? operationArg.trim() : (operationArg || 'select');
+          data = opts.data !== undefined ? opts.data : null;
+          filters = opts.filters || {};
+          options = opts.options || {};
+        }
+      }
+
+      if (!table) {
+        throw new Error(`Gateway ${operation} failed: table name is required`);
       }
 
       if (table === 'push_subscriptions' && operation === 'upsert' && !filters.conflict) {
@@ -451,7 +470,7 @@
         (typeof AppState !== 'undefined' && AppState.token) || null;
       if (!token) {
         // If public table read or push registration, anonymous access is permitted by /api/db
-        const isPublicRead = (table === 'notices' || table === 'batches' || table === 'blog_posts') && operation === 'select';
+        const isPublicRead = (table === 'notices' || table === 'batches' || table === 'blog_posts' || table === 'class_schedules' || table === 'institute_holidays') && operation === 'select';
         const isPushRegister = table === 'push_subscriptions' && (operation === 'insert' || operation === 'upsert');
         if (!isPublicRead && !isPushRegister) {
           throw new Error(`Gateway ${operation} ${table} failed (401): no active session`);
