@@ -521,6 +521,12 @@ export default async function handler(req, res) {
     }
 
     if (result.error) {
+      // Graceful fallback for newly introduced optional tables before operator applies SQL migration in Supabase SQL editor
+      if (operation === 'select' && (table === 'class_schedules' || table === 'institute_holidays') &&
+          (result.error.code === '42P01' || result.error.message?.includes('schema cache') || result.error.message?.includes('does not exist'))) {
+        return res.status(200).json({ success: true, data: [] });
+      }
+
       // A genuine database fault is a 500, not a 403. The previous gateway
       // reported every failure as "Database operation rejected", which made a
       // missing column indistinguishable from a permission problem.
