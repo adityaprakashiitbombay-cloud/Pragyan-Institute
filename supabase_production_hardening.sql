@@ -242,6 +242,7 @@ CREATE TABLE IF NOT EXISTS public.admins (
   is_head boolean DEFAULT false,
   photo_url text DEFAULT '',
   password_hash text,
+  token_version integer NOT NULL DEFAULT 1,
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
@@ -316,6 +317,7 @@ ALTER TABLE public.admins              ADD COLUMN IF NOT EXISTS password_hash te
 ALTER TABLE public.admins              ADD COLUMN IF NOT EXISTS photo_url text DEFAULT '';
 ALTER TABLE public.admins              ADD COLUMN IF NOT EXISTS upi_id text;
 ALTER TABLE public.admins              ADD COLUMN IF NOT EXISTS is_head boolean DEFAULT false;
+ALTER TABLE public.admins              ADD COLUMN IF NOT EXISTS token_version integer NOT NULL DEFAULT 1;
 ALTER TABLE public.admins              ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
 ALTER TABLE public.admins              ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
 

@@ -14,6 +14,7 @@ import { runBlogTests } from '../tests/blog.test.js';
 import { runSecurityHardeningTests } from '../tests/security-hardening.test.js';
 import { runMentorRatingTests } from '../tests/mentor-ratings.test.js';
 import { runPushNotificationTests } from '../tests/push-notifications.test.js';
+import { runAdminLogoutAllTests } from '../tests/admin-logout-all.test.js';
 
 console.log('================================================================');
 console.log('   PRAGYAN INSTITUTE — T1 TO T6 MASTER TEST RUNNER & AUDIT      ');
@@ -864,6 +865,14 @@ runMentorRatingTests(assert);
 // -----------------------------------------------------------------------------
 console.log('\n--- [T28] Web Push & Interactive Broadcast Suite ---');
 await runPushNotificationTests(assert);
+
+// -----------------------------------------------------------------------------
+// T29 — Admin Multi-Device Session Revocation & Device Logout. Covers
+// SQL schema, token_version JWT embedding, gateway revocation enforcement,
+// /api/admin-logout-all endpoint, and admin settings UI integration.
+// -----------------------------------------------------------------------------
+console.log('\n--- [T29] Admin Multi-Device Session Revocation & Device Logout ---');
+runAdminLogoutAllTests(assert);
 
 console.log('\n================================================================');
 console.log(`MASTER TEST RESULTS: ${pass} Passed, ${fail} Failed`);

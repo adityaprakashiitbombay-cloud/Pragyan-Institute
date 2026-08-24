@@ -116,7 +116,8 @@ export default async function handler(req, res) {
       resetRateLimit(normalizeRateLimitKey(safeId));
 
       const adminId = admin.admin_id || admin.id;
-      const token = createSession({ sub: adminId, role: 'admin', name: admin.name });
+      const tokenVersion = Number(admin.token_version) || 1;
+      const token = createSession({ sub: adminId, role: 'admin', name: admin.name, tv: tokenVersion });
       return res.status(200).json({
         success: true,
         role: 'admin',

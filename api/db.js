@@ -277,6 +277,23 @@ function authorizeAdminTableWrite(operation, data, filters, session) {
   return filtered;
 }
 
+async function isSessionRevoked(session, supabase) {
+  if (!session || session.role !== 'admin' || session.isCron || session.tv === undefined) {
+    return false;
+  }
+  try {
+    const { data: adminRow } = await supabase
+      .from('admins')
+      .select('token_version')
+      .or(`admin_id.eq.${session.sub},id.eq.${session.sub},username.eq.${session.sub}`)
+      .single();
+    if (adminRow && adminRow.token_version && Number(adminRow.token_version) > Number(session.tv)) {
+      return true;
+    }
+  } catch (_) {}
+  return false;
+}
+
 export default async function handler(req, res) {
   if (applyCors(req, res)) return;
   if (req.method !== 'POST') {
@@ -301,6 +318,9 @@ export default async function handler(req, res) {
     if (!entry.anon) {
       const adminSession = requireSession(req, res, ['admin']);
       if (!adminSession) return;
+      if (await isSessionRevoked(adminSession, supabaseRpc)) {
+        return res.status(401).json({ success: false, error: 'Your session has been logged out from another device. Please sign in again.' });
+      }
     }
     const rawParams = body.params && typeof body.params === 'object' ? body.params : {};
     const params = {};
@@ -348,6 +368,9 @@ export default async function handler(req, res) {
   if (!isAnonymousRead && !isAnonymousPushRegister) {
     session = requireSession(req, res, ['student', 'admin']);
     if (!session) return; // requireSession already answered
+    if (await isSessionRevoked(session, supabase)) {
+      return res.status(401).json({ success: false, error: 'Your session has been logged out from another device. Please sign in again.' });
+    }
   }
 
   if (isAnonymousPushRegister && !session) {

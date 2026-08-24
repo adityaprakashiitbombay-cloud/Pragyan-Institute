@@ -5724,6 +5724,40 @@ function renderStudentDashboard() {
                 </div>
               </div>
 
+              <!-- CARD 3: ACTIVE SESSIONS & MULTI-DEVICE SECURITY -->
+              <div class="admin-profile-card admin-session-security-card">
+                <div class="admin-card-head">
+                  <div class="admin-card-head-icon" style="background: rgba(220, 38, 38, 0.1); color: #DC2626;">
+                    <i aria-hidden="true" class="fa-solid fa-laptop-file"></i>
+                  </div>
+                  <div>
+                    <div class="admin-card-head-title">3. Multi-Device Session Security</div>
+                    <div class="admin-card-head-desc">Manage active logins and terminate sessions across other devices</div>
+                  </div>
+                </div>
+
+                <div class="admin-session-box">
+                  <div class="admin-session-status-row">
+                    <div class="session-status-icon">
+                      <i aria-hidden="true" class="fa-solid fa-circle-check" style="color: #059669;"></i>
+                    </div>
+                    <div>
+                      <strong style="color: #0F172A; font-size: 0.92rem;">Current Device Session: Active</strong>
+                      <p class="admin-field-hint" style="margin: 0.2rem 0 0;">This browser session is securely authenticated with token-version verification.</p>
+                    </div>
+                  </div>
+
+                  <div class="admin-session-action-wrap">
+                    <p style="font-size: 0.88rem; color: #475569; line-height: 1.5; margin: 0 0 0.85rem 0;">
+                      Logged into your Admin account on a shared computer, mobile phone, or previous device? You can instantly invalidate and terminate all other active login tokens worldwide with one click.
+                    </p>
+                    <button type="button" class="btn-logout-all-devices" id="btnAdminLogoutAllDevices">
+                      <i aria-hidden="true" class="fa-solid fa-arrow-right-from-bracket"></i> Log Out from All Other Devices
+                    </button>
+                  </div>
+                </div>
+              </div>
+
             </div>
 
             <div class="admin-profile-submit-wrap">
@@ -5867,8 +5901,51 @@ function renderStudentDashboard() {
         const headerName = document.getElementById('adminHeaderName');
         if (headerName && AppState.currentUser) headerName.textContent = AppState.currentUser.name;
 
-        alert(`\ud83c\udf89 Account details for ${targetAdmin.name} updated and synchronized successfully!`);
+        alert(`🎉 Account details for ${targetAdmin.name} updated and synchronized successfully!`);
         renderAdminDashboard();
+      });
+
+      // Logout from all other devices handler
+      const btnLogoutAll = pane.querySelector('#btnAdminLogoutAllDevices');
+      btnLogoutAll?.addEventListener('click', async (e) => {
+        e.preventDefault();
+        if (!confirm('Are you sure you want to log out your Admin account from all other devices?\n\nAll other active sessions on other phones, laptops, and browsers will be immediately terminated. You will remain logged in on this device.')) {
+          return;
+        }
+
+        btnLogoutAll.disabled = true;
+        const originalHtml = btnLogoutAll.innerHTML;
+        btnLogoutAll.innerHTML = '<i aria-hidden="true" class="fa-solid fa-spinner fa-spin"></i> Revoking All Other Sessions...';
+
+        try {
+          const token = sessionStorage.getItem('pragyan_portal_token') || localStorage.getItem('pragyan_portal_token') || AppState.token;
+          const res = await fetch('/api/admin-logout-all', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          const data = await res.json();
+          if (data.success) {
+            if (data.token) {
+              sessionStorage.setItem('pragyan_portal_token', data.token);
+              localStorage.setItem('pragyan_portal_token', data.token);
+              AppState.token = data.token;
+              if (window.SupabaseSync && typeof window.SupabaseSync.setSessionToken === 'function') {
+                window.SupabaseSync.setSessionToken(data.token);
+              }
+            }
+            showNotification('🔒 All other device sessions have been logged out successfully! This device remains active.', 'success');
+          } else {
+            showNotification(`Failed to revoke sessions: ${data.error || 'Unknown error'}`, 'error');
+          }
+        } catch (err) {
+          showNotification(`Network error: ${err.message}`, 'error');
+        } finally {
+          btnLogoutAll.disabled = false;
+          btnLogoutAll.innerHTML = originalHtml;
+        }
       });
 
     } catch (err) {
