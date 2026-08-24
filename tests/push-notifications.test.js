@@ -54,13 +54,14 @@ export async function runPushNotificationTests(assert) {
   assert(dbJs.includes("Students may only bind their own device subscription"), 'T28.13: student sessions cannot bind device subscriptions for other students');
   assert(dbJs.includes("isAnonymousPushRegister"), 'T28.14: anonymous visitor device registration is safely supported with null student_id');
 
-  // --- 5. Serverless Dispatcher (/api/send-push.js) ---
-  const sendPushJs = read('api/send-push.js');
-  assert(sendPushJs.includes("requireSession(req, res, ['admin'])"), 'T28.15: /api/send-push requires admin authentication');
+  // --- 5. Serverless Dispatcher (/api/send-push & /api/send-email) ---
+  const sendPushJs = read('api/send-email.js');
+  const vercelJson = read('vercel.json');
+  assert(vercelJson.includes('/api/send-push') && sendPushJs.includes("requireSession(req, res, ['admin']"), 'T28.15: /api/send-push requires admin authentication');
   assert(sendPushJs.includes("isCron"), 'T28.16: /api/send-push supports CRON_SECRET authorization for automated fee triggers');
   assert(sendPushJs.includes("interpolate"), 'T28.17: /api/send-push includes dynamic variable interpolation engine');
   assert(sendPushJs.includes("push_broadcast_logs"), 'T28.18: /api/send-push records audit journal entry for every broadcast');
-  assert(sendPushJs.includes("res.prune"), 'T28.19: /api/send-push automatically prunes dead 404/410 endpoints');
+  assert(sendPushJs.includes("resResult.prune") || sendPushJs.includes("res.prune"), 'T28.19: /api/send-push automatically prunes dead 404/410 endpoints');
 
   // --- 6. Service Worker Hooks (sw.js) ---
   const swJs = read('sw.js');

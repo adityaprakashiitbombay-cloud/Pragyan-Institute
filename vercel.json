@@ -23,6 +23,14 @@
       "destination": "/api/upload-file"
     },
     {
+      "source": "/api/admin-logout-all",
+      "destination": "/api/admin-sessions"
+    },
+    {
+      "source": "/api/send-push",
+      "destination": "/api/send-email"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
