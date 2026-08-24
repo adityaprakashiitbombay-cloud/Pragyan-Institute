@@ -199,6 +199,18 @@ export function requireSession(req, res, allowedRoles = [], opts = {}) {
   return session;
 }
 
+/** Decode session if valid bearer token is present; returns null without sending response. */
+export function optionalSession(req) {
+  const token = readBearerToken(req);
+  if (!token) return null;
+  try {
+    const secret = getSessionSecret();
+    return jwt.verify(token, secret, { algorithms: ['HS256'] });
+  } catch (_) {
+    return null;
+  }
+}
+
 /** Authorise a Vercel cron invocation (or an admin session) for scheduled jobs. */
 export function requireCronOrAdmin(req, res) {
   const token = readBearerToken(req);

@@ -17,7 +17,7 @@
 //   { table, operation, data?, filters?: { where?, columns?, conflict?, limit?, offset?, order?, ascending? } }
 // ============================================================================
 
-import { getSupabase, publicAdmin, requireSession, applyCors } from './_lib/auth.js';
+import { getSupabase, publicAdmin, requireSession, optionalSession, applyCors } from './_lib/auth.js';
 
 const TABLES = new Set([
   'students', 'notices', 'fee_receipts', 'fee_billing_ledger',
@@ -253,14 +253,21 @@ function authorizeStudent(table, operation, data, filters, session) {
     if (operation === 'select') return scoped;
     if (operation === 'insert' || operation === 'upsert') {
       for (const row of rows(data)) {
-        if (row?.student_id && row.student_id !== session.sub) {
-          throw new ForbiddenError('Students may only bind their own device subscription');
-        }
-        if (!row?.endpoint || !String(row.endpoint).startsWith('https://')) {
-          throw new BadRequestError('Valid HTTPS push endpoint is required');
-        }
-        if (!row?.p256dh_key || String(row.p256dh_key).length < 20 || !row?.auth_key || String(row.auth_key).length < 8) {
-          throw new BadRequestError('Valid cryptographic push subscription keys are required');
+        if (row && typeof row === 'object') {
+          row.p256dh_key = row.p256dh_key || row.p256dh || row.keys?.p256dh || '';
+          row.auth_key = row.auth_key || row.auth || row.keys?.auth || '';
+          if (row.student_id && row.student_id !== session.sub) {
+            throw new ForbiddenError('Students may only bind their own device subscription');
+          }
+          if (session?.sub) {
+            row.student_id = session.sub;
+          }
+          if (!row.endpoint || !String(row.endpoint).startsWith('https://')) {
+            throw new BadRequestError('Valid HTTPS push endpoint is required');
+          }
+          if (!row.p256dh_key || String(row.p256dh_key).length < 20 || !row.auth_key || String(row.auth_key).length < 8) {
+            throw new BadRequestError('Valid cryptographic push subscription keys are required');
+          }
         }
       }
       return filters?.where || {};
@@ -403,12 +410,23 @@ export default async function handler(req, res) {
     if (await isSessionRevoked(session, supabase)) {
       return res.status(401).json({ success: false, error: 'Your session has been logged out from another device. Please sign in again.' });
     }
+  } else if (isAnonymousPushRegister) {
+    session = optionalSession(req);
+    if (session && await isSessionRevoked(session, supabase)) {
+      session = null;
+    }
   }
 
-  if (isAnonymousPushRegister && !session) {
+  if (isAnonymousPushRegister) {
     for (const row of rows(data)) {
       if (row && typeof row === 'object') {
-        row.student_id = null;
+        row.p256dh_key = row.p256dh_key || row.p256dh || row.keys?.p256dh || '';
+        row.auth_key = row.auth_key || row.auth || row.keys?.auth || '';
+        if (session?.sub) {
+          row.student_id = session.sub;
+        } else if (!session) {
+          row.student_id = null;
+        }
         if (!row.endpoint || !String(row.endpoint).startsWith('https://')) {
           return res.status(400).json({ success: false, error: 'Valid HTTPS push endpoint is required' });
         }

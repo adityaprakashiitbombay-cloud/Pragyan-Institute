@@ -13044,13 +13044,18 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
           </div>
         </div>
 
-        <!-- 1-Click Quick Preset Strip -->
-        <div class="push-presets-bar">
-          <span class="preset-label"><i aria-hidden="true" class="fa-solid fa-bolt"></i> Quick Presets:</span>
-          <button type="button" class="btn btn-sm btn-preset" data-preset="fee">💵 Monthly Fee Due</button>
-          <button type="button" class="btn btn-sm btn-preset" data-preset="exam">🏆 Board Exam Drill</button>
-          <button type="button" class="btn btn-sm btn-preset" data-preset="holiday">📢 Weather / Holiday</button>
-          <button type="button" class="btn btn-sm btn-preset" data-preset="result">🎉 Result Celebration</button>
+        <!-- 1-Click Quick Preset Strip & Device Registration -->
+        <div class="push-presets-bar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+          <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+            <span class="preset-label"><i aria-hidden="true" class="fa-solid fa-bolt"></i> Quick Presets:</span>
+            <button type="button" class="btn btn-sm btn-preset" data-preset="fee">💵 Monthly Fee Due</button>
+            <button type="button" class="btn btn-sm btn-preset" data-preset="exam">🏆 Board Exam Drill</button>
+            <button type="button" class="btn btn-sm btn-preset" data-preset="holiday">📢 Weather / Holiday</button>
+            <button type="button" class="btn btn-sm btn-preset" data-preset="result">🎉 Result Celebration</button>
+          </div>
+          <button type="button" class="btn btn-sm btn-primary" id="btnRegisterCurrentDevice" style="margin-left:auto;">
+            <i aria-hidden="true" class="fa-solid fa-bell"></i> Enable / Register This Device
+          </button>
         </div>
 
         <div class="push-hub-grid">
@@ -13552,6 +13557,29 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
       } finally {
         btnDispatch.disabled = false;
         btnDispatch.innerHTML = '<i aria-hidden="true" class="fa-solid fa-paper-plane"></i> Broadcast Push Notification';
+      }
+    });
+
+    pane.querySelector('#btnRegisterCurrentDevice')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      btn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-spinner fa-spin"></i> Subscribing Device...';
+      try {
+        if (!window.PushClient || typeof window.PushClient.requestAndSubscribe !== 'function') {
+          throw new Error('Push notification client is not supported or loaded.');
+        }
+        const ok = await window.PushClient.requestAndSubscribe({ student_id: 'ADMIN', name: 'Admin Device' });
+        if (ok) {
+          showNotification('🔔 Device successfully registered for push notifications!', 'success');
+          syncPushStatsFromCloud();
+        } else {
+          showNotification('Permission was not granted or push registration failed on this browser.', 'warning');
+        }
+      } catch (err) {
+        showNotification('Push error: ' + err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-bell"></i> Enable / Register This Device';
       }
     });
 

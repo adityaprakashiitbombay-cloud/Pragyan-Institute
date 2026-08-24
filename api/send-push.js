@@ -146,12 +146,13 @@ export default async function handler(req, res) {
     if (studentIds.length > 0) {
       const { data: students } = await supabase
         .from('students')
-        .select('student_id, name, class_name, pending_fee, paid_fee, total_fee, roll_no')
-        .in('student_id', studentIds);
+        .select('*');
       if (students) {
         for (const s of students) {
-          s.pending_balance = Number(s.pending_fee ?? 0);
-          studentMap.set(s.student_id, s);
+          s.pending_balance = Number(s.pending_fee ?? s.pending_fees ?? 0);
+          if (s.student_id) studentMap.set(s.student_id, s);
+          if (s.id) studentMap.set(s.id, s);
+          if (s.roll_no) studentMap.set(s.roll_no, s);
         }
       }
     }

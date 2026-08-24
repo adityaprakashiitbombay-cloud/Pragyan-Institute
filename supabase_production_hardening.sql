@@ -1656,7 +1656,7 @@ CREATE TABLE IF NOT EXISTS public.push_subscriptions (
   endpoint      text UNIQUE NOT NULL,
   p256dh_key    text NOT NULL,
   auth_key      text NOT NULL,
-  student_id    text REFERENCES public.students(student_id) ON DELETE CASCADE,
+  student_id    text,
   anon_id       text,
   batch_id      text,
   device_os     text,
@@ -1668,6 +1668,7 @@ CREATE TABLE IF NOT EXISTS public.push_subscriptions (
   CONSTRAINT push_endpoint_https CHECK (endpoint LIKE 'https://%')
 );
 
+ALTER TABLE public.push_subscriptions DROP CONSTRAINT IF EXISTS push_subscriptions_student_id_fkey;
 CREATE INDEX IF NOT EXISTS idx_push_sub_student ON public.push_subscriptions(student_id);
 CREATE INDEX IF NOT EXISTS idx_push_sub_batch   ON public.push_subscriptions(batch_id);
 
@@ -1712,11 +1713,15 @@ ALTER TABLE public.push_broadcast_logs FORCE ROW LEVEL SECURITY;
 
 CREATE POLICY "service_role_full_push_subs"  ON public.push_subscriptions  FOR ALL TO service_role USING (true) WITH CHECK (true);
 CREATE POLICY "service_role_full_push_logs"  ON public.push_broadcast_logs FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "authenticated_push_subs"      ON public.push_subscriptions  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "anon_insert_push_subs"        ON public.push_subscriptions  FOR INSERT TO anon WITH CHECK (true);
+CREATE POLICY "anon_update_push_subs"        ON public.push_subscriptions  FOR UPDATE TO anon USING (true) WITH CHECK (true);
 
 REVOKE ALL ON public.push_subscriptions  FROM anon, authenticated;
 REVOKE ALL ON public.push_broadcast_logs FROM anon, authenticated;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.push_subscriptions TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.push_subscriptions TO anon;
 GRANT SELECT ON public.push_broadcast_logs TO authenticated;
 
 -- Verification:

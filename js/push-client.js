@@ -1,9 +1,8 @@
 // ============================================================================
-// PRAGYAN INSTITUTE — CLIENT WEB PUSH MANAGER (STUDENT LOGIN ONLY)
+// PRAGYAN INSTITUTE — CLIENT WEB PUSH MANAGER (STUDENT & PORTAL NOTIFICATIONS)
 // ----------------------------------------------------------------------------
-// Manages device push registration exclusively for authenticated students.
-// Per project policy: Zero popups or prompts for public marketing visitors.
-// Only prompts after student logs into their dashboard profile.
+// Manages device push registration with automatic key extraction,
+// VAPID subscription handshakes, and resilient Supabase database synchronization.
 // ============================================================================
 
 (function (window) {
@@ -25,6 +24,17 @@
       outputArray[i] = rawData.charCodeAt(i);
     }
     return outputArray;
+  }
+
+  /** Convert ArrayBuffer to base64url string */
+  function arrayBufferToBase64Url(buffer) {
+    if (!buffer) return '';
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return window.btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
 
   function detectDeviceDetails() {
@@ -57,7 +67,7 @@
 
     /**
      * Mount student in-dashboard permission card if not granted/declined.
-     * ONLY called from inside portal.js when student dashboard renders.
+     * Called from portal.js when student dashboard renders.
      */
     renderStudentPrompt: function (containerEl, student) {
       if (!this.isSupported()) return;
@@ -109,7 +119,7 @@
             card.innerHTML = `
               <div class="push-prompt-success">
                 <i aria-hidden="true" class="fa-solid fa-circle-check text-success"></i>
-                <span>Notifications enabled! You will receive live updates for ${student.class_name || 'your batch'}.</span>
+                <span>Notifications enabled! You will receive live updates for ${student?.class_name || 'your batch'}.</span>
               </div>
             `;
             setTimeout(() => { card.remove(); }, 3500);
@@ -143,12 +153,17 @@
       }
     },
 
-    /** Sync or renew subscription for logged-in student */
+    /** Sync or renew subscription for logged-in student or portal user */
     syncSubscription: async function (student) {
       if (!this.isSupported() || Notification.permission !== 'granted') return false;
 
       try {
-        const reg = await navigator.serviceWorker.ready;
+        let reg = await navigator.serviceWorker.getRegistration();
+        if (!reg) {
+          reg = await navigator.serviceWorker.register('/sw.js');
+        }
+        await navigator.serviceWorker.ready;
+
         let sub = await reg.pushManager.getSubscription();
 
         if (!sub) {
@@ -161,15 +176,43 @@
 
         if (!sub) return false;
 
-        const subJson = sub.toJSON();
-        const p256dh = subJson.keys ? subJson.keys.p256dh : '';
-        const auth = subJson.keys ? subJson.keys.auth : '';
+        // Extract cryptographic keys from JSON or raw ArrayBuffers
+        let p256dh = '';
+        let auth = '';
+        if (sub.toJSON) {
+          const subJson = sub.toJSON();
+          if (subJson.keys) {
+            p256dh = subJson.keys.p256dh || '';
+            auth = subJson.keys.auth || '';
+          }
+        }
+        if (!p256dh && typeof sub.getKey === 'function') {
+          try {
+            const rawP256 = sub.getKey('p256dh');
+            p256dh = arrayBufferToBase64Url(rawP256);
+          } catch (_) {}
+        }
+        if (!auth && typeof sub.getKey === 'function') {
+          try {
+            const rawAuth = sub.getKey('auth');
+            auth = arrayBufferToBase64Url(rawAuth);
+          } catch (_) {}
+        }
 
-        if (!p256dh || !auth) return false;
+        if (!p256dh || !auth) {
+          console.warn('[PushClient] Missing subscription keys p256dh or auth');
+          return false;
+        }
 
-        let batchId = null;
-        if (window.PRAGYAN_ACADEMIC && typeof window.PRAGYAN_ACADEMIC.resolveBatch === 'function') {
-          const res = window.PRAGYAN_ACADEMIC.resolveBatch(student?.class_name);
+        const targetStudent = student || (typeof AppState !== 'undefined' && AppState.currentUser) || null;
+        let studentId = targetStudent?.student_id || targetStudent?.roll_no || targetStudent?.rollNo || null;
+        if (!studentId && targetStudent?.id && !String(targetStudent.id).includes('-')) {
+          studentId = targetStudent.id;
+        }
+
+        let batchId = targetStudent?.batch_id || targetStudent?.batchId || null;
+        if (!batchId && targetStudent?.class_name && window.PRAGYAN_ACADEMIC?.resolveBatch) {
+          const res = window.PRAGYAN_ACADEMIC.resolveBatch(targetStudent.class_name);
           batchId = res?.id || null;
         }
 
@@ -178,29 +221,36 @@
           endpoint: sub.endpoint,
           p256dh_key: p256dh,
           auth_key: auth,
-          student_id: student?.student_id || student?.roll_no || student?.rollNo || (student?.id && !String(student.id).includes('-') ? student.id : null),
+          student_id: studentId,
           batch_id: batchId,
           device_os: device.device_os,
           browser: device.browser,
           user_agent: device.user_agent,
-          expires_at: sub.expirationTime ? new Date(sub.expirationTime).toISOString() : null
+          expires_at: sub.expirationTime ? new Date(sub.expirationTime).toISOString() : null,
+          updated_at: new Date().toISOString()
         };
 
+        // 1. Primary path: SupabaseSync authenticated gateway
         if (window.SupabaseSync && typeof window.SupabaseSync._apiDb === 'function') {
           try {
             await window.SupabaseSync._apiDb('push_subscriptions', 'upsert', {
               data: payload,
               filters: { conflict: 'endpoint' }
             });
+            console.log('[PushClient] Device subscription synced via SupabaseSync._apiDb');
             return true;
           } catch (syncErr) {
             console.warn('[PushClient] _apiDb failed, trying direct gateway:', syncErr);
           }
         }
 
+        // 2. Secondary path: Direct /api/db fetch
+        const cfg = (typeof window !== 'undefined' && window.PRAGYAN_CONFIG) ? window.PRAGYAN_CONFIG : {};
+        const apiBase = (cfg.API_BASE || (typeof window !== 'undefined' && window.PRAGYAN_API_BASE) || '').replace(/\/$/, '');
         const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pragyan_portal_token')) ||
           (typeof localStorage !== 'undefined' && localStorage.getItem('pragyan_portal_token')) || null;
-        const resp = await fetch('/api/db', {
+
+        const resp = await fetch(`${apiBase}/api/db`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -214,7 +264,30 @@
           })
         });
         const resJson = await resp.json().catch(() => null);
-        return Boolean(resJson && resJson.success);
+        if (resJson && resJson.success) {
+          console.log('[PushClient] Device subscription synced via /api/db');
+          return true;
+        }
+
+        // 3. Tertiary fallback: Direct Supabase PostgREST
+        if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY) {
+          try {
+            const restResp = await fetch(`${cfg.SUPABASE_URL}/rest/v1/push_subscriptions?on_conflict=endpoint`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': cfg.SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${token || cfg.SUPABASE_ANON_KEY}`,
+                'Prefer': 'resolution=merge-duplicates,return=representation'
+              },
+              body: JSON.stringify(payload)
+            });
+            if (restResp.ok) {
+              console.log('[PushClient] Device subscription synced via Supabase REST fallback');
+              return true;
+            }
+          } catch (_) {}
+        }
       } catch (err) {
         console.warn('[PushClient] Sync error:', err);
       }

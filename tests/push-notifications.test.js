@@ -104,6 +104,10 @@ export async function runPushNotificationTests(assert) {
   assert(pushClientJs.includes("'push_subscriptions'") && pushClientJs.includes("'endpoint'"), 'T28.39: js/push-client.js securely syncs device endpoints with conflict resolution');
   const syncJs = read('js/supabase-sync.js');
   assert(syncJs.includes("table === 'push_subscriptions'") && syncJs.includes("filters.conflict = 'endpoint'"), 'T28.40: js/supabase-sync.js supports dual-signature _apiDb with push conflict defaults');
+  assert(pushClientJs.includes("arrayBufferToBase64Url"), 'T28.41: js/push-client.js provides ArrayBuffer fallback key extraction for non-standard PushSubscription objects');
+  assert(portalJs.includes("btnRegisterCurrentDevice"), 'T28.42: js/portal.js provides 1-click admin device registration');
+  const authJs = read('api/_lib/auth.js');
+  assert(authJs.includes("optionalSession"), 'T28.43: api/_lib/auth.js exports optionalSession for push subscriber identification');
 }
 
 
