@@ -1683,13 +1683,15 @@
       }
 
       // ── PRIMARY AUTH PATH: Secure Verification via Serverless Endpoint ──
+      let authRes = null;
+      let authData = {};
       try {
-        const authRes = await fetch('/api/auth-login', {
+        authRes = await fetch('/api/auth-login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ role, identifier: cleanId, credential: cleanCred })
         });
-        const authData = await authRes.json().catch(() => ({}));
+        authData = await authRes.json().catch(() => ({}));
         if (authRes.ok && authData.success && authData.token) {
           this.isOfflineFallback = false;
           if (typeof sessionStorage !== 'undefined') {
@@ -1711,23 +1713,18 @@
           return { success: false, error: authData.error || 'Authentication failed. Please check your credentials.' };
         }
       } catch (apiErr) {
-        console.warn('API /api/auth-login unreachable, evaluating direct database auth fallback:', apiErr.message);
+        console.warn('API /api/auth-login unreachable:', apiErr.message);
       }
 
       // ── SECURITY: FAIL CLOSED ──────────────────────────────────────────
       // There is deliberately NO client-side fallback authentication. Any
       // browser-side bcrypt/plaintext check against anon-fetched hashes, or
       // locally minted session tokens, is forgeable by definition. If the
-      // server endpoint cannot be reached, nobody logs in — full stop.
-      if (!authRes || authRes.ok === undefined) {
-        // fetch() itself threw (network down / DNS / cold-start 5xx handled above)
-        return {
-          success: false,
-          error: 'Authentication service temporarily unavailable. Please check your connection and try again.'
-        };
-      }
-      // Server answered with an unexpected status (5xx etc.) — same answer.
-      return { success: false, error: 'Authentication service temporarily unavailable. Please check your connection and try again.' };
+      // server endpoint cannot be reached or fails, fail closed securely.
+      return {
+        success: false,
+        error: (authData && authData.error) || 'Authentication service temporarily unavailable. Please check your connection and try again.'
+      };
     },
 
     setSessionToken(token, role) {
