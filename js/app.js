@@ -1462,6 +1462,12 @@ function closeBlogReader() {
   overlay.remove();
   window.PragyanUI && window.PragyanUI.unlockScroll();
   blogReaderOpenSlug = null;
+  if (location.hash && location.hash.startsWith('#read=')) {
+    try {
+      const fallbackHash = blogActiveCategory !== 'all' ? `#category=${encodeURIComponent(blogActiveCategory)}` : '';
+      history.replaceState(null, '', location.pathname + location.search + fallbackHash);
+    } catch (_) {}
+  }
 }
 
 function openBlogReader(slug) {
@@ -1485,18 +1491,20 @@ function openBlogReader(slug) {
   overlay.setAttribute('aria-modal', 'true');
   overlay.setAttribute('aria-labelledby', 'blogReaderTitle');
   overlay.innerHTML = `
-    <div class="blog-reader-panel">
-      <button type="button" class="blog-reader-close" aria-label="Close article reader"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
-      <header class="blog-reader-head">
+    <div class="blog-reader-panel" tabindex="-1">
+      <div class="blog-reader-top-bar">
         <span class="blog-cat-pill ${blogCatClass(post.category)}">${escapeHtml(post.category)}</span>
+        <button type="button" class="blog-reader-close" aria-label="Close article reader"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+      </div>
+      <header class="blog-reader-head">
         <h2 id="blogReaderTitle">${escapeHtml(post.title)}</h2>
-        <p class="blog-reader-byline">
-          By <strong>${escapeHtml(post.author_name)}</strong> · ${escapeHtml(post.author_role)}
-          · ${blogFmtDate(post.published_at || post.created_at)}
-          · ⏱️ ${Number(post.read_time_minutes) || 3} min read
-          · 👁 <span data-live-views>${Number(post.views_count) || 0}</span>
-        </p>
-        ${post.cover_image_url ? `<img class="blog-reader-cover" src="${escapeHtml(post.cover_image_url)}" alt="">` : ''}
+        <div class="blog-reader-byline">
+          <span class="byline-item byline-author"><i class="fa-solid fa-user-pen" aria-hidden="true"></i> <strong>${escapeHtml(post.author_name)}</strong> (${escapeHtml(post.author_role)})</span>
+          <span class="byline-item byline-date"><i class="fa-regular fa-calendar-days" aria-hidden="true"></i> ${blogFmtDate(post.published_at || post.created_at)}</span>
+          <span class="byline-item byline-time"><i class="fa-regular fa-clock" aria-hidden="true"></i> ${Number(post.read_time_minutes) || 3} min read</span>
+          <span class="byline-item byline-views"><i class="fa-regular fa-eye" aria-hidden="true"></i> <span data-live-views>${Number(post.views_count) || 0}</span> views</span>
+        </div>
+        ${post.cover_image_url ? `<img class="blog-reader-cover" src="${escapeHtml(post.cover_image_url)}" alt="${escapeHtml(post.title)}" loading="lazy">` : ''}
       </header>
       <div class="blog-reader-body">${md.renderMarkdown(post.content_markdown)}</div>
       <footer class="blog-reader-footer">
@@ -1518,7 +1526,7 @@ function openBlogReader(slug) {
   window.PragyanUI && window.PragyanUI.lockScroll();
 
   const panel = overlay.querySelector('.blog-reader-panel');
-  panel.focus?.();
+  panel?.focus?.();
   const focusables = () => Array.from(overlay.querySelectorAll('button, a[href], [tabindex]:not([tabindex="-1"])'))
     .filter(el => el.offsetParent !== null);
   overlay.addEventListener('keydown', (e) => {
@@ -1569,9 +1577,41 @@ function handleHashForBlog() {
   if (m) openBlogReader(decodeURIComponent(m[1]));
 }
 
-/* --------------------------------------------------------------------------
- * 13. Interactive Faculty & Mentor Ratings (Real-Time Supabase Sync)
- * -------------------------------------------------------------------------- */
+function initBlog() {
+  const section = document.getElementById('blog');
+  if (!section) return;
+
+  const tabs = section.querySelectorAll('.blog-tab');
+  tabs.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      onBlogTabClick(btn);
+    });
+  });
+
+  const grid = document.getElementById('blogGrid');
+  if (grid) {
+    grid.addEventListener('click', (e) => {
+      const target = e.target.closest('a[data-slug], [data-slug], .blog-card');
+      if (!target) return;
+      const anchor = target.matches('a[data-slug]') ? target : target.querySelector('a[data-slug]') || target.closest('a[data-slug]');
+      const slug = target.dataset.slug || anchor?.dataset.slug;
+      if (slug) {
+        e.preventDefault();
+        openBlogReader(slug);
+      }
+    });
+  }
+
+  window.addEventListener('hashchange', () => {
+    handleHashForBlog();
+  });
+  restoreBlogCategoryFromHash();
+  handleHashForBlog();
+
+  fetchPublishedPosts();
+}
+
 /* --------------------------------------------------------------------------
  * 13. Interactive Faculty & Mentor Ratings (Real-Time Supabase Sync)
  * -------------------------------------------------------------------------- */
