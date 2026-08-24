@@ -1176,7 +1176,9 @@ let blogReaderList = [];   // ordered slugs inside the active filter (prev/next)
 let blogReaderOpenSlug = null;
 
 function blogApiPost(body) {
-  return fetch('/api/db', {
+  const cfg = (typeof window !== 'undefined' && window.PRAGYAN_CONFIG) ? window.PRAGYAN_CONFIG : {};
+  const apiBase = (cfg.API_BASE || (typeof window !== 'undefined' && window.PRAGYAN_API_BASE) || '').replace(/\/$/, '');
+  return fetch(`${apiBase}/api/db`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
@@ -1184,7 +1186,6 @@ function blogApiPost(body) {
     if (r.ok) return r.json();
     throw new Error(`HTTP ${r.status}`);
   }).catch(async (err) => {
-    const cfg = window.PRAGYAN_CONFIG || {};
     if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY) {
       try {
         if (body.operation === 'rpc' && body.fn) {

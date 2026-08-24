@@ -361,13 +361,15 @@ export default async function handler(req, res) {
     let clientIp = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'anon')
       .toString().split(',')[0].trim();
     if (rpcFn === 'increment_blog_views') {
-      const slug = String(params.p_slug || '');
-      if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) {
+      const rawSlug = String(params.p_slug || '').trim();
+      const slug = rawSlug.toLowerCase();
+      if (!slug || slug.length > 200 || !/^[a-z0-9-_]+$/.test(slug)) {
         return res.status(400).json({ success: false, error: 'Invalid article slug' });
       }
       if (!anonRpcAllowed(rpcFn, clientIp, slug)) {
         return res.status(429).json({ success: false, error: 'Too many requests' });
       }
+      params.p_slug = slug;
     }
     try {
       const { data: rpcData, error } = await supabaseRpc.rpc(rpcFn, params);

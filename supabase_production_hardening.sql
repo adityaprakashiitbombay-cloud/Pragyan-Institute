@@ -1441,8 +1441,10 @@ AS $fn$
 DECLARE v_views integer;
 BEGIN
   UPDATE public.blog_posts
-     SET views_count = views_count + 1
-   WHERE slug = btrim(p_slug)
+     SET views_count = COALESCE(views_count, 0) + 1,
+         updated_at = now()
+   WHERE lower(btrim(slug)) = lower(btrim(p_slug))
+      OR id::text = btrim(p_slug)
   RETURNING views_count INTO v_views;
   RETURN COALESCE(v_views, 0);
 END;

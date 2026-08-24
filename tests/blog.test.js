@@ -158,5 +158,11 @@ export function runBlogTests(assert) {
     'T25.55: api/db.js explicitly maps blog_posts in ORDER_COLUMNS and falls back safely to created_at');
   assert(portalSrc.includes("mutate('blog_posts', 'delete'") && portalSrc.includes("BLOG_POST_UPDATED"),
     'T25.56: portal.js permanently deletes articles from cloud database and broadcasts deletion event');
+  assert(sqlSrc.includes("COALESCE(views_count, 0) + 1"),
+    'T25.57: increment_blog_views is NULL-safe with COALESCE in SQL');
+  assert(sqlSrc.includes("lower(btrim(slug)) = lower(btrim(p_slug))"),
+    'T25.58: increment_blog_views supports case-insensitive and trimmed slug matching');
+  assert(appSrc.includes("increment_blog_views") && appSrc.includes("saveBlogViewsMap"),
+    'T25.59: app.js invokes atomic RPC and updates local storage view map');
 }
 
