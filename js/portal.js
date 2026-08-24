@@ -755,25 +755,42 @@
     const ui = BATCH_UI[b.batchId] || {};
     const src = extra || {};
     const timing = src.timing || src.timings || ui.timing || 'Mon – Sat: As per timetable';
+    const fee = (Number.isFinite(Number(src.monthly_fee ?? src.monthlyFee)) && Number(src.monthly_fee ?? src.monthlyFee) > 0)
+      ? Number(src.monthly_fee ?? src.monthlyFee)
+      : b.monthlyFee;
+    const rawTeachers = Array.isArray(src.teachers) && src.teachers.length > 0
+      ? src.teachers
+      : (b.teachers || []);
+    const teacherStr = src.teacher || (Array.isArray(rawTeachers) ? rawTeachers.map(t => typeof t === 'string' ? titleCaseName(t) : (t.name || '')).join(' & ') : b.teachers.map(titleCaseName).join(' & '));
+    const subjects = Array.isArray(src.subjects) && src.subjects.length > 0
+      ? src.subjects
+      : (BATCH_SUBJECTS[b.batchId] || []);
+
     return {
       id: b.batchId,
       batch_id: b.batchId,
-      name: b.name,
-      className: b.name,
-      batchName: b.name,
-      batch_name: b.name,
-      monthlyFee: b.monthlyFee,
-      monthly_fee: b.monthlyFee,
-      annualFee: cfgAnnual(b.monthlyFee),
+      name: src.name || b.name,
+      className: src.class_name || src.className || b.name,
+      batchName: src.name || b.name,
+      batch_name: src.name || b.name,
+      monthlyFee: fee,
+      monthly_fee: fee,
+      annualFee: src.annual_fee ? Number(src.annual_fee) : (src.annualFee ? Number(src.annualFee) : cfgAnnual(fee)),
+      annual_fee: src.annual_fee ? Number(src.annual_fee) : (src.annualFee ? Number(src.annualFee) : cfgAnnual(fee)),
       timing: timing,
       timings: timing,
       room: src.room || src.room_no || ui.room || 'As allotted',
-      teacher: src.teacher || b.teachers.map(titleCaseName).join(' & '),
-      badge: src.badge || b.tagline,
+      teacher: teacherStr,
+      teachers: rawTeachers,
+      subjects: subjects,
+      capacity: Number(src.capacity || 40),
+      tagline: src.tagline || b.tagline || '',
+      badge: src.badge || src.tagline || b.tagline,
+      status: src.status || 'Active',
       icon: batchIcon(b.batchId),
-      billingDay: b.billingDay,
+      billingDay: Number(src.billing_day || src.billingDay || b.billingDay || 1),
       reminderTier: b.reminderTier,
-      stream: b.stream
+      stream: b.stream || src.stream || ''
     };
   }
 
@@ -2172,7 +2189,7 @@
       this._batchesCache = batches;
       return batches;
     },
-    async saveBatches(batches) {  // BUG-1 fix: async
+    async saveBatches(batches) {
       this._batchesCache = batches;
       localStorage.setItem(STORAGE_KEY_BATCHES, JSON.stringify(batches));
       this.markMutation();
@@ -2180,12 +2197,20 @@
       try {
         if (Array.isArray(batches) && batches.length > 0) {
           const supaPayload = batches.map(b => ({
-            batch_id: b.id,
-            name: b.name,
+            batch_id: b.id || b.batch_id,
+            name: b.name || b.batch_name || b.className || '',
+            class_name: b.className || b.class_name || b.name || '',
             monthly_fee: Number(b.monthlyFee ?? b.monthly_fee) || classMonthlyFee(b.id || b.name || ''),
-            timing: b.timing || '',
+            annual_fee: Number(b.annualFee ?? b.annual_fee) || cfgAnnual(Number(b.monthlyFee ?? b.monthly_fee) || 0),
+            billing_day: Number(b.billingDay ?? b.billing_day ?? 1),
+            timing: b.timing || b.timings || '',
             room: b.room || '',
-            teacher: b.teacher || ''
+            teacher: b.teacher || '',
+            teachers: Array.isArray(b.teachers) ? b.teachers : (b.teacher ? b.teacher.split(/[&,]/).map(t => t.trim()).filter(Boolean) : []),
+            subjects: Array.isArray(b.subjects) ? b.subjects : (b.subject ? [b.subject] : []),
+            capacity: Number(b.capacity || 40),
+            tagline: b.tagline || b.badge || '',
+            status: b.status || 'Active'
           }));
           if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
             const r = await SupabaseSync.mutate('batches', 'upsert', supaPayload, { conflict: 'batch_id' });
@@ -4398,7 +4423,7 @@ function renderStudentDashboard() {
           <div class="dash-card-header">
             <div class="dash-card-title"><i aria-hidden="true" class="fa-solid fa-user-tie"></i> Assigned Faculty</div>
           </div>
-          <div style="display: flex; flex-direction: column; gap: 1rem;">
+          <div style="display: flex; flex-direction: column; gap: 0.75rem;">
             ${teacherList.map(t => `
               <div style="display: flex; align-items: center; gap: 0.875rem; padding: 0.75rem; background: var(--bg-surface-cream); border-radius: var(--radius-sm);">
                 <div style="width: 42px; height: 42px; border-radius: 50%; background: var(--primary-emerald); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size:1.1rem;">
@@ -4406,11 +4431,26 @@ function renderStudentDashboard() {
                 </div>
                 <div>
                   <div style="font-weight: 700; font-size: 0.92rem; color: var(--text-mahogany);">${escapeHtml(t)}</div>
-                  <div style="font-size: 0.8rem; color: var(--text-muted);">Faculty — ${escapeHtml(batchName)}</div>
+                  <div style="font-size: 0.8rem; color: var(--text-muted);">Faculty Mentor — ${escapeHtml(batchName)}</div>
                 </div>
               </div>
             `).join('')}
           </div>
+
+          ${((Array.isArray(myBatch.subjects) && myBatch.subjects.length > 0) ? myBatch.subjects : (BATCH_SUBJECTS[studentBatchKey] || [])).length > 0 ? `
+            <div style="margin-top: 1.25rem; border-top: 1px solid var(--border-sand); padding-top: 1rem;">
+              <div style="font-size: 0.85rem; font-weight: 800; color: var(--text-mahogany); margin-bottom: 0.6rem; display: flex; align-items: center; gap: 0.4rem;">
+                <i aria-hidden="true" class="fa-solid fa-book-open" style="color: var(--primary-emerald);"></i> Core Subjects &amp; Syllabus Topics
+              </div>
+              <div style="display: flex; flex-wrap: wrap; gap: 0.45rem;">
+                ${((Array.isArray(myBatch.subjects) && myBatch.subjects.length > 0) ? myBatch.subjects : (BATCH_SUBJECTS[studentBatchKey] || [])).map(sub => `
+                  <span style="background: #F0FDF4; border: 1px solid #BBF7D0; color: #166534; font-size: 0.78rem; font-weight: 700; padding: 0.25rem 0.6rem; border-radius: 99px;">
+                    ${escapeHtml(typeof sub === 'string' ? sub : (sub.name || ''))}
+                  </span>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
         </div>
       </div>
     `;
@@ -5000,6 +5040,7 @@ function renderStudentDashboard() {
     renderAdminAuditHistoryTab();
     renderAdminSettingsTab();
     renderAdminBlogTab();
+    renderAdminBatchesTab();
 
     // Preserve the currently active admin tab!
     let targetTab = AppState.activeAdminTab || 'students';
@@ -5889,6 +5930,8 @@ function renderStudentDashboard() {
       renderAdminBlogTab();
     } else if (tabName === 'schedule') {
       renderAdminScheduleTab();
+    } else if (tabName === 'batches') {
+      renderAdminBatchesTab();
     } else if (tabName === 'push') {
       renderAdminPushTab();
     }
@@ -14431,6 +14474,662 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
         }
       });
     });
+  }
+
+  /* ==========================================================================
+   * ADMIN BATCHES & COURSE MASTER TAB
+   * ========================================================================== */
+  let adminBatchesFilterStream = 'all';
+  let adminBatchesFilterStatus = 'all';
+  let adminBatchesSearchQuery = '';
+
+  function renderAdminBatchesTab() {
+    const pane = document.getElementById('adminTabPane-batches');
+    if (!pane) return;
+
+    const batches = AppState.getBatches();
+    const students = AppState.getStudents();
+
+    // Map student count per batch
+    const studentCountMap = {};
+    students.forEach(st => {
+      const bKey = getBatchCategoryKey(st.className || st.batchName || st.class_name || '');
+      if (bKey) {
+        studentCountMap[bKey] = (studentCountMap[bKey] || 0) + 1;
+      }
+    });
+
+    // KPI Aggregations
+    const totalBatches = batches.length;
+    const activeBatches = batches.filter(b => (b.status || 'Active').toLowerCase() === 'active').length;
+    const totalEnrolledStudents = students.length;
+    const totalCapacity = batches.reduce((acc, b) => acc + (Number(b.capacity) || 40), 0);
+    const totalMonthlyRevenuePotential = batches.reduce((acc, b) => {
+      const bKey = getBatchCategoryKey(b.name || b.className || b.id || b.batch_id || '');
+      const count = studentCountMap[bKey] || 0;
+      const fee = Number(b.monthlyFee ?? b.monthly_fee) || 0;
+      return acc + (fee * count);
+    }, 0);
+
+    // Filter batches
+    let filteredBatches = batches.filter(b => {
+      // Stream filter
+      if (adminBatchesFilterStream !== 'all') {
+        const bStream = (b.stream || '').toLowerCase();
+        if (adminBatchesFilterStream.toLowerCase() !== bStream) {
+          // Check if stream is in name or id
+          const bName = (b.name || '').toLowerCase();
+          if (!bName.includes(adminBatchesFilterStream.toLowerCase())) {
+            return false;
+          }
+        }
+      }
+
+      // Status filter
+      if (adminBatchesFilterStatus !== 'all') {
+        const bStatus = (b.status || 'Active').toLowerCase();
+        if (adminBatchesFilterStatus.toLowerCase() !== bStatus) {
+          return false;
+        }
+      }
+
+      // Search query
+      if (adminBatchesSearchQuery) {
+        const q = adminBatchesSearchQuery.toLowerCase();
+        const bId = (b.id || b.batch_id || '').toLowerCase();
+        const bName = (b.name || b.className || '').toLowerCase();
+        const bClass = (b.className || b.class_name || '').toLowerCase();
+        const bTeacher = (b.teacher || (Array.isArray(b.teachers) ? b.teachers.join(' ') : '')).toLowerCase();
+        const bRoom = (b.room || '').toLowerCase();
+        const bSubjects = (Array.isArray(b.subjects) ? b.subjects.map(s => typeof s === 'string' ? s : (s.name || '')).join(' ') : '').toLowerCase();
+        return bId.includes(q) || bName.includes(q) || bClass.includes(q) || bTeacher.includes(q) || bRoom.includes(q) || bSubjects.includes(q);
+      }
+
+      return true;
+    });
+
+    pane.innerHTML = `
+      <div class="admin-batches-container">
+        <!-- Header Banner -->
+        <div class="admin-batches-header">
+          <div>
+            <div class="admin-batches-header-title">
+              <i aria-hidden="true" class="fa-solid fa-layer-group"></i> Batches &amp; Course Master
+            </div>
+            <div class="admin-batches-header-sub">
+              Centralized Supabase-synced course catalog. Regulate class definitions, fee tariffs, lecture timings, classroom rooms, and faculty mentors directly reflected in real time across Student Profiles.
+            </div>
+          </div>
+          <div class="admin-batches-header-actions">
+            <button type="button" id="btnAdminAddNewBatch" class="btn" style="background:#FFFFFF; color:var(--primary-emerald); font-weight:800; border-radius:8px; padding:0.6rem 1.25rem; display:inline-flex; align-items:center; gap:0.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.12); cursor:pointer;">
+              <i aria-hidden="true" class="fa-solid fa-plus"></i> Add New Batch
+            </button>
+            <button type="button" id="btnAdminSyncBatches" class="btn" style="background:rgba(255,255,255,0.15); color:#FFFFFF; border:1px solid rgba(255,255,255,0.4); font-weight:700; border-radius:8px; padding:0.6rem 1rem; display:inline-flex; align-items:center; gap:0.5rem; cursor:pointer;">
+              <i aria-hidden="true" class="fa-solid fa-arrows-rotate"></i> Sync Cloud
+            </button>
+          </div>
+        </div>
+
+        <!-- KPI Stat Cards -->
+        <div class="admin-batches-kpi-grid">
+          <div class="admin-batch-kpi-card">
+            <div class="admin-batch-kpi-icon" style="background:#ECFDF5; color:#059669;">
+              <i aria-hidden="true" class="fa-solid fa-book-bookmark"></i>
+            </div>
+            <div>
+              <div class="admin-batch-kpi-label">Active / Total Batches</div>
+              <div class="admin-batch-kpi-value">${activeBatches} <span style="font-size:0.95rem; color:var(--text-muted); font-weight:600;">/ ${totalBatches}</span></div>
+            </div>
+          </div>
+
+          <div class="admin-batch-kpi-card">
+            <div class="admin-batch-kpi-icon" style="background:#EFF6FF; color:#2563EB;">
+              <i aria-hidden="true" class="fa-solid fa-user-graduate"></i>
+            </div>
+            <div>
+              <div class="admin-batch-kpi-label">Enrolled Students</div>
+              <div class="admin-batch-kpi-value">${totalEnrolledStudents} <span style="font-size:0.95rem; color:var(--text-muted); font-weight:600;">/ ${totalCapacity} Cap</span></div>
+            </div>
+          </div>
+
+          <div class="admin-batch-kpi-card">
+            <div class="admin-batch-kpi-icon" style="background:#FEF3C7; color:#D97706;">
+              <i aria-hidden="true" class="fa-solid fa-indian-rupee-sign"></i>
+            </div>
+            <div>
+              <div class="admin-batch-kpi-label">Monthly Fee Billing</div>
+              <div class="admin-batch-kpi-value">₹${totalMonthlyRevenuePotential.toLocaleString()}</div>
+            </div>
+          </div>
+
+          <div class="admin-batch-kpi-card">
+            <div class="admin-batch-kpi-icon" style="background:#FAF5FF; color:#9333EA;">
+              <i aria-hidden="true" class="fa-solid fa-chalkboard-user"></i>
+            </div>
+            <div>
+              <div class="admin-batch-kpi-label">Cloud Sync State</div>
+              <div class="admin-batch-kpi-value" style="font-size:1.15rem; color:#059669;">
+                <i aria-hidden="true" class="fa-solid fa-circle-check"></i> Connected
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Search & Filter Toolbar -->
+        <div class="admin-batches-toolbar">
+          <div class="admin-batches-search-wrap">
+            <i aria-hidden="true" class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="adminBatchesSearchInput" class="admin-batches-search-input" aria-label="Search Batches" placeholder="Search by batch name, code, teacher, room, or subject..." value="${escapeHtml(adminBatchesSearchQuery)}" />
+          </div>
+
+          <div class="admin-batches-filter-group">
+            <select id="adminBatchesStreamFilter" class="admin-batches-filter-select" aria-label="Filter by Academic Stream">
+              <option value="all" ${adminBatchesFilterStream === 'all' ? 'selected' : ''}>All Streams (All Disciplines)</option>
+              <option value="Foundation" ${adminBatchesFilterStream === 'Foundation' ? 'selected' : ''}>Foundation (Classes 8th–10th)</option>
+              <option value="Science" ${adminBatchesFilterStream === 'Science' ? 'selected' : ''}>Science (PCM / PCB / NEET / JEE)</option>
+              <option value="Commerce" ${adminBatchesFilterStream === 'Commerce' ? 'selected' : ''}>Commerce (Accountancy &amp; Economics)</option>
+              <option value="Arts" ${adminBatchesFilterStream === 'Arts' ? 'selected' : ''}>Arts &amp; Humanities</option>
+              <option value="Special" ${adminBatchesFilterStream === 'Special' ? 'selected' : ''}>Specialized English &amp; Skills</option>
+            </select>
+
+            <select id="adminBatchesStatusFilter" class="admin-batches-filter-select" aria-label="Filter by Batch Status">
+              <option value="all" ${adminBatchesFilterStatus === 'all' ? 'selected' : ''}>All Statuses</option>
+              <option value="Active" ${adminBatchesFilterStatus === 'Active' ? 'selected' : ''}>Active Batches</option>
+              <option value="Upcoming" ${adminBatchesFilterStatus === 'Upcoming' ? 'selected' : ''}>Upcoming Batches</option>
+              <option value="Archived" ${adminBatchesFilterStatus === 'Archived' ? 'selected' : ''}>Archived Batches</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Batches Grid -->
+        ${filteredBatches.length === 0 ? `
+          <div class="dash-card" style="text-align:center; padding:3rem 1.5rem; color:var(--text-muted);">
+            <div style="font-size:2.5rem; margin-bottom:0.75rem; color:var(--text-sand);">📚</div>
+            <h3 style="font-size:1.15rem; font-weight:800; color:var(--text-mahogany);">No Batches Found</h3>
+            <p style="font-size:0.88rem; margin-top:0.35rem;">No batch records matched your filter criteria. You can create a new batch or reset filters.</p>
+            <button type="button" id="btnResetBatchFilters" class="btn" style="margin-top:1rem; background:var(--primary-emerald); color:#fff; font-weight:700; border-radius:8px; padding:0.5rem 1.25rem;">
+              Reset Filters
+            </button>
+          </div>
+        ` : `
+          <div class="admin-batches-grid">
+            ${filteredBatches.map(b => {
+              const bId = b.id || b.batch_id || '';
+              const bName = b.name || b.batch_name || b.className || 'Unnamed Batch';
+              const bClass = b.className || b.class_name || b.name || '';
+              const bStream = b.stream || (bName.includes('Science') ? 'Science' : (bName.includes('Commerce') ? 'Commerce' : (bName.includes('Arts') ? 'Arts' : (bName.includes('Foundation') ? 'Foundation' : 'Academic'))));
+              const bMonthlyFee = Number(b.monthlyFee ?? b.monthly_fee) || 0;
+              const bAnnualFee = Number(b.annualFee ?? b.annual_fee) || (bMonthlyFee * 12);
+              const bTiming = b.timing || b.timings || 'Contact Office';
+              const bRoom = b.room || b.room_no || 'Room 1';
+              const bBillingDay = Number(b.billingDay ?? b.billing_day ?? 1);
+              const bCapacity = Number(b.capacity || 40);
+              const bTagline = b.tagline || '';
+              const bStatus = b.status || 'Active';
+
+              const bKey = getBatchCategoryKey(bName || bClass || bId);
+              const enrolledCount = studentCountMap[bKey] || 0;
+              const occupancyPct = Math.min(100, Math.round((enrolledCount / Math.max(1, bCapacity)) * 100));
+
+              // Format teachers
+              let teacherNames = [];
+              if (Array.isArray(b.teachers) && b.teachers.length > 0) {
+                teacherNames = b.teachers;
+              } else if (b.teacher) {
+                teacherNames = b.teacher.split(/[&,]/).map(t => t.trim()).filter(Boolean);
+              }
+              if (teacherNames.length === 0) teacherNames = ['Chandan Kumar (Director)'];
+
+              // Format subjects
+              let subjectsList = [];
+              if (Array.isArray(b.subjects) && b.subjects.length > 0) {
+                subjectsList = b.subjects.map(s => typeof s === 'string' ? s : (s.name || ''));
+              } else if (typeof BATCH_SUBJECTS !== 'undefined' && BATCH_SUBJECTS[bKey]) {
+                subjectsList = BATCH_SUBJECTS[bKey];
+              }
+
+              return `
+                <div class="admin-batch-card" data-id="${escapeHtml(bId)}">
+                  <div class="admin-batch-card-top">
+                    <div class="admin-batch-card-badges">
+                      <span class="admin-batch-code-badge">${escapeHtml(bId)}</span>
+                      <div style="display:flex; gap:0.4rem; align-items:center;">
+                        <span class="admin-batch-stream-badge">${escapeHtml(bStream)}</span>
+                        <span class="admin-batch-status-badge ${bStatus.toLowerCase()}">${escapeHtml(bStatus)}</span>
+                      </div>
+                    </div>
+                    <div class="admin-batch-card-title">${escapeHtml(bName)}</div>
+                    <div class="admin-batch-card-class"><i aria-hidden="true" class="fa-solid fa-graduation-cap" style="color:var(--primary-emerald);"></i> ${escapeHtml(bClass)}</div>
+                    ${bTagline ? `<div class="admin-batch-card-tagline"><i aria-hidden="true" class="fa-solid fa-star"></i> ${escapeHtml(bTagline)}</div>` : ''}
+                  </div>
+
+                  <div class="admin-batch-card-body">
+                    <div class="admin-batch-fee-row">
+                      <div>
+                        <div style="font-size:0.75rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Monthly Tuition</div>
+                        <div class="admin-batch-fee-val">₹${bMonthlyFee.toLocaleString()}<span style="font-size:0.78rem; font-weight:600; color:var(--text-muted);">/mo</span></div>
+                      </div>
+                      <div style="text-align:right;">
+                        <div class="admin-batch-annual-fee">Annual: ₹${bAnnualFee.toLocaleString()}</div>
+                        <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.15rem;">
+                          <i aria-hidden="true" class="fa-solid fa-calendar-check"></i> Bill Day ${bBillingDay}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="admin-batch-meta-item">
+                      <i aria-hidden="true" class="fa-solid fa-clock"></i>
+                      <span><strong>Timing:</strong> ${escapeHtml(bTiming)}</span>
+                    </div>
+
+                    <div class="admin-batch-meta-item">
+                      <i aria-hidden="true" class="fa-solid fa-door-open"></i>
+                      <span><strong>Classroom:</strong> ${escapeHtml(bRoom)}</span>
+                    </div>
+
+                    <div class="admin-batch-meta-item">
+                      <i aria-hidden="true" class="fa-solid fa-user-tie"></i>
+                      <span><strong>Faculty:</strong> ${escapeHtml(teacherNames.join(' & '))}</span>
+                    </div>
+
+                    <div class="admin-batch-occupancy-wrap">
+                      <div class="admin-batch-occupancy-labels">
+                        <span><i aria-hidden="true" class="fa-solid fa-users"></i> Enrolled: ${enrolledCount} students</span>
+                        <span>Capacity: ${bCapacity} (${occupancyPct}%)</span>
+                      </div>
+                      <div class="admin-batch-occupancy-bar">
+                        <div class="admin-batch-occupancy-fill" style="width: ${occupancyPct}%; ${occupancyPct >= 90 ? 'background: linear-gradient(90deg, #F59E0B, #DC2626);' : ''}"></div>
+                      </div>
+                    </div>
+
+                    ${subjectsList.length > 0 ? `
+                      <div style="margin-top:0.25rem;">
+                        <div style="font-size:0.76rem; font-weight:700; color:var(--text-muted); margin-bottom:0.25rem;">
+                          <i aria-hidden="true" class="fa-solid fa-book-open"></i> Subjects Covered:
+                        </div>
+                        <div class="admin-batch-subjects-container">
+                          ${subjectsList.map(s => `<span class="admin-batch-subject-chip">${escapeHtml(s)}</span>`).join('')}
+                        </div>
+                      </div>
+                    ` : ''}
+                  </div>
+
+                  <div class="admin-batch-card-footer">
+                    <button type="button" class="btn-batch-action btn-batch-edit" data-id="${escapeHtml(bId)}" title="Edit Batch Details">
+                      <i aria-hidden="true" class="fa-solid fa-pen-to-square"></i> Edit Details
+                    </button>
+                    <button type="button" class="btn-batch-action btn-batch-view-stu" data-batch="${escapeHtml(bName)}" title="Filter Student Directory">
+                      <i aria-hidden="true" class="fa-solid fa-list-check"></i> Students (${enrolledCount})
+                    </button>
+                    <button type="button" class="btn-batch-action btn-batch-delete" data-id="${escapeHtml(bId)}" data-enrolled="${enrolledCount}" title="Delete Batch">
+                      <i aria-hidden="true" class="fa-solid fa-trash-can"></i>
+                    </button>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `}
+      </div>
+    `;
+
+    // Event Listeners: Search & Filters
+    pane.querySelector('#adminBatchesSearchInput')?.addEventListener('input', (e) => {
+      adminBatchesSearchQuery = e.target.value;
+      renderAdminBatchesTab();
+    });
+
+    pane.querySelector('#adminBatchesStreamFilter')?.addEventListener('change', (e) => {
+      adminBatchesFilterStream = e.target.value;
+      renderAdminBatchesTab();
+    });
+
+    pane.querySelector('#adminBatchesStatusFilter')?.addEventListener('change', (e) => {
+      adminBatchesFilterStatus = e.target.value;
+      renderAdminBatchesTab();
+    });
+
+    pane.querySelector('#btnResetBatchFilters')?.addEventListener('click', () => {
+      adminBatchesSearchQuery = '';
+      adminBatchesFilterStream = 'all';
+      adminBatchesFilterStatus = 'all';
+      renderAdminBatchesTab();
+    });
+
+    // Add New Batch Button
+    pane.querySelector('#btnAdminAddNewBatch')?.addEventListener('click', () => {
+      openAddEditBatchModal(null);
+    });
+
+    // Cloud Sync Button
+    pane.querySelector('#btnAdminSyncBatches')?.addEventListener('click', async () => {
+      const syncBtn = pane.querySelector('#btnAdminSyncBatches');
+      if (syncBtn) {
+        syncBtn.disabled = true;
+        syncBtn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-spinner fa-spin"></i> Syncing...';
+      }
+      try {
+        if (typeof SupabaseSync !== 'undefined' && SupabaseSync.pull) {
+          await SupabaseSync.pull();
+        }
+        alert('✅ Batches successfully synced with Supabase cloud database!');
+      } catch (err) {
+        alert('⚠️ Sync encountered a minor network issue. Local cache preserved.');
+      } finally {
+        renderAdminBatchesTab();
+      }
+    });
+
+    // Batch Card Action Buttons
+    pane.querySelectorAll('.btn-batch-edit').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const bId = btn.dataset.id;
+        openAddEditBatchModal(bId);
+      });
+    });
+
+    pane.querySelectorAll('.btn-batch-view-stu').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const batchName = btn.dataset.batch;
+        // Switch to student directory tab and filter by this batch
+        switchAdminTab('students');
+        const filterSelect = document.getElementById('adminStudentClassFilter');
+        if (filterSelect) {
+          filterSelect.value = batchName;
+          filterSelect.dispatchEvent(new Event('change'));
+        }
+      });
+    });
+
+    pane.querySelectorAll('.btn-batch-delete').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const bId = btn.dataset.id;
+        const enrolled = Number(btn.dataset.enrolled) || 0;
+        deleteBatch(bId, enrolled);
+      });
+    });
+  }
+
+  /* ==========================================================================
+   * ADD / EDIT BATCH MODAL
+   * ========================================================================== */
+  function openAddEditBatchModal(batchId = null) {
+    const existingModal = document.getElementById('addEditBatchModal');
+    if (existingModal) existingModal.remove();
+
+    const batches = AppState.getBatches();
+    const existing = batchId ? batches.find(b => (b.id || b.batch_id) === batchId) : null;
+    const isEdit = !!existing;
+
+    // Generate next batch ID suggestion if new
+    let suggestedId = `BAT-${String(batches.length + 1).padStart(2, '0')}`;
+    if (isEdit) {
+      suggestedId = existing.id || existing.batch_id || '';
+    }
+
+    const currentFee = isEdit ? (Number(existing.monthlyFee ?? existing.monthly_fee) || 0) : 2500;
+    const currentAnnual = isEdit ? (Number(existing.annualFee ?? existing.annual_fee) || (currentFee * 12)) : (currentFee * 12);
+    const currentTeachers = isEdit ? (Array.isArray(existing.teachers) ? existing.teachers.join(', ') : (existing.teacher || 'Chandan Kumar')) : 'Chandan Kumar';
+    const currentSubjects = isEdit ? (Array.isArray(existing.subjects) ? existing.subjects.map(s => typeof s === 'string' ? s : (s.name || '')).join(', ') : '') : 'Physics, Chemistry, Mathematics';
+    const currentRoom = isEdit ? (existing.room || existing.room_no || 'Room 1') : 'Room 1';
+    const currentTiming = isEdit ? (existing.timing || existing.timings || '04:00 PM – 06:00 PM') : '04:00 PM – 06:00 PM';
+    const currentBillingDay = isEdit ? (Number(existing.billingDay ?? existing.billing_day ?? 1)) : 1;
+    const currentCapacity = isEdit ? (Number(existing.capacity) || 40) : 40;
+    const currentStatus = isEdit ? (existing.status || 'Active') : 'Active';
+    const currentStream = isEdit ? (existing.stream || 'Science') : 'Science';
+    const currentTagline = isEdit ? (existing.tagline || '') : '';
+    const currentName = isEdit ? (existing.name || existing.batch_name || '') : '';
+    const currentClass = isEdit ? (existing.className || existing.class_name || '') : '';
+
+    const modalId = 'addEditBatchModal';
+    const modalHtml = `
+      <div class="modal-backdrop" id="${modalId}" role="dialog" aria-modal="true" aria-labelledby="batchModalTitle">
+        <div class="modal-dialog" style="max-width: 680px; max-height: 90vh; overflow-y: auto;">
+          <div class="modal-header" style="background: linear-gradient(135deg, #064E3B 0%, #047857 100%); color: #fff; padding: 1.25rem 1.5rem; border-radius: 12px 12px 0 0;">
+            <div>
+              <h3 class="modal-title" id="batchModalTitle" style="color: #fff; font-size: 1.25rem; font-weight: 800; display: flex; align-items: center; gap: 0.5rem;">
+                <i aria-hidden="true" class="fa-solid fa-layer-group"></i> ${isEdit ? 'Edit Batch &amp; Tariff Master' : 'Create New Class Batch'}
+              </h3>
+              <p style="font-size: 0.84rem; color: #D1FAE5; margin-top: 0.2rem;">
+                ${isEdit ? `Updating class parameters for ${escapeHtml(suggestedId)}. Changes sync to Supabase database.` : 'Add a new standard, course, or competitive batch.'}
+              </p>
+            </div>
+            <button type="button" class="btn-close-modal" id="btnCloseBatchModal" aria-label="Close modal" style="color: #fff; background: rgba(255,255,255,0.2); border: none; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+              <i aria-hidden="true" class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+
+          <form id="formAddEditBatch" style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1.1rem;">
+            <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 1rem;">
+              <div>
+                <label for="batchFormCode" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany); display: block; margin-bottom: 0.3rem;">Batch Code *</label>
+                <input type="text" id="batchFormCode" class="form-input" aria-label="Batch Code" style="width: 100%; padding: 0.55rem; border-radius: 8px; font-weight: 800; font-family: monospace;" value="${escapeHtml(suggestedId)}" ${isEdit ? 'readonly' : 'required'} />
+              </div>
+              <div>
+                <label for="batchFormName" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany); display: block; margin-bottom: 0.3rem;">Batch Display Name *</label>
+                <input type="text" id="batchFormName" class="form-input" aria-label="Batch Display Name" style="width: 100%; padding: 0.55rem; border-radius: 8px;" placeholder="e.g. Class 11th - Medical (NEET) FastTrack" value="${escapeHtml(currentName)}" required />
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+              <div>
+                <label for="batchFormClass" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany); display: block; margin-bottom: 0.3rem;">Class Standard / Level *</label>
+                <input type="text" id="batchFormClass" class="form-input" aria-label="Class Standard or Level" style="width: 100%; padding: 0.55rem; border-radius: 8px;" placeholder="e.g. Class 11th" value="${escapeHtml(currentClass)}" required />
+              </div>
+              <div>
+                <label for="batchFormStream" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany); display: block; margin-bottom: 0.3rem;">Academic Stream *</label>
+                <select id="batchFormStream" class="form-input" aria-label="Academic Stream" style="width: 100%; padding: 0.55rem; border-radius: 8px;" required>
+                  <option value="Foundation" ${currentStream === 'Foundation' ? 'selected' : ''}>Foundation (Classes 8th–10th)</option>
+                  <option value="Science" ${currentStream === 'Science' ? 'selected' : ''}>Science (PCM / PCB / NEET / JEE)</option>
+                  <option value="Commerce" ${currentStream === 'Commerce' ? 'selected' : ''}>Commerce (Accountancy &amp; Economics)</option>
+                  <option value="Arts" ${currentStream === 'Arts' ? 'selected' : ''}>Arts &amp; Humanities</option>
+                  <option value="Special" ${currentStream === 'Special' ? 'selected' : ''}>Specialized English &amp; Skills</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; background: var(--bg-surface-cream); padding: 1rem; border-radius: 10px; border: 1px solid var(--border-sand);">
+              <div>
+                <label for="batchFormMonthlyFee" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany); display: block; margin-bottom: 0.3rem;">Monthly Fee (₹) *</label>
+                <input type="number" id="batchFormMonthlyFee" class="form-input" aria-label="Monthly Tuition Fee in Rupees" min="0" step="50" style="width: 100%; padding: 0.55rem; border-radius: 8px; font-weight: 800; color: var(--primary-emerald);" value="${currentFee}" required />
+              </div>
+              <div>
+                <label for="batchFormAnnualFee" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany); display: block; margin-bottom: 0.3rem;">Annual Fee (₹)</label>
+                <input type="number" id="batchFormAnnualFee" class="form-input" aria-label="Annual Fee in Rupees" min="0" step="500" style="width: 100%; padding: 0.55rem; border-radius: 8px;" value="${currentAnnual}" />
+              </div>
+              <div>
+                <label for="batchFormBillingDay" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany); display: block; margin-bottom: 0.3rem;">Billing Day of Mo.</label>
+                <input type="number" id="batchFormBillingDay" class="form-input" aria-label="Billing Day of Month" min="1" max="28" style="width: 100%; padding: 0.55rem; border-radius: 8px;" value="${currentBillingDay}" />
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+              <div>
+                <label for="batchFormTiming" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany); display: block; margin-bottom: 0.3rem;">Lecture Timings</label>
+                <input type="text" id="batchFormTiming" class="form-input" aria-label="Lecture Timings" style="width: 100%; padding: 0.55rem; border-radius: 8px;" placeholder="e.g. 04:00 PM – 06:00 PM" value="${escapeHtml(currentTiming)}" />
+              </div>
+              <div>
+                <label for="batchFormRoom" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany); display: block; margin-bottom: 0.3rem;">Classroom / Room No</label>
+                <input type="text" id="batchFormRoom" class="form-input" aria-label="Classroom or Room Number" style="width: 100%; padding: 0.55rem; border-radius: 8px;" placeholder="e.g. Room 101" value="${escapeHtml(currentRoom)}" />
+              </div>
+              <div>
+                <label for="batchFormCapacity" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany); display: block; margin-bottom: 0.3rem;">Seat Capacity</label>
+                <input type="number" id="batchFormCapacity" class="form-input" aria-label="Seat Capacity" min="1" max="500" style="width: 100%; padding: 0.55rem; border-radius: 8px;" value="${currentCapacity}" />
+              </div>
+            </div>
+
+            <div>
+              <label for="batchFormTeachers" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany); display: block; margin-bottom: 0.3rem;">
+                Faculty Mentors <span style="font-weight: normal; color: var(--text-muted);">(Comma separated)</span>
+              </label>
+              <input type="text" id="batchFormTeachers" class="form-input" aria-label="Faculty Mentors" style="width: 100%; padding: 0.55rem; border-radius: 8px;" placeholder="e.g. Chandan Kumar (Director), Dr. Verma" value="${escapeHtml(currentTeachers)}" />
+            </div>
+
+            <div>
+              <label for="batchFormSubjects" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany); display: block; margin-bottom: 0.3rem;">
+                Core Syllabus Subjects <span style="font-weight: normal; color: var(--text-muted);">(Comma separated)</span>
+              </label>
+              <input type="text" id="batchFormSubjects" class="form-input" aria-label="Core Syllabus Subjects" style="width: 100%; padding: 0.55rem; border-radius: 8px;" placeholder="e.g. Physics, Chemistry, Biology, Weekly Test" value="${escapeHtml(currentSubjects)}" />
+            </div>
+
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem;">
+              <div>
+                <label for="batchFormTagline" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany); display: block; margin-bottom: 0.3rem;">Batch Badge / Tagline</label>
+                <input type="text" id="batchFormTagline" class="form-input" aria-label="Batch Badge or Tagline" style="width: 100%; padding: 0.55rem; border-radius: 8px;" placeholder="e.g. Premium Board + Foundation" value="${escapeHtml(currentTagline)}" />
+              </div>
+              <div>
+                <label for="batchFormStatus" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany); display: block; margin-bottom: 0.3rem;">Batch Status</label>
+                <select id="batchFormStatus" class="form-input" aria-label="Batch Status" style="width: 100%; padding: 0.55rem; border-radius: 8px;">
+                  <option value="Active" ${currentStatus === 'Active' ? 'selected' : ''}>Active</option>
+                  <option value="Upcoming" ${currentStatus === 'Upcoming' ? 'selected' : ''}>Upcoming</option>
+                  <option value="Archived" ${currentStatus === 'Archived' ? 'selected' : ''}>Archived</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 0.5rem; border-top: 1px solid #E5E7EB; padding-top: 1.1rem;">
+              <button type="button" id="btnCancelBatchModal" class="btn" style="background: #F3F4F6; color: var(--text-mahogany); font-weight: 700; border-radius: 8px; padding: 0.55rem 1.25rem; cursor:pointer;">
+                Cancel
+              </button>
+              <button type="submit" id="btnSubmitBatchForm" class="btn" style="background: var(--primary-emerald); color: #fff; font-weight: 800; border-radius: 8px; padding: 0.55rem 1.5rem; box-shadow: 0 4px 12px rgba(6, 78, 59, 0.2); cursor:pointer;">
+                <i aria-hidden="true" class="fa-solid fa-cloud-arrow-up"></i> ${isEdit ? 'Save &amp; Sync Changes' : 'Create &amp; Publish Batch'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const modalEl = document.getElementById(modalId);
+    const dialog = wireModalA11y(modalEl, { closeOnBackdrop: false });
+
+    modalEl.querySelector('#btnCloseBatchModal')?.addEventListener('click', () => dialog.close());
+    modalEl.querySelector('#btnCancelBatchModal')?.addEventListener('click', () => dialog.close());
+
+    modalEl.querySelector('#formAddEditBatch')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const submitBtn = modalEl.querySelector('#btnSubmitBatchForm');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-spinner fa-spin"></i> Syncing to Cloud...';
+      }
+
+      try {
+        const batch_id = modalEl.querySelector('#batchFormCode').value.trim().toUpperCase();
+        const name = modalEl.querySelector('#batchFormName').value.trim();
+        const class_name = modalEl.querySelector('#batchFormClass').value.trim();
+        const stream = modalEl.querySelector('#batchFormStream').value;
+        const monthly_fee = Number(modalEl.querySelector('#batchFormMonthlyFee').value) || 0;
+        const annual_fee = Number(modalEl.querySelector('#batchFormAnnualFee').value) || (monthly_fee * 12);
+        const billing_day = Number(modalEl.querySelector('#batchFormBillingDay').value) || 1;
+        const timing = modalEl.querySelector('#batchFormTiming').value.trim();
+        const room = modalEl.querySelector('#batchFormRoom').value.trim();
+        const capacity = Number(modalEl.querySelector('#batchFormCapacity').value) || 40;
+        const rawTeachers = modalEl.querySelector('#batchFormTeachers').value.trim();
+        const teachers = rawTeachers ? rawTeachers.split(',').map(t => t.trim()).filter(Boolean) : ['Chandan Kumar'];
+        const rawSubjects = modalEl.querySelector('#batchFormSubjects').value.trim();
+        const subjects = rawSubjects ? rawSubjects.split(',').map(s => s.trim()).filter(Boolean) : [];
+        const tagline = modalEl.querySelector('#batchFormTagline').value.trim();
+        const status = modalEl.querySelector('#batchFormStatus').value;
+
+        const batchObj = {
+          batch_id,
+          id: batch_id,
+          name,
+          batch_name: name,
+          class_name,
+          className: class_name,
+          stream,
+          monthly_fee,
+          monthlyFee: monthly_fee,
+          annual_fee,
+          annualFee: annual_fee,
+          billing_day,
+          billingDay: billing_day,
+          timing,
+          timings: timing,
+          room,
+          room_no: room,
+          capacity,
+          teachers,
+          teacher: teachers.join(' & '),
+          subjects,
+          tagline,
+          status,
+          updated_at: new Date().toISOString()
+        };
+
+        const allBatches = AppState.getBatches().slice();
+        const existingIdx = allBatches.findIndex(b => (b.id || b.batch_id) === batch_id);
+
+        if (existingIdx !== -1) {
+          allBatches[existingIdx] = { ...allBatches[existingIdx], ...batchObj };
+        } else {
+          allBatches.push(batchObj);
+        }
+
+        // Save locally and mutate to Supabase
+        await AppState.saveBatches(allBatches);
+
+        // Audit log entry
+        const adminUser = AppState.currentUser || { name: 'Admin', admin_id: 'ADM-01' };
+        AppState.addAuditLog(
+          adminUser.name || 'Admin',
+          'BATCH_MUTATION',
+          'All Classes',
+          batch_id,
+          `Admin ${adminUser.name || 'Chandan'} ${isEdit ? 'updated' : 'created'} batch ${batch_id} (${name}) with monthly fee ₹${monthly_fee}`,
+          { batch_id, name, monthly_fee, status }
+        );
+
+        dialog.close();
+        renderAdminBatchesTab();
+
+        alert(`✅ Batch ${batch_id} successfully ${isEdit ? 'updated' : 'created'} and synced to Supabase cloud!`);
+      } catch (err) {
+        console.error('Error saving batch:', err);
+        alert('❌ Error updating batch: ' + (err?.message || err));
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-cloud-arrow-up"></i> Retry Save';
+        }
+      }
+    });
+  }
+
+  /* ==========================================================================
+   * DELETE BATCH ACTION
+   * ========================================================================== */
+  async function deleteBatch(batchId, enrolledCount) {
+    if (!batchId) return;
+
+    let confirmMsg = `Are you sure you want to delete batch "${batchId}"?`;
+    if (enrolledCount > 0) {
+      confirmMsg = `⚠️ WARNING: There are ${enrolledCount} active students currently enrolled in batch "${batchId}".\n\nDeleting this batch from database may affect student dashboards and billing automation.\n\nAre you sure you want to delete it anyway?`;
+    }
+
+    if (!confirm(confirmMsg)) return;
+
+    try {
+      const allBatches = AppState.getBatches().filter(b => (b.id || b.batch_id) !== batchId);
+      
+      // Delete mutation from Supabase cloud
+      if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
+        await SupabaseSync.mutate('batches', 'delete', null, { where: { batch_id: batchId } });
+      }
+
+      await AppState.saveBatches(allBatches);
+
+      const adminUser = AppState.currentUser || { name: 'Admin' };
+      AppState.addAuditLog(adminUser.name || 'Admin', 'BATCH_DELETE', 'All Classes', batchId, `Admin ${adminUser.name} deleted batch ${batchId} from course master`, { batchId });
+
+      renderAdminBatchesTab();
+      alert(`🗑️ Batch "${batchId}" successfully deleted from Supabase cloud!`);
+    } catch (err) {
+      console.error('Error deleting batch:', err);
+      alert('❌ Failed to delete batch: ' + (err?.message || err));
+    }
   }
 
   // Expose AppState to window for sync and testing

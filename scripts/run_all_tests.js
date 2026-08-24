@@ -18,9 +18,10 @@ import { runAdminLogoutAllTests } from '../tests/admin-logout-all.test.js';
 import { runVipPassCardTests } from '../tests/vip-pass-card.test.js';
 import { runClassScheduleTests } from '../tests/class-schedule.test.js';
 import { runStudentFeeViewTests } from '../tests/student-fee-view.test.js';
+import { runBatchManagementTests } from '../tests/batch-management.test.js';
 
 console.log('================================================================');
-console.log('   PRAGYAN INSTITUTE — T1 TO T32 MASTER TEST RUNNER & AUDIT     ');
+console.log('   PRAGYAN INSTITUTE — T1 TO T33 MASTER TEST RUNNER & AUDIT     ');
 console.log('================================================================\n');
 
 let pass = 0;
@@ -899,6 +900,14 @@ runClassScheduleTests(assert);
 // -----------------------------------------------------------------------------
 console.log('\n--- [T32] Student Fee View & Mobile Responsiveness Suite ---');
 runStudentFeeViewTests(assert);
+
+// -----------------------------------------------------------------------------
+// T33 — Batches & Course Master Management Suite. Covers SQL schema,
+// gateway allowlisting, client normalization, admin UI CRUD modal workflows,
+// and student dashboard dynamic property binding.
+// -----------------------------------------------------------------------------
+console.log('\n--- [T33] Batches & Course Master Management Suite ---');
+runBatchManagementTests(assert);
 
 console.log('\n================================================================');
 console.log(`MASTER TEST RESULTS: ${pass} Passed, ${fail} Failed`);

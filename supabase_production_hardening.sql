@@ -180,6 +180,10 @@ CREATE TABLE IF NOT EXISTS public.batches (
   billing_day smallint,
   teachers jsonb DEFAULT '[]'::jsonb,
   schedule jsonb DEFAULT '[]'::jsonb,
+  subjects jsonb DEFAULT '[]'::jsonb,
+  timing text DEFAULT '',
+  room text DEFAULT '',
+  capacity integer DEFAULT 40,
   tagline text,
   status text DEFAULT 'Active',
   created_at timestamptz DEFAULT now(),
@@ -285,6 +289,10 @@ ALTER TABLE public.batches             ADD COLUMN IF NOT EXISTS class_name text;
 ALTER TABLE public.batches             ADD COLUMN IF NOT EXISTS billing_day smallint;
 ALTER TABLE public.batches             ADD COLUMN IF NOT EXISTS teachers jsonb DEFAULT '[]'::jsonb;
 ALTER TABLE public.batches             ADD COLUMN IF NOT EXISTS schedule jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE public.batches             ADD COLUMN IF NOT EXISTS subjects jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE public.batches             ADD COLUMN IF NOT EXISTS timing text DEFAULT '';
+ALTER TABLE public.batches             ADD COLUMN IF NOT EXISTS room text DEFAULT '';
+ALTER TABLE public.batches             ADD COLUMN IF NOT EXISTS capacity integer DEFAULT 40;
 ALTER TABLE public.batches             ADD COLUMN IF NOT EXISTS tagline text;
 ALTER TABLE public.batches             ADD COLUMN IF NOT EXISTS status text DEFAULT 'Active';
 ALTER TABLE public.batches             ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
@@ -1179,20 +1187,20 @@ $fn$;
 -- Mirrors api/_lib/academic-config.js. Fees are the authoritative monthly rate;
 -- annual_fee is the 5% scholarship price on a full-year advance.
 INSERT INTO public.batches
-  (batch_id, name, class_name, monthly_fee, annual_fee, class_code, billing_day, teachers, tagline, status)
+  (batch_id, name, class_name, monthly_fee, annual_fee, class_code, billing_day, teachers, tagline, timing, room, subjects, capacity, status)
 VALUES
-  ('BAT-12PCM',   'Class 12th PCM',                      'Class 12th PCM',              1500, 17100, '12', 1, '["PROF. RAVI RANJAN","CHANDAN KUMAR"]'::jsonb, 'ASCEND — I.Sc. Physics, Chemistry & Higher Mathematics', 'Active'),
-  ('BAT-12PCB',   'Class 12th PCB',                      'Class 12th PCB',              1500, 17100, '12', 1, '["CHANDAN KUMAR","PROF. RAVI RANJAN"]'::jsonb, 'ASCEND — I.Sc. Physics, Chemistry & Biology',            'Active'),
-  ('BAT-11PCM',   'Class 11th PCM',                      'Class 11th PCM',              1500, 17100, '11', 2, '["PROF. RAVI RANJAN","CHANDAN KUMAR"]'::jsonb, 'ASCEND — I.Sc. Foundation with Higher Mathematics',      'Active'),
-  ('BAT-11PCB',   'Class 11th PCB',                      'Class 11th PCB',              1500, 17100, '11', 2, '["CHANDAN KUMAR","PROF. RAVI RANJAN"]'::jsonb, 'ASCEND — I.Sc. Foundation with Biology',                 'Active'),
-  ('BAT-10',      'Class 10th (ACHIEVER)',               'Class 10th',                  1000, 11400, '10', 1, '["CHANDAN KUMAR","PROF. RAVI RANJAN"]'::jsonb, 'ACHIEVER — Matric Board intensive',                      'Active'),
-  ('BAT-09',      'Class 9th (NURTURE)',                 'Class 9th',                   1000, 11400, '09', 2, '["CHANDAN KUMAR","PROF. RAVI RANJAN"]'::jsonb, 'NURTURE — Board foundation',                             'Active'),
-  ('BAT-08',      'Class 8th (ALPHA)',                    'Class 8th',                    800,  9120, '08', 3, '["CHANDAN KUMAR","PROF. RAVI RANJAN"]'::jsonb, 'ALPHA — Middle school mastery',                          'Active'),
-  ('BAT-67',      'Class 6th & 7th (PIONEER)',            'Class 6th & 7th',              700,  7980, '07', 4, '["CHANDAN KUMAR","ADITI SINGH"]'::jsonb,       'PIONEER — Early foundation',                             'Active'),
-  ('BAT-15',      'Class 1st to 5th (Junior Foundation)', 'Class 1st to 5th',             500,  5700, '05', 5, '["ADITI SINGH","CHANDAN KUMAR"]'::jsonb,       'Junior Foundation — primary all-subject care',           'Active'),
-  ('BAT-ENG-912', 'Special English 9th to 12th',          'Special English 9th to 12th', 1000, 11400, '01', 6, '["ADITI SINGH"]'::jsonb,                       'English & Grammar mastery with Aditi Singh',             'Active'),
-  ('BAT-ENG-68',  'Special English 6th to 8th',           'Special English 6th to 8th',   700,  7980, '01', 6, '["ADITI SINGH"]'::jsonb,                       'English & Grammar foundation with Aditi Singh',          'Active'),
-  ('BAT-ENG-15',  'Special English 1st to 5th',           'Special English 1st to 5th',   500,  5700, '01', 6, '["ADITI SINGH"]'::jsonb,                       'Early English & phonics with Aditi Singh',               'Active')
+  ('BAT-12PCM',   'Class 12th PCM',                      'Class 12th PCM',              1500, 17100, '12', 1, '["PROF. RAVI RANJAN","CHANDAN KUMAR"]'::jsonb, 'ASCEND — I.Sc. Physics, Chemistry & Higher Mathematics', '6:30 AM – 8:30 AM',  'Room 101 (Senior Hall)', '["Physics", "Chemistry", "Higher Mathematics"]'::jsonb, 40, 'Active'),
+  ('BAT-12PCB',   'Class 12th PCB',                      'Class 12th PCB',              1500, 17100, '12', 1, '["CHANDAN KUMAR","PROF. RAVI RANJAN"]'::jsonb, 'ASCEND — I.Sc. Physics, Chemistry & Biology',            '6:30 AM – 8:30 AM',  'Room 101 (Senior Hall)', '["Physics", "Chemistry", "Biology"]'::jsonb,            40, 'Active'),
+  ('BAT-11PCM',   'Class 11th PCM',                      'Class 11th PCM',              1500, 17100, '11', 2, '["PROF. RAVI RANJAN","CHANDAN KUMAR"]'::jsonb, 'ASCEND — I.Sc. Foundation with Higher Mathematics',      '8:30 AM – 10:30 AM', 'Room 101 (Senior Hall)', '["Physics", "Chemistry", "Higher Mathematics"]'::jsonb, 40, 'Active'),
+  ('BAT-11PCB',   'Class 11th PCB',                      'Class 11th PCB',              1500, 17100, '11', 2, '["CHANDAN KUMAR","PROF. RAVI RANJAN"]'::jsonb, 'ASCEND — I.Sc. Foundation with Biology',                 '8:30 AM – 10:30 AM', 'Room 101 (Senior Hall)', '["Physics", "Chemistry", "Biology"]'::jsonb,            40, 'Active'),
+  ('BAT-10',      'Class 10th (ACHIEVER)',               'Class 10th',                  1000, 11400, '10', 1, '["CHANDAN KUMAR","PROF. RAVI RANJAN"]'::jsonb, 'ACHIEVER — Matric Board intensive',                      '4:00 PM – 6:00 PM',  'Room 102 (Smart Lab)',   '["Mathematics", "Science", "Social Science"]'::jsonb,  45, 'Active'),
+  ('BAT-09',      'Class 9th (NURTURE)',                 'Class 9th',                   1000, 11400, '09', 2, '["CHANDAN KUMAR","PROF. RAVI RANJAN"]'::jsonb, 'NURTURE — Board foundation',                             '5:30 PM – 7:30 PM',  'Room 102 (Smart Lab)',   '["Mathematics", "Science", "English"]'::jsonb,         45, 'Active'),
+  ('BAT-08',      'Class 8th (ALPHA)',                    'Class 8th',                    800,  9120, '08', 3, '["CHANDAN KUMAR","PROF. RAVI RANJAN"]'::jsonb, 'ALPHA — Middle school mastery',                          '3:00 PM – 4:30 PM',  'Room 103 (Main Hall)',   '["Mathematics", "Science", "English"]'::jsonb,         40, 'Active'),
+  ('BAT-67',      'Class 6th & 7th (PIONEER)',            'Class 6th & 7th',              700,  7980, '07', 4, '["CHANDAN KUMAR","ADITI SINGH"]'::jsonb,       'PIONEER — Early foundation',                             '2:00 PM – 3:30 PM',  'Room 103 (Main Hall)',   '["Science", "Maths", "English Basics"]'::jsonb,        35, 'Active'),
+  ('BAT-15',      'Class 1st to 5th (Junior Foundation)', 'Class 1st to 5th',             500,  5700, '05', 5, '["ADITI SINGH","CHANDAN KUMAR"]'::jsonb,       'Junior Foundation — primary all-subject care',           '3:30 PM – 5:00 PM',  'Room 104 (Junior Wing)', '["Basic Science", "Numeracy", "Reading"]'::jsonb,      30, 'Active'),
+  ('BAT-ENG-912', 'Special English 9th to 12th',          'Special English 9th to 12th', 1000, 11400, '01', 6, '["ADITI SINGH"]'::jsonb,                       'English & Grammar mastery with Aditi Singh',             '6:00 PM – 7:00 PM',  'Room 105 (Language Lab)','["English Grammar", "Spoken English"]'::jsonb,         35, 'Active'),
+  ('BAT-ENG-68',  'Special English 6th to 8th',           'Special English 6th to 8th',   700,  7980, '01', 6, '["ADITI SINGH"]'::jsonb,                       'English & Grammar foundation with Aditi Singh',          '5:00 PM – 6:00 PM',  'Room 105 (Language Lab)','["Grammar Basics", "Vocabulary", "Phonics"]'::jsonb,   35, 'Active'),
+  ('BAT-ENG-15',  'Special English 1st to 5th',           'Special English 1st to 5th',   500,  5700, '01', 6, '["ADITI SINGH"]'::jsonb,                       'Early English & phonics with Aditi Singh',               '2:30 PM – 3:30 PM',  'Room 105 (Language Lab)','["Phonics", "Reading", "Handwriting"]'::jsonb,        30, 'Active')
 ON CONFLICT (batch_id) DO UPDATE SET
   name        = EXCLUDED.name,
   class_name  = EXCLUDED.class_name,
@@ -1202,6 +1210,10 @@ ON CONFLICT (batch_id) DO UPDATE SET
   billing_day = EXCLUDED.billing_day,
   teachers    = EXCLUDED.teachers,
   tagline     = EXCLUDED.tagline,
+  timing      = EXCLUDED.timing,
+  room        = EXCLUDED.room,
+  subjects    = EXCLUDED.subjects,
+  capacity    = EXCLUDED.capacity,
   status      = EXCLUDED.status;
 
 -- Retire the four placeholder batches earlier client builds seeded locally.
