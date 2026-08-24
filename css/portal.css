@@ -871,8 +871,8 @@
   z-index: 1;
   width: 100%;
   max-width: 450px;
-  height: 380px;
-  min-height: 380px;
+  height: 420px;
+  min-height: 420px;
   transform-style: preserve-3d;
   transition: transform 0.7s cubic-bezier(0.4, 0.2, 0.2, 1);
   cursor: pointer;
@@ -3685,8 +3685,8 @@
   .metallic-card-3d {
     width: 100% !important;
     max-width: 100% !important;
-    height: 380px !important;
-    min-height: 380px !important;
+    height: 420px !important;
+    min-height: 400px !important;
     aspect-ratio: auto !important;
     border-radius: 18px !important;
     box-sizing: border-box !important;
@@ -5696,8 +5696,8 @@ button, a, input, select, textarea {
 
   .metallic-card-3d {
     max-width: 100% !important;
-    height: 380px !important;
-    min-height: 375px !important;
+    height: 420px !important;
+    min-height: 400px !important;
   }
 
   .table-responsive,

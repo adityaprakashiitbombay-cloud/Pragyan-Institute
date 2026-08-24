@@ -12,12 +12,12 @@ export function runVipPassCardTests(assert) {
   // --- 1. Dimensions, Elevation & 3D Perspective (Android & Desktop) ---
   assert(portalCss.includes('.metallic-card-3d-container') && portalCss.includes('perspective: 1200px'),
     'T30.1: portal.css defines 3D perspective 1200px for metallic VIP card container');
-  assert(portalCss.includes('height: 380px') && portalCss.includes('min-height: 380px'),
-    'T30.2: portal.css increases card height to 380px to prevent base cutoff and reveal signatures');
+  assert(portalCss.includes('height: 420px') && portalCss.includes('min-height: 420px'),
+    'T30.2: portal.css increases card height to 420px to prevent base cutoff and reveal signatures');
   assert(portalCss.includes('border-radius: 20px'),
     'T30.3: portal.css provides ultra-luxurious 20px card border radius');
-  assert(portalCss.includes('min-height: 375px !important'),
-    'T30.4: mobile & Android media queries maintain at least 375px height');
+  assert(portalCss.includes('min-height: 400px !important'),
+    'T30.4: mobile & Android media queries maintain at least 400px height');
 
   // --- 2. Metallic Glowing Status Badge ---
   assert(portalCss.includes('.metallic-status-pill.pill-cleared'),
