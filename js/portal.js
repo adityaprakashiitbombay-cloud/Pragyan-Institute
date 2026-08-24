@@ -13165,7 +13165,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
         </div>
 
         <!-- Live Push Metric Cards -->
-        <div class="stats-grid" id="pushHubStatsGrid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 1.5rem;">
+        <div class="stats-grid push-stats-grid" id="pushHubStatsGrid">
           <div class="stat-card stat-card-blue">
             <div class="stat-icon"><i aria-hidden="true" class="fa-solid fa-mobile-screen-button"></i></div>
             <div class="stat-content">
@@ -13193,15 +13193,15 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
         </div>
 
         <!-- 1-Click Quick Preset Strip & Device Registration -->
-        <div class="push-presets-bar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
-          <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+        <div class="push-presets-container">
+          <div class="push-presets-bar">
             <span class="preset-label"><i aria-hidden="true" class="fa-solid fa-bolt"></i> Quick Presets:</span>
             <button type="button" class="btn btn-sm btn-preset" data-preset="fee">💵 Monthly Fee Due</button>
             <button type="button" class="btn btn-sm btn-preset" data-preset="exam">🏆 Board Exam Drill</button>
             <button type="button" class="btn btn-sm btn-preset" data-preset="holiday">📢 Weather / Holiday</button>
             <button type="button" class="btn btn-sm btn-preset" data-preset="result">🎉 Result Celebration</button>
           </div>
-          <button type="button" class="btn btn-sm btn-primary" id="btnRegisterCurrentDevice" style="margin-left:auto;">
+          <button type="button" class="btn btn-sm btn-primary btn-register-device" id="btnRegisterCurrentDevice">
             <i aria-hidden="true" class="fa-solid fa-bell"></i> Enable / Register This Device
           </button>
         </div>
@@ -13779,7 +13779,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
       }
 
       container.innerHTML = `
-        <div class="push-logs-scroll-wrap">
+        <div class="push-logs-desktop-wrap push-logs-scroll-wrap">
           <table class="portal-table push-logs-table">
             <thead>
               <tr>
@@ -13822,6 +13822,55 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
               }).join('')}
             </tbody>
           </table>
+        </div>
+
+        <div class="push-logs-mobile-list">
+          ${logs.map(l => {
+            const dt = new Date(l.created_at || Date.now()).toLocaleString('en-IN', {
+              day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+            });
+            const targetStr = l.target_type === 'ALL' ? '🌐 All Students' :
+              l.target_type === 'BATCHES' ? '🎓 Batches' :
+              l.target_type === 'DUES' ? '💰 Dues Filter' : '👤 Student Direct';
+
+            const isSuccess = Number(l.delivered_count || 0) > 0;
+            const badgeClass = isSuccess ? 'status-pill status-verified' : 'status-pill status-danger';
+            const totalAudience = Number(l.audience_size || l.sent_count || 0);
+            const delivered = Number(l.delivered_count || 0);
+            const pct = totalAudience > 0 ? Math.min(100, Math.round((delivered / totalAudience) * 100)) : (delivered > 0 ? 100 : 0);
+
+            return `
+              <div class="push-log-card">
+                <div class="push-log-card-head">
+                  <div class="push-log-card-title-group">
+                    <strong class="push-log-card-title">${escapeHtml(l.title)}</strong>
+                    <span class="push-log-card-time"><i aria-hidden="true" class="fa-regular fa-clock"></i> ${dt}</span>
+                  </div>
+                  <span class="${badgeClass}">${isSuccess ? 'Delivered' : (Number(l.audience_size || 0) === 0 ? '0 Audience' : 'Failed')}</span>
+                </div>
+
+                <div class="push-log-card-body">
+                  ${escapeHtml(l.body)}
+                </div>
+
+                <div class="push-log-card-meta">
+                  <span class="status-pill status-adjusted">${targetStr}</span>
+                  <span class="push-log-card-sender"><i aria-hidden="true" class="fa-solid fa-user-shield"></i> ${escapeHtml(l.dispatched_by || 'CHANDAN')}</span>
+                </div>
+
+                <div class="push-log-card-progress">
+                  <div class="push-log-progress-info">
+                    <span>Delivery Rate: <strong>${delivered} / ${totalAudience}</strong></span>
+                    <span class="push-log-progress-pct">${pct}%</span>
+                  </div>
+                  <div class="push-log-progress-bar">
+                    <div class="push-log-progress-fill" style="width: ${pct}%;"></div>
+                  </div>
+                  ${Number(l.pruned_count || 0) > 0 ? `<div class="push-log-pruned-note"><i aria-hidden="true" class="fa-solid fa-triangle-exclamation"></i> ${l.pruned_count} dead/unregistered endpoints pruned</div>` : ''}
+                </div>
+              </div>
+            `;
+          }).join('')}
         </div>
       `;
     } catch (err) {
