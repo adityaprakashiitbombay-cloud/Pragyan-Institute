@@ -3189,6 +3189,12 @@ function renderStudentDashboard() {
     // Preserve active student tab
     const targetTab = AppState.activeStudentTab || 'details';
     switchStudentTab(targetTab);
+
+    // Prompt student for mobile/browser push alerts (student-only login policy)
+    if (window.PushClient && typeof window.PushClient.renderStudentPrompt === 'function') {
+      const detailsPane = document.getElementById('studentTabPane-details') || document.querySelector('.dashboard-content-body');
+      window.PushClient.renderStudentPrompt(detailsPane, student);
+    }
   }
 
   function switchStudentTab(tabName) {
@@ -5526,6 +5532,8 @@ function renderStudentDashboard() {
       renderAdminSettingsTab();
     } else if (tabName === 'blog') {
       renderAdminBlogTab();
+    } else if (tabName === 'push') {
+      renderAdminPushTab();
     }
   }
 
@@ -12194,7 +12202,564 @@ function renderStudentDashboard() {
       }
     }
     modalEl.querySelectorAll('[data-blog-save]').forEach(b => b.addEventListener('click', () => saveBlog(b.dataset.blogSave)));
-  }  // Expose AppState to window for sync and testing
+  }
+
+  /* ==========================================================================
+   * ADMIN PUSH NOTIFICATIONS & BROADCAST HUB
+   * ========================================================================== */
+  let activePushTargetType = 'ALL';
+  let selectedPushBatches = new Set();
+  let selectedPushStudentId = null;
+
+  async function renderAdminPushTab() {
+    const pane = document.getElementById('adminTabPane-push');
+    if (!pane) return;
+
+    const batches = window.PRAGYAN_ACADEMIC?.BATCHES || [];
+
+    pane.innerHTML = `
+      <div class="admin-push-hub">
+        <div class="push-hub-header">
+          <div>
+            <h2 class="push-hub-title"><i aria-hidden="true" class="fa-solid fa-tower-broadcast"></i> Instant Push Notifications &amp; Broadcast Hub</h2>
+            <p class="push-hub-subtitle">Send real-time mobile lockscreen alerts, fee notices, and exam announcements directly to students' devices with zero telecom/SMS charges.</p>
+          </div>
+          <div class="push-hub-status-badge">
+            <span class="status-dot-pulse"></span>
+            <span>Gateway Online · W3C VAPID Relay</span>
+          </div>
+        </div>
+
+        <!-- 1-Click Quick Preset Strip -->
+        <div class="push-presets-bar">
+          <span class="preset-label"><i aria-hidden="true" class="fa-solid fa-bolt"></i> Quick Presets:</span>
+          <button type="button" class="btn btn-sm btn-preset" data-preset="fee">💵 Monthly Fee Due</button>
+          <button type="button" class="btn btn-sm btn-preset" data-preset="exam">🏆 Board Exam Drill</button>
+          <button type="button" class="btn btn-sm btn-preset" data-preset="holiday">📢 Weather / Holiday</button>
+          <button type="button" class="btn btn-sm btn-preset" data-preset="result">🎉 Result Celebration</button>
+        </div>
+
+        <div class="push-hub-grid">
+          <!-- Left Column: Audience & Composer -->
+          <div class="push-composer-col">
+            <!-- Audience Targeting Matrix -->
+            <div class="push-card">
+              <h3 class="push-card-heading"><i aria-hidden="true" class="fa-solid fa-crosshairs"></i> 1. Audience Targeting Matrix</h3>
+              <div class="push-audience-options">
+                <label class="push-radio-label">
+                  <input type="radio" name="pushTargetType" value="ALL" checked>
+                  <span><strong>🌐 All Enrolled Students &amp; Parents</strong> (Institute-wide alert)</span>
+                </label>
+                <label class="push-radio-label">
+                  <input type="radio" name="pushTargetType" value="BATCHES">
+                  <span><strong>🎓 Specific Academic Batches</strong> (Select below)</span>
+                </label>
+                <label class="push-radio-label">
+                  <input type="radio" name="pushTargetType" value="STUDENT">
+                  <span><strong>👤 Individual Student Direct Alert</strong> (1-on-1 notice)</span>
+                </label>
+                <label class="push-radio-label">
+                  <input type="radio" name="pushTargetType" value="DUES">
+                  <span><strong>💰 Fee Dues Filter Only</strong> (Students with pending balance &gt; ₹0)</span>
+                </label>
+              </div>
+
+              <!-- Batch Chips Container -->
+              <div id="pushBatchSelector" class="push-subselector" style="display:none;">
+                <label class="subselector-label">Select Target Batches:</label>
+                <div class="push-batch-chips">
+                  ${batches.map(b => `
+                    <button type="button" class="push-chip" data-batch-id="${escapeHtml(b.id)}">
+                      ${escapeHtml(b.name || b.id)}
+                    </button>
+                  `).join('')}
+                </div>
+              </div>
+
+              <!-- Student Search Autocomplete -->
+              <div id="pushStudentSelector" class="push-subselector" style="display:none;">
+                <label for="pushStudentSearchInput" class="subselector-label">Search Student by Name, Roll No, or Mobile:</label>
+                <input type="text" id="pushStudentSearchInput" aria-label="Search Student by Name, Roll No, or Mobile" class="portal-input" placeholder="Type student name or roll...">
+                <div id="pushStudentDropdown" class="push-student-dropdown" style="display:none; max-height:160px; overflow-y:auto; background:#fff; border:1px solid #cbd5e1; border-radius:6px; margin-top:4px;"></div>
+                <div id="pushSelectedStudentBadge" class="selected-student-badge" style="display:none; margin-top:6px; font-weight:700; color:#065F46;"></div>
+              </div>
+            </div>
+
+            <!-- Message Composer -->
+            <div class="push-card">
+              <h3 class="push-card-heading"><i aria-hidden="true" class="fa-solid fa-pen-nib"></i> 2. Message Composer &amp; Personalization</h3>
+              
+              <!-- Notification Title -->
+              <div class="admin-form-group">
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                  <label for="pushTitleInput">Notification Title <span class="req-star">*</span></label>
+                  <span class="admin-field-hint" id="pushTitleCount">0 / 80</span>
+                </div>
+                <input type="text" id="pushTitleInput" class="portal-input" maxlength="80" placeholder="e.g. 📢 Pragyan Institute Announcement" value="📢 Pragyan Institute Announcement">
+              </div>
+
+              <!-- Quick Emoji Bar -->
+              <div class="push-emoji-bar">
+                <span class="emoji-label">Add Emoji:</span>
+                ${['📢', '🚨', '💵', '🏆', '📚', '⚡', '🎉', '🔔', '📅', '📝'].map(em => `
+                  <button type="button" class="emoji-btn">${em}</button>
+                `).join('')}
+              </div>
+
+              <!-- Message Body -->
+              <div class="admin-form-group">
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                  <label for="pushBodyInput">Message Body <span class="req-star">*</span></label>
+                  <span class="admin-field-hint" id="pushBodyCount">0 / 250</span>
+                </div>
+                <textarea id="pushBodyInput" class="portal-input" rows="3" maxlength="250" style="height:auto; min-height:80px; padding:0.65rem;" placeholder="Dear {{student_name}}, weekly evaluation test for {{batch_name}} starts at 4:00 PM tomorrow. Please be on time.">Dear {{student_name}}, weekly evaluation test for {{batch_name}} starts at 4:00 PM tomorrow. Please be on time.</textarea>
+              </div>
+
+              <!-- Dynamic Variable Chips -->
+              <div class="push-vars-bar">
+                <span class="vars-label">Insert Dynamic Tag:</span>
+                <button type="button" class="btn-var-tag" data-tag="{{student_name}}">👤 {{student_name}}</button>
+                <button type="button" class="btn-var-tag" data-tag="{{batch_name}}">🎓 {{batch_name}}</button>
+                <button type="button" class="btn-var-tag" data-tag="{{pending_dues}}">💵 {{pending_dues}}</button>
+                <button type="button" class="btn-var-tag" data-tag="{{due_date}}">📅 {{due_date}}</button>
+              </div>
+
+              <!-- Action Buttons Grid -->
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:0.95rem;">
+                <div>
+                  <label for="pushAction1Title" style="font-size:0.8rem; font-weight:700; color:#334155;">Action 1 (Label)</label>
+                  <input type="text" id="pushAction1Title" aria-label="Action 1 (Label)" class="portal-input" value="💳 Pay Fees">
+                </div>
+                <div>
+                  <label for="pushAction1Url" style="font-size:0.8rem; font-weight:700; color:#334155;">Action 1 (Target URL)</label>
+                  <input type="text" id="pushAction1Url" aria-label="Action 1 (Target URL)" class="portal-input" value="/pay.html">
+                </div>
+              </div>
+
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:0.95rem;">
+                <div>
+                  <label for="pushAction2Title" style="font-size:0.8rem; font-weight:700; color:#334155;">Action 2 (Label - Optional)</label>
+                  <input type="text" id="pushAction2Title" aria-label="Action 2 (Label - Optional)" class="portal-input" placeholder="e.g. 📄 View Notice">
+                </div>
+                <div>
+                  <label for="pushAction2Url" style="font-size:0.8rem; font-weight:700; color:#334155;">Action 2 (Target URL)</label>
+                  <input type="text" id="pushAction2Url" aria-label="Action 2 (Target URL)" class="portal-input" placeholder="/#notices">
+                </div>
+              </div>
+
+              <!-- Options Grid: Priority & TTL -->
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:1.25rem;">
+                <div>
+                  <label for="pushPrioritySelect" style="font-size:0.8rem; font-weight:700; color:#334155;">Urgency &amp; Sound</label>
+                  <select id="pushPrioritySelect" aria-label="Urgency & Sound" class="portal-input" style="padding:0 0.65rem;">
+                    <option value="high" selected>🚨 High Priority (Chime + Dual Vibration)</option>
+                    <option value="normal">🔔 Normal Priority (Standard Alert)</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="pushTtlSelect" style="font-size:0.8rem; font-weight:700; color:#334155;">Expiry (Time-To-Live)</label>
+                  <select id="pushTtlSelect" aria-label="Expiry (Time-To-Live)" class="portal-input" style="padding:0 0.65rem;">
+                    <option value="24" selected>24 Hours</option>
+                    <option value="6">6 Hours (Time-sensitive)</option>
+                    <option value="72">3 Days (Important notices)</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Dispatch Action -->
+              <div style="margin-top:1rem;">
+                <button type="button" class="btn btn-primary" id="btnDispatchPush" style="width:100%; justify-content:center; padding:0.85rem 1.5rem; font-size:0.95rem;">
+                  <i aria-hidden="true" class="fa-solid fa-paper-plane"></i> Broadcast Push Notification
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: Live Mobile Simulator -->
+          <div class="push-simulator-col">
+            <div class="push-card" style="position:sticky; top:1rem;">
+              <h3 class="push-card-heading"><i aria-hidden="true" class="fa-solid fa-mobile-screen"></i> Smartphone Lockscreen Simulator</h3>
+              <p class="admin-field-hint" style="margin-bottom:1rem;">Live preview of how this notification will appear on student and parent smartphones:</p>
+              
+              <div class="phone-mockup-frame">
+                <div class="phone-speaker-bar"></div>
+                <div class="phone-lockscreen-time">09:41</div>
+                <div class="phone-lockscreen-date">Monday, 24 August</div>
+                
+                <!-- The Notification Card -->
+                <div class="phone-notif-card" id="phoneSimNotifCard">
+                  <div class="sim-notif-header">
+                    <div class="sim-notif-app">
+                      <img src="./assets/images/logo.png" alt="Logo" class="sim-app-icon">
+                      <span class="sim-app-name">PRAGYAN INSTITUTE</span>
+                    </div>
+                    <span class="sim-notif-time">now</span>
+                  </div>
+                  <div class="sim-notif-title" id="simNotifTitle">📢 Pragyan Institute Announcement</div>
+                  <div class="sim-notif-body" id="simNotifBody">Dear Rahul Sharma, weekly evaluation test for Class 10th (ACHIEVER) starts at 4:00 PM tomorrow. Please be on time.</div>
+                  <div class="sim-notif-actions" id="simNotifActions">
+                    <span class="sim-action-btn" id="simAction1">💳 Pay Fees</span>
+                    <span class="sim-action-btn" id="simAction2" style="display:none;"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sent Broadcast History & Audit Logs -->
+        <div class="push-card" style="margin-top:1.5rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; padding-bottom:0.6rem; border-bottom:1px solid #f1f5f9;">
+            <h3 class="push-card-heading" style="margin:0; padding:0; border:none;"><i aria-hidden="true" class="fa-solid fa-clock-rotate-left"></i> Broadcast Dispatch History &amp; Delivery Logs</h3>
+            <button type="button" class="btn btn-sm btn-outline" id="btnRefreshPushLogs">
+              <i aria-hidden="true" class="fa-solid fa-arrows-rotate"></i> Refresh Logs
+            </button>
+          </div>
+          <div class="table-responsive" id="pushLogsTableContainer">
+            <div style="padding:1.5rem; text-align:center; color:#64748B;"><i aria-hidden="true" class="fa-solid fa-spinner fa-spin"></i> Loading broadcast logs...</div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    wirePushComposerEvents(pane);
+    loadPushBroadcastLogs();
+  }
+
+  function wirePushComposerEvents(pane) {
+    const titleInput = pane.querySelector('#pushTitleInput');
+    const bodyInput = pane.querySelector('#pushBodyInput');
+    const action1Title = pane.querySelector('#pushAction1Title');
+    const action1Url = pane.querySelector('#pushAction1Url');
+    const action2Title = pane.querySelector('#pushAction2Title');
+    const action2Url = pane.querySelector('#pushAction2Url');
+
+    const simTitle = pane.querySelector('#simNotifTitle');
+    const simBody = pane.querySelector('#simNotifBody');
+    const simAct1 = pane.querySelector('#simAction1');
+    const simAct2 = pane.querySelector('#simAction2');
+
+    const titleCount = pane.querySelector('#pushTitleCount');
+    const bodyCount = pane.querySelector('#pushBodyCount');
+
+    function updateSim() {
+      const rawT = titleInput?.value || '📢 Pragyan Institute Alert';
+      const rawB = bodyInput?.value || 'You have a new update from Pragyan Institute.';
+
+      // Sample preview replacements
+      const sampleT = rawT
+        .replace(/\{\{\s*(?:student_name|name)\s*\}\}/gi, 'Rahul Sharma')
+        .replace(/\{\{\s*(?:batch_name|batch)\s*\}\}/gi, 'Class 10th (ACHIEVER)')
+        .replace(/\{\{\s*(?:pending_dues|dues)\s*\}\}/gi, '₹1,000')
+        .replace(/\{\{\s*due_date\s*\}\}/gi, '5th August');
+
+      const sampleB = rawB
+        .replace(/\{\{\s*(?:student_name|name)\s*\}\}/gi, 'Rahul Sharma')
+        .replace(/\{\{\s*(?:batch_name|batch)\s*\}\}/gi, 'Class 10th (ACHIEVER)')
+        .replace(/\{\{\s*(?:pending_dues|dues)\s*\}\}/gi, '₹1,000')
+        .replace(/\{\{\s*due_date\s*\}\}/gi, '5th August');
+
+      if (simTitle) simTitle.textContent = sampleT;
+      if (simBody) simBody.textContent = sampleB;
+      if (titleCount) titleCount.textContent = `${titleInput?.value.length || 0} / 80`;
+      if (bodyCount) bodyCount.textContent = `${bodyInput?.value.length || 0} / 250`;
+
+      if (simAct1) {
+        simAct1.textContent = action1Title?.value || '💳 Pay Fees';
+        simAct1.style.display = action1Title?.value ? 'block' : 'none';
+      }
+      if (simAct2) {
+        simAct2.textContent = action2Title?.value || '📄 View Notice';
+        simAct2.style.display = action2Title?.value ? 'block' : 'none';
+      }
+    }
+
+    [titleInput, bodyInput, action1Title, action2Title].forEach(el => {
+      el?.addEventListener('input', updateSim);
+    });
+    updateSim();
+
+    // Emoji clicks
+    pane.querySelectorAll('.emoji-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (bodyInput) {
+          bodyInput.value += ' ' + btn.textContent.trim();
+          updateSim();
+        }
+      });
+    });
+
+    // Dynamic variable tag clicks
+    pane.querySelectorAll('.btn-var-tag').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tag = btn.dataset.tag;
+        if (bodyInput && tag) {
+          bodyInput.value += ' ' + tag;
+          updateSim();
+        }
+      });
+    });
+
+    // Preset buttons
+    pane.querySelectorAll('.btn-preset').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const p = btn.dataset.preset;
+        if (p === 'fee') {
+          if (titleInput) titleInput.value = '💵 Pragyan Institute: Monthly Fee Due Alert';
+          if (bodyInput) bodyInput.value = 'Dear {{student_name}}, your {{batch_name}} tuition fee of {{pending_dues}} is due. Please tap below to clear dues via UPI.';
+          if (action1Title) action1Title.value = '💳 Pay via UPI';
+          if (action1Url) action1Url.value = '/pay.html';
+        } else if (p === 'exam') {
+          if (titleInput) titleInput.value = '🏆 Upcoming Batch Test Series Announcement';
+          if (bodyInput) bodyInput.value = 'Important: Special assessment test for {{batch_name}} will be conducted tomorrow at 4:00 PM. Attendance is compulsory.';
+          if (action1Title) action1Title.value = '📄 Test Details';
+          if (action1Url) action1Url.value = '/#batches';
+        } else if (p === 'holiday') {
+          if (titleInput) titleInput.value = '📢 Pragyan Institute: Holiday & Timetable Update';
+          if (bodyInput) bodyInput.value = 'Notice for all students: Offline classes are rescheduled today. Please review the updated timetable on the student portal.';
+          if (action1Title) action1Title.value = '📄 Open Noticeboard';
+          if (action1Url) action1Url.value = '/#notices';
+        } else if (p === 'result') {
+          if (titleInput) titleInput.value = '🎉 Congratulations! Batch Results Announced';
+          if (bodyInput) bodyInput.value = 'Pragyan Institute students achieve top percentile scores in recent evaluations. Check the merit list now.';
+          if (action1Title) action1Title.value = '🏆 View Results';
+          if (action1Url) action1Url.value = '/#blog';
+        }
+        updateSim();
+      });
+    });
+
+    // Audience Radio Buttons
+    pane.querySelectorAll('input[name="pushTargetType"]').forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        activePushTargetType = e.target.value;
+        const batchBox = pane.querySelector('#pushBatchSelector');
+        const studentBox = pane.querySelector('#pushStudentSelector');
+        if (batchBox) batchBox.style.display = activePushTargetType === 'BATCHES' ? 'block' : 'none';
+        if (studentBox) studentBox.style.display = activePushTargetType === 'STUDENT' ? 'block' : 'none';
+      });
+    });
+
+    // Batch Chips Multi-Select
+    pane.querySelectorAll('.push-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const bid = chip.dataset.batchId;
+        if (selectedPushBatches.has(bid)) {
+          selectedPushBatches.delete(bid);
+          chip.classList.remove('active');
+        } else {
+          selectedPushBatches.add(bid);
+          chip.classList.add('active');
+        }
+      });
+    });
+
+    // Student Search Autocomplete
+    const studentSearch = pane.querySelector('#pushStudentSearchInput');
+    const studentDropdown = pane.querySelector('#pushStudentDropdown');
+    const selectedStudentBadge = pane.querySelector('#pushSelectedStudentBadge');
+
+    studentSearch?.addEventListener('input', () => {
+      const q = studentSearch.value.trim().toLowerCase();
+      if (!q || q.length < 2) {
+        if (studentDropdown) studentDropdown.style.display = 'none';
+        return;
+      }
+      const allStudents = AppState.getStudents ? AppState.getStudents() : (AppState.students || []);
+      const matches = allStudents.filter(s => {
+        const name = (s.name || '').toLowerCase();
+        const roll = (s.roll_no || s.student_id || '').toLowerCase();
+        const mob = (s.mobile || '').toLowerCase();
+        return name.includes(q) || roll.includes(q) || mob.includes(q);
+      }).slice(0, 5);
+
+      if (matches.length === 0) {
+        if (studentDropdown) {
+          studentDropdown.innerHTML = '<div style="padding:8px 12px; color:#64748B; font-size:0.8rem;">No matching students found</div>';
+          studentDropdown.style.display = 'block';
+        }
+        return;
+      }
+
+      if (studentDropdown) {
+        studentDropdown.innerHTML = matches.map(m => `
+          <div class="student-search-item" data-sid="${escapeHtml(m.student_id || m.id)}" style="padding:8px 12px; cursor:pointer; font-size:0.84rem; border-bottom:1px solid #F1F5F9;">
+            <strong>${escapeHtml(m.name)}</strong> (${escapeHtml(m.class_name || 'Batch')}) · Roll: ${escapeHtml(m.roll_no || m.student_id)}
+          </div>
+        `).join('');
+        studentDropdown.style.display = 'block';
+
+        studentDropdown.querySelectorAll('.student-search-item').forEach(item => {
+          item.addEventListener('click', () => {
+            selectedPushStudentId = item.dataset.sid;
+            const chosen = matches.find(m => (m.student_id || m.id) === selectedPushStudentId);
+            if (chosen && selectedStudentBadge) {
+              selectedStudentBadge.innerHTML = `<i aria-hidden="true" class="fa-solid fa-user-check"></i> Selected: <strong>${escapeHtml(chosen.name)}</strong> (${escapeHtml(chosen.class_name || '')})`;
+              selectedStudentBadge.style.display = 'block';
+            }
+            studentDropdown.style.display = 'none';
+            if (studentSearch) studentSearch.value = chosen ? chosen.name : '';
+          });
+        });
+      }
+    });
+
+    // Broadcast Dispatch Button
+    const btnDispatch = pane.querySelector('#btnDispatchPush');
+    btnDispatch?.addEventListener('click', async () => {
+      const title = titleInput?.value.trim();
+      const body = bodyInput?.value.trim();
+      if (!title || !body) {
+        alert('Please provide both notification title and message body.');
+        return;
+      }
+
+      const target = { type: activePushTargetType };
+      if (activePushTargetType === 'BATCHES') {
+        target.batches = Array.from(selectedPushBatches);
+        if (target.batches.length === 0) {
+          alert('Please select at least one target batch chip.');
+          return;
+        }
+      } else if (activePushTargetType === 'STUDENT') {
+        if (!selectedPushStudentId) {
+          alert('Please search and select a target student.');
+          return;
+        }
+        target.students = [selectedPushStudentId];
+      }
+
+      const actions = [];
+      if (action1Title?.value.trim()) {
+        actions.push({ action: 'action_1', title: action1Title.value.trim(), url: action1Url?.value.trim() || '/pay.html' });
+      }
+      if (action2Title?.value.trim()) {
+        actions.push({ action: 'action_2', title: action2Title.value.trim(), url: action2Url?.value.trim() || '/#notices' });
+      }
+
+      const priority = pane.querySelector('#pushPrioritySelect')?.value || 'high';
+      const ttlHours = pane.querySelector('#pushTtlSelect')?.value || '24';
+
+      if (!confirm(`Are you sure you want to broadcast this push notification to ${activePushTargetType === 'ALL' ? 'ALL active devices' : activePushTargetType}?`)) {
+        return;
+      }
+
+      btnDispatch.disabled = true;
+      btnDispatch.innerHTML = '<i aria-hidden="true" class="fa-solid fa-spinner fa-spin"></i> Broadcasting to Devices...';
+
+      try {
+        const token = sessionStorage.getItem('pragyan_portal_token');
+        const res = await fetch('/api/send-push', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({
+            title,
+            body,
+            target,
+            actions,
+            priority,
+            ttlHours
+          })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          showNotification(`🚀 Broadcast Dispatched! ${data.delivered} delivered (${data.audienceSize} target devices, ${data.pruned} pruned).`, 'success');
+          loadPushBroadcastLogs();
+        } else {
+          showNotification(`Broadcast failed: ${data.error || 'Unknown error'}`, 'error');
+        }
+      } catch (err) {
+        showNotification(`Broadcast network error: ${err.message}`, 'error');
+      } finally {
+        btnDispatch.disabled = false;
+        btnDispatch.innerHTML = '<i aria-hidden="true" class="fa-solid fa-paper-plane"></i> Broadcast Push Notification';
+      }
+    });
+
+    pane.querySelector('#btnRefreshPushLogs')?.addEventListener('click', loadPushBroadcastLogs);
+  }
+
+  async function loadPushBroadcastLogs() {
+    const container = document.getElementById('pushLogsTableContainer');
+    if (!container) return;
+
+    try {
+      if (!window.SupabaseSync || typeof window.SupabaseSync._apiDb !== 'function') {
+        container.innerHTML = '<div style="padding:1.5rem; text-align:center; color:#64748B;">Gateway sync is initializing...</div>';
+        return;
+      }
+
+      const res = await window.SupabaseSync._apiDb({
+        table: 'push_broadcast_logs',
+        operation: 'select',
+        filters: { limit: 15, ascending: false }
+      });
+
+      const logs = (res && res.data) || [];
+      if (logs.length === 0) {
+        container.innerHTML = `
+          <div style="padding:2rem; text-align:center; color:#64748B;">
+            <i aria-hidden="true" class="fa-solid fa-bell-slash" style="font-size:1.8rem; margin-bottom:0.5rem; display:block; opacity:0.6;"></i>
+            No push broadcasts sent yet. Compose and send your first announcement above!
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = `
+        <table class="portal-table" style="width:100%;">
+          <thead>
+            <tr>
+              <th>Date &amp; Time</th>
+              <th>Notification Title &amp; Message</th>
+              <th>Target Audience</th>
+              <th>Sent / Delivered</th>
+              <th>Sender</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${logs.map(l => {
+              const dt = new Date(l.created_at || Date.now()).toLocaleString('en-IN', {
+                day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+              });
+              const targetStr = l.target_type === 'ALL' ? '🌐 All Students' :
+                l.target_type === 'BATCHES' ? '🎓 Batches' :
+                l.target_type === 'DUES' ? '💰 Dues Filter' : '👤 Student Direct';
+
+              const isSuccess = Number(l.delivered_count || 0) > 0;
+              const badgeClass = isSuccess ? 'status-pill status-verified' : 'status-pill status-danger';
+
+              return `
+                <tr>
+                  <td style="white-space:nowrap; font-size:0.82rem; color:#64748B;">${dt}</td>
+                  <td>
+                    <strong style="color:#0F172A; display:block;">${escapeHtml(l.title)}</strong>
+                    <span style="font-size:0.8rem; color:#475569;">${escapeHtml(l.body).slice(0, 90)}${l.body.length > 90 ? '...' : ''}</span>
+                  </td>
+                  <td><span class="status-pill status-adjusted">${targetStr}</span></td>
+                  <td style="font-weight:700; font-size:0.85rem;">
+                    <span style="color:#065F46;">${l.delivered_count || 0}</span> / ${l.audience_size || l.sent_count || 0}
+                    ${Number(l.pruned_count || 0) > 0 ? `<small style="color:#DC2626; display:block;">(${l.pruned_count} pruned)</small>` : ''}
+                  </td>
+                  <td style="font-size:0.82rem; color:#475569;">${escapeHtml(l.dispatched_by || 'CHANDAN')}</td>
+                  <td><span class="${badgeClass}">${isSuccess ? 'Delivered' : 'Failed'}</span></td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+    } catch (err) {
+      container.innerHTML = `<div style="padding:1rem; color:#DC2626; text-align:center;">Failed to load logs: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  // Expose AppState to window for sync and testing
   if (typeof window !== 'undefined') {
     window.AppState = AppState;
   }

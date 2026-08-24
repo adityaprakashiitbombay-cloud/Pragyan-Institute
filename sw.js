@@ -17,7 +17,7 @@
 //      with { ignoreSearch: true }.
 // ============================================================================
 
-const CACHE_NAME = 'pragyan-portal-v90.0.f7d2e6c3';
+const CACHE_NAME = 'pragyan-portal-v90.0.e4cb803f';
 
 // Static assets to pre-cache for instant loads
 const PRECACHE_ASSETS = [
@@ -26,18 +26,19 @@ const PRECACHE_ASSETS = [
   './pay.html',
   './features.html',
   './manifest.json',
-  './css/variables.css?v=90.0.f7d2e6c3',
-  './css/main.css?v=90.0.f7d2e6c3',
-  './css/components.css?v=90.0.f7d2e6c3',
-  './css/animations.css?v=90.0.f7d2e6c3',
-  './css/portal.css?v=90.0.f7d2e6c3',
-  './js/blog-markdown.js?v=90.0.f7d2e6c3',
-  './js/config.js?v=90.0.f7d2e6c3',
-  './js/academic-config.js?v=90.0.f7d2e6c3',
-  './js/supabase-sync.js?v=90.0.f7d2e6c3',
-  './js/chat.js?v=90.0.f7d2e6c3',
-  './js/app.js?v=90.0.f7d2e6c3',
-  './js/portal.js?v=90.0.f7d2e6c3',
+  './css/variables.css?v=90.0.e4cb803f',
+  './css/main.css?v=90.0.e4cb803f',
+  './css/components.css?v=90.0.e4cb803f',
+  './css/animations.css?v=90.0.e4cb803f',
+  './css/portal.css?v=90.0.e4cb803f',
+  './js/blog-markdown.js?v=90.0.e4cb803f',
+  './js/push-client.js?v=90.0.e4cb803f',
+  './js/config.js?v=90.0.e4cb803f',
+  './js/academic-config.js?v=90.0.e4cb803f',
+  './js/supabase-sync.js?v=90.0.e4cb803f',
+  './js/chat.js?v=90.0.e4cb803f',
+  './js/app.js?v=90.0.e4cb803f',
+  './js/portal.js?v=90.0.e4cb803f',
   './assets/images/favicon.ico',
   './assets/images/logo.png',
   './assets/images/apple-touch-icon.png',
@@ -191,3 +192,70 @@ self.addEventListener('fetch', event => {
     })
   );
 });
+
+// ============================================================================
+// PUSH NOTIFICATIONS & INTERACTIVE DISPATCH (W3C Web Push)
+// ============================================================================
+
+self.addEventListener('push', event => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (_) {
+    data = { title: 'Pragyan Institute Update', body: event.data ? event.data.text() : 'You have a new notification.' };
+  }
+
+  const title = data.title || 'Pragyan Institute Alert';
+  const options = {
+    body: data.body || '',
+    icon: data.icon || './assets/images/logo.png',
+    badge: data.badge || './assets/images/logo.png',
+    image: data.image || undefined,
+    tag: data.tag || 'pragyan-broadcast',
+    renotify: true,
+    data: {
+      url: data.url || './',
+      actions: data.actions || []
+    },
+    vibrate: data.priority === 'high' ? [200, 100, 200] : [100, 50, 100],
+    actions: Array.isArray(data.actions) ? data.actions.slice(0, 2).map(act => ({
+      action: act.action || 'open',
+      title: act.title || 'Open'
+    })) : []
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+
+  const data = event.notification.data || {};
+  let targetUrl = data.url || './';
+
+  // If user tapped a specific action button
+  if (event.action && Array.isArray(data.actions)) {
+    const clickedAction = data.actions.find(a => a.action === event.action);
+    if (clickedAction && clickedAction.url) {
+      targetUrl = clickedAction.url;
+    }
+  }
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
+      for (const client of clientList) {
+        if ('focus' in client) {
+          client.focus();
+          if ('navigate' in client && targetUrl) {
+            client.navigate(targetUrl);
+          }
+          return;
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+    })
+  );
+});
+

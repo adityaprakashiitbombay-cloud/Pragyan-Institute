@@ -1578,3 +1578,84 @@ GRANT EXECUTE ON FUNCTION public.get_mentor_ratings() TO service_role;
 -- Verification:
 SELECT count(*) AS mentor_ratings_ready FROM pg_tables
  WHERE schemaname='public' AND tablename='mentor_ratings';
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- SECTION 15: WEB PUSH SUBSCRIPTIONS & BROADCAST JOURNAL
+-- ----------------------------------------------------------------------------
+-- push_subscriptions : device endpoints. Students manage ONLY their own rows;
+--                      anonymous visitors register into a NULL-student pool.
+-- push_broadcast_logs: dispatch journal, admin-read-only via the gateway;
+--                      writes happen exclusively through /api/send-push.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS public.push_subscriptions (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  endpoint      text UNIQUE NOT NULL,
+  p256dh_key    text NOT NULL,
+  auth_key      text NOT NULL,
+  student_id    text REFERENCES public.students(student_id) ON DELETE CASCADE,
+  anon_id       text,
+  batch_id      text,
+  device_os     text,
+  browser       text,
+  user_agent    text,
+  expires_at    timestamptz,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT push_endpoint_https CHECK (endpoint LIKE 'https://%')
+);
+
+CREATE INDEX IF NOT EXISTS idx_push_sub_student ON public.push_subscriptions(student_id);
+CREATE INDEX IF NOT EXISTS idx_push_sub_batch   ON public.push_subscriptions(batch_id);
+
+CREATE TABLE IF NOT EXISTS public.push_broadcast_logs (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  title           text NOT NULL,
+  body            text NOT NULL,
+  target_type     text NOT NULL CHECK (target_type IN ('ALL','BATCHES','STUDENT','DUES')),
+  target_filter   jsonb NOT NULL DEFAULT '{}'::jsonb,
+  audience_size   integer NOT NULL DEFAULT 0,
+  sent_count      integer NOT NULL DEFAULT 0,
+  delivered_count integer NOT NULL DEFAULT 0,
+  failed_count    integer NOT NULL DEFAULT 0,
+  pruned_count    integer NOT NULL DEFAULT 0,
+  dispatched_by   text NOT NULL DEFAULT 'CHANDAN KUMAR',
+  source          text NOT NULL DEFAULT 'admin',
+  payload_meta    jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_push_logs_recent ON public.push_broadcast_logs(created_at DESC);
+
+DROP TRIGGER IF EXISTS trg_push_sub_updated_at ON public.push_subscriptions;
+CREATE TRIGGER trg_push_sub_updated_at
+  BEFORE UPDATE ON public.push_subscriptions
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+DO $do$
+DECLARE p record;
+BEGIN
+  FOR p IN SELECT policyname FROM pg_policies
+           WHERE schemaname='public' AND tablename IN ('push_subscriptions','push_broadcast_logs')
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', p.policyname, p.schemaname, p.tablename);
+  END LOOP;
+END $do$;
+
+ALTER TABLE public.push_subscriptions  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.push_subscriptions  FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.push_broadcast_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.push_broadcast_logs FORCE ROW LEVEL SECURITY;
+
+CREATE POLICY "service_role_full_push_subs"  ON public.push_subscriptions  FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "service_role_full_push_logs"  ON public.push_broadcast_logs FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+REVOKE ALL ON public.push_subscriptions  FROM anon, authenticated;
+REVOKE ALL ON public.push_broadcast_logs FROM anon, authenticated;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.push_subscriptions TO authenticated;
+GRANT SELECT ON public.push_broadcast_logs TO authenticated;
+
+-- Verification:
+SELECT tablename FROM pg_tables WHERE schemaname='public'
+  AND tablename IN ('push_subscriptions','push_broadcast_logs');

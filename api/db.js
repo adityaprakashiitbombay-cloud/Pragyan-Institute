@@ -22,7 +22,7 @@ import { getSupabase, publicAdmin, requireSession, applyCors } from './_lib/auth
 const TABLES = new Set([
   'students', 'notices', 'fee_receipts', 'fee_billing_ledger',
   'student_requests', 'batches', 'admins', 'audit_logs',
-  'blog_posts'
+  'blog_posts', 'push_subscriptions', 'push_broadcast_logs'
 ]);
 
 // Readable without a session, because the marketing site renders before login.
@@ -32,7 +32,7 @@ const PUBLIC_TABLES = new Set(['notices', 'batches', 'blog_posts']);
 // TABLES entirely: the email quota ledger is server-only bookkeeping.
 const STUDENT_TABLES = new Set([
   'students', 'notices', 'fee_receipts', 'fee_billing_ledger',
-  'student_requests', 'batches', 'admins'
+  'student_requests', 'batches', 'admins', 'push_subscriptions'
 ]);
 
 // Allowlisted server-side functions callable through this gateway's rpc
@@ -103,7 +103,7 @@ const ORDER_COLUMNS = {
 };
 
 // Descending by default where the UI shows newest-first lists.
-const DEFAULT_DESCENDING = new Set(['notices', 'fee_receipts', 'fee_billing_ledger', 'student_requests', 'audit_logs', 'blog_posts']);
+const DEFAULT_DESCENDING = new Set(['notices', 'fee_receipts', 'fee_billing_ledger', 'student_requests', 'audit_logs', 'blog_posts', 'push_subscriptions', 'push_broadcast_logs']);
 
 // Columns a student may see on the institute's own admin records. This is the
 // payment identity shown on pay.html — never the credential columns.
@@ -240,6 +240,27 @@ function authorizeStudent(table, operation, data, filters, session) {
     }
   }
 
+  if (table === 'push_subscriptions') {
+    if (operation === 'select') return scoped;
+    if (operation === 'insert' || operation === 'upsert') {
+      for (const row of rows(data)) {
+        if (row?.student_id && row.student_id !== session.sub) {
+          throw new ForbiddenError('Students may only bind their own device subscription');
+        }
+        if (!row?.endpoint || !String(row.endpoint).startsWith('https://')) {
+          throw new BadRequestError('Valid HTTPS push endpoint is required');
+        }
+        if (!row?.p256dh_key || String(row.p256dh_key).length < 20 || !row?.auth_key || String(row.auth_key).length < 8) {
+          throw new BadRequestError('Valid cryptographic push subscription keys are required');
+        }
+      }
+      return filters?.where || {};
+    }
+    if (operation === 'delete') {
+      return scoped;
+    }
+  }
+
   throw new ForbiddenError('Students cannot modify this record directly');
 }
 
@@ -320,12 +341,27 @@ export default async function handler(req, res) {
     return res.status(503).json({ success: false, error: 'Server database configuration is missing' });
   }
 
-  // Anonymous reads of the public catalogue need no session; everything else does.
+  // Anonymous reads of the public catalogue or anonymous device registration need no session; everything else does.
   const isAnonymousRead = PUBLIC_TABLES.has(table) && operation === 'select';
+  const isAnonymousPushRegister = table === 'push_subscriptions' && (operation === 'insert' || operation === 'upsert');
   let session = null;
-  if (!isAnonymousRead) {
+  if (!isAnonymousRead && !isAnonymousPushRegister) {
     session = requireSession(req, res, ['student', 'admin']);
     if (!session) return; // requireSession already answered
+  }
+
+  if (isAnonymousPushRegister && !session) {
+    for (const row of rows(data)) {
+      if (row && typeof row === 'object') {
+        row.student_id = null;
+        if (!row.endpoint || !String(row.endpoint).startsWith('https://')) {
+          return res.status(400).json({ success: false, error: 'Valid HTTPS push endpoint is required' });
+        }
+        if (!row.p256dh_key || String(row.p256dh_key).length < 20 || !row.auth_key || String(row.auth_key).length < 8) {
+          return res.status(400).json({ success: false, error: 'Valid cryptographic push subscription keys are required' });
+        }
+      }
+    }
   }
 
   // Blog feed: anyone without an admin session — including anonymous visitors

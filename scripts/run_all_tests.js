@@ -13,6 +13,7 @@ import { runClientMoneyAndTouchTests } from '../tests/client-money-and-touch.tes
 import { runBlogTests } from '../tests/blog.test.js';
 import { runSecurityHardeningTests } from '../tests/security-hardening.test.js';
 import { runMentorRatingTests } from '../tests/mentor-ratings.test.js';
+import { runPushNotificationTests } from '../tests/push-notifications.test.js';
 
 console.log('================================================================');
 console.log('   PRAGYAN INSTITUTE — T1 TO T6 MASTER TEST RUNNER & AUDIT      ');
@@ -855,6 +856,14 @@ runBlogTests(assert);
 // -----------------------------------------------------------------------------
 console.log('\n--- [T26] Interactive Faculty & Mentor Ratings ---');
 runMentorRatingTests(assert);
+
+// -----------------------------------------------------------------------------
+// T28 — Web Push & Interactive Broadcast Suite. Covers zero-dependency
+// RFC 8291/8292 cryptography, variable interpolation, database schema,
+// gateway authorization, service worker hooks, and admin live simulator.
+// -----------------------------------------------------------------------------
+console.log('\n--- [T28] Web Push & Interactive Broadcast Suite ---');
+await runPushNotificationTests(assert);
 
 console.log('\n================================================================');
 console.log(`MASTER TEST RESULTS: ${pass} Passed, ${fail} Failed`);

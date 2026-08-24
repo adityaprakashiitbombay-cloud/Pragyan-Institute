@@ -34,6 +34,7 @@
 // ============================================================================
 
 import { getSupabase, requireSession, applyCors } from './_lib/auth.js';
+import { pushToSubscription } from './_lib/webpush.js';
 
 // How each documented failure code from the RPC maps onto HTTP. Anything the
 // function might grow later falls through to 400 rather than being reported as
@@ -121,6 +122,39 @@ export default async function handler(req, res) {
     // idempotent:true means this request had already been approved and the
     // original receipt is being returned unchanged — a safe replay, not an error,
     // so the caller can reconcile its local copy either way.
+
+    // Best-effort push notification to student device
+    try {
+      const studentId = result.student_id;
+      const receiptNo = result.receipt_no || (result.receipt && result.receipt.receipt_no);
+      const amountPaid = result.amount_paid || (result.receipt && result.receipt.amount);
+      if (studentId) {
+        const { data: subs } = await supabase
+          .from('push_subscriptions')
+          .select('endpoint, p256dh_key, auth_key, student_id')
+          .eq('student_id', studentId);
+
+        if (subs && subs.length > 0) {
+          const vapidKeys = {
+            publicKey: process.env.VAPID_PUBLIC_KEY || 'BP3tVwB7SjSNTEn7SsPHvzeTySIm17F7AA8Kdcbc0FMUHGBdE8K0tmvEmVVLY3dw9ypIMIG4oOKFNGJAZ1sndMQ',
+            privateKey: process.env.VAPID_PRIVATE_KEY || 'MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQglvAU5VuajVTFhOoC4EmlieeCySWkSuzcnoyU6MEPixShRANCAAT97VcAe0o0jUxJ-0rDx783k8kiJtexewAPCnXG3NBTFBxgXRPCtLZrxJlVS2N3cPcqSDCBuKDihTRiQGdbJ3TE'
+          };
+          const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:pragyan.lalganj@gmail.com';
+          const pushPayload = {
+            title: '✅ Fee Payment Verified!',
+            body: `Your payment of ₹${Number(amountPaid || 0).toLocaleString('en-IN')} has been verified. Official Receipt #${receiptNo || 'REC'} is ready.`,
+            icon: '/assets/images/logo.png',
+            url: '/portal.html',
+            actions: [{ action: 'receipt', title: '📄 View Receipt', url: '/portal.html' }],
+            priority: 'high'
+          };
+          for (const sub of subs) {
+            pushToSubscription(sub, pushPayload, { vapidKeys, vapidSubject, ttlSeconds: 86400, urgency: 'high' }).catch(() => {});
+          }
+        }
+      }
+    } catch (_) { /* push notification is best-effort */ }
+
     return res.status(200).json({ success: true, data: result, idempotent: Boolean(result.idempotent) });
   } catch (err) {
     console.error('[approve-payment] unexpected failure:', err?.message || err);
