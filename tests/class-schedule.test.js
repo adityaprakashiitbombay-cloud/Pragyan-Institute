@@ -62,4 +62,8 @@ export function runClassScheduleTests(assert) {
     'T31.17: css/portal.css styles schedule period cards with status badges');
   assert(portalCss.includes('.holiday-list-grid') && portalCss.includes('.student-week-chip'),
     'T31.18: css/portal.css styles holiday grid and day selector chips');
+  assert(syncJs.includes('normalizeSchedule(r)') && syncJs.includes('normalizeHoliday(r)'),
+    'T31.19: js/supabase-sync.js normalizes class_schedules and institute_holidays in updateLocalState');
+  assert(syncJs.includes('normalizeSchedule(s)') && syncJs.includes('normalizeHoliday(h)'),
+    'T31.20: js/supabase-sync.js defines normalizeSchedule and normalizeHoliday helper methods');
 }

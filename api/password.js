@@ -24,8 +24,8 @@ export default async function handler(req, res) {
     try {
       const { data: admin, error } = await supabase
         .from('admins')
-        .select('admin_id,password,password_hash')
-        .eq('admin_id', session.sub)
+        .select('admin_id,id,username,password,password_hash')
+        .or(`admin_id.eq.${session.sub},username.eq.${session.sub},id.eq.${session.sub}`)
         .maybeSingle();
       if (error) throw error;
       const valid = admin?.password_hash
@@ -34,10 +34,11 @@ export default async function handler(req, res) {
       if (!valid) return res.status(401).json({ error: 'Current password is incorrect' });
 
       const password_hash = await bcrypt.hash(newPassword, 12);
+      const targetId = admin?.admin_id || session.sub;
       const { error: updateError } = await supabase
         .from('admins')
-        .update({ password_hash, password: newPassword })
-        .eq('admin_id', session.sub);
+        .update({ password_hash, password: newPassword, updated_at: new Date().toISOString() })
+        .or(`admin_id.eq.${targetId},username.eq.${targetId},id.eq.${targetId}`);
       if (updateError) throw updateError;
       return res.status(200).json({ success: true });
     } catch (error) {

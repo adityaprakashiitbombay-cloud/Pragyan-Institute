@@ -1110,15 +1110,17 @@
     // ── Normalize & Store Pulled Data ────────────────────────────────────────
     updateLocalState(data) {
       const normalized = {
-        blog_posts:         Array.isArray(data.blog_posts)      ? data.blog_posts.map(r => this.normalizeBlogPost(r)).filter(Boolean) : undefined,
-    students:           Array.isArray(data.students)           ? data.students.map(r => this.normalizeStudent(r)).filter(Boolean)  : undefined,
+        blog_posts:         Array.isArray(data.blog_posts)         ? data.blog_posts.map(r => this.normalizeBlogPost(r)).filter(Boolean) : undefined,
+        students:           Array.isArray(data.students)           ? data.students.map(r => this.normalizeStudent(r)).filter(Boolean)  : undefined,
         notices:            Array.isArray(data.notices)            ? data.notices.map(r => this.normalizeNotice(r)).filter(Boolean)     : undefined,
         fee_receipts:       Array.isArray(data.fee_receipts)       ? data.fee_receipts.map(r => this.normalizeReceipt(r)).filter(Boolean) : undefined,
         fee_billing_ledger: Array.isArray(data.fee_billing_ledger) ? data.fee_billing_ledger.map(r => this.normalizeLedger(r)).filter(Boolean) : undefined,
         student_requests:   Array.isArray(data.student_requests)   ? data.student_requests.map(r => this.normalizeRequest(r)).filter(Boolean) : undefined,
         batches:            Array.isArray(data.batches)            ? data.batches.map(r => this.normalizeBatch(r)).filter(Boolean)     : undefined,
         admins:             Array.isArray(data.admins)             ? data.admins.map(r => this.normalizeAdmin(r)).filter(Boolean)      : undefined,
-        audit_logs:         Array.isArray(data.audit_logs)         ? data.audit_logs.map(r => this.normalizeAuditLog(r)).filter(Boolean) : undefined
+        audit_logs:         Array.isArray(data.audit_logs)         ? data.audit_logs.map(r => this.normalizeAuditLog(r)).filter(Boolean) : undefined,
+        class_schedules:    Array.isArray(data.class_schedules)    ? data.class_schedules.map(r => this.normalizeSchedule(r)).filter(Boolean) : undefined,
+        institute_holidays: Array.isArray(data.institute_holidays) ? data.institute_holidays.map(r => this.normalizeHoliday(r)).filter(Boolean) : undefined
       };
 
       // S4 & F8: Attach fee receipts to their respective students as feeHistory
@@ -1569,6 +1571,47 @@
         published_at: b.published_at || b.publishedAt || null,
         created_at: b.created_at || b.createdAt || '',
         updated_at: b.updated_at || b.updatedAt || ''
+      };
+    },
+
+    normalizeSchedule(s) {
+      if (!s || typeof s !== 'object') return null;
+      return {
+        id: s.id || `SCHED-${s.batch_id || s.batchId || 'BAT-10'}-${(s.day_of_week || s.dayOfWeek || 'MON').slice(0, 3).toUpperCase()}-${s.sort_order || s.sortOrder || 1}`,
+        batch_id: s.batch_id || s.batchId || 'BAT-10',
+        batchId: s.batch_id || s.batchId || 'BAT-10',
+        day_of_week: s.day_of_week || s.dayOfWeek || 'Monday',
+        dayOfWeek: s.day_of_week || s.dayOfWeek || 'Monday',
+        subject: s.subject || 'Lecture',
+        start_time: s.start_time || s.startTime || '04:00 PM',
+        startTime: s.start_time || s.startTime || '04:00 PM',
+        end_time: s.end_time || s.endTime || '05:00 PM',
+        endTime: s.end_time || s.endTime || '05:00 PM',
+        teacher: s.teacher || 'Faculty',
+        room: s.room || 'Classroom 1',
+        is_cancelled: Boolean(s.is_cancelled || s.isCancelled),
+        isCancelled: Boolean(s.is_cancelled || s.isCancelled),
+        sort_order: Number(s.sort_order ?? s.sortOrder ?? 1),
+        sortOrder: Number(s.sort_order ?? s.sortOrder ?? 1),
+        created_at: s.created_at || s.createdAt || new Date().toISOString(),
+        updated_at: s.updated_at || s.updatedAt || new Date().toISOString()
+      };
+    },
+
+    normalizeHoliday(h) {
+      if (!h || typeof h !== 'object') return null;
+      return {
+        id: h.id || `HOL-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        title: h.title || 'Holiday',
+        start_date: h.start_date || h.startDate || new Date().toISOString().split('T')[0],
+        startDate: h.start_date || h.startDate || new Date().toISOString().split('T')[0],
+        end_date: h.end_date || h.endDate || new Date().toISOString().split('T')[0],
+        endDate: h.end_date || h.endDate || new Date().toISOString().split('T')[0],
+        target_batch: h.target_batch || h.targetBatch || 'ALL',
+        targetBatch: h.target_batch || h.targetBatch || 'ALL',
+        description: h.description || '',
+        created_at: h.created_at || h.createdAt || new Date().toISOString(),
+        updated_at: h.updated_at || h.updatedAt || new Date().toISOString()
       };
     },
 

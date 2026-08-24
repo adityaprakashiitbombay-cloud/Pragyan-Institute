@@ -113,4 +113,13 @@ export function runAdminLogoutAllTests(assert) {
     portalCssContent.includes('.btn-revoke-device'),
     'T29.20: js/portal.js and portal.css implement responsive real-time active device list and per-device termination'
   );
+  assert(
+    dbApiContent.includes("'role'") && dbApiContent.includes("['username', 'name', 'role'"),
+    'T29.21: api/db.js authorizeAdminTableWrite permits role, name, mobile, email, upi_id, and photo_url'
+  );
+  const passwordApiContent = fs.readFileSync(path.resolve('api/password.js'), 'utf8');
+  assert(
+    passwordApiContent.includes('admin_id.eq.${session.sub},username.eq.${session.sub},id.eq.${session.sub}'),
+    'T29.22: api/password.js supports multi-identifier admin lookup via or clause'
+  );
 }

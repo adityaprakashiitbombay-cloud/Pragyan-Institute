@@ -2045,20 +2045,20 @@
       try {
         if (Array.isArray(admins) && admins.length > 0) {
           const supaPayload = admins.map(a => ({
-            admin_id: a.id,
-            username: a.username,
-            name: a.name,
-            role: a.role,
-            mobile: a.mobile,
-            email: a.email,
-            upi_id: a.upiId || "",
-            photo_url: a.photoUrl || ''
+            admin_id: a.admin_id || a.id || a.username || 'ADM-01',
+            username: a.username || 'chandan',
+            name: a.name || 'Chandan Kumar',
+            role: a.role || 'Managing Director',
+            mobile: a.mobile || '7369891858',
+            email: a.email || 'chandan@pragyaninstitute.com',
+            upi_id: a.upiId || a.upi_id || "",
+            photo_url: a.photoUrl || a.photo_url || ''
           }));
           if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
-            const currentId = this.currentUser?.id;
-            const current = supaPayload.find(a => a.admin_id === currentId);
+            const currentId = this.currentUser?.admin_id || this.currentUser?.id || this.currentUser?.username || 'ADM-01';
+            const current = supaPayload.find(a => a.admin_id === currentId || a.username === currentId) || supaPayload[0];
             if (!current) return;
-            const r = await SupabaseSync.mutate('admins', 'update', current, { where: { admin_id: currentId } });
+            const r = await SupabaseSync.mutate('admins', 'update', current, { where: { admin_id: current.admin_id } });
             if (!r?.success) console.warn('saveAdmins write failed:', r?.error);
           }
         }
