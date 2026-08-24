@@ -12101,11 +12101,22 @@ function renderStudentDashboard() {
     const modalHtml = `
       <div class="inner-modal-backdrop active" id="blogEditorModal">
         <div class="inner-modal-content" role="dialog" aria-modal="true" aria-labelledby="blogEditorTitle" tabindex="-1" style="max-width:860px; width:100%; max-height:92vh; overflow-y:auto;">
-          <button type="button" class="close-modal-btn" data-blog-editor-close aria-label="Close article editor">&times;</button>
-          <h3 id="blogEditorTitle" style="font-family:var(--font-heading); font-size:1.25rem; color:var(--text-mahogany); margin-bottom:1.1rem;">
-            <i aria-hidden="true" class="fa-solid fa-feather-pointed" style="color:var(--primary-emerald);"></i>
-            ${isNew ? 'Write a New Article' : 'Edit Article'}
-          </h3>
+          <div class="inner-modal-header blog-editor-header">
+            <div style="display:flex; align-items:center; gap:0.65rem;">
+              <div class="blog-editor-icon-badge">
+                <i aria-hidden="true" class="fa-solid fa-feather-pointed"></i>
+              </div>
+              <div>
+                <h3 id="blogEditorTitle" class="blog-editor-title" style="margin:0; font-family:var(--font-heading); font-size:1.2rem; color:var(--text-mahogany);">
+                  ${isNew ? 'Write a New Article' : 'Edit Article'}
+                </h3>
+                <p class="blog-editor-subtitle" style="margin:0.2rem 0 0; font-size:0.8rem; color:var(--text-secondary);">Compose rich academic content, strategies, and announcements</p>
+              </div>
+            </div>
+            <button type="button" class="btn-close-inner blog-editor-close-btn" data-blog-editor-close aria-label="Close article editor" title="Close editor">
+              <i aria-hidden="true" class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
           <form id="blogEditorForm" novalidate>
             <div class="form-group">
               <label class="form-label" for="blogEdTitle">Title *</label>
@@ -12148,10 +12159,10 @@ function renderStudentDashboard() {
               </button>
               <div id="blogPreviewPane" class="blog-reader-body" hidden style="border:1px solid var(--border-sand); border-radius:var(--radius-md); padding:1.1rem; margin-top:0.7rem; background:var(--bg-surface-pure);"></div>
             </div>
-            <div style="display:flex; gap:0.7rem; flex-wrap:wrap; justify-content:flex-end; border-top:1px solid var(--border-sand); padding-top:1rem;">
-              <button type="button" class="btn btn-outline-sage" data-blog-editor-close>Cancel</button>
-              <button type="button" class="btn btn-sage" data-blog-save="draft"><i aria-hidden="true" class="fa-solid fa-floppy-disk"></i> Save as Draft</button>
-              <button type="button" class="btn btn-emerald" data-blog-save="publish"><i aria-hidden="true" class="fa-solid fa-paper-plane"></i> Publish Live</button>
+            <div class="blog-editor-actions-bar">
+              <button type="button" class="btn btn-outline-sage btn-blog-cancel" data-blog-editor-close>Cancel</button>
+              <button type="button" class="btn btn-sage btn-blog-save-draft" data-blog-save="draft"><i aria-hidden="true" class="fa-solid fa-floppy-disk"></i> Save as Draft</button>
+              <button type="button" class="btn btn-emerald btn-blog-publish-main" data-blog-save="publish"><i aria-hidden="true" class="fa-solid fa-paper-plane"></i> Publish Live</button>
             </div>
           </form>
         </div>

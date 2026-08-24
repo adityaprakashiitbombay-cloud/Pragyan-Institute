@@ -4845,6 +4845,110 @@ button, a, input, select, textarea {
   outline-offset: 2px;
 }
 
+/* Admin Blog Editor Header & Action Bar Enhancements */
+.blog-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1.5px solid var(--border-sand, #E2E8F0);
+}
+
+.blog-editor-icon-badge {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(6, 78, 59, 0.1);
+  color: var(--primary-emerald, #064E3B);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  flex-shrink: 0;
+}
+
+.blog-editor-close-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 38px !important;
+  min-width: 38px !important;
+  height: 38px !important;
+  border-radius: 50% !important;
+  background: #F1F5F9 !important;
+  color: #0F172A !important;
+  border: 1.5px solid #CBD5E1 !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08) !important;
+  font-size: 1.1rem !important;
+  cursor: pointer !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  touch-action: manipulation !important;
+  flex-shrink: 0 !important;
+}
+
+.blog-editor-close-btn:hover {
+  background: #FEE2E2 !important;
+  border-color: #FCA5A5 !important;
+  color: #DC2626 !important;
+  transform: rotate(90deg) scale(1.05) !important;
+}
+
+.blog-editor-close-btn:active {
+  transform: scale(0.92) !important;
+}
+
+.blog-editor-actions-bar {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  border-top: 1.5px solid var(--border-sand, #E2E8F0);
+  padding-top: 1.1rem;
+  margin-top: 1.25rem;
+  background: #FFFFFF;
+}
+
+.btn-blog-publish-main {
+  min-height: 44px;
+  padding: 0.65rem 1.6rem;
+  font-size: 0.95rem;
+  font-weight: 800;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 2px 8px rgba(6, 78, 59, 0.25);
+  transition: all 0.2s ease;
+  touch-action: manipulation;
+}
+
+.btn-blog-publish-main:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(6, 78, 59, 0.35);
+}
+
+.btn-blog-save-draft {
+  min-height: 44px;
+  padding: 0.65rem 1.3rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  touch-action: manipulation;
+}
+
+.btn-blog-cancel {
+  min-height: 44px;
+  padding: 0.65rem 1.15rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: 8px;
+  touch-action: manipulation;
+}
+
 @media (max-width: 767px) {
   #adminTabPane-blog .dash-card-header {
     flex-direction: column !important;
@@ -4861,9 +4965,60 @@ button, a, input, select, textarea {
     width: 100% !important;
   }
   #blogEditorModal .inner-modal-content {
-    padding: 1.15rem !important;
-    max-height: 96vh !important;
-    border-radius: 12px !important;
+    padding: 1.15rem 0.95rem !important;
+    max-height: 94vh !important;
+    max-height: 94dvh !important;
+    width: 98vw !important;
+    max-width: 98vw !important;
+    border-radius: 14px !important;
+  }
+  .blog-editor-header {
+    margin-bottom: 0.95rem;
+    padding-bottom: 0.75rem;
+  }
+  .blog-editor-title {
+    font-size: 1.05rem !important;
+  }
+  .blog-editor-subtitle {
+    font-size: 0.75rem !important;
+  }
+  .blog-editor-close-btn {
+    width: 42px !important;
+    min-width: 42px !important;
+    height: 42px !important;
+    font-size: 1.2rem !important;
+  }
+  .blog-editor-actions-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    position: sticky;
+    bottom: -1px;
+    background: #FFFFFF;
+    padding: 0.85rem 0.5rem;
+    margin: 1rem -0.95rem -0.95rem -0.95rem;
+    border-top: 2px solid var(--border-sand, #E2E8F0);
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.06);
+    z-index: 20;
+  }
+  .btn-blog-publish-main {
+    width: 100% !important;
+    justify-content: center !important;
+    min-height: 48px !important;
+    font-size: 0.98rem !important;
+    order: 1;
+  }
+  .btn-blog-save-draft {
+    width: 100% !important;
+    justify-content: center !important;
+    min-height: 44px !important;
+    order: 2;
+  }
+  .btn-blog-cancel {
+    width: 100% !important;
+    justify-content: center !important;
+    min-height: 40px !important;
+    order: 3;
   }
 }
 

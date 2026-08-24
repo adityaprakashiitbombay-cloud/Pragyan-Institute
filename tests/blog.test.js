@@ -112,4 +112,16 @@ export function runBlogTests(assert) {
   assert(sqlSrc.includes('increment_blog_views(p_slug text)'), 'T25.37: atomic view-count RPC exists');
   assert(sqlSrc.includes("REVOKE ALL ON FUNCTION public.increment_blog_views(text) FROM PUBLIC, anon, authenticated"),
     'T25.38: view-count RPC is service-role-only at the SQL layer');
+
+  // --- 10. Editor Header, Close Button & Mobile Action Bar ------------------------
+  const portalCss = read('css/portal.css');
+  assert(portalSrc.includes('class="inner-modal-header blog-editor-header"'),
+    'T25.39: blog editor modal includes .blog-editor-header with visible close button');
+  assert(portalSrc.includes('class="btn-close-inner blog-editor-close-btn"') && portalSrc.includes('fa-xmark'),
+    'T25.40: blog editor close button uses .blog-editor-close-btn with FontAwesome icon');
+  assert(portalSrc.includes('class="blog-editor-actions-bar"') && portalSrc.includes('btn-blog-publish-main'),
+    'T25.41: blog editor includes .blog-editor-actions-bar for responsive submit actions');
+  assert(portalCss.includes('.blog-editor-actions-bar') && portalCss.includes('.btn-blog-publish-main'),
+    'T25.42: portal.css includes mobile responsive rules for blog editor submit buttons and sticky action bar');
 }
+
