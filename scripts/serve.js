@@ -45,48 +45,58 @@ const server = http.createServer((req, res) => {
   let reqPath = decodeURIComponent(req.url.split('?')[0]);
   if (reqPath === '/' || reqPath === '') reqPath = '/index.html';
   
-  // Local /api/db execution for seamless local testing
-  if (reqPath === '/api/db' || reqPath === '/api/db.js') {
+  // Local /api/* execution for seamless local testing
+  if (reqPath.startsWith('/api/')) {
     if (req.method === 'OPTIONS') {
       res.writeHead(204, {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey'
       });
       return res.end();
     }
-    let body = '';
-    req.on('data', chunk => { body += chunk; });
-    req.on('end', async () => {
-      try {
-        req.body = body ? JSON.parse(body) : {};
-        const { default: handler } = await import(`../api/db.js?v=${Date.now()}`);
-        
-        const mockRes = {
-          _status: 200,
-          _headers: {
-            'Content-Type': 'application/json; charset=utf-8',
-            'Access-Control-Allow-Origin': '*'
-          },
-          status(code) { this._status = code; return this; },
-          setHeader(k, v) { this._headers[k] = v; return this; },
-          json(obj) {
-            res.writeHead(this._status, this._headers);
-            res.end(JSON.stringify(obj));
-          },
-          end(data) {
-            res.writeHead(this._status, this._headers);
-            res.end(data);
-          }
-        };
 
-        await handler(req, mockRes);
-      } catch (err) {
-        res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-        res.end(JSON.stringify({ success: false, error: err.message }));
-      }
-    });
-    return;
+    const apiRoute = reqPath.replace(/^\/api\//, '').replace(/\.js$/, '');
+    const apiFile = path.join(ROOT, 'api', `${apiRoute}.js`);
+
+    if (fs.existsSync(apiFile)) {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', async () => {
+        try {
+          req.body = body ? JSON.parse(body) : {};
+          const { default: handler } = await import(`../api/${apiRoute}.js?v=${Date.now()}`);
+          
+          const mockRes = {
+            _status: 200,
+            _headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Access-Control-Allow-Origin': '*'
+            },
+            status(code) { this._status = code; return this; },
+            setHeader(k, v) { this._headers[k] = v; return this; },
+            json(obj) {
+              res.writeHead(this._status, this._headers);
+              res.end(JSON.stringify(obj));
+            },
+            send(data) {
+              res.writeHead(this._status, this._headers);
+              res.end(typeof data === 'object' ? JSON.stringify(data) : String(data));
+            },
+            end(data) {
+              res.writeHead(this._status, this._headers);
+              res.end(data || '');
+            }
+          };
+
+          await handler(req, mockRes);
+        } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+          res.end(JSON.stringify({ success: false, error: err.message }));
+        }
+      });
+      return;
+    }
   }
 
   const filePath = path.join(ROOT, reqPath.replace(/^\//, ''));
