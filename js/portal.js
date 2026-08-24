@@ -3443,17 +3443,22 @@ function renderStudentDashboard() {
     if (!pane || !s) return;
 
     // Calculate accurate ledger amounts
+    const feeAcc = (typeof AppState.getStudentFeeAccount === 'function')
+      ? AppState.getStudentFeeAccount(s.id || s.student_id || s.rollNo, s)
+      : null;
     const resolvedBatch = (window.PRAGYAN_ACADEMIC && typeof window.PRAGYAN_ACADEMIC.resolveBatch === 'function')
       ? window.PRAGYAN_ACADEMIC.resolveBatch(s.className || s.class_name || s.batchName)
       : null;
     const batchStandardFee = resolvedBatch?.fee || (window.PRAGYAN_ACADEMIC?.monthlyFeeFor ? window.PRAGYAN_ACADEMIC.monthlyFeeFor(s.className || s.class_name) : 1000);
     const rawPaid = Number(s.paidFee ?? s.paid_fee ?? 0);
-    const pendingFee = Number(s.pendingFee ?? s.pending_fee ?? 0);
+    const pendingFee = Number(feeAcc?.totalDue ?? s.pendingFee ?? s.pending_fee ?? 0);
     const isFeeCleared = pendingFee <= 0;
 
     let displayTotalFee = Number(s.totalFee ?? s.total_fee ?? 0);
     if (displayTotalFee <= 1) {
       displayTotalFee = (rawPaid + pendingFee > 0) ? (rawPaid + pendingFee) : batchStandardFee;
+    } else if (displayTotalFee < (rawPaid + pendingFee)) {
+      displayTotalFee = rawPaid + pendingFee;
     }
     const displayPaidFee = isFeeCleared ? (rawPaid > 0 ? rawPaid : displayTotalFee) : rawPaid;
 
