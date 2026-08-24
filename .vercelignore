@@ -11,6 +11,7 @@ database_migrations
 *.sql
 *.md
 *.log
+api/send-push.js
 
 # Env & OS files
 .env*

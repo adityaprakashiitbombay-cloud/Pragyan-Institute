@@ -80,7 +80,33 @@ async function handlePushBroadcast(req, res) {
     return res.status(503).json({ success: false, error: 'Database service unavailable' });
   }
 
-  const body = req.body || {};
+  // Support GET request for active push stats (subscribers count, recent log)
+  if (req.method === 'GET') {
+    try {
+      const { count: subsCount } = await supabase
+        .from('push_subscriptions')
+        .select('*', { count: 'exact', head: true });
+
+      const { data: recentLogs } = await supabase
+        .from('push_broadcast_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(25);
+
+      return res.status(200).json({
+        success: true,
+        subscribers: subsCount || 0,
+        recentLogs: recentLogs || []
+      });
+    } catch (err) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  let body = req.body || {};
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch (_) { body = {}; }
+  }
   const rawTitle = stripTags(body.title || 'Pragyan Institute Update').slice(0, 100);
   const rawBody = stripTags(body.body || '').slice(0, 300);
   if (!rawBody) {

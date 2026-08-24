@@ -19,7 +19,11 @@ export default async function handler(req, res) {
   if (applyCors(req, res)) return;
 
   // Stream token generator route
-  if (req.url && req.url.includes('stream-token')) {
+  const isStreamToken = (req.url && req.url.includes('stream-token')) ||
+    (req.headers['x-matched-path'] && req.headers['x-matched-path'].includes('stream-token')) ||
+    (req.headers['x-vercel-matched-path'] && req.headers['x-vercel-matched-path'].includes('stream-token'));
+
+  if (isStreamToken) {
     if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
     const session = requireSession(req, res, ['student', 'admin']);
     if (!session) return;
