@@ -11631,23 +11631,23 @@ function renderStudentDashboard() {
       .reduce((sum, l) => sum + (l.details?.amount || 0), 0);
 
     pane.innerHTML = `
-      <div class="dash-card">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.25rem;">
+      <div class="dash-card admin-audit-main-card">
+        <div class="admin-audit-header-row">
           <div>
-            <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-mahogany); margin: 0;">
-              <i aria-hidden="true" class="fa-solid fa-clock-rotate-left" style="color: var(--primary-emerald);"></i> Master Administrative Audit & Action History Log (${allLogs.length})
+            <h3 class="admin-audit-header-title">
+              <i aria-hidden="true" class="fa-solid fa-clock-rotate-left" style="color: var(--primary-emerald);"></i> Master Administrative Audit &amp; Action History Log (${allLogs.length})
             </h3>
-            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">Complete chronological audit trial of all fee collections, approvals, announcements, adjustments, and registrations by specific educators</div>
+            <div class="admin-audit-header-desc">Complete chronological audit trail of all fee collections, approvals, announcements, adjustments, and registrations by specific educators</div>
           </div>
-          <div class="admin-audit-filter-wrap" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; width: 100%; max-width: 580px; justify-content: flex-end;">
-            <select id="adminAuditEducatorSelect" aria-label="Filter the audit trail by educator" class="portal-input" style="flex: 1 1 140px; min-width: 130px; max-width: 100%; font-size: 0.82rem; height: 38px; padding: 0.4rem 0.65rem; border-color: var(--primary-emerald); font-weight: 600;">
+          <div class="admin-audit-filter-wrap">
+            <select id="adminAuditEducatorSelect" aria-label="Filter the audit trail by educator" class="portal-input admin-audit-educator-select">
               <option value="all" ${currentAuditEducator === 'all' ? 'selected' : ''}>🌟 All Educators / Admins</option>
               <option value="Ravi" ${currentAuditEducator === 'Ravi' ? 'selected' : ''}>👔 Prof. Ravi Ranjan</option>
               <option value="Chandan" ${currentAuditEducator === 'Chandan' ? 'selected' : ''}>🔬 Chandan Kumar</option>
             </select>
-            <input type="text" id="adminAuditSearchInput" aria-label="Search audit history" class="portal-input" placeholder="🔍 Search audit history..." value="${currentAuditSearch}" style="flex: 1 1 140px; min-width: 130px; max-width: 100%; font-size: 0.82rem; height: 38px; padding: 0.4rem 0.65rem;">
+            <input type="text" id="adminAuditSearchInput" aria-label="Search audit history" class="portal-input admin-audit-search-input" placeholder="🔍 Search audit history..." value="${escapeHtml(currentAuditSearch)}">
             ${isMainAdmin() ? `
-              <button id="btnClearAllAuditLogs" class="btn" title="Main Admin Exclusive: Purge all audit logs from database and local storage" style="background: linear-gradient(135deg, #DC2626 0%, #991B1B 100%); color: #fff; border: 1px solid #7F1D1D; height: 38px; padding: 0 0.85rem; font-size: 0.8rem; font-weight: 700; border-radius: 6px; display: inline-flex; align-items: center; gap: 0.4rem; box-shadow: 0 2px 6px rgba(220, 38, 38, 0.25); cursor: pointer; white-space: nowrap;">
+              <button id="btnClearAllAuditLogs" class="btn btn-clear-all-audits" title="Main Admin Exclusive: Purge all audit logs from database and local storage">
                 <i aria-hidden="true" class="fa-solid fa-trash-can"></i> Clear All Audits
               </button>
             ` : ''}
@@ -11655,29 +11655,29 @@ function renderStudentDashboard() {
         </div>
 
         ${currentAuditEducator !== 'all' ? `
-          <div style="background: #D1FAE5; border: 1px solid #10B981; border-radius: 8px; padding: 0.85rem 1.15rem; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+          <div class="audit-educator-banner">
             <div>
-              <div style="font-weight: 700; color: #065F46; font-size: 0.95rem;">
+              <div class="audit-educator-title">
                 <i aria-hidden="true" class="fa-solid fa-user-tie"></i> Audit Log Filtered for Educator: <strong>${currentAuditEducator === 'Ravi' ? 'Prof. Ravi Ranjan (Director & Maths Lead)' : 'Chandan Kumar (Director & Science Lead)'}</strong>
               </div>
-              <div style="font-size: 0.82rem; color: #047857; margin-top: 0.2rem;">
-                Total Fee Payments Verified / Accepted by this Educator: <strong style="font-size: 1rem; color: #065F46;">₹${totalCollectedByEducator.toLocaleString()}</strong> across <strong>${filteredLogs.filter(l => l.actionType === 'FEE_PAYMENT' || l.actionType === 'PAYMENT_VERIFIED').length}</strong> transactions.
+              <div class="audit-educator-desc">
+                Total Fee Payments Verified / Accepted by this Educator: <strong class="audit-educator-amount">₹${totalCollectedByEducator.toLocaleString()}</strong> across <strong>${filteredLogs.filter(l => l.actionType === 'FEE_PAYMENT' || l.actionType === 'PAYMENT_VERIFIED').length}</strong> transactions.
               </div>
             </div>
-            <button class="btn" id="btnClearEducatorFilter" style="background: #065F46; color: #fff; padding: 0.3rem 0.75rem; font-size: 0.8rem; border-radius: 6px;">Clear Filter</button>
+            <button class="btn btn-clear-educator-filter" id="btnClearEducatorFilter">Clear Filter</button>
           </div>
         ` : ''}
 
-        <!-- Filter Chips -->
-        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.25rem;">
-          <button class="notice-admin-filter-chip ${currentAuditFilter === 'all' ? 'active' : ''}" data-audit-filter="all">All (${allLogs.length})</button>
-          <button class="notice-admin-filter-chip ${currentAuditFilter === 'FEE_ADJUSTMENT' ? 'active' : ''}" data-audit-filter="FEE_ADJUSTMENT" style="${currentAuditFilter === 'FEE_ADJUSTMENT' ? 'background: #7C3AED !important; border-color: #7C3AED !important; color: #fff !important;' : ''}">⚖️ Fee Adjustments & Waivers</button>
-          <button class="notice-admin-filter-chip ${currentAuditFilter === 'FEE_PAYMENT' ? 'active' : ''}" data-audit-filter="FEE_PAYMENT">💳 Direct Fee Payments</button>
-          <button class="notice-admin-filter-chip ${currentAuditFilter === 'PAYMENT_VERIFIED' ? 'active' : ''}" data-audit-filter="PAYMENT_VERIFIED">✅ Verified Online Payments</button>
-          <button class="notice-admin-filter-chip ${currentAuditFilter === 'PROFILE_APPROVED' ? 'active' : ''}" data-audit-filter="PROFILE_APPROVED">👤 Profile Updates</button>
-          <button class="notice-admin-filter-chip ${currentAuditFilter === 'NOTICE_BROADCAST' ? 'active' : ''}" data-audit-filter="NOTICE_BROADCAST">📢 Announcements</button>
-          <button class="notice-admin-filter-chip ${currentAuditFilter === 'STUDENT_REGISTERED' ? 'active' : ''}" data-audit-filter="STUDENT_REGISTERED">🎓 Student Registrations</button>
-          <button class="notice-admin-filter-chip ${currentAuditFilter === 'SECURITY' ? 'active' : ''}" data-audit-filter="SECURITY">🔒 Security & Deletions</button>
+        <!-- Filter Chips Bar -->
+        <div class="admin-audit-chips-bar">
+          <button type="button" class="notice-admin-filter-chip ${currentAuditFilter === 'all' ? 'active' : ''}" data-audit-filter="all">All (${allLogs.length})</button>
+          <button type="button" class="notice-admin-filter-chip ${currentAuditFilter === 'FEE_ADJUSTMENT' ? 'active' : ''}" data-audit-filter="FEE_ADJUSTMENT" style="${currentAuditFilter === 'FEE_ADJUSTMENT' ? 'background: #7C3AED !important; border-color: #7C3AED !important; color: #fff !important;' : ''}">⚖️ Fee Adjustments &amp; Waivers</button>
+          <button type="button" class="notice-admin-filter-chip ${currentAuditFilter === 'FEE_PAYMENT' ? 'active' : ''}" data-audit-filter="FEE_PAYMENT">💳 Direct Fee Payments</button>
+          <button type="button" class="notice-admin-filter-chip ${currentAuditFilter === 'PAYMENT_VERIFIED' ? 'active' : ''}" data-audit-filter="PAYMENT_VERIFIED">✅ Verified Online Payments</button>
+          <button type="button" class="notice-admin-filter-chip ${currentAuditFilter === 'PROFILE_APPROVED' ? 'active' : ''}" data-audit-filter="PROFILE_APPROVED">👤 Profile Updates</button>
+          <button type="button" class="notice-admin-filter-chip ${currentAuditFilter === 'NOTICE_BROADCAST' ? 'active' : ''}" data-audit-filter="NOTICE_BROADCAST">📢 Announcements</button>
+          <button type="button" class="notice-admin-filter-chip ${currentAuditFilter === 'STUDENT_REGISTERED' ? 'active' : ''}" data-audit-filter="STUDENT_REGISTERED">🎓 Student Registrations</button>
+          <button type="button" class="notice-admin-filter-chip ${currentAuditFilter === 'SECURITY' ? 'active' : ''}" data-audit-filter="SECURITY">🔒 Security &amp; Deletions</button>
         </div>
 
         <!-- History Timeline List -->
@@ -11697,7 +11697,7 @@ function renderStudentDashboard() {
               if (aType === 'FEE_ADJUSTMENT_CORRECTION' || aType === 'FEE_REGULATED') {
                 cardBorderLeft = 'border-left: 5px solid #7C3AED;';
                 cardBg = 'linear-gradient(135deg, #FAF5FF 0%, #F5EEFF 100%);';
-                typePill = '<span style="background: linear-gradient(135deg, #EDE9FE, #DDD6FE); color: #5B21B6; border: 1.5px solid #A78BFA; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.35rem; box-shadow: 0 1px 4px rgba(124, 58, 237, 0.15);"><i aria-hidden="true" class="fa-solid fa-scale-balanced"></i> ⚖️ Fee Adjustment & Correction</span>';
+                typePill = '<span style="background: linear-gradient(135deg, #EDE9FE, #DDD6FE); color: #5B21B6; border: 1.5px solid #A78BFA; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.35rem; box-shadow: 0 1px 4px rgba(124, 58, 237, 0.15);"><i aria-hidden="true" class="fa-solid fa-scale-balanced"></i> ⚖️ Fee Adjustment &amp; Correction</span>';
               } else if (aType === 'FEE_PAYMENT') {
                 cardBorderLeft = 'border-left: 5px solid #059669;';
                 cardBg = '#F0FDF4;';
@@ -11713,7 +11713,7 @@ function renderStudentDashboard() {
               } else if (aType === 'STUDENT_PERMANENTLY_DELETED') {
                 cardBorderLeft = 'border-left: 5px solid #DC2626;';
                 cardBg = '#FEF2F2;';
-                typePill = '<span style="background: #FEE2E2; color: #991B1B; border: 1.5px solid #FCA5A5; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i aria-hidden="true" class="fa-solid fa-trash-can"></i> Student Deleted & Purged</span>';
+                typePill = '<span style="background: #FEE2E2; color: #991B1B; border: 1.5px solid #FCA5A5; padding: 0.25rem 0.75rem; border-radius: 99px; font-weight: 800; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i aria-hidden="true" class="fa-solid fa-trash-can"></i> Student Deleted &amp; Purged</span>';
               } else if (aType === 'STUDENT_PASSWORD_RESET') {
                 cardBorderLeft = 'border-left: 5px solid #0D9488;';
                 cardBg = '#F0FDFA;';
@@ -11733,17 +11733,17 @@ function renderStudentDashboard() {
               }
 
               return `
-                <div style="border: 1px solid var(--border-sand); ${cardBorderLeft} border-radius: 8px; padding: 1rem; background: ${cardBg}; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.75rem; box-shadow: 0 1px 4px rgba(0,0,0,0.03);">
+                <div class="admin-audit-log-card" style="${cardBorderLeft} background: ${cardBg};">
                   <div style="flex: 1; min-width: 250px;">
                     <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.35rem;">
                       ${typePill}
                       <span style="font-size: 0.8rem; font-weight: 700; color: var(--primary-emerald); background: rgba(6, 78, 59, 0.08); padding: 0.15rem 0.5rem; border-radius: 4px;">
-                        <i aria-hidden="true" class="fa-solid fa-user-tie"></i> ${log.actor}
+                        <i aria-hidden="true" class="fa-solid fa-user-tie"></i> ${escapeHtml(log.actor)}
                       </span>
-                      <span style="font-size: 0.8rem; color: var(--text-muted);"><i aria-hidden="true" class="fa-regular fa-clock"></i> ${log.timestamp}</span>
+                      <span style="font-size: 0.8rem; color: var(--text-muted);"><i aria-hidden="true" class="fa-regular fa-clock"></i> ${escapeHtml(log.timestamp)}</span>
                     </div>
-                    <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-mahogany); margin-bottom: 0.2rem;">${log.description}</div>
-                    <div style="font-size: 0.8rem; color: var(--text-muted);">Target Student: <strong>${log.studentName}</strong> (Roll #${log.studentRoll})</div>
+                    <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-mahogany); margin-bottom: 0.2rem;">${escapeHtml(log.description)}</div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">Target Student: <strong>${escapeHtml(log.studentName)}</strong> (Roll #${escapeHtml(log.studentRoll)})</div>
                   </div>
                 </div>
               `;
@@ -11763,9 +11763,17 @@ function renderStudentDashboard() {
       renderAdminAuditHistoryTab();
     });
 
-    pane.querySelector('#adminAuditSearchInput')?.addEventListener('input', (e) => {
+    const searchIn = pane.querySelector('#adminAuditSearchInput');
+    searchIn?.addEventListener('input', (e) => {
       currentAuditSearch = e.target.value;
+      const start = e.target.selectionStart;
+      const end = e.target.selectionEnd;
       renderAdminAuditHistoryTab();
+      const updatedIn = document.getElementById('adminAuditSearchInput');
+      if (updatedIn) {
+        updatedIn.focus();
+        updatedIn.setSelectionRange(start, end);
+      }
     });
 
     pane.querySelectorAll('[data-audit-filter]').forEach(btn => {
