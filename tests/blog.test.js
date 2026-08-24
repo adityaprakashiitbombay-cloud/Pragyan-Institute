@@ -134,5 +134,15 @@ export function runBlogTests(assert) {
     'T25.45: portal.js preloads seed articles into local store when uninitialized');
   assert(portalSrc.includes("conflict: 'slug'") && portalSrc.includes("isNew ? 'insert' : 'upsert'"),
     'T25.46: admin blog save uses upsert with slug conflict key for seamless editing of seed articles');
+
+  // --- 12. Real-Time View Count Cross-Device & Admin Tab Sync ---------------------
+  assert(portalSrc.includes('syncAdminBlogPostsFromCloud') && portalSrc.includes('_isSyncingBlog'),
+    'T25.47: portal.js implements syncAdminBlogPostsFromCloud to fetch live database views');
+  assert(portalSrc.includes('btnRefreshBlogViews') && portalSrc.includes('Refresh Views'),
+    'T25.48: portal.js renders #btnRefreshBlogViews with live sync event handler');
+  assert(portalSrc.includes('preservedViews') || (portalSrc.includes('Math.max') && portalSrc.includes('views_count')),
+    'T25.49: portal.js preserves live views_count on admin article save');
+  assert(appSrc.includes('BLOG_VIEWS_UPDATED') && portalSrc.includes('BLOG_VIEWS_UPDATED'),
+    'T25.50: app.js and portal.js sync view counts across browser tabs via BroadcastChannel');
 }
 

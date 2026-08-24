@@ -12183,7 +12183,92 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
       .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
       .replace(/\s+/g, ' ').trim();
   }
-  function renderAdminBlogTab() {
+
+  let _isSyncingBlog = false;
+  let _blogTabSyncInterval = null;
+
+  async function syncAdminBlogPostsFromCloud(silent = false) {
+    if (_isSyncingBlog) return;
+    _isSyncingBlog = true;
+    const btnRefresh = document.getElementById('btnRefreshBlogViews');
+    if (btnRefresh && !silent) {
+      btnRefresh.disabled = true;
+      btnRefresh.innerHTML = '<i aria-hidden="true" class="fa-solid fa-arrows-rotate fa-spin"></i> Syncing…';
+    }
+
+    try {
+      let livePosts = null;
+      if (window.SupabaseSync && typeof window.SupabaseSync._apiDb === 'function') {
+        try {
+          const res = await window.SupabaseSync._apiDb('blog_posts', 'select', null, { limit: 100 });
+          if (Array.isArray(res) && res.length > 0) livePosts = res;
+        } catch (_) {}
+      }
+      if (!livePosts) {
+        const token = sessionStorage.getItem('pragyan_portal_token') || localStorage.getItem('pragyan_portal_token') || AppState.token;
+        const resp = await fetch('/api/db', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ table: 'blog_posts', operation: 'select', filters: { limit: 100 } })
+        });
+        const json = await resp.json().catch(() => ({}));
+        if (json && json.success && Array.isArray(json.data) && json.data.length > 0) {
+          livePosts = json.data;
+        }
+      }
+
+      if (Array.isArray(livePosts) && livePosts.length > 0) {
+        const currentLocal = blogReadLocal();
+        const merged = livePosts.map(lp => {
+          const loc = currentLocal.find(x => x.id === lp.id || x.slug === lp.slug);
+          return {
+            ...loc,
+            ...lp,
+            views_count: Math.max(Number(lp.views_count) || 0, Number(loc?.views_count) || 0)
+          };
+        });
+        currentLocal.forEach(loc => {
+          if (!merged.some(m => m.id === loc.id || m.slug === loc.slug)) {
+            merged.push(loc);
+          }
+        });
+        blogWriteLocal(merged);
+        renderAdminBlogTab(true);
+        if (!silent) {
+          showNotification('📊 Real-time view counts & articles synced from database!', 'success');
+        }
+      }
+    } catch (err) {
+      console.warn('[syncAdminBlogPostsFromCloud] Note:', err.message);
+    } finally {
+      _isSyncingBlog = false;
+      if (btnRefresh) {
+        btnRefresh.disabled = false;
+        btnRefresh.innerHTML = '<i aria-hidden="true" class="fa-solid fa-arrows-rotate"></i> Refresh Views';
+      }
+    }
+  }
+
+  // Cross-tab real-time blog views listener
+  try {
+    const blogBc = new BroadcastChannel('pragyan_portal_sync');
+    blogBc.addEventListener('message', (e) => {
+      if (e.data && e.data.type === 'BLOG_VIEWS_UPDATED' && e.data.slug) {
+        const posts = blogReadLocal();
+        const target = posts.find(p => p.slug === e.data.slug);
+        if (target) {
+          target.views_count = Math.max(Number(target.views_count) || 0, Number(e.data.count) || 0);
+          blogWriteLocal(posts);
+          const pane = document.getElementById('adminTabPane-blog');
+          if (pane && (pane.classList.contains('active') || pane.style.display !== 'none')) {
+            renderAdminBlogTab(true);
+          }
+        }
+      }
+    });
+  } catch (_) {}
+
+  function renderAdminBlogTab(fromSync = false) {
     const pane = document.getElementById('adminTabPane-blog');
     if (!pane) return;
 
@@ -12216,11 +12301,14 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
       <div class="dash-card">
         <div class="dash-card-header">
           <h3 class="dash-card-title"><i aria-hidden="true" class="fa-solid fa-feather-pointed"></i> Article Manager</h3>
-          <div style="display:flex; gap:0.6rem; align-items:center;">
+          <div style="display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap;">
             <label for="blogAdminFilter" class="sr-only">Filter articles</label>
             <select id="blogAdminFilter" style="min-height:38px; padding:0.4rem 0.7rem; border-radius:8px; border:1px solid var(--border-sand); font-weight:600;">
               ${filterOptions.map(o => `<option value="${o[0]}" ${blogAdminFilter === o[0] ? 'selected' : ''}>${o[1]}</option>`).join('')}
             </select>
+            <button type="button" class="btn btn-outline" id="btnRefreshBlogViews" style="min-height:38px; padding:0.4rem 0.85rem; display:inline-flex; align-items:center; gap:0.4rem; font-weight:600;" title="Sync real-time article views and database changes">
+              <i aria-hidden="true" class="fa-solid fa-arrows-rotate"></i> Refresh Views
+            </button>
             <button type="button" class="btn btn-emerald" id="btnNewBlogPost" style="padding:0.55rem 1.1rem;">
               <i aria-hidden="true" class="fa-solid fa-plus"></i> New Article
             </button>
@@ -12267,6 +12355,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
       blogAdminFilter = e.target.value;
       renderAdminBlogTab();
     });
+    pane.querySelector('#btnRefreshBlogViews')?.addEventListener('click', () => syncAdminBlogPostsFromCloud(false));
     pane.querySelector('#btnNewBlogPost')?.addEventListener('click', () => openBlogEditor(null));
     pane.querySelector('[data-blog-edit="new"]')?.addEventListener('click', () => openBlogEditor(null));
 
@@ -12321,6 +12410,23 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
         }
       });
     });
+
+    // If not triggered from sync, start background cloud sync to ensure view counts are real-time
+    if (!fromSync) {
+      syncAdminBlogPostsFromCloud(true);
+
+      // Auto-poll real-time views every 15s while on the blog tab
+      if (_blogTabSyncInterval) clearInterval(_blogTabSyncInterval);
+      _blogTabSyncInterval = setInterval(() => {
+        const activePane = document.getElementById('adminTabPane-blog');
+        if (activePane && (activePane.classList.contains('active') || activePane.style.display !== 'none')) {
+          syncAdminBlogPostsFromCloud(true);
+        } else {
+          clearInterval(_blogTabSyncInterval);
+          _blogTabSyncInterval = null;
+        }
+      }, 15000);
+    }
   }
   /* -- Blog editor modal ------------------------------------------------------ */
   function openBlogEditor(post) {
@@ -12492,6 +12598,10 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
       const publishNow = mode === 'publish';
       const plainForExcerpt = blogStripMarkdown(bodyMd);
 
+      // Preserve live database view counts
+      const existingLive = blogReadLocal().find(x => x.id === values.id || x.slug === slug);
+      const preservedViews = Math.max(Number(existingLive?.views_count) || 0, Number(values.views_count) || 0);
+
       const payload = {
         id: values.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : undefined),
         slug,
@@ -12505,7 +12615,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
         author_role: AppState.currentUser && AppState.currentUser.role || 'Science Lead & Head Admin',
         is_published: publishNow,
         read_time_minutes: md.estimateReadingMinutes(bodyMd),
-        views_count: values.views_count,
+        views_count: preservedViews,
         published_at: values.published_at || (publishNow ? new Date().toISOString() : null),
         updated_at: new Date().toISOString(),
         created_at: values.created_at || new Date().toISOString()

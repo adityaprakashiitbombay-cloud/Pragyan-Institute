@@ -1442,7 +1442,7 @@ END;
 $fn$;
 
 REVOKE ALL ON FUNCTION public.increment_blog_views(text) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.increment_blog_views(text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.increment_blog_views(text) TO service_role, anon, authenticated;
 
 -- Canonical Preloaded Articles (Editable & Deletable by Admin)
 INSERT INTO public.blog_posts (id, slug, title, excerpt, content_markdown, category, tags, author_name, author_role, is_published, read_time_minutes, views_count, published_at)

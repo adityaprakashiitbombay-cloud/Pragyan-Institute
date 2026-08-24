@@ -1550,7 +1550,7 @@ function openBlogReader(slug) {
   overlay.querySelector('.blog-reader-close').addEventListener('click', closeBlogReader);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) closeBlogReader(); });
 
-  // View counter: optimistic display + local persistence + atomic server increment + grid badge sync
+  // View counter: optimistic display + local persistence + atomic server increment + grid badge sync + cross-tab broadcast
   const viewsEl = overlay.querySelector('[data-live-views]');
   post.views_count = (Number(post.views_count) || 0) + 1;
   saveBlogViewsMap(post.slug, post.views_count);
@@ -1563,14 +1563,42 @@ function openBlogReader(slug) {
   if (viewsEl) viewsEl.textContent = Number(post.views_count).toLocaleString('en-IN');
   updateGridBadges(post.views_count);
 
+  // Cross-tab real-time notification
+  try {
+    const bc = new BroadcastChannel('pragyan_portal_sync');
+    bc.postMessage({ type: 'BLOG_VIEWS_UPDATED', slug: post.slug, count: post.views_count });
+    bc.close();
+  } catch (_) {}
+
   blogApiPost({ operation: 'rpc', fn: 'increment_blog_views', params: { p_slug: post.slug } })
     .then(json => {
       if (json && json.success && json.data != null) {
         const liveCount = Number(json.data);
-        post.views_count = liveCount;
-        saveBlogViewsMap(post.slug, liveCount);
-        if (viewsEl) viewsEl.textContent = liveCount.toLocaleString('en-IN');
-        updateGridBadges(liveCount);
+        if (liveCount > 0) {
+          post.views_count = liveCount;
+          saveBlogViewsMap(post.slug, liveCount);
+          if (viewsEl) viewsEl.textContent = liveCount.toLocaleString('en-IN');
+          updateGridBadges(liveCount);
+
+          // Update blog master store for seamless sync to admin portal
+          try {
+            const raw = localStorage.getItem('pragyan_db_blog_master');
+            if (raw) {
+              const posts = JSON.parse(raw);
+              const target = posts.find(p => p.slug === post.slug || p.id === post.id);
+              if (target) {
+                target.views_count = liveCount;
+                localStorage.setItem('pragyan_db_blog_master', JSON.stringify(posts));
+              }
+            }
+          } catch (_) {}
+
+          try {
+            const bc = new BroadcastChannel('pragyan_portal_sync');
+            bc.postMessage({ type: 'BLOG_VIEWS_UPDATED', slug: post.slug, count: liveCount });
+            bc.close();
+          } catch (_) {}
+        }
       }
     })
     .catch(() => {});
