@@ -451,7 +451,8 @@ export default async function handler(req, res) {
       }
       // Widen child-table scoping to every identifier form the student's rows
       // may carry (6-digit id + UUID). `students` itself keys on the canonical id.
-      if (table !== 'students' && table !== 'admins') {
+      // Public tables (notices, batches, etc.) do not have student_id.
+      if (table !== 'students' && table !== 'admins' && !PUBLIC_TABLES.has(table)) {
         const scopeIds = await resolveStudentScope(supabase, session.sub);
         filters.where = { ...filters.where, student_id: scopeIds };
       }

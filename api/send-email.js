@@ -256,13 +256,15 @@ export default async function handler(req, res) {
       return res.status(200).json({
         success: true,
         quota: {
-          limit: quota.daily_limit || DAILY_EMAIL_LIMIT,
-          sent: quota.sent_count || 0,
-          pending: quota.pending_count || 0,
-          failed: quota.failed_count || 0,
-          remaining: quota.remaining || 0,
-          dayKey: quota.day_key,
-          canSend: quota.can_send
+          limit: quota?.limit ?? DAILY_EMAIL_LIMIT,
+          used: quota?.used ?? 0,
+          remaining: quota?.remaining ?? 0,
+          day: quota?.day ?? null,
+          breakdown: quota?.breakdown ?? {},
+          // Aliases for compatibility
+          daily_limit: quota?.limit ?? DAILY_EMAIL_LIMIT,
+          sent: quota?.used ?? 0,
+          canSend: (quota?.remaining ?? 0) > 0
         }
       });
     } catch (err) {
@@ -285,7 +287,10 @@ export default async function handler(req, res) {
 
   const { to, subject, html, text, student_id, category: rawCat } = req.body || {};
 
-  if (!to || typeof to !== 'string' || !EMAIL_PATTERN.test(to.trim())) {
+  const toList = Array.isArray(to) ? to : (typeof to === 'string' ? [to] : []);
+  const cleanTo = toList.map(e => String(e || '').trim()).filter(e => EMAIL_PATTERN.test(e));
+
+  if (!cleanTo.length) {
     return res.status(400).json({ success: false, error: 'Valid recipient email (to) is required' });
   }
   if (!subject || typeof subject !== 'string' || !subject.trim()) {
@@ -316,10 +321,9 @@ export default async function handler(req, res) {
   let reservation = null;
   try {
     reservation = await reserveQuota({
-      recipient: to.trim().toLowerCase(),
-      studentId: targetStudent,
       category,
-      isCritical: CRITICAL_CATEGORIES.has(category)
+      recipients: cleanTo,
+      reference: targetStudent ? `STUDENT-${targetStudent}` : null
     });
   } catch (err) {
     if (err instanceof EmailQuotaUnavailableError) {
@@ -328,57 +332,61 @@ export default async function handler(req, res) {
     return res.status(500).json({ success: false, error: 'Quota reservation failed: ' + err.message });
   }
 
-  if (!reservation.granted) {
+  if (!reservation || !Array.isArray(reservation.granted) || reservation.granted.length === 0) {
     return res.status(429).json({
       success: false,
-      error: reservation.message || 'Daily email quota exhausted (100/day limit reached)',
+      error: 'Daily email quota exhausted (100/day limit reached)',
       quota: {
-        sent: reservation.sentCount,
-        remaining: reservation.remaining,
-        dayKey: reservation.dayKey
+        limit: reservation?.limit ?? DAILY_EMAIL_LIMIT,
+        used: reservation?.used_before ?? 0,
+        remaining: reservation?.remaining_after ?? 0,
+        day: reservation?.day ?? null
       }
     });
   }
 
+  const grantedRecipients = reservation.granted.map(g => g.recipient);
+  const dispatchIds = reservation.granted.map(g => g.dispatch_id).filter(id => Number.isFinite(Number(id)));
+  const targetEmail = grantedRecipients[0];
   let sendResult = null;
   let finalStatus = 'failed';
   try {
     sendResult = await sendEmailViaResend({
       apiKey,
       from: fromAddress,
-      to: [to.trim()],
+      to: [targetEmail],
       subject: subject.trim(),
       html: html || undefined,
       text: text || undefined
     });
     finalStatus = statusForSendResult(sendResult);
   } catch (err) {
-    sendResult = { ok: false, status: 500, error: err.message };
+    sendResult = { success: false, error: { message: err.message } };
     finalStatus = 'failed';
   }
 
   try {
-    await settleQuota({
-      dispatchId: reservation.dispatchId,
-      status: finalStatus,
-      messageId: sendResult.id || null,
-      errorMessage: extractResendErrorMessage(sendResult)
+    await settleQuota(dispatchIds, finalStatus, {
+      messageId: sendResult?.data?.id || null,
+      error: sendResult?.success ? null : extractResendErrorMessage(sendResult?.error)
     });
   } catch (settleErr) {
     console.error('Failed to settle email dispatch quota:', settleErr.message);
   }
 
-  if (!sendResult.ok) {
+  if (!sendResult?.success) {
     return res.status(502).json({
       success: false,
-      error: `Email delivery failed: ${extractResendErrorMessage(sendResult)}`,
-      dispatchId: reservation.dispatchId
+      error: `Email delivery failed: ${extractResendErrorMessage(sendResult?.error)}`,
+      dispatchId: dispatchIds[0] || null,
+      dispatchIds
     });
   }
 
   return res.status(200).json({
     success: true,
-    messageId: sendResult.id,
-    dispatchId: reservation.dispatchId
+    messageId: sendResult?.data?.id || null,
+    dispatchId: dispatchIds[0] || null,
+    dispatchIds
   });
 }

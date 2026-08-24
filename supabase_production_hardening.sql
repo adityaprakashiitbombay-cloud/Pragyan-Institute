@@ -748,9 +748,10 @@ LANGUAGE sql SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $fn$
   UPDATE public.fee_billing_ledger
-     SET email_sent_at      = CASE WHEN p_success THEN now() ELSE NULL END,
+     SET email_sent_at      = CASE WHEN p_success THEN COALESCE(email_sent_at, now()) ELSE email_sent_at END,
          resend_message_id  = COALESCE(p_message_id, resend_message_id),
-         email_error        = CASE WHEN p_success THEN NULL ELSE p_error END
+         email_error        = CASE WHEN p_success THEN NULL ELSE COALESCE(p_error, email_error) END,
+         updated_at         = now()
    WHERE id = p_ledger_id;
 $fn$;
 
@@ -1180,6 +1181,25 @@ BEGIN
   RETURN v_count;
 END;
 $fn$;
+
+-- Compatibility view: fee_email_log aliasing email_dispatch_log
+CREATE OR REPLACE VIEW public.fee_email_log AS
+  SELECT
+    id,
+    COALESCE(reference, dedupe_key, 'EMAIL-' || id::text) AS ref_key,
+    COALESCE(settled_at, created_at) AS sent_at,
+    status,
+    error AS error_message,
+    jsonb_build_object(
+      'recipient', recipient,
+      'category', category,
+      'dispatch_day', dispatch_day,
+      'provider_message_id', provider_message_id,
+      'reference', reference,
+      'dedupe_key', dedupe_key
+    ) AS metadata
+  FROM public.email_dispatch_log;
+
 
 -- ============================================================================
 -- 12. BATCH CATALOGUE -- the 12 canonical batches

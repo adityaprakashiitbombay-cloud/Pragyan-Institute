@@ -19,9 +19,10 @@ import { runVipPassCardTests } from '../tests/vip-pass-card.test.js';
 import { runClassScheduleTests } from '../tests/class-schedule.test.js';
 import { runStudentFeeViewTests } from '../tests/student-fee-view.test.js';
 import { runBatchManagementTests } from '../tests/batch-management.test.js';
+import { runFeeLedgerEmailTests } from '../tests/fee-ledger-email.test.js';
 
 console.log('================================================================');
-console.log('   PRAGYAN INSTITUTE — T1 TO T33 MASTER TEST RUNNER & AUDIT     ');
+console.log('   PRAGYAN INSTITUTE — T1 TO T34 MASTER TEST RUNNER & AUDIT     ');
 console.log('================================================================\n');
 
 let pass = 0;
@@ -908,6 +909,14 @@ runStudentFeeViewTests(assert);
 // -----------------------------------------------------------------------------
 console.log('\n--- [T33] Batches & Course Master Management Suite ---');
 runBatchManagementTests(assert);
+
+// -----------------------------------------------------------------------------
+// T34 — Fee Billing Ledger & Email Dispatch Log Suite. Covers schema,
+// atomic RPCs (claim/settle/apply), send-email parameter and quota contracts,
+// gateway public table safety, and client log integration.
+// -----------------------------------------------------------------------------
+console.log('\n--- [T34] Fee Billing Ledger & Email Dispatch Log Suite ---');
+await runFeeLedgerEmailTests(assert);
 
 console.log('\n================================================================');
 console.log(`MASTER TEST RESULTS: ${pass} Passed, ${fail} Failed`);
