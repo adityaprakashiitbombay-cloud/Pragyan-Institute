@@ -749,6 +749,7 @@ $fn$;
 -- amount from new_data->>'amount', but pay.html writes it to
 -- new_data.paymentDetails.amount, so every online payment approval failed with
 -- "Invalid payment amount". This version accepts both shapes.
+DROP FUNCTION IF EXISTS public.approve_payment_request(text, text, boolean);
 DROP FUNCTION IF EXISTS public.approve_payment_request(text, text);
 DROP FUNCTION IF EXISTS public.approve_payment_request(text);
 
@@ -1283,7 +1284,7 @@ DECLARE fn text;
 BEGIN
   FOREACH fn IN ARRAY ARRAY[
     'public.apply_monthly_fee(text, text, numeric, text)',
-    'public.approve_payment_request(text, text)',
+    'public.approve_payment_request(text, text, boolean)',
     'public.generate_next_student_id(text)',
     'public.claim_ledger_email(uuid, integer)',
     'public.settle_ledger_email(uuid, boolean, text, text)',
