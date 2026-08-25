@@ -2036,36 +2036,40 @@
     color: var(--secondary-sage-text) !important;
   }
 
-  /* Batches Section on Mobile: Smooth swipeable tabs, centered billing toggle, and luxurious cards */
+  /* Batches Section on Mobile: Symmetrical 2-Column Grid with Hero 'All Batches' pill */
   .tabs-container {
-    display: flex !important;
-    justify-content: flex-start !important;
-    overflow-x: auto !important;
-    -webkit-overflow-scrolling: touch !important;
-    scroll-snap-type: x mandatory !important;
-    margin-left: -1rem !important;
-    margin-right: -1rem !important;
-    padding: 0.35rem 1rem 0.85rem 1rem !important;
-    gap: 0.6rem !important;
-    margin-bottom: 1.5rem !important;
-    scrollbar-width: none !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.55rem !important;
+    width: 100% !important;
+    max-width: 520px !important;
+    margin: 0 auto 1.5rem auto !important;
+    padding: 0 !important;
+    overflow-x: visible !important;
   }
   .tabs-container::-webkit-scrollbar {
     display: none !important;
   }
   .tab-btn {
-    scroll-snap-align: center !important;
+    width: 100% !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
     white-space: nowrap !important;
-    padding: 0.55rem 1.15rem !important;
+    padding: 0.6rem 0.75rem !important;
     font-size: 0.88rem !important;
     font-weight: 700 !important;
-    flex-shrink: 0 !important;
     min-height: 44px !important;
     border-radius: var(--radius-full) !important;
     border: 1.5px solid var(--border-sand) !important;
     background: var(--bg-surface-cream, #F4EFEA) !important;
     color: var(--text-charcoal) !important;
     transition: all 0.2s ease !important;
+    box-sizing: border-box !important;
+  }
+  .tab-btn[data-class="all"] {
+    grid-column: 1 / -1 !important;
   }
   .tab-btn.active {
     background: var(--primary-terracotta) !important;
