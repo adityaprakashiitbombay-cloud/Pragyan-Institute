@@ -4724,14 +4724,21 @@ function renderStudentDashboard() {
         </div>
       </div>
 
-      <div class="dash-card">
-        <div class="dash-card-header">
-          <div class="dash-card-title"><i aria-hidden="true" class="fa-solid fa-file-invoice-dollar"></i> Audited Fee Statement &amp; Transaction History</div>
-          ${s.pendingFee > 0 ? `
-            <a href="${payUrl}" target="_blank" class="btn btn-emerald btn-dash-pay-online" style="padding: 0.45rem 1.15rem; font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.45rem;">
-              <i aria-hidden="true" class="fa-solid fa-bolt"></i> Pay Online via UPI
-            </a>
-          ` : '<span class="status-badge status-paid"><i aria-hidden="true" class="fa-solid fa-check-double"></i> All Fees Cleared</span>'}
+      <div class="dash-card fee-statement-dash-card">
+        <div class="dash-card-header fee-statement-card-header">
+          <div class="fee-statement-title-wrap">
+            <div class="dash-card-title"><i aria-hidden="true" class="fa-solid fa-file-invoice-dollar"></i> Audited Fee Statement &amp; Transaction History</div>
+            <span class="fee-statement-ledger-tag">
+              <i aria-hidden="true" class="fa-solid fa-shield-halved"></i> Institutional Ledger Verified
+            </span>
+          </div>
+          <div class="fee-statement-header-action">
+            ${s.pendingFee > 0 ? `
+              <a href="${payUrl}" target="_blank" class="btn btn-emerald btn-dash-pay-online">
+                <i aria-hidden="true" class="fa-solid fa-bolt"></i> Pay Online via UPI
+              </a>
+            ` : '<span class="status-badge status-paid"><i aria-hidden="true" class="fa-solid fa-check-double"></i> All Fees Cleared</span>'}
+          </div>
         </div>
 
         <!-- Desktop Table View (visible on screen > 768px) -->
