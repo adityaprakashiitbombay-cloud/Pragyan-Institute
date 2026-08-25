@@ -296,6 +296,7 @@ a:not(.btn-terracotta):not(.btn-emerald):focus-visible,
   background: linear-gradient(135deg, #B45309 0%, #F59E0B 25%, #FFFBEB 50%, #F59E0B 75%, #92400E 100%);
   background-size: 200% auto;
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
   animation: textShimmer 4.5s linear infinite;
   display: inline-block;
@@ -305,6 +306,7 @@ a:not(.btn-terracotta):not(.btn-emerald):focus-visible,
   background: linear-gradient(135deg, #064E3B 0%, #059669 25%, #ECFDF5 50%, #059669 75%, #064E3B 100%);
   background-size: 200% auto;
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
   animation: textShimmer 5s linear infinite;
   display: inline-block;

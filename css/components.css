@@ -273,6 +273,7 @@
   color: #B5543A;
   background: linear-gradient(135deg, #B5543A 0%, #C2410C 50%, #9A3412 100%);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
   position: relative;
   display: inline-block;
@@ -2814,6 +2815,7 @@
   margin: 0;
   display: -webkit-box;
   -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -3115,6 +3117,7 @@
     font-size: 0.88rem;
     line-height: 1.5;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
   }
   .blog-foot {
     font-size: 0.82rem;
