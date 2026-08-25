@@ -257,14 +257,14 @@
       }, delay);
     },
 
-    // Adaptive polling: 60s when Realtime WebSocket is active, 30s when disconnected/polling fallback
+    // Adaptive polling: 30s when Realtime WebSocket is active, 15s when disconnected/polling fallback
     _resetPollTimer() {
       if (this.pollTimer) {
         clearInterval(this.pollTimer);
         this.pollTimer = null;
       }
       if (typeof document !== 'undefined' && document.hidden) return; // Do not poll when tab is backgrounded
-      const interval = this._realtimeSubscribed ? 60000 : 30000;
+      const interval = this._realtimeSubscribed ? 30000 : 15000;
       this._pollIntervalMs = interval;
       this.pollTimer = window.setInterval(() => {
         if (typeof document !== 'undefined' && !document.hidden) {
@@ -377,10 +377,12 @@
             // _realtimeSubscribed stayed true, so the badge kept claiming
             // "Cloud synced" and polling stayed on the slow 60s cadence.
             if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-              console.warn(`[SupabaseSync] Realtime ${status} — falling back to polling`);
+              console.warn(`[SupabaseSync] Realtime ${status} — using active polling`);
               this._realtimeSubscribed = false;
               this._realtimeChannel = null;
-              this.updateStatus('local');
+              if (this._connected) {
+                this.updateStatus('synced');
+              }
               this._resetPollTimer();
             }
           });
@@ -550,12 +552,24 @@
         }, 5000); // 5 seconds per page
 
         try {
-          // Row scoping (student role) is enforced server-side by the gateway;
-          // the legacy extraQuery filter string is no longer needed here.
-          const page = await this._apiDb(table, 'select', {
-            filters: { limit: pageSize, offset },
-            options: { signal: pageAbortController.signal }
-          });
+          // Primary path: Authenticated database gateway (/api/db)
+          let page = null;
+          try {
+            page = await this._apiDb(table, 'select', {
+              filters: { limit: pageSize, offset },
+              options: { signal: pageAbortController.signal }
+            });
+          } catch (apiErr) {
+            // Direct REST fallback for public catalogue if gateway is unreachable (e.g. preview host / local dev)
+            const isPublicTable = table === 'notices' || table === 'batches' || table === 'blog_posts' || table === 'class_schedules' || table === 'institute_holidays';
+            if (isPublicTable) {
+              const orderCol = ORDER_COLUMNS[table] || 'created_at';
+              const query = `limit=${pageSize}&offset=${offset}&order=${orderCol}.desc`;
+              page = await this._rest('GET', table, query, null, {}, { signal: pageAbortController.signal });
+            } else {
+              throw apiErr;
+            }
+          }
           clearTimeout(pageTimeout);
 
           if (!Array.isArray(page) || page.length === 0) break;

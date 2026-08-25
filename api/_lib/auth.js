@@ -49,16 +49,20 @@ const DEV_ORIGINS = [
 // deploy still echoed Access-Control-Allow-Origin: http://localhost:8080 with
 // credentials — anything a developer happened to be running locally could read
 // an authenticated response. They are now gated on the same check as the regex.
-function allowedOrigins() {
-  return process.env.NODE_ENV === 'production'
-    ? PRODUCTION_ORIGINS
-    : PRODUCTION_ORIGINS.concat(DEV_ORIGINS);
+const VERCEL_ORIGIN = /^https:\/\/[a-zA-Z0-9_-]+\.vercel\.app$/i;
+
+function isOriginAllowed(origin) {
+  if (!origin) return false;
+  if (PRODUCTION_ORIGINS.includes(origin)) return true;
+  if (VERCEL_ORIGIN.test(origin)) return true;
+  if (process.env.NODE_ENV !== 'production' && (DEV_ORIGINS.includes(origin) || LOOPBACK_ORIGIN.test(origin))) return true;
+  return false;
 }
 
 export function applyCors(req, res) {
   const origin = req.headers.origin;
 
-  if (origin && allowedOrigins().includes(origin)) {
+  if (origin && isOriginAllowed(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
   } else if (origin && process.env.NODE_ENV !== 'production' && LOOPBACK_ORIGIN.test(origin)) {
