@@ -622,6 +622,8 @@ $fn$;
 --
 -- LOCK ORDER (project-wide invariant): student_requests -> students -> child
 -- tables. Both money-moving RPCs obey it, so they cannot deadlock each other.
+DROP FUNCTION IF EXISTS public.apply_monthly_fee CASCADE;
+DROP FUNCTION IF EXISTS apply_monthly_fee CASCADE;
 DROP FUNCTION IF EXISTS public.apply_monthly_fee(text, text, numeric, text);
 DROP FUNCTION IF EXISTS public.apply_monthly_fee(text, text, numeric);
 
@@ -771,6 +773,8 @@ $fn$;
 -- amount from new_data->>'amount', but pay.html writes it to
 -- new_data.paymentDetails.amount, so every online payment approval failed with
 -- "Invalid payment amount". This version accepts both shapes.
+DROP FUNCTION IF EXISTS public.approve_payment_request CASCADE;
+DROP FUNCTION IF EXISTS approve_payment_request CASCADE;
 DROP FUNCTION IF EXISTS public.approve_payment_request(text, text, boolean);
 DROP FUNCTION IF EXISTS public.approve_payment_request(text, text);
 DROP FUNCTION IF EXISTS public.approve_payment_request(text);
