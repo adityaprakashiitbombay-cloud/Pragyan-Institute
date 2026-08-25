@@ -47,11 +47,11 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
   <!-- CSS Design System -->
-  <link rel="stylesheet" href="./css/variables.css?v=90.0.f6167c09">
-  <link rel="stylesheet" href="./css/main.css?v=90.0.f6167c09">
-  <link rel="stylesheet" href="./css/components.css?v=90.0.f6167c09">
-  <link rel="stylesheet" href="./css/animations.css?v=90.0.f6167c09">
-  <link rel="stylesheet" href="./css/portal.css?v=90.0.f6167c09">
+  <link rel="stylesheet" href="./css/variables.css?v=90.0.9d93de49">
+  <link rel="stylesheet" href="./css/main.css?v=90.0.9d93de49">
+  <link rel="stylesheet" href="./css/components.css?v=90.0.9d93de49">
+  <link rel="stylesheet" href="./css/animations.css?v=90.0.9d93de49">
+  <link rel="stylesheet" href="./css/portal.css?v=90.0.9d93de49">
 
   <!-- Schema.org JSON-LD Structured Data for Google Top Ranking & Knowledge Graph -->
   <script type="application/ld+json">
@@ -195,7 +195,6 @@
         <li><a href="#batches">Batches & Fees</a></li>
         <li><a href="#gallery">Photo Gallery</a></li>
         <li><a href="#contact">Contact</a></li>
-        <li><a href="#portal" class="open-portal-trigger" data-portal-tab="community"><i aria-hidden="true" class="fa-solid fa-comments"></i> Community</a></li>
       </ul>
 
       <div class="nav-actions">
@@ -231,7 +230,6 @@
       <li><a href="#batches">Batches & Fees</a></li>
       <li><a href="#gallery">Photo Gallery</a></li>
       <li><a href="#contact">Contact</a></li>
-      <li><a href="#portal" class="open-portal-trigger" data-portal-tab="community"><i class="fa-solid fa-comments" aria-hidden="true"></i> Community Forum</a></li>
     </ul>
   </div>
 
@@ -1540,24 +1538,24 @@
   <!-- Application Scripts -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
-  <script defer src="./js/config.js?v=90.0.f6167c09"></script>
+  <script defer src="./js/config.js?v=90.0.9d93de49"></script>
   <!-- Canonical batch/fee/faculty table. Must load before app.js and portal.js,
        which read window.PRAGYAN_ACADEMIC instead of keeping their own copies. -->
-  <script defer src="./js/academic-config.js?v=90.0.f6167c09"></script>
-  <script defer src="./js/supabase-sync.js?v=90.0.f6167c09"></script>
-  <script type="module" src="./js/blog-markdown.js?v=90.0.f6167c09"></script>
+  <script defer src="./js/academic-config.js?v=90.0.9d93de49"></script>
+  <script defer src="./js/supabase-sync.js?v=90.0.9d93de49"></script>
+  <script type="module" src="./js/blog-markdown.js?v=90.0.9d93de49"></script>
         <script src="https://cdn.jsdelivr.net/npm/stream-chat@8.52.0/dist/browser.full-bundle.min.js"></script>
-        <script defer src="./js/stream-community-chat.js?v=90.0.f6167c09"></script>
-  <script defer src="./js/push-client.js?v=90.0.f6167c09"></script>
-  <script defer src="./js/chat.js?v=90.0.f6167c09"></script>
-  <script defer src="./js/app.js?v=90.0.f6167c09"></script>
-  <script defer src="./js/portal.js?v=90.0.f6167c09"></script>
+        <script defer src="./js/stream-community-chat.js?v=90.0.9d93de49"></script>
+  <script defer src="./js/push-client.js?v=90.0.9d93de49"></script>
+  <script defer src="./js/chat.js?v=90.0.9d93de49"></script>
+  <script defer src="./js/app.js?v=90.0.9d93de49"></script>
+  <script defer src="./js/portal.js?v=90.0.9d93de49"></script>
 
   <!-- PWA Service Worker Registration for Instant Offline Caching -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=90.0.f6167c09').then(reg => {
+        navigator.serviceWorker.register('./sw.js?v=90.0.9d93de49').then(reg => {
           reg.update().catch(() => {});
         }).catch(err => console.log('SW reg error:', err));
       });

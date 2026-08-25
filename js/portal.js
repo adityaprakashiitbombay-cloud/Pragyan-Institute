@@ -3117,10 +3117,9 @@ const supaPayload = pushableReqs.map(r => ({
 
       // Only open portal if URL hash specifically requests it
       const hash = window.location.hash;
-      const wantsPortalByHash = hash === '#portal' || hash === '#login' || hash === '#community' || hash === '#forum';
+      const wantsPortalByHash = hash === '#portal' || hash === '#login';
       if (wantsPortalByHash) {
-        const targetTab = (hash === '#community' || hash === '#forum') ? 'community' : null;
-        openPortal(targetTab);
+        openPortal();
       }
     }
   }
