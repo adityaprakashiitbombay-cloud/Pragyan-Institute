@@ -66,4 +66,18 @@ export function runClassScheduleTests(assert) {
     'T31.19: js/supabase-sync.js normalizes class_schedules and institute_holidays in updateLocalState');
   assert(syncJs.includes('normalizeSchedule(s)') && syncJs.includes('normalizeHoliday(h)'),
     'T31.20: js/supabase-sync.js defines normalizeSchedule and normalizeHoliday helper methods');
+
+  // --- 8. Cross-Device Sync, Mutate Mapping & Modal Edit Capabilities ---
+  assert(dbJs.includes("table === 'class_schedules' || table === 'institute_holidays'") && dbJs.includes("filters.conflict = 'id'"),
+    'T31.21: api/db.js defaults upsert conflict to id for class_schedules and institute_holidays');
+  assert(syncJs.includes("table === 'class_schedules'") && syncJs.includes("rowObj.batch_id = rowObj.batchId"),
+    'T31.22: js/supabase-sync.js mutate() normalizes class_schedules fields to snake_case');
+  assert(syncJs.includes("table === 'institute_holidays'") && syncJs.includes("rowObj.start_date = rowObj.startDate"),
+    'T31.23: js/supabase-sync.js mutate() normalizes institute_holidays fields to snake_case');
+  assert(portalJs.includes('btn-edit-holiday') && portalJs.includes('openAddHolidayModal(holiday)'),
+    'T31.24: js/portal.js provides edit button and handler for institute holidays');
+  assert(portalJs.includes('resolvedBatchObj?.batchId') && portalJs.includes('studentBatchKey'),
+    'T31.25: js/portal.js renderStudentBatchTab resolves exact batch ID and category key for student timetable');
+  assert(portalJs.includes("SupabaseSync.mutate('class_schedules', 'delete'") && portalJs.includes("SupabaseSync.mutate('institute_holidays', 'delete'"),
+    'T31.26: js/portal.js syncs schedule and holiday deletions directly to Supabase cloud database');
 }

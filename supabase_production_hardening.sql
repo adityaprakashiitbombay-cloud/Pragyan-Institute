@@ -1838,7 +1838,7 @@ SELECT tablename FROM pg_tables WHERE schemaname='public'
 -- ═══════════════════════════════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS public.class_schedules (
-  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id            text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   batch_id      text NOT NULL,
   day_of_week   text NOT NULL,
   subject       text NOT NULL,
@@ -1853,7 +1853,7 @@ CREATE TABLE IF NOT EXISTS public.class_schedules (
 );
 
 CREATE TABLE IF NOT EXISTS public.institute_holidays (
-  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id            text PRIMARY KEY DEFAULT gen_random_uuid()::text,
   title         text NOT NULL,
   start_date    date NOT NULL,
   end_date      date NOT NULL,
@@ -1865,6 +1865,10 @@ CREATE TABLE IF NOT EXISTS public.institute_holidays (
 
 CREATE INDEX IF NOT EXISTS idx_class_schedules_batch_day ON public.class_schedules(batch_id, day_of_week, sort_order);
 CREATE INDEX IF NOT EXISTS idx_institute_holidays_dates ON public.institute_holidays(start_date, end_date);
+
+-- Ensure primary key columns are text for cross-platform string and uuid ID compatibility
+ALTER TABLE public.class_schedules ALTER COLUMN id TYPE text;
+ALTER TABLE public.institute_holidays ALTER COLUMN id TYPE text;
 
 ALTER TABLE public.class_schedules ADD COLUMN IF NOT EXISTS batch_id text;
 ALTER TABLE public.class_schedules ADD COLUMN IF NOT EXISTS day_of_week text;

@@ -2294,7 +2294,7 @@
       try {
         if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate && Array.isArray(schedules) && schedules.length > 0) {
           const payload = schedules.map(s => ({
-            id: s.id || `SCHED-${s.batch_id || 'BAT-01'}-${(s.day_of_week || 'MON').slice(0,3).toUpperCase()}-${s.sort_order || 1}`,
+            id: String(s.id || `SCHED-${s.batch_id || s.batchId || 'BAT-10'}-${(s.day_of_week || s.dayOfWeek || 'MON').slice(0,3).toUpperCase()}-${s.sort_order || s.sortOrder || 1}`),
             batch_id: s.batch_id || s.batchId || 'BAT-10',
             day_of_week: s.day_of_week || s.dayOfWeek || 'Monday',
             subject: s.subject || 'Lecture',
@@ -2302,8 +2302,8 @@
             end_time: s.end_time || s.endTime || '05:00 PM',
             teacher: s.teacher || 'Faculty',
             room: s.room || 'Classroom 1',
-            is_cancelled: !!s.is_cancelled,
-            sort_order: Number(s.sort_order) || 1
+            is_cancelled: !!(s.is_cancelled || s.isCancelled),
+            sort_order: Number(s.sort_order || s.sortOrder) || 1
           }));
           const r = await SupabaseSync.mutate('class_schedules', 'upsert', payload, { conflict: 'id' });
           if (!r?.success) console.warn('saveClassSchedules cloud write note:', r?.error);
@@ -2329,7 +2329,7 @@
       try {
         if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate && Array.isArray(holidays) && holidays.length > 0) {
           const payload = holidays.map(h => ({
-            id: h.id || `HOL-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            id: String(h.id || `HOL-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`),
             title: h.title || 'Holiday',
             start_date: h.start_date || h.startDate || new Date().toISOString().split('T')[0],
             end_date: h.end_date || h.endDate || new Date().toISOString().split('T')[0],
@@ -4317,25 +4317,26 @@ function renderStudentDashboard() {
     if (!pane || !s) return;
 
     const batches = AppState.getBatches();
-    const studentBatch = s.batchName || s.className || '';
+    const studentBatch = s.batchName || s.className || s.class_name || '';
 
     const studentBatchKey = getBatchCategoryKey(studentBatch);
+    const resolvedBatchObj = (typeof ACADEMIC !== 'undefined' && ACADEMIC.resolveBatch) ? ACADEMIC.resolveBatch(studentBatch) : null;
     const myBatch = batches.find(b => {
-      const bKey = getBatchCategoryKey(b.name || b.batch_name || b.className || b.id || '');
+      const bKey = getBatchCategoryKey(b.name || b.batch_name || b.className || b.id || b.batch_id || b.batchId || '');
       return bKey && (bKey === studentBatchKey);
-    }) || batches[0] || {};
+    }) || resolvedBatchObj || batches[0] || {};
 
-    const batchId = myBatch.id || myBatch.batch_id || (typeof ACADEMIC !== 'undefined' && ACADEMIC.resolveBatch ? (ACADEMIC.resolveBatch(studentBatch)?.id || 'BAT-10') : 'BAT-10');
-    const canonicalOwn = ACADEMIC ? ACADEMIC.resolveBatch(batchId || studentBatch || '') : null;
-    const batchName    = myBatch.name || myBatch.batch_name || studentBatch || 'Your Batch';
-    const batchTiming  = myBatch.timing || myBatch.timings || 'Contact Institute';
-    const batchRoom    = myBatch.room || myBatch.room_no || 'As allotted';
+    const batchId = myBatch.batchId || myBatch.batch_id || myBatch.id || resolvedBatchObj?.batchId || resolvedBatchObj?.id || studentBatchKey || 'BAT-10';
+    const canonicalOwn = resolvedBatchObj || (ACADEMIC ? ACADEMIC.resolveBatch(batchId || studentBatch || '') : null);
+    const batchName    = myBatch.name || myBatch.batch_name || (canonicalOwn ? canonicalOwn.name : studentBatch) || 'Your Batch';
+    const batchTiming  = myBatch.timing || myBatch.timings || (canonicalOwn ? canonicalOwn.timing : 'Contact Institute') || 'Contact Institute';
+    const batchRoom    = myBatch.room || myBatch.room_no || (canonicalOwn ? canonicalOwn.room : 'As allotted') || 'As allotted';
     const batchFee     = Number(myBatch.monthlyFee ?? myBatch.monthly_fee) || (canonicalOwn ? canonicalOwn.monthlyFee : 0);
     const batchTeacher = myBatch.teacher
       || (canonicalOwn ? canonicalOwn.teachers.map(titleCaseName).join(' & ') : 'Faculty Mentors');
 
     const teacherList = batchTeacher.split(/[&,]/).map(t => t.trim()).filter(Boolean);
-    const enrolledInBatchCount = AppState.getStudents().filter(st => getBatchCategoryKey(st.className || st.batchName || '') === studentBatchKey).length;
+    const enrolledInBatchCount = AppState.getStudents().filter(st => getBatchCategoryKey(st.className || st.batchName || st.class_name || '') === studentBatchKey).length;
 
     // Determine current day in IST
     const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -4352,8 +4353,11 @@ function renderStudentDashboard() {
     const allHolidays = AppState.getInstituteHolidays ? AppState.getInstituteHolidays() : [];
     const todayDateStr = new Date().toISOString().split('T')[0];
     const activeHolidays = allHolidays.filter(h => {
-      const target = (h.target_batch || h.targetBatch || 'ALL').toUpperCase();
-      const matchBatch = target === 'ALL' || target === (batchId || '').toUpperCase() || target === (studentBatchKey || '').toUpperCase();
+      const target = (h.target_batch || h.targetBatch || 'ALL').trim().toUpperCase();
+      const matchBatch = target === 'ALL' ||
+                         target === (batchId || '').toUpperCase() ||
+                         target === (studentBatchKey || '').toUpperCase() ||
+                         getBatchCategoryKey(target) === studentBatchKey;
       const sDate = h.start_date || h.startDate || '';
       const eDate = h.end_date || h.endDate || sDate;
       return matchBatch && sDate <= todayDateStr && todayDateStr <= eDate;
@@ -4362,7 +4366,12 @@ function renderStudentDashboard() {
     // Fetch dynamic schedules from database / AppState
     const allSchedules = AppState.getClassSchedules ? AppState.getClassSchedules() : [];
     let daySchedules = allSchedules.filter(sch => {
-      const matchB = (sch.batch_id || sch.batchId) === batchId || getBatchCategoryKey(sch.batch_id || '') === studentBatchKey;
+      const schB = (sch.batch_id || sch.batchId || '').trim();
+      const matchB = (schB === batchId) ||
+                     (schB === studentBatchKey) ||
+                     (getBatchCategoryKey(schB) === studentBatchKey) ||
+                     (schB.toLowerCase() === (studentBatch || '').toLowerCase()) ||
+                     (schB.toLowerCase() === (batchId || '').toLowerCase());
       const matchD = (sch.day_of_week || sch.dayOfWeek || '').toLowerCase() === currentSelectedDay.toLowerCase();
       return matchB && matchD;
     });
@@ -4380,8 +4389,8 @@ function renderStudentDashboard() {
         isCancelled: !!sch.is_cancelled
       }));
     } else if (currentSelectedDay !== 'Sunday') {
-      const subjectList = BATCH_SUBJECTS[studentBatchKey] || [];
-      const slotList = BATCH_SLOTS[studentBatchKey] || [];
+      const subjectList = BATCH_SUBJECTS[studentBatchKey] || BATCH_SUBJECTS[batchId] || [];
+      const slotList = BATCH_SLOTS[studentBatchKey] || BATCH_SLOTS[batchId] || [];
       renderedScheduleItems = subjectList.map((subject, i) => ({
         subject,
         time: slotList[i] || batchTiming,
@@ -14280,9 +14289,10 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
               <label for="periodFormBatch" style="font-weight:700; font-size:0.85rem; color:var(--text-mahogany); display:block; margin-bottom:0.3rem;">Target Batch</label>
               <select id="periodFormBatch" class="form-input" aria-label="Target Batch" style="width:100%; padding:0.5rem; border-radius:8px;" required>
                 ${batches.map(b => {
-                  const bId = b.id || b.batch_id;
+                  const bId = b.batchId || b.id || b.batch_id;
                   const bName = b.name || b.batch_name || bId;
-                  const sel = isEdit ? ((existingPeriod.batch_id || existingPeriod.batchId) === bId) : (bId === activeAdminScheduleBatchId);
+                  const curBatch = existingPeriod ? (existingPeriod.batch_id || existingPeriod.batchId) : activeAdminScheduleBatchId;
+                  const sel = (bId === curBatch || getBatchCategoryKey(bId) === getBatchCategoryKey(curBatch));
                   return `<option value="${escapeHtml(bId)}" ${sel ? 'selected' : ''}>${escapeHtml(bName)} (${escapeHtml(bId)})</option>`;
                 }).join('')}
               </select>
@@ -14293,14 +14303,15 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
                 <label for="periodFormDay" style="font-weight:700; font-size:0.85rem; color:var(--text-mahogany); display:block; margin-bottom:0.3rem;">Day of Week</label>
                 <select id="periodFormDay" class="form-input" aria-label="Day of Week" style="width:100%; padding:0.5rem; border-radius:8px;" required>
                   ${daysOfWeek.map(d => {
-                    const sel = isEdit ? ((existingPeriod.day_of_week || existingPeriod.dayOfWeek || '').toLowerCase() === d.toLowerCase()) : (d.toLowerCase() === activeAdminScheduleDay.toLowerCase());
+                    const curDay = existingPeriod ? (existingPeriod.day_of_week || existingPeriod.dayOfWeek || '') : activeAdminScheduleDay;
+                    const sel = (d.toLowerCase() === curDay.toLowerCase());
                     return `<option value="${d}" ${sel ? 'selected' : ''}>${d}</option>`;
                   }).join('')}
                 </select>
               </div>
               <div>
                 <label for="periodFormSort" style="font-weight:700; font-size:0.85rem; color:var(--text-mahogany); display:block; margin-bottom:0.3rem;">Sort / Period #</label>
-                <input type="number" id="periodFormSort" class="form-input" aria-label="Sort or Period Number" style="width:100%; padding:0.5rem; border-radius:8px;" min="1" max="10" value="${existingPeriod?.sort_order || 1}" required />
+                <input type="number" id="periodFormSort" class="form-input" aria-label="Sort or Period Number" style="width:100%; padding:0.5rem; border-radius:8px;" min="1" max="10" value="${existingPeriod?.sort_order || existingPeriod?.sortOrder || 1}" required />
               </div>
             </div>
 
@@ -14312,11 +14323,11 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
               <div>
                 <label for="periodFormStartTime" style="font-weight:700; font-size:0.85rem; color:var(--text-mahogany); display:block; margin-bottom:0.3rem;">Start Time</label>
-                <input type="text" id="periodFormStartTime" class="form-input" aria-label="Start Time" style="width:100%; padding:0.5rem; border-radius:8px;" placeholder="e.g. 04:00 PM" value="${escapeHtml(existingPeriod?.start_time || '04:00 PM')}" required />
+                <input type="text" id="periodFormStartTime" class="form-input" aria-label="Start Time" style="width:100%; padding:0.5rem; border-radius:8px;" placeholder="e.g. 04:00 PM" value="${escapeHtml(existingPeriod?.start_time || existingPeriod?.startTime || '04:00 PM')}" required />
               </div>
               <div>
                 <label for="periodFormEndTime" style="font-weight:700; font-size:0.85rem; color:var(--text-mahogany); display:block; margin-bottom:0.3rem;">End Time</label>
-                <input type="text" id="periodFormEndTime" class="form-input" aria-label="End Time" style="width:100%; padding:0.5rem; border-radius:8px;" placeholder="e.g. 05:00 PM" value="${escapeHtml(existingPeriod?.end_time || '05:00 PM')}" required />
+                <input type="text" id="periodFormEndTime" class="form-input" aria-label="End Time" style="width:100%; padding:0.5rem; border-radius:8px;" placeholder="e.g. 05:00 PM" value="${escapeHtml(existingPeriod?.end_time || existingPeriod?.endTime || '05:00 PM')}" required />
               </div>
             </div>
 
@@ -14327,12 +14338,12 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
               </div>
               <div>
                 <label for="periodFormRoom" style="font-weight:700; font-size:0.85rem; color:var(--text-mahogany); display:block; margin-bottom:0.3rem;">Classroom / Hall</label>
-                <input type="text" id="periodFormRoom" class="form-input" aria-label="Classroom or Hall" style="width:100%; padding:0.5rem; border-radius:8px;" placeholder="e.g. Room 1" value="${escapeHtml(existingPeriod?.room || 'Main Hall')}" />
+                <input type="text" id="periodFormRoom" class="form-input" aria-label="Classroom or Hall" style="width:100%; padding:0.5rem; border-radius:8px;" placeholder="e.g. Classroom 1" value="${escapeHtml(existingPeriod?.room || 'Main Hall')}" />
               </div>
             </div>
 
             <div style="display:flex; align-items:center; gap:0.6rem; padding:0.5rem; background:#FAF9F6; border-radius:8px;">
-              <input type="checkbox" id="periodFormIsCancelled" aria-label="Mark as Cancelled or Class Off" style="width:18px; height:18px; cursor:pointer;" ${existingPeriod?.is_cancelled ? 'checked' : ''} />
+              <input type="checkbox" id="periodFormIsCancelled" aria-label="Mark as Cancelled or Class Off" style="width:18px; height:18px; cursor:pointer;" ${(existingPeriod?.is_cancelled || existingPeriod?.isCancelled) ? 'checked' : ''} />
               <label for="periodFormIsCancelled" style="font-size:0.88rem; font-weight:700; color:#DC2626; cursor:pointer;">
                 Mark as Cancelled / Class Off for this period
               </label>
@@ -14369,36 +14380,70 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
       const room = modalEl.querySelector('#periodFormRoom').value.trim();
       const is_cancelled = modalEl.querySelector('#periodFormIsCancelled').checked;
 
-      if (isEdit) {
-        const idx = allSchedules.findIndex(p => p.id === existingPeriod.id);
+      if (isEdit && existingPeriod) {
+        const targetId = String(existingPeriod.id || '');
+        const idx = allSchedules.findIndex(p => String(p.id) === targetId);
         if (idx !== -1) {
           allSchedules[idx] = {
             ...allSchedules[idx],
             batch_id,
+            batchId: batch_id,
             day_of_week,
+            dayOfWeek: day_of_week,
             sort_order,
+            sortOrder: sort_order,
             subject,
             start_time,
+            startTime: start_time,
             end_time,
+            endTime: end_time,
             teacher,
             room,
             is_cancelled,
+            isCancelled: is_cancelled,
             updated_at: new Date().toISOString()
           };
+        } else {
+          allSchedules.push({
+            id: existingPeriod.id || `SCHED-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            batch_id,
+            batchId: batch_id,
+            day_of_week,
+            dayOfWeek: day_of_week,
+            sort_order,
+            sortOrder: sort_order,
+            subject,
+            start_time,
+            startTime: start_time,
+            end_time,
+            endTime: end_time,
+            teacher,
+            room,
+            is_cancelled,
+            isCancelled: is_cancelled,
+            updated_at: new Date().toISOString()
+          });
         }
       } else {
         allSchedules.push({
           id: `SCHED-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           batch_id,
+          batchId: batch_id,
           day_of_week,
+          dayOfWeek: day_of_week,
           sort_order,
+          sortOrder: sort_order,
           subject,
           start_time,
+          startTime: start_time,
           end_time,
+          endTime: end_time,
           teacher,
           room,
           is_cancelled,
-          created_at: new Date().toISOString()
+          isCancelled: is_cancelled,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         });
       }
 
@@ -14408,7 +14453,8 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
     });
   }
 
-  function openAddHolidayModal() {
+  function openAddHolidayModal(existingHoliday = null) {
+    const isEdit = !!existingHoliday;
     const modalId = 'adminAddHolidayModal';
     const existingModal = document.getElementById(modalId);
     if (existingModal) existingModal.remove();
@@ -14421,7 +14467,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
         <div class="inner-modal-content" style="background:#fff; border-radius:14px; max-width:480px; width:100%; max-height:90vh; overflow-y:auto; padding:1.5rem; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
           <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #E5E7EB; padding-bottom:0.75rem; margin-bottom:1.25rem;">
             <h4 style="font-weight:800; font-size:1.15rem; color:#92400E; margin:0;">
-              🏖️ Declare Official Holiday / Break
+              ${isEdit ? '✏️ Edit Official Holiday / Break' : '🏖️ Declare Official Holiday / Break'}
             </h4>
             <button type="button" id="btnCloseHolidayModal" class="btn" aria-label="Close dialog" style="background:none; border:none; font-size:1.2rem; cursor:pointer; color:var(--text-muted);">&times;</button>
           </div>
@@ -14429,41 +14475,42 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
           <form id="formAddHoliday" style="display:flex; flex-direction:column; gap:1rem;">
             <div>
               <label for="holidayFormTitle" style="font-weight:700; font-size:0.85rem; color:var(--text-mahogany); display:block; margin-bottom:0.3rem;">Holiday / Vacation Title</label>
-              <input type="text" id="holidayFormTitle" class="form-input" aria-label="Holiday Title" style="width:100%; padding:0.5rem; border-radius:8px;" placeholder="e.g. Diwali Break, Holi Festival, Independence Day" required />
+              <input type="text" id="holidayFormTitle" class="form-input" aria-label="Holiday Title" style="width:100%; padding:0.5rem; border-radius:8px;" placeholder="e.g. Diwali Break, Holi Festival, Independence Day" value="${escapeHtml(existingHoliday?.title || '')}" required />
             </div>
 
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
               <div>
                 <label for="holidayFormStartDate" style="font-weight:700; font-size:0.85rem; color:var(--text-mahogany); display:block; margin-bottom:0.3rem;">Start Date</label>
-                <input type="date" id="holidayFormStartDate" class="form-input" aria-label="Start Date" style="width:100%; padding:0.5rem; border-radius:8px;" value="${todayStr}" required />
+                <input type="date" id="holidayFormStartDate" class="form-input" aria-label="Start Date" style="width:100%; padding:0.5rem; border-radius:8px;" value="${existingHoliday?.start_date || existingHoliday?.startDate || todayStr}" required />
               </div>
               <div>
                 <label for="holidayFormEndDate" style="font-weight:700; font-size:0.85rem; color:var(--text-mahogany); display:block; margin-bottom:0.3rem;">End Date</label>
-                <input type="date" id="holidayFormEndDate" class="form-input" aria-label="End Date" style="width:100%; padding:0.5rem; border-radius:8px;" value="${todayStr}" required />
+                <input type="date" id="holidayFormEndDate" class="form-input" aria-label="End Date" style="width:100%; padding:0.5rem; border-radius:8px;" value="${existingHoliday?.end_date || existingHoliday?.endDate || existingHoliday?.start_date || existingHoliday?.startDate || todayStr}" required />
               </div>
             </div>
 
             <div>
               <label for="holidayFormBatch" style="font-weight:700; font-size:0.85rem; color:var(--text-mahogany); display:block; margin-bottom:0.3rem;">Target Batch Scope</label>
               <select id="holidayFormBatch" class="form-input" aria-label="Target Batch Scope" style="width:100%; padding:0.5rem; border-radius:8px;">
-                <option value="ALL">🌐 All Batches (Entire Institute Closed)</option>
+                <option value="ALL" ${(existingHoliday?.target_batch === 'ALL' || !existingHoliday?.target_batch) ? 'selected' : ''}>🌐 All Batches (Entire Institute Closed)</option>
                 ${batches.map(b => {
-                  const bId = b.id || b.batch_id;
+                  const bId = b.batchId || b.id || b.batch_id;
                   const bName = b.name || b.batch_name || bId;
-                  return `<option value="${escapeHtml(bId)}">🎓 ${escapeHtml(bName)} (${escapeHtml(bId)}) Only</option>`;
+                  const sel = isEdit && (existingHoliday.target_batch === bId || existingHoliday.targetBatch === bId);
+                  return `<option value="${escapeHtml(bId)}" ${sel ? 'selected' : ''}>🎓 ${escapeHtml(bName)} (${escapeHtml(bId)}) Only</option>`;
                 }).join('')}
               </select>
             </div>
 
             <div>
               <label for="holidayFormDesc" style="font-weight:700; font-size:0.85rem; color:var(--text-mahogany); display:block; margin-bottom:0.3rem;">Description / Notice</label>
-              <textarea id="holidayFormDesc" class="form-input" aria-label="Holiday Description" rows="2" style="width:100%; padding:0.5rem; border-radius:8px;" placeholder="e.g. Institute will remain closed on account of festival celebrations. Regular classes resume Monday."></textarea>
+              <textarea id="holidayFormDesc" class="form-input" aria-label="Holiday Description" rows="2" style="width:100%; padding:0.5rem; border-radius:8px;" placeholder="e.g. Institute will remain closed on account of festival celebrations. Regular classes resume Monday.">${escapeHtml(existingHoliday?.description || '')}</textarea>
             </div>
 
             <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:0.5rem; border-top:1px solid #E5E7EB; padding-top:1rem;">
               <button type="button" id="btnCancelHolidayModal" class="btn" style="background:#F3F4F6; color:var(--text-mahogany); font-weight:700; border-radius:8px; padding:0.5rem 1rem;">Cancel</button>
               <button type="submit" class="btn" style="background:#D97706; color:#fff; font-weight:700; border-radius:8px; padding:0.5rem 1.25rem;">
-                <i aria-hidden="true" class="fa-solid fa-cloud-arrow-up"></i> Publish Holiday
+                <i aria-hidden="true" class="fa-solid fa-cloud-arrow-up"></i> ${isEdit ? 'Save Holiday Changes' : 'Publish Holiday'}
               </button>
             </div>
           </form>
@@ -14487,15 +14534,51 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
       const target_batch = modalEl.querySelector('#holidayFormBatch').value;
       const description = modalEl.querySelector('#holidayFormDesc').value.trim();
 
-      allHolidays.push({
-        id: `HOL-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        title,
-        start_date,
-        end_date,
-        target_batch,
-        description,
-        created_at: new Date().toISOString()
-      });
+      if (isEdit && existingHoliday) {
+        const targetId = String(existingHoliday.id || '');
+        const idx = allHolidays.findIndex(h => String(h.id) === targetId);
+        if (idx !== -1) {
+          allHolidays[idx] = {
+            ...allHolidays[idx],
+            title,
+            start_date,
+            startDate: start_date,
+            end_date,
+            endDate: end_date,
+            target_batch,
+            targetBatch: target_batch,
+            description,
+            updated_at: new Date().toISOString()
+          };
+        } else {
+          allHolidays.push({
+            id: existingHoliday.id || `HOL-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            title,
+            start_date,
+            startDate: start_date,
+            end_date,
+            endDate: end_date,
+            target_batch,
+            targetBatch: target_batch,
+            description,
+            updated_at: new Date().toISOString()
+          });
+        }
+      } else {
+        allHolidays.push({
+          id: `HOL-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          title,
+          start_date,
+          startDate: start_date,
+          end_date,
+          endDate: end_date,
+          target_batch,
+          targetBatch: target_batch,
+          description,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+      }
 
       await AppState.saveInstituteHolidays(allHolidays);
       dialog.close();
@@ -14708,9 +14791,12 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
                   </div>
                   ${h.description ? `<div style="font-size:0.8rem; color:#475569; margin-top:0.4rem; font-style:italic;">"${escapeHtml(h.description)}"</div>` : ''}
                 </div>
-                <div style="display:flex; justify-content:flex-end; border-top:1px dashed #FDE68A; padding-top:0.6rem; margin-top:0.6rem;">
+                <div style="display:flex; justify-content:flex-end; gap:0.5rem; border-top:1px dashed #FDE68A; padding-top:0.6rem; margin-top:0.6rem;">
+                  <button type="button" class="btn btn-sm btn-edit-holiday" data-id="${escapeHtml(h.id)}" aria-label="Edit holiday" style="background:#FEF3C7; color:#92400E; border:1px solid #FDE68A; font-weight:700; border-radius:6px; padding:0.25rem 0.6rem; font-size:0.78rem;">
+                    <i aria-hidden="true" class="fa-solid fa-pen-to-square"></i> Edit
+                  </button>
                   <button type="button" class="btn btn-sm btn-delete-holiday" data-id="${escapeHtml(h.id)}" aria-label="Remove holiday" style="background:#FEF2F2; color:#DC2626; border:1px solid #FECACA; font-weight:700; border-radius:6px; padding:0.25rem 0.6rem; font-size:0.78rem;">
-                    <i aria-hidden="true" class="fa-solid fa-trash"></i> Remove Holiday
+                    <i aria-hidden="true" class="fa-solid fa-trash"></i> Remove
                   </button>
                 </div>
               </div>
@@ -14760,20 +14846,43 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
 
     // Edit Period
     pane.querySelectorAll('.btn-edit-period').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const pId = btn.dataset.id;
-        const period = allSchedules.find(p => p.id === pId);
-        if (period) openAddEditPeriodModal(period);
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const pId = String(btn.dataset.id || '');
+        const allSchedules = AppState.getClassSchedules ? AppState.getClassSchedules() : [];
+        const period = allSchedules.find(p => String(p.id) === pId) || currentPeriods.find(p => String(p.id) === pId);
+        if (period) {
+          openAddEditPeriodModal(period);
+        } else {
+          console.warn('Period not found for ID:', pId);
+        }
+      });
+    });
+
+    // Edit Holiday
+    pane.querySelectorAll('.btn-edit-holiday').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const hId = String(btn.dataset.id || '');
+        const allHolidays = AppState.getInstituteHolidays ? AppState.getInstituteHolidays() : [];
+        const holiday = allHolidays.find(h => String(h.id) === hId);
+        if (holiday) openAddHolidayModal(holiday);
       });
     });
 
     // Toggle Single Period Off
     pane.querySelectorAll('.btn-toggle-period-off').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const pId = btn.dataset.id;
-        const period = allSchedules.find(p => p.id === pId);
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const pId = String(btn.dataset.id || '');
+        const allSchedules = AppState.getClassSchedules ? AppState.getClassSchedules() : [];
+        const period = allSchedules.find(p => String(p.id) === pId) || currentPeriods.find(p => String(p.id) === pId);
         if (period) {
           period.is_cancelled = !period.is_cancelled;
+          period.isCancelled = period.is_cancelled;
           await AppState.saveClassSchedules(allSchedules);
           renderAdminScheduleTab();
         }
@@ -14782,11 +14891,17 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
 
     // Delete Single Period
     pane.querySelectorAll('.btn-delete-period').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const pId = btn.dataset.id;
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const pId = String(btn.dataset.id || '');
         if (confirm('Delete this period from schedule?')) {
-          const updated = allSchedules.filter(p => p.id !== pId);
+          const allSchedules = AppState.getClassSchedules ? AppState.getClassSchedules() : [];
+          const updated = allSchedules.filter(p => String(p.id) !== pId);
           await AppState.saveClassSchedules(updated);
+          if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate && pId) {
+            SupabaseSync.mutate('class_schedules', 'delete', null, { where: { id: pId } }).catch(err => console.warn(err));
+          }
           renderAdminScheduleTab();
         }
       });
@@ -14794,11 +14909,17 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
 
     // Delete Holiday
     pane.querySelectorAll('.btn-delete-holiday').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const hId = btn.dataset.id;
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const hId = String(btn.dataset.id || '');
         if (confirm('Remove this official holiday?')) {
-          const updatedHolidays = allHolidays.filter(h => h.id !== hId);
+          const allHolidays = AppState.getInstituteHolidays ? AppState.getInstituteHolidays() : [];
+          const updatedHolidays = allHolidays.filter(h => String(h.id) !== hId);
           await AppState.saveInstituteHolidays(updatedHolidays);
+          if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate && hId) {
+            SupabaseSync.mutate('institute_holidays', 'delete', null, { where: { id: hId } }).catch(err => console.warn(err));
+          }
           renderAdminScheduleTab();
         }
       });

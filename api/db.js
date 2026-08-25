@@ -487,6 +487,7 @@ export default async function handler(req, res) {
       if (!filters.conflict) {
         if (table === 'push_subscriptions') filters.conflict = 'endpoint';
         else if (table === 'blog_posts') filters.conflict = 'slug';
+        else if (table === 'class_schedules' || table === 'institute_holidays') filters.conflict = 'id';
         else return res.status(400).json({ success: false, error: 'Missing conflict column for upsert' });
       }
       let upsertRows = rows(data);

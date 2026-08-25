@@ -946,6 +946,30 @@
             if (rowObj.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rowObj.id)) {
               delete rowObj.id;
             }
+          } else if (table === 'class_schedules') {
+            const sId = rowObj.id;
+            if (sId) changedIds.push(sId);
+            if (rowObj.batchId && !rowObj.batch_id) rowObj.batch_id = rowObj.batchId;
+            if (rowObj.dayOfWeek && !rowObj.day_of_week) rowObj.day_of_week = rowObj.dayOfWeek;
+            if (rowObj.startTime && !rowObj.start_time) rowObj.start_time = rowObj.startTime;
+            if (rowObj.endTime && !rowObj.end_time) rowObj.end_time = rowObj.endTime;
+            if (rowObj.isCancelled !== undefined && rowObj.is_cancelled === undefined) rowObj.is_cancelled = Boolean(rowObj.isCancelled);
+            if (rowObj.sortOrder !== undefined && rowObj.sort_order === undefined) rowObj.sort_order = Number(rowObj.sortOrder);
+            delete rowObj.batchId;
+            delete rowObj.dayOfWeek;
+            delete rowObj.startTime;
+            delete rowObj.endTime;
+            delete rowObj.isCancelled;
+            delete rowObj.sortOrder;
+          } else if (table === 'institute_holidays') {
+            const hId = rowObj.id;
+            if (hId) changedIds.push(hId);
+            if (rowObj.startDate && !rowObj.start_date) rowObj.start_date = rowObj.startDate;
+            if (rowObj.endDate && !rowObj.end_date) rowObj.end_date = rowObj.endDate;
+            if (rowObj.targetBatch && !rowObj.target_batch) rowObj.target_batch = rowObj.targetBatch;
+            delete rowObj.startDate;
+            delete rowObj.endDate;
+            delete rowObj.targetBatch;
           } else if (rowObj.id) {
             changedIds.push(rowObj.id);
           }
