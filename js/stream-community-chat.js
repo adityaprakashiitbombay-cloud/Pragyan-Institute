@@ -735,18 +735,10 @@
 
       currentUser = { id: tokenData.userId, name: tokenData.userName, role: tokenData.userRole };
 
-      // Connect user if not connected
+      // Connect user using authenticated user ID token
+      // Passing { id: tokenData.userId } directly avoids Stream WS code 6 username collisions
       if (!client.userID) {
-        try {
-          await client.connectUser(currentUser, tokenData.token);
-        } catch (connErr) {
-          console.warn('[StreamChat] connectUser with metadata failed, attempting id-only connect:', connErr.message);
-          if (connErr.message && (connErr.message.includes('already exist') || connErr.message.includes('UpdateUsers') || connErr.message.includes('code 6'))) {
-            await client.connectUser({ id: tokenData.userId }, tokenData.token);
-          } else {
-            throw connErr;
-          }
-        }
+        await client.connectUser({ id: tokenData.userId }, tokenData.token);
       }
 
       await setupChannels();
