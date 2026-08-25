@@ -9958,60 +9958,95 @@ button, a, input, select, textarea {
 }
 
 .stream-msg-row.mine .stream-msg-bubble {
-  border-bottom-right-radius: 2px !important;
+  border-bottom-right-radius: 3px !important;
 }
 
 .stream-msg-row.theirs .stream-msg-bubble {
-  border-bottom-left-radius: 2px !important;
+  border-bottom-left-radius: 3px !important;
+}
+
+.stream-ch-pill:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+.stream-ch-pill:active {
+  transform: translateY(0);
+}
+
+.stream-cat-pill:hover {
+  border-color: var(--primary-emerald, #064E3B) !important;
+  color: var(--primary-emerald, #064E3B) !important;
+}
+
+@media (min-width: 900px) {
+  .desktop-banner-stats {
+    display: block !important;
+  }
 }
 
 @media (max-width: 768px) {
   .stream-chat-wrapper {
-    height: calc(100dvh - 130px) !important;
+    height: calc(100dvh - 120px) !important;
     max-height: none !important;
-    border-radius: 8px !important;
+    border-radius: 10px !important;
     margin: 0 -0.25rem;
   }
   
-  .stream-header-bar {
-    padding: 0.5rem 0.65rem !important;
+  .stream-top-bar {
+    padding: 0.5rem 0.75rem !important;
+  }
+
+  .stream-active-banner {
+    padding: 0.6rem 0.75rem !important;
+    gap: 0.5rem !important;
   }
   
-  .stream-pills-scroll {
+  .stream-channels-scroll-wrap {
+    padding: 0.45rem 0.65rem !important;
     gap: 0.35rem !important;
   }
   
   .stream-ch-pill {
-    font-size: 0.75rem !important;
-    padding: 0.3rem 0.65rem !important;
-    min-height: 32px !important;
+    font-size: 0.76rem !important;
+    padding: 0.35rem 0.7rem !important;
+    min-height: 34px !important;
+  }
+
+  .stream-cat-bar {
+    padding: 0.4rem 0.65rem !important;
+    gap: 0.3rem !important;
+  }
+
+  .stream-cat-pill {
+    font-size: 0.72rem !important;
+    padding: 0.2rem 0.55rem !important;
   }
   
   #stream-msg-list {
-    padding: 0.75rem 0.65rem !important;
-    gap: 0.5rem !important;
+    padding: 0.85rem 0.65rem !important;
   }
   
   .stream-msg-bubble {
-    font-size: 0.86rem !important;
-    padding: 0.55rem 0.75rem !important;
+    font-size: 0.88rem !important;
+    padding: 0.6rem 0.85rem !important;
   }
   
   #stream-chat-form {
-    padding: 0.5rem 0.65rem !important;
+    padding: 0.55rem 0.65rem !important;
     gap: 0.4rem !important;
   }
   
   #stream-msg-input {
     font-size: 16px !important;
-    min-height: 42px !important;
-    padding: 0.45rem 0.7rem !important;
+    min-height: 44px !important;
+    padding: 0.5rem 0.75rem !important;
   }
   
   #btn-stream-send {
-    padding: 0.45rem 0.85rem !important;
-    min-height: 42px !important;
-    font-size: 0.84rem !important;
+    padding: 0.5rem 0.95rem !important;
+    min-height: 44px !important;
+    font-size: 0.85rem !important;
   }
   
   #btn-stream-send span {
