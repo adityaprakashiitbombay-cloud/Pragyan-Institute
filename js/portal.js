@@ -86,7 +86,7 @@
 
 
   // Core Feature Flags
-  const ENABLE_COMMUNITY_CHAT = false;
+  const ENABLE_COMMUNITY_CHAT = true;
 
   // Input Sanitizer & HTML Escaper for XSS Protection
   function sanitizeInput(str) {

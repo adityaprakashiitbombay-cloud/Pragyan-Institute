@@ -9909,4 +9909,16 @@ button, a, input, select, textarea {
 
 
 
-
+
+
+/* ── Stream Community Chat ────────────────────────────────────────────────── */
+.stream-ch-pill:hover { background: rgba(255,255,255,.2) !important; }
+.stream-ch-pill.active { box-shadow: 0 2px 8px rgba(16,185,129,.4); }
+#stream-msg-list::-webkit-scrollbar { width: 6px; }
+#stream-msg-list::-webkit-scrollbar-thumb { background: var(--border-sand,#DDD5CD); border-radius: 3px; }
+#stream-msg-input:focus { border-color: var(--primary-emerald); outline: none; }
+@media (max-width: 768px) {
+  #stream-msg-list { padding: .85rem !important; }
+  #stream-chat-form { padding: .6rem .7rem !important; }
+  .stream-ch-pill { font-size: .76rem !important; padding: .35rem .65rem !important; }
+}
