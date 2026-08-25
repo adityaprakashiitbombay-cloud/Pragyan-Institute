@@ -1198,8 +1198,14 @@ END;
 $fn$;
 
 -- Compatibility view: fee_email_log aliasing email_dispatch_log
-DROP TABLE IF EXISTS public.fee_email_log CASCADE;
-DROP VIEW IF EXISTS public.fee_email_log CASCADE;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_views WHERE schemaname = 'public' AND viewname = 'fee_email_log') THEN
+    EXECUTE 'DROP VIEW public.fee_email_log CASCADE';
+  ELSIF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'fee_email_log') THEN
+    EXECUTE 'DROP TABLE public.fee_email_log CASCADE';
+  END IF;
+END $$;
 CREATE OR REPLACE VIEW public.fee_email_log AS
   SELECT
     id,
