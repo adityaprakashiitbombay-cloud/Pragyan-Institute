@@ -3635,7 +3635,7 @@ function renderStudentDashboard() {
             <div class="metallic-id-header">
               <div class="metallic-id-brand">
                 <img src="assets/images/logo.png" class="metallic-id-logo" alt="Pragyan Institute Logo">
-                <div>
+                <div class="metallic-id-brand-text">
                   <div class="metallic-id-inst-name">PRAGYAN INSTITUTE</div>
                   <div class="metallic-id-inst-sub">Lalganj • Institutional Student Pass</div>
                 </div>
@@ -3662,7 +3662,7 @@ function renderStudentDashboard() {
                   </div>
                   <div class="metallic-nfc-wave" title="Contactless NFC Digital ID"><i aria-hidden="true" class="fa-solid fa-wifi"></i></div>
                 </div>
-                <h3>${sanitizeInput(s.name)}</h3>
+                <h3 class="metallic-student-name">${sanitizeInput(s.name)}</h3>
                 <div class="metallic-pills-row">
                   <span class="metallic-id-chip"><i aria-hidden="true" class="fa-solid fa-id-badge"></i> ID: ${s.student_id || s.rollNo || s.id}</span>
                   <span class="metallic-class-tag"><i aria-hidden="true" class="fa-solid fa-graduation-cap"></i> ${sanitizeInput(s.className)}</span>
@@ -3671,10 +3671,10 @@ function renderStudentDashboard() {
             </div>
 
             <div class="metallic-id-details-row">
-              <div><span>Roll:</span> <strong>#${s.rollNo}</strong></div>
-              <div><span>DOB:</span> <strong>${formatDate(s.dob)}</strong></div>
-              <div><span>Contact:</span> <strong>${sanitizeInput(s.mobile)}</strong></div>
-              <div><span>Guardian:</span> <strong>${sanitizeInput(s.guardianName || 'Parent/Guardian')}</strong></div>
+              <div class="detail-cell"><span class="detail-k">Roll:</span> <strong class="detail-v">#${s.rollNo}</strong></div>
+              <div class="detail-cell"><span class="detail-k">DOB:</span> <strong class="detail-v">${formatDate(s.dob)}</strong></div>
+              <div class="detail-cell"><span class="detail-k">Contact:</span> <strong class="detail-v">${sanitizeInput(s.mobile)}</strong></div>
+              <div class="detail-cell"><span class="detail-k">Guardian:</span> <strong class="detail-v">${sanitizeInput(s.guardianName || 'Parent/Guardian')}</strong></div>
             </div>
 
             <div class="metallic-credential-highlight-strip">
@@ -3687,7 +3687,7 @@ function renderStudentDashboard() {
               </div>
               <div class="metallic-credential-strip-right">
                 <span class="metallic-strip-label">Session:</span>
-                <strong>2026–2027</strong>
+                <strong class="metallic-strip-session-val">2026–2027</strong>
               </div>
             </div>
 
@@ -3699,16 +3699,16 @@ function renderStudentDashboard() {
             </div>
           </div>
 
-          <!-- BACK FACE: Official Student Credentials & Signatures -->
+          <!-- BACK FACE: Official Academic Quote, Institutional Creed & Signatures -->
           <div class="card-face card-face-back">
             <div class="metallic-card-glimmer"></div>
 
             <div class="metallic-id-header">
               <div class="metallic-id-brand">
                 <img src="assets/images/logo.png" class="metallic-id-logo" alt="Pragyan Institute Logo">
-                <div>
-                  <div class="metallic-id-inst-name">STUDENT CREDENTIALS</div>
-                  <div class="metallic-id-inst-sub">Official Academic Identification Pass</div>
+                <div class="metallic-id-brand-text">
+                  <div class="metallic-id-inst-name">PRAGYAN INSTITUTE</div>
+                  <div class="metallic-id-inst-sub">Official Academic Pass &amp; Institutional Oath</div>
                 </div>
               </div>
               <div class="metallic-hologram-seal">
@@ -3716,47 +3716,31 @@ function renderStudentDashboard() {
               </div>
             </div>
 
-            <div class="back-card-content">
-              <div class="back-meta-grid-2col">
-                <div class="back-meta-item">
-                  <span class="back-label">Student ID:</span>
-                  <span class="back-val font-mono">${s.student_id || s.rollNo || s.id}</span>
+            <div class="back-card-content back-card-quote-centric">
+              <!-- Inspiring Institutional Academic Quote Hero Box -->
+              <div class="back-quote-box back-quote-box-hero">
+                <div class="quote-header-decor">
+                  <i aria-hidden="true" class="fa-solid fa-quote-left quote-icon-large"></i>
+                  <span class="quote-decor-tag">ACADEMIC MOTTO</span>
                 </div>
-                <div class="back-meta-item">
-                  <span class="back-label">Roll Number:</span>
-                  <span class="back-val">#${s.rollNo}</span>
-                </div>
-                <div class="back-meta-item">
-                  <span class="back-label">Class &amp; Batch:</span>
-                  <span class="back-val">${sanitizeInput(s.batchName || s.className)}</span>
-                </div>
-                <div class="back-meta-item">
-                  <span class="back-label">Date of Birth:</span>
-                  <span class="back-val">${formatDate(s.dob)}</span>
-                </div>
-                <div class="back-meta-item">
-                  <span class="back-label">Father / Guardian:</span>
-                  <span class="back-val">${sanitizeInput(s.guardianName || 'Parent / Guardian')}</span>
-                </div>
-                <div class="back-meta-item">
-                  <span class="back-label">Emergency Phone:</span>
-                  <span class="back-val">${sanitizeInput(s.guardianMobile || s.mobile)}</span>
-                </div>
-                <div class="back-meta-item">
-                  <span class="back-label">Blood Group:</span>
-                  <span class="back-val">${s.bloodGroup || 'Not Specified'}</span>
-                </div>
-                <div class="back-meta-item">
-                  <span class="back-label">Academic Session:</span>
-                  <span class="back-val">2026–2027</span>
+                <p class="quote-text-hero">
+                  “Education is the most powerful weapon which you can use to change the world.”
+                </p>
+                <div class="quote-author-hero">
+                  <span class="author-dash">—</span> <strong>Nelson Mandela</strong> • <span class="motto-sub">Pragyan Academic Motto</span>
                 </div>
               </div>
 
-              <!-- Inspiring Institutional Academic Quote -->
-              <div class="back-quote-box">
-                <i aria-hidden="true" class="fa-solid fa-quote-left quote-icon"></i>
-                <p class="quote-text">“Education is the most powerful weapon which you can use to change the world.”</p>
-                <div class="quote-author">— Nelson Mandela • Pragyan Academic Motto</div>
+              <!-- Institutional Creed & Privilege Notice -->
+              <div class="back-creed-strip">
+                <div class="creed-item">
+                  <i aria-hidden="true" class="fa-solid fa-star creed-star"></i>
+                  <span>Excellence in Science, Mathematics &amp; Foundation • Affiliated &amp; Approved</span>
+                </div>
+                <div class="creed-item creed-notice">
+                  <i aria-hidden="true" class="fa-solid fa-shield-check creed-check"></i>
+                  <span>Official digital credential for student privileges in Academic Session 2026–2027.</span>
+                </div>
               </div>
             </div>
 

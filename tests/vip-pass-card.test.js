@@ -34,8 +34,8 @@ export function runVipPassCardTests(assert) {
     'T30.9: portal.css styles inspiring academic quote box on card back');
   assert(portalJs.includes('Education is the most powerful weapon which you can use to change the world'),
     'T30.10: js/portal.js renders inspiring academic quote on back of student card');
-  assert(portalJs.includes('back-meta-grid-2col') && portalJs.includes('Date of Birth'),
-    'T30.11: js/portal.js renders comprehensive student details (DOB, Roll, Batch, Guardian, Mobile) on back face');
+  assert(portalJs.includes('Pragyan Academic Motto') && portalJs.includes('Institutional Oath'),
+    'T30.11: js/portal.js showcases prominent institutional quote and motto on back face');
 
   // --- 4. Back Card Signatories & Full Campus Address ---
   assert(portalCss.includes('.back-signatories-row') && portalCss.includes('.back-sign-title'),
