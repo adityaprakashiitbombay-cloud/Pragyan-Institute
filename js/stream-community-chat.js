@@ -3,11 +3,14 @@
  * ----------------------------------------------------------------------------
  * GetStream.io realtime multi-group messaging engine with dedicated class
  * channels for every batch (Class 1st to 12th + Special English + All-Institute).
- * Every chat group and participant has their own distinct identity, role badge,
- * student roll number, verified faculty credentials, and real-time communication.
+ * Uses GetStream open livestream channel architecture for universal multi-device
+ * synchronization, persistent cloud message history across page reloads and logins,
+ * verified faculty credentials, student roll identities, and live WebSockets.
  * ========================================================================== */
 (function () {
   'use strict';
+
+  const CHANNEL_TYPE = 'livestream';
 
   let client = null;
   let activeChannel = null;
@@ -16,6 +19,7 @@
   let activeChannelId = 'institute-all';
   let selectedCategory = 'ALL';
   let searchQuery = '';
+  let isListening = false;
 
   const CHANNEL_IDENTITIES = {
     'institute-all': {
@@ -253,7 +257,7 @@
 
     // 1. Institute-wide main channel
     const allMeta = CHANNEL_IDENTITIES['institute-all'];
-    const allCh = client.channel('messaging', 'institute-all', {
+    const allCh = client.channel(CHANNEL_TYPE, 'institute-all', {
       name: allMeta.name
     });
     channelsMap.set('institute-all', allCh);
@@ -263,7 +267,7 @@
       if (!isAdmin && b.batchId !== myBatch) continue;
       const chId = `batch-${b.batchId}`;
       const meta = CHANNEL_IDENTITIES[chId] || { name: b.name || b.batchId };
-      const ch = client.channel('messaging', chId, {
+      const ch = client.channel(CHANNEL_TYPE, chId, {
         name: meta.name
       });
       channelsMap.set(chId, ch);
@@ -276,11 +280,13 @@
 
     activeChannel = channelsMap.get(activeChannelId) || allCh;
 
-    // Watch the active channel immediately for instant render
+    // Watch active channel and load historical messages from Stream's database
     try {
-      await activeChannel.watch();
+      await activeChannel.watch({ state: true, presence: true });
     } catch (watchErr) {
-      console.warn('[StreamChat] Initial watch warning:', watchErr.message);
+      console.warn('[StreamChat] Initial watch note:', watchErr.message);
+      // Fallback watch without params
+      try { await activeChannel.watch(); } catch (_) {}
     }
   }
 
@@ -289,13 +295,23 @@
     activeChannelId = targetChannelId;
     activeChannel = channelsMap.get(targetChannelId);
 
-    // Watch on switch if not watched yet
+    // Show instant loading state in message feed
+    const list = container.querySelector('#stream-msg-list');
+    if (list) {
+      list.innerHTML = `
+        <div style="text-align: center; color: #64748B; margin: auto; padding: 2rem 1rem;">
+          <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 1.8rem; color: #064E3B;" aria-hidden="true"></i>
+          <p style="margin-top: 0.75rem; font-size: 0.88rem; font-weight: 700;">Loading channel messages...</p>
+        </div>
+      `;
+    }
+
+    // Always watch to fetch latest cloud messages and subscribe to real-time events
     try {
-      if (!activeChannel.state?.messages) {
-        await activeChannel.watch();
-      }
+      await activeChannel.watch({ state: true, presence: true });
     } catch (e) {
       console.warn('[StreamChat] switchChannel watch warning:', e.message);
+      try { await activeChannel.watch(); } catch (_) {}
     }
 
     renderUI(container);
@@ -438,7 +454,7 @@
 
     const activeMeta = CHANNEL_IDENTITIES[activeChannelId] || {
       id: activeChannelId,
-      name: activeChannel.data?.name || 'Class Group',
+      name: activeChannel?.data?.name || 'Class Group',
       shortName: 'Class Group',
       icon: '💬',
       category: 'General',
@@ -450,7 +466,7 @@
     };
 
     const studentCount = getStudentCountForBatch(activeMeta.batchId);
-    const onlineCount = activeChannel.state?.watcher_count || 1;
+    const onlineCount = activeChannel?.state?.watcher_count || 1;
     const categories = getCategoriesList();
 
     container.innerHTML = `
@@ -539,7 +555,7 @@
 
         <!-- MESSAGES FEED CONTAINER -->
         <div id="stream-msg-list" style="flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 1.25rem 1rem; background: #FAF9F6; display: flex; flex-direction: column;">
-          ${renderMsgList(activeChannel.state?.messages)}
+          ${renderMsgList(activeChannel?.state?.messages)}
         </div>
 
         <!-- REALTIME TYPING NOTIFIER -->
@@ -581,8 +597,8 @@
       });
     });
 
-    // 3. Realtime WebSocket Subscriptions for live updates
-    const handleUpdate = () => {
+    // 3. Helper to refresh message list
+    const refreshMsgList = () => {
       const list = container.querySelector('#stream-msg-list');
       if (list && activeChannel) {
         list.innerHTML = renderMsgList(activeChannel.state?.messages);
@@ -590,34 +606,49 @@
       }
     };
 
-    activeChannel.off('message.new');
-    activeChannel.off('message.updated');
-    activeChannel.off('message.deleted');
-    activeChannel.off('user.presence.changed');
-    activeChannel.off('typing.start');
-    activeChannel.off('typing.stop');
+    // 4. Attach client-level real-time listener (if not already listening)
+    if (client && !isListening) {
+      isListening = true;
 
-    activeChannel.on('message.new', handleUpdate);
-    activeChannel.on('message.updated', handleUpdate);
-    activeChannel.on('message.deleted', handleUpdate);
-    activeChannel.on('user.presence.changed', () => {
-      const cntEl = container.querySelector('#stream-online-count');
-      if (cntEl && activeChannel) cntEl.textContent = `${activeChannel.state?.watcher_count || 1} active now`;
-    });
+      client.on('message.new', event => {
+        if (activeChannel && (event.channel_id === activeChannel.id || event.cid === activeChannel.cid)) {
+          refreshMsgList();
+        }
+      });
 
-    // 4. Typing indicator
-    activeChannel.on('typing.start', e => {
-      if (e.user?.id !== currentUser.id) {
-        const box = container.querySelector('#stream-typing-box');
-        if (box) box.textContent = `✍️ ${escapeHtml(e.user?.name || 'Someone')} is typing in this group...`;
-      }
-    });
-    activeChannel.on('typing.stop', e => {
-      if (e.user?.id !== currentUser.id) {
-        const box = container.querySelector('#stream-typing-box');
-        if (box) box.textContent = '';
-      }
-    });
+      client.on('message.updated', event => {
+        if (activeChannel && (event.channel_id === activeChannel.id || event.cid === activeChannel.cid)) {
+          refreshMsgList();
+        }
+      });
+
+      client.on('message.deleted', event => {
+        if (activeChannel && (event.channel_id === activeChannel.id || event.cid === activeChannel.cid)) {
+          refreshMsgList();
+        }
+      });
+
+      client.on('user.presence.changed', () => {
+        const cntEl = container.querySelector('#stream-online-count');
+        if (cntEl && activeChannel) {
+          cntEl.textContent = `${activeChannel.state?.watcher_count || 1} active now`;
+        }
+      });
+
+      client.on('typing.start', e => {
+        if (e.user?.id !== currentUser.id && activeChannel && (e.channel_id === activeChannel.id || e.cid === activeChannel.cid)) {
+          const box = container.querySelector('#stream-typing-box');
+          if (box) box.textContent = `✍️ ${escapeHtml(e.user?.name || 'Someone')} is typing in this group...`;
+        }
+      });
+
+      client.on('typing.stop', e => {
+        if (e.user?.id !== currentUser.id && activeChannel && (e.channel_id === activeChannel.id || e.cid === activeChannel.cid)) {
+          const box = container.querySelector('#stream-typing-box');
+          if (box) box.textContent = '';
+        }
+      });
+    }
 
     // 5. Send message form
     const form = container.querySelector('#stream-chat-form');
@@ -640,8 +671,9 @@
 
       try {
         await activeChannel.sendMessage({ text });
-        handleUpdate();
+        refreshMsgList();
       } catch (err) {
+        console.error('[StreamChat Send Error]', err);
         alert('Failed to send message: ' + err.message);
       } finally {
         if (sendBtn) sendBtn.disabled = false;
@@ -659,7 +691,7 @@
           if (activeChannel?.state?.messages) {
             activeChannel.state.messages = activeChannel.state.messages.filter(m => m.id !== msgId);
           }
-          handleUpdate();
+          refreshMsgList();
         } catch (e) {
           alert('Delete failed: ' + e.message);
         }
@@ -680,7 +712,7 @@
       <div style="padding: 4rem 1.5rem; text-align: center; color: #64748B;">
         <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 2.5rem; color: #064E3B;" aria-hidden="true"></i>
         <p style="margin-top: 1.25rem; font-weight: 800; font-size: 1.05rem; color: #1E293B;">Connecting to Pragyan Realtime Class Gateway…</p>
-        <p style="font-size: 0.85rem; color: #64748B;">Loading live class groups, channels and messages...</p>
+        <p style="font-size: 0.85rem; color: #64748B;">Syncing live class channels and message archives from Stream cloud...</p>
       </div>
     `;
 
@@ -689,19 +721,34 @@
       if (typeof StreamChat === 'undefined') throw new Error('Stream Chat SDK failed to load.');
 
       const tokenData = await fetchToken();
-      client = StreamChat.getInstance(tokenData.apiKey);
+      
+      // Clean up previous client connection if switching accounts
+      if (client && client.userID && client.userID !== tokenData.userId) {
+        try { await client.disconnectUser(); } catch (_) {}
+        client = null;
+        isListening = false;
+      }
+
+      if (!client) {
+        client = StreamChat.getInstance(tokenData.apiKey);
+      }
+
       currentUser = { id: tokenData.userId, name: tokenData.userName, role: tokenData.userRole };
 
-      try {
-        await client.connectUser(currentUser, tokenData.token);
-      } catch (connErr) {
-        console.warn('[StreamChat] connectUser with metadata failed, attempting id-only connect:', connErr.message);
-        if (connErr.message && (connErr.message.includes('already exist') || connErr.message.includes('UpdateUsers') || connErr.message.includes('code 6'))) {
-          await client.connectUser({ id: tokenData.userId }, tokenData.token);
-        } else {
-          throw connErr;
+      // Connect user if not connected
+      if (!client.userID) {
+        try {
+          await client.connectUser(currentUser, tokenData.token);
+        } catch (connErr) {
+          console.warn('[StreamChat] connectUser with metadata failed, attempting id-only connect:', connErr.message);
+          if (connErr.message && (connErr.message.includes('already exist') || connErr.message.includes('UpdateUsers') || connErr.message.includes('code 6'))) {
+            await client.connectUser({ id: tokenData.userId }, tokenData.token);
+          } else {
+            throw connErr;
+          }
         }
       }
+
       await setupChannels();
       renderUI(containerEl);
     } catch (err) {
@@ -722,8 +769,11 @@
   }
 
   function disconnect() {
-    if (client) { client.disconnectUser(); client = null; }
-    channelsMap.clear(); activeChannel = null; currentUser = null;
+    if (client) { 
+      try { client.disconnectUser(); } catch (_) {}
+      client = null; 
+    }
+    channelsMap.clear(); activeChannel = null; currentUser = null; isListening = false;
   }
 
   // Public API
