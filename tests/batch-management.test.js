@@ -48,4 +48,11 @@ export function runBatchManagementTests(assert) {
   assert(portalJs.includes('myBatch.room'), 'T33.21: Student batch view dynamically resolves live classroom room');
   assert(portalJs.includes('myBatch.timing'), 'T33.22: Student batch view dynamically resolves live lecture timing');
   assert(portalJs.includes('myBatch.subjects'), 'T33.23: Student batch view dynamically resolves live core subjects list');
+
+  // 8. Resilient Edit Button & Modal Backdrop
+  assert(portalJs.includes('.btn-batch-edit') && portalJs.includes("btn.getAttribute('data-id')"), 'T33.24: js/portal.js wires edit details button with resilient data-id attribute reading');
+  assert(portalJs.includes('b.batchId || b.id || b.batch_id') && portalJs.includes('openAddEditBatchModal'), 'T33.25: js/portal.js matches batch identifiers across camelCase, snake_case, and category keys');
+  assert(portalJs.includes('portal-modal-backdrop') && portalJs.includes('addEditBatchModal'), 'T33.26: js/portal.js opens batch edit modal with full-screen fixed backdrop and accessible dialog');
+  assert(portalCss.includes('.btn-batch-edit') && portalCss.includes('.admin-batch-card-footer'), 'T33.27: css/portal.css defines responsive button styles for batch editing and actions');
 }
+

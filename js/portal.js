@@ -15186,8 +15186,8 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
         ` : `
           <div class="admin-batches-grid">
             ${filteredBatches.map(b => {
-              const bId = b.id || b.batch_id || '';
-              const bName = b.name || b.batch_name || b.className || 'Unnamed Batch';
+              const bId = b.batchId || b.id || b.batch_id || getBatchCategoryKey(b.name || b.className) || '';
+              const bName = b.name || b.batch_name || b.batchName || b.className || 'Unnamed Batch';
               const bClass = b.className || b.class_name || b.name || '';
               const bStream = b.stream || (bName.includes('Science') ? 'Science' : (bName.includes('Commerce') ? 'Commerce' : (bName.includes('Arts') ? 'Arts' : (bName.includes('Foundation') ? 'Foundation' : 'Academic'))));
               const bMonthlyFee = Number(b.monthlyFee ?? b.monthly_fee) || 0;
@@ -15354,15 +15354,19 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
 
     // Batch Card Action Buttons
     pane.querySelectorAll('.btn-batch-edit').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const bId = btn.dataset.id;
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const bId = btn.getAttribute('data-id') || btn.dataset.id;
         openAddEditBatchModal(bId);
       });
     });
 
     pane.querySelectorAll('.btn-batch-view-stu').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const batchName = btn.dataset.batch;
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const batchName = btn.getAttribute('data-batch') || btn.dataset.batch;
         // Switch to student directory tab and filter by this batch
         switchAdminTab('students');
         const filterSelect = document.getElementById('adminStudentClassFilter');
@@ -15374,9 +15378,11 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
     });
 
     pane.querySelectorAll('.btn-batch-delete').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const bId = btn.dataset.id;
-        const enrolled = Number(btn.dataset.enrolled) || 0;
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const bId = btn.getAttribute('data-id') || btn.dataset.id;
+        const enrolled = Number(btn.getAttribute('data-enrolled') || btn.dataset.enrolled) || 0;
         deleteBatch(bId, enrolled);
       });
     });
@@ -15386,17 +15392,30 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
    * ADD / EDIT BATCH MODAL
    * ========================================================================== */
   function openAddEditBatchModal(batchId = null) {
-    const existingModal = document.getElementById('addEditBatchModal');
+    const modalId = 'addEditBatchModal';
+    const existingModal = document.getElementById(modalId);
     if (existingModal) existingModal.remove();
 
-    const batches = AppState.getBatches();
-    const existing = batchId ? batches.find(b => (b.id || b.batch_id) === batchId) : null;
+    const batches = AppState.getBatches ? AppState.getBatches() : ((typeof ACADEMIC !== 'undefined' && ACADEMIC.BATCHES) ? ACADEMIC.BATCHES : []);
+    
+    // Resilient matching across all batch ID and name formats
+    const existing = batchId ? batches.find(b => {
+      const id1 = String(b.batchId || b.id || b.batch_id || '').trim().toLowerCase();
+      const name1 = String(b.name || b.batch_name || b.batchName || b.className || '').trim().toLowerCase();
+      const target = String(batchId).trim().toLowerCase();
+      if (id1 && (id1 === target || target.includes(id1) || id1.includes(target))) return true;
+      if (name1 && (name1 === target || target.includes(name1) || name1.includes(target))) return true;
+      const k1 = getBatchCategoryKey(id1 || name1);
+      const kt = getBatchCategoryKey(target);
+      return Boolean(k1 && kt && k1 === kt);
+    }) : null;
+
     const isEdit = !!existing;
 
     // Generate next batch ID suggestion if new
     let suggestedId = `BAT-${String(batches.length + 1).padStart(2, '0')}`;
     if (isEdit) {
-      suggestedId = existing.id || existing.batch_id || '';
+      suggestedId = existing.batchId || existing.id || existing.batch_id || batchId || '';
     }
 
     const currentFee = isEdit ? (Number(existing.monthlyFee ?? existing.monthly_fee) || 0) : 2500;
@@ -15410,23 +15429,22 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
     const currentStatus = isEdit ? (existing.status || 'Active') : 'Active';
     const currentStream = isEdit ? (existing.stream || 'Science') : 'Science';
     const currentTagline = isEdit ? (existing.tagline || '') : '';
-    const currentName = isEdit ? (existing.name || existing.batch_name || '') : '';
-    const currentClass = isEdit ? (existing.className || existing.class_name || '') : '';
+    const currentName = isEdit ? (existing.name || existing.batch_name || existing.batchName || existing.className || '') : '';
+    const currentClass = isEdit ? (existing.className || existing.class_name || existing.name || '') : '';
 
-    const modalId = 'addEditBatchModal';
     const modalHtml = `
-      <div class="modal-backdrop" id="${modalId}" role="dialog" aria-modal="true" aria-labelledby="batchModalTitle">
-        <div class="modal-dialog" style="max-width: 680px; max-height: 90vh; overflow-y: auto;">
-          <div class="modal-header" style="background: linear-gradient(135deg, #064E3B 0%, #047857 100%); color: #fff; padding: 1.25rem 1.5rem; border-radius: 12px 12px 0 0;">
+      <div class="inner-modal-backdrop active portal-modal-backdrop" id="${modalId}" role="dialog" aria-modal="true" aria-labelledby="batchModalTitle" style="display:flex; align-items:center; justify-content:center; position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:99999; padding:1rem;">
+        <div class="inner-modal-content" style="background:#FFFFFF; border-radius:14px; max-width:680px; width:100%; max-height:90vh; overflow-y:auto; box-shadow:0 20px 40px rgba(0,0,0,0.25); border:1.5px solid #047857;">
+          <div class="modal-header" style="background: linear-gradient(135deg, #064E3B 0%, #047857 100%); color: #fff; padding: 1.25rem 1.5rem; border-radius: 12px 12px 0 0; display:flex; justify-content:space-between; align-items:flex-start;">
             <div>
-              <h3 class="modal-title" id="batchModalTitle" style="color: #fff; font-size: 1.25rem; font-weight: 800; display: flex; align-items: center; gap: 0.5rem;">
+              <h3 class="modal-title" id="batchModalTitle" style="color: #fff; font-size: 1.25rem; font-weight: 800; display: flex; align-items: center; gap: 0.5rem; margin:0;">
                 <i aria-hidden="true" class="fa-solid fa-layer-group"></i> ${isEdit ? 'Edit Batch &amp; Tariff Master' : 'Create New Class Batch'}
               </h3>
-              <p style="font-size: 0.84rem; color: #D1FAE5; margin-top: 0.2rem;">
+              <p style="font-size: 0.84rem; color: #D1FAE5; margin: 0.3rem 0 0 0;">
                 ${isEdit ? `Updating class parameters for ${escapeHtml(suggestedId)}. Changes sync to Supabase database.` : 'Add a new standard, course, or competitive batch.'}
               </p>
             </div>
-            <button type="button" class="btn-close-modal" id="btnCloseBatchModal" aria-label="Close modal" style="color: #fff; background: rgba(255,255,255,0.2); border: none; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+            <button type="button" class="btn-close-modal" id="btnCloseBatchModal" aria-label="Close modal" style="color: #fff; background: rgba(255,255,255,0.2); border: none; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size:1.1rem;">
               <i aria-hidden="true" class="fa-solid fa-xmark"></i>
             </button>
           </div>
@@ -15460,7 +15478,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
               </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; background: var(--bg-surface-cream); padding: 1rem; border-radius: 10px; border: 1px solid var(--border-sand);">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; background: var(--bg-surface-cream, #F8FAFC); padding: 1rem; border-radius: 10px; border: 1.5px solid var(--border-sand, #E2E8F0);">
               <div>
                 <label for="batchFormMonthlyFee" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany); display: block; margin-bottom: 0.3rem;">Monthly Fee (₹) *</label>
                 <input type="number" id="batchFormMonthlyFee" class="form-input" aria-label="Monthly Tuition Fee in Rupees" min="0" step="50" style="width: 100%; padding: 0.55rem; border-radius: 8px; font-weight: 800; color: var(--primary-emerald);" value="${currentFee}" required />
@@ -15567,9 +15585,11 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
 
         const batchObj = {
           batch_id,
+          batchId: batch_id,
           id: batch_id,
           name,
           batch_name: name,
+          batchName: name,
           class_name,
           className: class_name,
           stream,
@@ -15593,7 +15613,13 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
         };
 
         const allBatches = AppState.getBatches().slice();
-        const existingIdx = allBatches.findIndex(b => (b.id || b.batch_id) === batch_id);
+        const existingIdx = allBatches.findIndex(b => {
+          const id1 = b.id || b.batch_id || b.batchId;
+          const name1 = b.name || b.batch_name || b.className;
+          return id1 === batch_id || 
+                 getBatchCategoryKey(id1 || name1) === getBatchCategoryKey(batch_id) ||
+                 (String(id1).toUpperCase() === String(batch_id).toUpperCase());
+        });
 
         if (existingIdx !== -1) {
           allBatches[existingIdx] = { ...allBatches[existingIdx], ...batchObj };
@@ -15644,7 +15670,13 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
     if (!confirm(confirmMsg)) return;
 
     try {
-      const allBatches = AppState.getBatches().filter(b => (b.id || b.batch_id) !== batchId);
+      const allBatches = AppState.getBatches().filter(b => {
+        const id1 = b.batchId || b.id || b.batch_id;
+        const name1 = b.name || b.batch_name || b.className;
+        return id1 !== batchId && 
+               getBatchCategoryKey(id1 || name1) !== getBatchCategoryKey(batchId) &&
+               String(id1).toLowerCase() !== String(batchId).toLowerCase();
+      });
       
       // Delete mutation from Supabase cloud
       if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
