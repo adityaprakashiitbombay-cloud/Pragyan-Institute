@@ -14168,36 +14168,55 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
    * ========================================================================== */
   let activeAdminScheduleBatchId = 'BAT-10';
   let activeAdminScheduleDay = 'Monday';
+  try {
+    const savedBatch = sessionStorage.getItem('pragyan_admin_schedule_batch');
+    if (savedBatch) activeAdminScheduleBatchId = savedBatch;
+    const savedDay = sessionStorage.getItem('pragyan_admin_schedule_day');
+    if (savedDay) activeAdminScheduleDay = savedDay;
+  } catch (e) {}
 
   async function seedDefaultScheduleForBatchAndDay(batchId, day) {
     const allSchedules = AppState.getClassSchedules ? AppState.getClassSchedules() : [];
     const bKey = getBatchCategoryKey(batchId);
     const subjects = BATCH_SUBJECTS[bKey] || ['Mathematics', 'Science', 'English'];
-    const slots = BATCH_SLOTS[bKey] || ['04:00 PM - 05:00 PM', '05:00 PM - 06:00 PM', '06:00 PM - 07:00 PM'];
+    const slots = BATCH_SLOTS[bKey] || ['04:00 PM – 05:00 PM', '05:00 PM – 06:00 PM', '06:00 PM – 07:00 PM'];
     const batchObj = (typeof ACADEMIC !== 'undefined' && ACADEMIC.resolveBatch) ? ACADEMIC.resolveBatch(batchId) : null;
-    const teacher = batchObj ? batchObj.teachers.map(titleCaseName).join(' & ') : 'Faculty Mentors';
+    const teachers = batchObj?.teachers ? batchObj.teachers.map(titleCaseName) : ['Prof. Ravi Ranjan', 'Chandan Kumar'];
     const room = batchObj?.room || 'Main Hall';
 
     // Remove existing for this batch & day
-    const filtered = allSchedules.filter(s => !(s.batch_id === batchId && s.day_of_week.toLowerCase() === day.toLowerCase()));
+    const filtered = allSchedules.filter(s => {
+      const sBatch = s.batch_id || s.batchId || '';
+      const sDay = String(s.day_of_week || s.dayOfWeek || '').toLowerCase();
+      const isSameBatch = (sBatch === batchId) || (getBatchCategoryKey(sBatch) === bKey) || (String(sBatch).toUpperCase() === String(batchId).toUpperCase());
+      const isSameDay = sDay === String(day).toLowerCase();
+      return !(isSameBatch && isSameDay);
+    });
     
     subjects.forEach((subj, idx) => {
-      const slot = slots[idx] || '04:00 PM - 05:00 PM';
-      const parts = slot.split('-').map(p => p.trim());
+      const slot = slots[idx] || '04:00 PM – 05:00 PM';
+      const parts = slot.split(/[–-]/).map(p => p.trim());
       const startTime = parts[0] || '04:00 PM';
       const endTime = parts[1] || '05:00 PM';
+      const teacher = teachers[idx % teachers.length] || 'Faculty Mentors';
 
       filtered.push({
-        id: `SCHED-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        id: `SCHED-${batchId}-${String(day).slice(0, 3).toUpperCase()}-${Date.now()}-${idx + 1}`,
         batch_id: batchId,
+        batchId: batchId,
         day_of_week: day,
+        dayOfWeek: day,
         subject: subj,
         start_time: startTime,
+        startTime: startTime,
         end_time: endTime,
+        endTime: endTime,
         teacher: teacher,
         room: room,
         is_cancelled: false,
+        isCancelled: false,
         sort_order: idx + 1,
+        sortOrder: idx + 1,
         created_at: new Date().toISOString()
       });
     });
@@ -14208,7 +14227,13 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
 
   async function replicateDayScheduleAcrossWeek(batchId, sourceDay) {
     const allSchedules = AppState.getClassSchedules ? AppState.getClassSchedules() : [];
-    const sourcePeriods = allSchedules.filter(s => (s.batch_id || s.batchId) === batchId && (s.day_of_week || s.dayOfWeek || '').toLowerCase() === sourceDay.toLowerCase());
+    const bKey = getBatchCategoryKey(batchId);
+    const sourcePeriods = allSchedules.filter(s => {
+      const sBatch = s.batch_id || s.batchId || '';
+      const isSameBatch = (sBatch === batchId) || (getBatchCategoryKey(sBatch) === bKey) || (String(sBatch).toUpperCase() === String(batchId).toUpperCase());
+      const isSameDay = String(s.day_of_week || s.dayOfWeek || '').toLowerCase() === String(sourceDay).toLowerCase();
+      return isSameBatch && isSameDay;
+    });
 
     if (sourcePeriods.length === 0) {
       alert(`⚠️ No periods found for ${sourceDay}. Please add periods before replicating across the week.`);
@@ -14221,21 +14246,32 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
 
     const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     // Remove old periods for these weekdays for this batch
-    let updated = allSchedules.filter(s => !((s.batch_id || s.batchId) === batchId && weekdays.map(w => w.toLowerCase()).includes((s.day_of_week || s.dayOfWeek || '').toLowerCase())));
+    let updated = allSchedules.filter(s => {
+      const sBatch = s.batch_id || s.batchId || '';
+      const isSameBatch = (sBatch === batchId) || (getBatchCategoryKey(sBatch) === bKey) || (String(sBatch).toUpperCase() === String(batchId).toUpperCase());
+      const isWeekDay = weekdays.map(w => w.toLowerCase()).includes(String(s.day_of_week || s.dayOfWeek || '').toLowerCase());
+      return !(isSameBatch && isWeekDay);
+    });
 
     weekdays.forEach(targetDay => {
       sourcePeriods.forEach((sp, idx) => {
         updated.push({
-          id: `SCHED-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${targetDay.slice(0, 3)}`,
+          id: `SCHED-${batchId}-${targetDay.slice(0, 3).toUpperCase()}-${Date.now()}-${idx + 1}`,
           batch_id: batchId,
+          batchId: batchId,
           day_of_week: targetDay,
+          dayOfWeek: targetDay,
           subject: sp.subject,
-          start_time: sp.start_time,
-          end_time: sp.end_time,
+          start_time: sp.start_time || sp.startTime || '04:00 PM',
+          startTime: sp.start_time || sp.startTime || '04:00 PM',
+          end_time: sp.end_time || sp.endTime || '05:00 PM',
+          endTime: sp.end_time || sp.endTime || '05:00 PM',
           teacher: sp.teacher || 'Faculty Mentors',
           room: sp.room || 'Main Hall',
           is_cancelled: false,
-          sort_order: sp.sort_order || (idx + 1),
+          isCancelled: false,
+          sort_order: sp.sort_order || sp.sortOrder || (idx + 1),
+          sortOrder: sp.sort_order || sp.sortOrder || (idx + 1),
           created_at: new Date().toISOString()
         });
       });
@@ -14248,10 +14284,15 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
 
   async function toggleEntireDayOff(batchId, day, shouldCancel) {
     const allSchedules = AppState.getClassSchedules ? AppState.getClassSchedules() : [];
+    const bKey = getBatchCategoryKey(batchId);
     let affected = 0;
     allSchedules.forEach(s => {
-      if ((s.batch_id || s.batchId) === batchId && (s.day_of_week || s.dayOfWeek || '').toLowerCase() === day.toLowerCase()) {
+      const sBatch = s.batch_id || s.batchId || '';
+      const isSameBatch = (sBatch === batchId) || (getBatchCategoryKey(sBatch) === bKey) || (String(sBatch).toUpperCase() === String(batchId).toUpperCase());
+      const isSameDay = String(s.day_of_week || s.dayOfWeek || '').toLowerCase() === String(day).toLowerCase();
+      if (isSameBatch && isSameDay) {
         s.is_cancelled = shouldCancel;
+        s.isCancelled = shouldCancel;
         affected++;
       }
     });
@@ -14271,7 +14312,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
     const existingModal = document.getElementById(modalId);
     if (existingModal) existingModal.remove();
 
-    const batches = (typeof ACADEMIC !== 'undefined' && ACADEMIC.BATCHES) ? ACADEMIC.BATCHES : AppState.getBatches();
+    const batches = AppState.getBatches ? AppState.getBatches() : ((typeof ACADEMIC !== 'undefined' && ACADEMIC.BATCHES) ? ACADEMIC.BATCHES : []);
     const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
     const modalHtml = `
@@ -14289,11 +14330,13 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
               <label for="periodFormBatch" style="font-weight:700; font-size:0.85rem; color:var(--text-mahogany); display:block; margin-bottom:0.3rem;">Target Batch</label>
               <select id="periodFormBatch" class="form-input" aria-label="Target Batch" style="width:100%; padding:0.5rem; border-radius:8px;" required>
                 ${batches.map(b => {
-                  const bId = b.batchId || b.id || b.batch_id;
-                  const bName = b.name || b.batch_name || bId;
+                  const bId = b.batchId || b.id || b.batch_id || '';
+                  const bName = b.name || b.batch_name || b.className || bId;
+                  const bKey = getBatchCategoryKey(bId || bName);
                   const curBatch = existingPeriod ? (existingPeriod.batch_id || existingPeriod.batchId) : activeAdminScheduleBatchId;
-                  const sel = (bId === curBatch || getBatchCategoryKey(bId) === getBatchCategoryKey(curBatch));
-                  return `<option value="${escapeHtml(bId)}" ${sel ? 'selected' : ''}>${escapeHtml(bName)} (${escapeHtml(bId)})</option>`;
+                  const curKey = getBatchCategoryKey(curBatch);
+                  const sel = (bId === curBatch || (bKey && curKey && bKey === curKey) || (String(bId).toUpperCase() === String(curBatch).toUpperCase()));
+                  return `<option value="${escapeHtml(bKey || bId)}" ${sel ? 'selected' : ''}>${escapeHtml(bName)} (${escapeHtml(bKey || bId)})</option>`;
                 }).join('')}
               </select>
             </div>
@@ -14304,7 +14347,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
                 <select id="periodFormDay" class="form-input" aria-label="Day of Week" style="width:100%; padding:0.5rem; border-radius:8px;" required>
                   ${daysOfWeek.map(d => {
                     const curDay = existingPeriod ? (existingPeriod.day_of_week || existingPeriod.dayOfWeek || '') : activeAdminScheduleDay;
-                    const sel = (d.toLowerCase() === curDay.toLowerCase());
+                    const sel = (d.toLowerCase() === String(curDay).toLowerCase());
                     return `<option value="${d}" ${sel ? 'selected' : ''}>${d}</option>`;
                   }).join('')}
                 </select>
@@ -14448,6 +14491,12 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
       }
 
       await AppState.saveClassSchedules(allSchedules);
+      activeAdminScheduleBatchId = batch_id;
+      activeAdminScheduleDay = day_of_week;
+      try {
+        sessionStorage.setItem('pragyan_admin_schedule_batch', activeAdminScheduleBatchId);
+        sessionStorage.setItem('pragyan_admin_schedule_day', activeAdminScheduleDay);
+      } catch(err) {}
       dialog.close();
       renderAdminScheduleTab();
     });
@@ -14459,7 +14508,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
     const existingModal = document.getElementById(modalId);
     if (existingModal) existingModal.remove();
 
-    const batches = (typeof ACADEMIC !== 'undefined' && ACADEMIC.BATCHES) ? ACADEMIC.BATCHES : AppState.getBatches();
+    const batches = AppState.getBatches ? AppState.getBatches() : ((typeof ACADEMIC !== 'undefined' && ACADEMIC.BATCHES) ? ACADEMIC.BATCHES : []);
     const todayStr = new Date().toISOString().split('T')[0];
 
     const modalHtml = `
@@ -14494,10 +14543,11 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
               <select id="holidayFormBatch" class="form-input" aria-label="Target Batch Scope" style="width:100%; padding:0.5rem; border-radius:8px;">
                 <option value="ALL" ${(existingHoliday?.target_batch === 'ALL' || !existingHoliday?.target_batch) ? 'selected' : ''}>🌐 All Batches (Entire Institute Closed)</option>
                 ${batches.map(b => {
-                  const bId = b.batchId || b.id || b.batch_id;
-                  const bName = b.name || b.batch_name || bId;
-                  const sel = isEdit && (existingHoliday.target_batch === bId || existingHoliday.targetBatch === bId);
-                  return `<option value="${escapeHtml(bId)}" ${sel ? 'selected' : ''}>🎓 ${escapeHtml(bName)} (${escapeHtml(bId)}) Only</option>`;
+                  const bId = b.batchId || b.id || b.batch_id || '';
+                  const bName = b.name || b.batch_name || b.className || bId;
+                  const bKey = getBatchCategoryKey(bId || bName);
+                  const sel = isEdit && (existingHoliday.target_batch === bId || existingHoliday.targetBatch === bId || getBatchCategoryKey(existingHoliday.target_batch || existingHoliday.targetBatch || '') === bKey);
+                  return `<option value="${escapeHtml(bKey || bId)}" ${sel ? 'selected' : ''}>🎓 ${escapeHtml(bName)} (${escapeHtml(bKey || bId)}) Only</option>`;
                 }).join('')}
               </select>
             </div>
@@ -14590,16 +14640,22 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
     const pane = document.getElementById('adminTabPane-schedule');
     if (!pane) return;
 
-    const batches = (typeof ACADEMIC !== 'undefined' && ACADEMIC.BATCHES) ? ACADEMIC.BATCHES : AppState.getBatches();
+    const batches = AppState.getBatches ? AppState.getBatches() : ((typeof ACADEMIC !== 'undefined' && ACADEMIC.BATCHES) ? ACADEMIC.BATCHES : []);
     const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
     const allSchedules = AppState.getClassSchedules ? AppState.getClassSchedules() : [];
     const allHolidays = AppState.getInstituteHolidays ? AppState.getInstituteHolidays() : [];
 
+    const activeKey = getBatchCategoryKey(activeAdminScheduleBatchId);
+
     // Filter periods for selected batch & day
     const currentPeriods = allSchedules.filter(sch => {
-      const matchB = (sch.batch_id || sch.batchId) === activeAdminScheduleBatchId;
-      const matchD = (sch.day_of_week || sch.dayOfWeek || '').toLowerCase() === activeAdminScheduleDay.toLowerCase();
+      const schB = sch.batch_id || sch.batchId || '';
+      const matchB = (schB === activeAdminScheduleBatchId) ||
+                     (getBatchCategoryKey(schB) === activeKey) ||
+                     (String(schB).toUpperCase() === String(activeAdminScheduleBatchId).toUpperCase());
+      const schD = String(sch.day_of_week || sch.dayOfWeek || '').toLowerCase();
+      const matchD = schD === activeAdminScheduleDay.toLowerCase();
       return matchB && matchD;
     });
 
@@ -14607,7 +14663,10 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
 
     const isAllOff = currentPeriods.length > 0 && currentPeriods.every(p => !!p.is_cancelled);
     const selectedBatchObj = (typeof ACADEMIC !== 'undefined' && ACADEMIC.resolveBatch) ? ACADEMIC.resolveBatch(activeAdminScheduleBatchId) : null;
-    const batchDisplayName = selectedBatchObj ? `${selectedBatchObj.name} (${selectedBatchObj.timing})` : activeAdminScheduleBatchId;
+    const fallbackBatchFromState = batches.find(b => (b.batchId || b.id || b.batch_id) === activeAdminScheduleBatchId || getBatchCategoryKey(b.batchId || b.id || b.name || '') === activeKey);
+    const batchName = selectedBatchObj?.name || fallbackBatchFromState?.name || fallbackBatchFromState?.batch_name || activeAdminScheduleBatchId;
+    const batchTiming = fallbackBatchFromState?.timing || fallbackBatchFromState?.timings || (selectedBatchObj ? 'Regular Schedule' : 'As per timetable');
+    const batchDisplayName = `${batchName} (${batchTiming})`;
 
     pane.innerHTML = `
       <div class="dash-card schedule-header-card" style="margin-bottom: 1.25rem;">
@@ -14646,9 +14705,14 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
             </label>
             <select id="adminScheduleBatchSelect" class="form-input schedule-batch-select" aria-label="Select Batch" style="min-width:240px;">
               ${batches.map(b => {
-                const bId = b.batchId || b.id || b.batch_id;
-                const bName = b.name || b.batch_name || bId;
-                return `<option value="${escapeHtml(bId)}" ${bId === activeAdminScheduleBatchId ? 'selected' : ''}>${escapeHtml(bName)} (${escapeHtml(bId)})</option>`;
+                const bId = b.batchId || b.id || b.batch_id || '';
+                const bName = b.name || b.batch_name || b.className || bId;
+                const bKey = getBatchCategoryKey(bId || bName);
+                const isSelected = (bId === activeAdminScheduleBatchId) ||
+                                   (bKey && activeKey && bKey === activeKey) ||
+                                   (String(bId).toUpperCase() === String(activeAdminScheduleBatchId).toUpperCase()) ||
+                                   (String(bName).toLowerCase() === String(activeAdminScheduleBatchId).toLowerCase());
+                return `<option value="${escapeHtml(bKey || bId)}" ${isSelected ? 'selected' : ''}>${escapeHtml(bName)} (${escapeHtml(bKey || bId)})</option>`;
               }).join('')}
             </select>
           </div>
@@ -14668,7 +14732,12 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
         <div class="student-schedule-week-bar" style="margin-bottom:0;">
           ${daysOfWeek.map(d => {
             const isActive = d.toLowerCase() === activeAdminScheduleDay.toLowerCase();
-            const periodsForD = allSchedules.filter(s => (s.batch_id || s.batchId) === activeAdminScheduleBatchId && (s.day_of_week || s.dayOfWeek || '').toLowerCase() === d.toLowerCase());
+            const periodsForD = allSchedules.filter(s => {
+              const sB = s.batch_id || s.batchId || '';
+              const matchB = (sB === activeAdminScheduleBatchId) || (getBatchCategoryKey(sB) === activeKey);
+              const matchD = (s.day_of_week || s.dayOfWeek || '').toLowerCase() === d.toLowerCase();
+              return matchB && matchD;
+            });
             const hasOff = periodsForD.length > 0 && periodsForD.every(p => !!p.is_cancelled);
             return `
               <button type="button" class="student-week-chip ${isActive ? 'active' : ''}" data-day="${d}" aria-label="Day ${d}">
@@ -14812,14 +14881,22 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
     // Attach Event Listeners
     // Batch Selector
     pane.querySelector('#adminScheduleBatchSelect')?.addEventListener('change', (e) => {
-      activeAdminScheduleBatchId = e.target.value;
+      const val = e.target.value;
+      const canonicalKey = getBatchCategoryKey(val);
+      activeAdminScheduleBatchId = canonicalKey || val;
+      try {
+        sessionStorage.setItem('pragyan_admin_schedule_batch', activeAdminScheduleBatchId);
+      } catch (err) {}
       renderAdminScheduleTab();
     });
 
     // Day chips
     pane.querySelectorAll('.student-week-chip').forEach(chip => {
       chip.addEventListener('click', () => {
-        activeAdminScheduleDay = chip.dataset.day;
+        activeAdminScheduleDay = chip.dataset.day || 'Monday';
+        try {
+          sessionStorage.setItem('pragyan_admin_schedule_day', activeAdminScheduleDay);
+        } catch (err) {}
         renderAdminScheduleTab();
       });
     });

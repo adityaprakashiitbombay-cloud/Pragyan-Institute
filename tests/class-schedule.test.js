@@ -80,4 +80,14 @@ export function runClassScheduleTests(assert) {
     'T31.25: js/portal.js renderStudentBatchTab resolves exact batch ID and category key for student timetable');
   assert(portalJs.includes("SupabaseSync.mutate('class_schedules', 'delete'") && portalJs.includes("SupabaseSync.mutate('institute_holidays', 'delete'"),
     'T31.26: js/portal.js syncs schedule and holiday deletions directly to Supabase cloud database');
+
+  // --- 9. Admin Schedule Batch Selector Resilience & Session Persistence ---
+  assert(portalJs.includes("sessionStorage.getItem('pragyan_admin_schedule_batch')") && portalJs.includes("sessionStorage.setItem('pragyan_admin_schedule_batch'"),
+    'T31.27: js/portal.js persists activeAdminScheduleBatchId in sessionStorage to prevent accidental resets');
+  assert(portalJs.includes("bKey && activeKey && bKey === activeKey") && portalJs.includes("escapeHtml(bKey || bId)"),
+    'T31.28: js/portal.js renders schedule batch select options with canonical keys and resilient matching');
+  assert(portalJs.includes("const canonicalKey = getBatchCategoryKey(val)") && portalJs.includes("activeAdminScheduleBatchId = canonicalKey || val"),
+    'T31.29: js/portal.js normalizes selected batch ID to canonical key on change event');
+  assert(portalJs.includes("getBatchCategoryKey(schB) === activeKey") && portalJs.includes("activeKey = getBatchCategoryKey(activeAdminScheduleBatchId)"),
+    'T31.30: js/portal.js filters timetable periods by resolved canonical batch key');
 }
