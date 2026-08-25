@@ -3654,6 +3654,9 @@ function renderStudentDashboard() {
             <i aria-hidden="true" class="fa-solid fa-id-card"></i> Student Information & Profile Details
           </div>
           <div class="student-header-actions-row" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+            <button class="btn" id="btnStudentTogglePush" style="background-color: ${(typeof Notification !== 'undefined' && Notification.permission === 'granted') ? '#059669' : '#D97706'}; color: #fff; padding: 0.45rem 0.85rem; font-size: 0.82rem; font-weight: 600; cursor: pointer; border-radius: 6px; border: none; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; box-shadow: 0 2px 6px rgba(0,0,0,0.12);">
+              <i aria-hidden="true" class="fa-solid fa-bell"></i> <span>${(typeof Notification !== 'undefined' && Notification.permission === 'granted') ? '🟢 Alerts Active' : 'Enable Notifications'}</span>
+            </button>
             <button class="btn btn-emerald" id="btnStudentChangePassword" style="background-color: #2563EB; color: #fff; padding: 0.45rem 0.85rem; font-size: 0.82rem; font-weight: 600; cursor: pointer; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem;">
               <i aria-hidden="true" class="fa-solid fa-key"></i> Change Password
             </button>
@@ -4085,6 +4088,42 @@ function renderStudentDashboard() {
         renderStudentDashboard();
       }
     });
+
+    // 1-Click Mobile/Desktop Push Notification Activation from Student Profile
+    const btnPush = pane.querySelector('#btnStudentTogglePush');
+    if (btnPush) {
+      btnPush.addEventListener('click', async () => {
+        if (!window.PushClient) {
+          showToast('Push notifications service not initialized.', 'warning');
+          return;
+        }
+        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+          showToast('✅ Mobile lockscreen notifications are already active on this device!', 'success');
+          window.PushClient.syncSubscription(s);
+          return;
+        }
+        btnPush.disabled = true;
+        btnPush.innerHTML = '<i aria-hidden="true" class="fa-solid fa-spinner fa-spin"></i> Activating...';
+        const ok = await window.PushClient.requestAndSubscribe(s);
+        if (ok) {
+          showToast('🎉 Mobile lockscreen push notifications enabled successfully!', 'success');
+          btnPush.disabled = false;
+          btnPush.style.backgroundColor = '#059669';
+          btnPush.innerHTML = '<i aria-hidden="true" class="fa-solid fa-bell"></i> <span>🟢 Alerts Active</span>';
+        } else {
+          btnPush.disabled = false;
+          btnPush.innerHTML = '<i aria-hidden="true" class="fa-solid fa-bell"></i> <span>Enable Notifications</span>';
+          if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
+            showToast('⚠️ Notifications are blocked in your browser settings. Please allow notifications for this site.', 'warning');
+          }
+        }
+      });
+    }
+
+    // Mount floating / top student push permission prompt
+    if (window.PushClient && typeof window.PushClient.renderStudentPrompt === 'function') {
+      window.PushClient.renderStudentPrompt(pane, s);
+    }
   }
 
   function openStudentPasswordModal() {
@@ -4529,7 +4568,37 @@ function renderStudentDashboard() {
       ? relevantNotices
       : relevantNotices.filter(n => n.category === filterCat);
 
+    const isPushGranted = typeof Notification !== 'undefined' && Notification.permission === 'granted';
+
     pane.innerHTML = `
+      <!-- Mobile Lockscreen Push Notification Hub Banner -->
+      <div class="student-push-banner-card" style="background: linear-gradient(135deg, #064E3B 0%, #047857 100%); border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; color: #ffffff; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; box-shadow: 0 4px 14px rgba(6, 78, 59, 0.2);">
+        <div style="display: flex; align-items: center; gap: 0.85rem; min-width: 240px; flex: 1;">
+          <div style="width: 42px; height: 42px; border-radius: 10px; background: rgba(255, 255, 255, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.25rem; flex-shrink: 0;">
+            <i aria-hidden="true" class="fa-solid fa-bell"></i>
+          </div>
+          <div>
+            <div style="font-weight: 800; font-size: 1rem; color: #FDE68A;">
+              ${isPushGranted ? '🟢 Mobile Lockscreen Push Alerts Active' : '🔔 Enable Mobile Lockscreen Notifications'}
+            </div>
+            <div style="font-size: 0.82rem; color: rgba(255, 255, 255, 0.9); margin-top: 0.15rem;">
+              Receive real-time push alerts for exam schedules, daily timetable updates, holiday alerts, and fee receipts directly on your phone.
+            </div>
+          </div>
+        </div>
+        <div>
+          ${isPushGranted ? `
+            <span style="background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.4); padding: 0.45rem 0.95rem; border-radius: 99px; font-size: 0.82rem; font-weight: 700; display: inline-flex; align-items: center; gap: 0.35rem;">
+              <i aria-hidden="true" class="fa-solid fa-circle-check" style="color: #6EE7B7;"></i> Active on Device
+            </span>
+          ` : `
+            <button type="button" class="btn" id="btnStudentNoticesEnablePush" style="background: #F59E0B; color: #78350F; font-weight: 800; font-size: 0.84rem; padding: 0.5rem 1.15rem; border-radius: 8px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 0.45rem; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);">
+              <i aria-hidden="true" class="fa-solid fa-bell"></i> Enable Notifications
+            </button>
+          `}
+        </div>
+      </div>
+
       <div class="dash-card">
         <div class="dash-card-header">
           <div class="dash-card-title"><i aria-hidden="true" class="fa-solid fa-bullhorn" style="color: var(--primary-emerald);"></i> Institute Notice & Announcement Board</div>
@@ -4590,6 +4659,32 @@ function renderStudentDashboard() {
         const cat = btn.dataset.cat;
         renderStudentNotifications(cat);
       };
+    });
+
+    // 1-Click Enable Notifications button on Notice Tab
+    pane.querySelector('#btnStudentNoticesEnablePush')?.addEventListener('click', async () => {
+      if (!window.PushClient) {
+        showToast('Push notifications service not initialized.', 'warning');
+        return;
+      }
+      const btn = pane.querySelector('#btnStudentNoticesEnablePush');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-spinner fa-spin"></i> Activating...';
+      }
+      const ok = await window.PushClient.requestAndSubscribe(s);
+      if (ok) {
+        showToast('🎉 Mobile lockscreen notifications enabled successfully!', 'success');
+        renderStudentNotifications(filterCat);
+      } else {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-bell"></i> Enable Notifications';
+        }
+        if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
+          showToast('⚠️ Notifications are blocked in browser settings. Please allow notifications for this site.', 'warning');
+        }
+      }
     });
   }
 

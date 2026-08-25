@@ -6842,6 +6842,7 @@ button, a, input, select, textarea {
 .push-prompt-icon {
   font-size: 1.6rem;
   line-height: 1;
+  flex-shrink: 0;
 }
 
 .push-prompt-title {
@@ -6862,6 +6863,7 @@ button, a, input, select, textarea {
   display: flex;
   gap: 0.65rem;
   margin-left: 2.45rem;
+  flex-wrap: wrap;
 }
 
 .push-prompt-success {
@@ -6871,6 +6873,21 @@ button, a, input, select, textarea {
   font-size: 0.9rem;
   font-weight: 700;
   color: #065F46;
+}
+
+@media (max-width: 640px) {
+  .student-push-prompt-card {
+    padding: 0.95rem 1rem;
+  }
+  .push-prompt-actions {
+    margin-left: 0;
+    width: 100%;
+  }
+  .push-prompt-actions .btn {
+    flex: 1;
+    min-height: 40px;
+    justify-content: center;
+  }
 }
 
 /* ==========================================================================
