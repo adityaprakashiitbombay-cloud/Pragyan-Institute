@@ -47,11 +47,11 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
   <!-- CSS Design System -->
-  <link rel="stylesheet" href="./css/variables.css?v=90.0.c102b41b">
-  <link rel="stylesheet" href="./css/main.css?v=90.0.c102b41b">
-  <link rel="stylesheet" href="./css/components.css?v=90.0.c102b41b">
-  <link rel="stylesheet" href="./css/animations.css?v=90.0.c102b41b">
-  <link rel="stylesheet" href="./css/portal.css?v=90.0.c102b41b">
+  <link rel="stylesheet" href="./css/variables.css?v=90.0.5c2d55cf">
+  <link rel="stylesheet" href="./css/main.css?v=90.0.5c2d55cf">
+  <link rel="stylesheet" href="./css/components.css?v=90.0.5c2d55cf">
+  <link rel="stylesheet" href="./css/animations.css?v=90.0.5c2d55cf">
+  <link rel="stylesheet" href="./css/portal.css?v=90.0.5c2d55cf">
 
   <!-- Schema.org JSON-LD Structured Data for Google Top Ranking & Knowledge Graph -->
   <script type="application/ld+json">
@@ -1010,11 +1010,11 @@
       </header>
 
       <div class="tabs-container blog-tabs" role="tablist" aria-label="Filter articles by category">
-        <button type="button" class="tab-btn blog-tab active" role="tab" aria-selected="true" data-blog-cat="all">All Articles</button>
-        <button type="button" class="tab-btn blog-tab" role="tab" aria-selected="false" data-blog-cat="Board Exams">Board Exams (10th &amp; 12th)</button>
-        <button type="button" class="tab-btn blog-tab" role="tab" aria-selected="false" data-blog-cat="English Speaking">English Academy</button>
-        <button type="button" class="tab-btn blog-tab" role="tab" aria-selected="false" data-blog-cat="Study Tips">Study Tips &amp; Notes</button>
-        <button type="button" class="tab-btn blog-tab" role="tab" aria-selected="false" data-blog-cat="Institute News">Announcements</button>
+        <button type="button" class="tab-btn blog-tab active" role="tab" aria-selected="true" data-blog-cat="all"><i aria-hidden="true" class="fa-solid fa-layer-group"></i> <span>All Articles</span></button>
+        <button type="button" class="tab-btn blog-tab" role="tab" aria-selected="false" data-blog-cat="Board Exams"><i aria-hidden="true" class="fa-solid fa-graduation-cap"></i> <span>Board Exams (10th &amp; 12th)</span></button>
+        <button type="button" class="tab-btn blog-tab" role="tab" aria-selected="false" data-blog-cat="English Speaking"><i aria-hidden="true" class="fa-solid fa-comments"></i> <span>English Academy</span></button>
+        <button type="button" class="tab-btn blog-tab" role="tab" aria-selected="false" data-blog-cat="Study Tips"><i aria-hidden="true" class="fa-solid fa-lightbulb"></i> <span>Study Tips &amp; Notes</span></button>
+        <button type="button" class="tab-btn blog-tab" role="tab" aria-selected="false" data-blog-cat="Institute News"><i aria-hidden="true" class="fa-solid fa-bullhorn"></i> <span>Announcements</span></button>
       </div>
 
       <div class="blog-grid" id="blogGrid">
@@ -1530,22 +1530,22 @@
   <!-- Application Scripts -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
-  <script defer src="./js/config.js?v=90.0.c102b41b"></script>
+  <script defer src="./js/config.js?v=90.0.5c2d55cf"></script>
   <!-- Canonical batch/fee/faculty table. Must load before app.js and portal.js,
        which read window.PRAGYAN_ACADEMIC instead of keeping their own copies. -->
-  <script defer src="./js/academic-config.js?v=90.0.c102b41b"></script>
-  <script defer src="./js/supabase-sync.js?v=90.0.c102b41b"></script>
-  <script type="module" src="./js/blog-markdown.js?v=90.0.c102b41b"></script>
-  <script defer src="./js/push-client.js?v=90.0.c102b41b"></script>
-  <script defer src="./js/chat.js?v=90.0.c102b41b"></script>
-  <script defer src="./js/app.js?v=90.0.c102b41b"></script>
-  <script defer src="./js/portal.js?v=90.0.c102b41b"></script>
+  <script defer src="./js/academic-config.js?v=90.0.5c2d55cf"></script>
+  <script defer src="./js/supabase-sync.js?v=90.0.5c2d55cf"></script>
+  <script type="module" src="./js/blog-markdown.js?v=90.0.5c2d55cf"></script>
+  <script defer src="./js/push-client.js?v=90.0.5c2d55cf"></script>
+  <script defer src="./js/chat.js?v=90.0.5c2d55cf"></script>
+  <script defer src="./js/app.js?v=90.0.5c2d55cf"></script>
+  <script defer src="./js/portal.js?v=90.0.5c2d55cf"></script>
 
   <!-- PWA Service Worker Registration for Instant Offline Caching -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=90.0.c102b41b').then(reg => {
+        navigator.serviceWorker.register('./sw.js?v=90.0.5c2d55cf').then(reg => {
           reg.update().catch(() => {});
         }).catch(err => console.log('SW reg error:', err));
       });
