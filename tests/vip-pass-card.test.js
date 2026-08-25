@@ -19,23 +19,23 @@ export function runVipPassCardTests(assert) {
   assert(portalCss.includes('min-height: 400px !important'),
     'T30.4: mobile & Android media queries maintain at least 400px height');
 
-  // --- 2. Metallic Glowing Status Badge ---
-  assert(portalCss.includes('.metallic-status-pill.pill-cleared'),
-    'T30.5: portal.css implements .metallic-status-pill.pill-cleared emerald badge');
+  // --- 2. Metallic Glowing Active Scholar Status Badge (No Payment Status on Card) ---
+  assert(portalCss.includes('.metallic-credential-pill'),
+    'T30.5: portal.css implements .metallic-credential-pill emerald credential badge');
   assert(portalCss.includes('.status-pulsing-gem'),
     'T30.6: portal.css implements pulsing micro-gem animation for active scholar status');
-  assert(portalJs.includes('ACTIVE · CLEARED'),
-    'T30.7: js/portal.js renders clean ACTIVE · CLEARED status text');
-  assert(!portalJs.includes("🟢 CLEARED"),
-    'T30.8: js/portal.js removes filthy raw emoji text string from card status');
+  assert(portalJs.includes('ACTIVE SCHOLAR') && portalJs.includes('SCHOLAR PASS'),
+    'T30.7: js/portal.js renders clean ACTIVE SCHOLAR and SCHOLAR PASS credentials');
+  assert(!portalJs.includes("highlight-dues-box") && !portalJs.includes("Tuition Clearance:") && !portalJs.includes("🟢 CLEARED"),
+    'T30.8: js/portal.js completely removes fee status and payment dues from ID card faces');
 
-  // --- 3. Fee Ledger Resolution (No ₹1 Dues Bug) ---
-  assert(portalJs.includes('displayTotalFee') && portalJs.includes('displayPaidFee'),
-    'T30.9: js/portal.js calculates displayTotalFee and displayPaidFee accurately');
-  assert(portalJs.includes('displayTotalFee <= 1') && portalJs.includes('batchStandardFee'),
-    'T30.10: js/portal.js falls back to batch fee when total_fee is uninitialized / 1');
-  assert(portalJs.includes('isFeeCleared ? (rawPaid > 0 ? rawPaid : displayTotalFee) : rawPaid'),
-    'T30.11: js/portal.js displays full tuition amount as paid when fee is 100% cleared');
+  // --- 3. Inspiring Academic Quote & Complete Student Profile Details on Back ---
+  assert(portalCss.includes('.back-quote-box') && portalCss.includes('.quote-text'),
+    'T30.9: portal.css styles inspiring academic quote box on card back');
+  assert(portalJs.includes('Education is the most powerful weapon which you can use to change the world'),
+    'T30.10: js/portal.js renders inspiring academic quote on back of student card');
+  assert(portalJs.includes('back-meta-grid-2col') && portalJs.includes('Date of Birth'),
+    'T30.11: js/portal.js renders comprehensive student details (DOB, Roll, Batch, Guardian, Mobile) on back face');
 
   // --- 4. Back Card Signatories & Full Campus Address ---
   assert(portalCss.includes('.back-signatories-row') && portalCss.includes('.back-sign-title'),

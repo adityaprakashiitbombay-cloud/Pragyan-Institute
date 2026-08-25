@@ -1317,7 +1317,8 @@
 }
 
 /* Dedicated Highlight Status & Tuition Strip */
-.metallic-status-highlight-strip {
+/* Dedicated Highlight Credentials & Session Strip (No Payment Status) */
+.metallic-credential-highlight-strip {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1329,14 +1330,14 @@
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
 }
 
-.metallic-status-strip-left {
+.metallic-credential-strip-left {
   display: flex;
   align-items: center;
   gap: 0.45rem;
   min-width: 0;
 }
 
-.metallic-status-strip-right {
+.metallic-credential-strip-right {
   display: flex;
   align-items: center;
   gap: 0.35rem;
@@ -1344,7 +1345,7 @@
   flex-shrink: 0;
 }
 
-.metallic-status-strip-right strong {
+.metallic-credential-strip-right strong {
   color: #FDE68A;
   font-weight: 800;
   font-size: 0.88rem;
@@ -1359,12 +1360,7 @@
   flex-shrink: 0;
 }
 
-.metallic-status-cell {
-  grid-column: span 1;
-}
-
-/* Luxurious Glowing Emerald & Rose Metallic Status Badges */
-.metallic-status-pill {
+.metallic-credential-pill {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
@@ -1380,9 +1376,6 @@
   position: relative;
   overflow: hidden;
   flex-shrink: 0;
-}
-
-.metallic-status-pill.pill-cleared {
   background: linear-gradient(135deg, rgba(6, 78, 59, 0.9) 0%, rgba(5, 150, 105, 0.8) 50%, rgba(16, 185, 129, 0.95) 100%);
   color: #ECFDF5;
   border: 1.5px solid rgba(52, 211, 153, 0.95);
@@ -1390,7 +1383,7 @@
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85), 0 0 8px rgba(110, 231, 183, 0.65);
 }
 
-.metallic-status-pill.pill-cleared::after {
+.metallic-credential-pill::after {
   content: '';
   position: absolute;
   top: 0;
@@ -1400,11 +1393,6 @@
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
   transform: skewX(-20deg);
   animation: pillGleam 3.5s infinite ease-in-out;
-}
-
-@keyframes pillGleam {
-  0%, 60% { left: -100%; }
-  100% { left: 160%; }
 }
 
 .status-pulsing-gem {
@@ -1423,12 +1411,9 @@
   50% { transform: scale(1.35); opacity: 0.85; filter: drop-shadow(0 0 10px #10B981); }
 }
 
-.metallic-status-pill.pill-due {
-  background: linear-gradient(135deg, rgba(185, 28, 28, 0.9) 0%, rgba(220, 38, 38, 0.8) 50%, rgba(239, 68, 68, 0.95) 100%);
-  color: #FEF2F2;
-  border: 1.5px solid rgba(248, 113, 113, 0.9);
-  box-shadow: 0 0 16px rgba(239, 68, 68, 0.55), inset 0 1px 2px rgba(255, 255, 255, 0.5), inset 0 -1px 2px rgba(0, 0, 0, 0.4);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+@keyframes pillGleam {
+  0%, 60% { left: -100%; }
+  100% { left: 160%; }
 }
 
 /* Card Barcode Footer (Laser Precision & Logical Encoding) */
@@ -1490,77 +1475,97 @@
   gap: 0.35rem;
 }
 
-/* BACK FACE CONTENT */
+/* BACK FACE CONTENT: Rich Student Details Grid & Academic Quote */
 .back-card-content {
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  gap: 0.35rem;
   font-size: 0.84rem;
   flex: 1;
-  justify-content: space-evenly;
+  justify-content: space-between;
+  margin-block: 0.15rem;
 }
 
-.back-meta-item {
+.back-meta-grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.28rem 0.75rem;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 0.42rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  font-size: 0.8rem;
+}
+
+.back-meta-grid-2col .back-meta-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
-  padding-bottom: 0.25rem;
+  gap: 0.35rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 0.18rem;
+  min-width: 0;
+}
+
+.back-meta-grid-2col .back-meta-item:nth-last-child(1),
+.back-meta-grid-2col .back-meta-item:nth-last-child(2) {
+  border-bottom: none;
+  padding-bottom: 0;
 }
 
 .back-label {
-  color: rgba(255, 255, 255, 0.85);
+  color: #D1D5DB;
   font-weight: 600;
+  font-size: 0.74rem;
+  flex-shrink: 0;
 }
 
 .back-val {
   color: #ffffff;
   font-weight: 700;
+  font-size: 0.76rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
 }
 
-.highlight-dues-box {
-  background: rgba(0, 0, 0, 0.45);
-  padding: 0.4rem 0.75rem;
-  border-radius: 8px;
+/* Inspiring Academic Quote Box on Card Back */
+.back-quote-box {
+  background: linear-gradient(135deg, rgba(6, 78, 59, 0.6) 0%, rgba(2, 44, 34, 0.8) 100%);
   border: 1px solid rgba(245, 158, 11, 0.45);
-  margin-block: 0.15rem;
+  border-left: 3.5px solid #F59E0B;
+  border-radius: 8px;
+  padding: 0.4rem 0.65rem;
+  position: relative;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  margin-block: 0.1rem;
 }
 
-.back-dues-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.8rem;
-  font-weight: 800;
-  padding: 0.22rem 0.65rem;
-  border-radius: var(--radius-full);
-  letter-spacing: 0.03em;
+.quote-icon {
+  color: #FCD34D;
+  font-size: 0.72rem;
+  opacity: 0.9;
+  margin-right: 0.35rem;
 }
 
-.back-dues-pill.has-dues {
-  background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%);
-  color: #ffffff;
-  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.45);
+.quote-text {
+  font-style: italic;
+  font-size: 0.76rem;
+  line-height: 1.35;
+  color: #FEF3C7;
+  margin: 0;
+  font-weight: 600;
+  display: inline;
 }
 
-.back-dues-pill.no-dues {
-  background: linear-gradient(135deg, #10B981 0%, #047857 100%);
-  color: #ffffff;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.45);
-}
-
-.back-meta-grid {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.84rem;
-  color: rgba(255, 255, 255, 0.9);
-  background: rgba(0, 0, 0, 0.35);
-  padding: 0.35rem 0.75rem;
-  border-radius: 6px;
-}
-
-.back-meta-grid strong {
-  color: #FDE68A;
+.quote-author {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #6EE7B7;
+  margin-top: 3px;
+  text-align: right;
+  letter-spacing: 0.02em;
 }
 
 /* BACK FACE FOOTER (Signatories & Verified Campus Location) */

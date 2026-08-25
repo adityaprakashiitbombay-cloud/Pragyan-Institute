@@ -3601,11 +3601,11 @@ function renderStudentDashboard() {
                 <img src="assets/images/logo.png" class="metallic-id-logo" alt="Pragyan Institute Logo">
                 <div>
                   <div class="metallic-id-inst-name">PRAGYAN INSTITUTE</div>
-                  <div class="metallic-id-inst-sub">Lalganj • Institutional VIP Pass</div>
+                  <div class="metallic-id-inst-sub">Lalganj • Institutional Student Pass</div>
                 </div>
               </div>
               <div class="metallic-vip-crest">
-                <i aria-hidden="true" class="fa-solid fa-crown"></i> <span>VIP SCHOLAR</span>
+                <i aria-hidden="true" class="fa-solid fa-crown"></i> <span>SCHOLAR PASS</span>
               </div>
             </div>
 
@@ -3636,30 +3636,22 @@ function renderStudentDashboard() {
 
             <div class="metallic-id-details-row">
               <div><span>Roll:</span> <strong>#${s.rollNo}</strong></div>
-              <div><span>Batch:</span> <strong>${sanitizeInput(s.className)}</strong></div>
+              <div><span>DOB:</span> <strong>${formatDate(s.dob)}</strong></div>
               <div><span>Contact:</span> <strong>${sanitizeInput(s.mobile)}</strong></div>
               <div><span>Guardian:</span> <strong>${sanitizeInput(s.guardianName || 'Parent/Guardian')}</strong></div>
             </div>
 
-            <div class="metallic-status-highlight-strip">
-              <div class="metallic-status-strip-left">
-                <span class="metallic-strip-label">Status:</span>
-                ${isFeeCleared ? `
-                  <span class="metallic-status-pill pill-cleared">
-                    <span class="status-pulsing-gem"></span>
-                    <i aria-hidden="true" class="fa-solid fa-shield-check"></i>
-                    <span>ACTIVE · CLEARED</span>
-                  </span>
-                ` : `
-                  <span class="metallic-status-pill pill-due">
-                    <i aria-hidden="true" class="fa-solid fa-triangle-exclamation"></i>
-                    <span>₹${pendingFee.toLocaleString('en-IN')} DUE</span>
-                  </span>
-                `}
+            <div class="metallic-credential-highlight-strip">
+              <div class="metallic-credential-strip-left">
+                <span class="metallic-credential-pill">
+                  <span class="status-pulsing-gem"></span>
+                  <i aria-hidden="true" class="fa-solid fa-shield-check"></i>
+                  <span>ACTIVE SCHOLAR</span>
+                </span>
               </div>
-              <div class="metallic-status-strip-right">
-                <span class="metallic-strip-label">Tuition:</span>
-                <strong>₹${displayTotalFee.toLocaleString('en-IN')}</strong>
+              <div class="metallic-credential-strip-right">
+                <span class="metallic-strip-label">Session:</span>
+                <strong>2026–2027</strong>
               </div>
             </div>
 
@@ -3671,7 +3663,7 @@ function renderStudentDashboard() {
             </div>
           </div>
 
-          <!-- BACK FACE: Official Academic & Fee Ledger -->
+          <!-- BACK FACE: Official Student Credentials & Signatures -->
           <div class="card-face card-face-back">
             <div class="metallic-card-glimmer"></div>
 
@@ -3679,8 +3671,8 @@ function renderStudentDashboard() {
               <div class="metallic-id-brand">
                 <img src="assets/images/logo.png" class="metallic-id-logo" alt="Pragyan Institute Logo">
                 <div>
-                  <div class="metallic-id-inst-name">FEE & ACADEMIC LEDGER</div>
-                  <div class="metallic-id-inst-sub">Official Institutional Credentials</div>
+                  <div class="metallic-id-inst-name">STUDENT CREDENTIALS</div>
+                  <div class="metallic-id-inst-sub">Official Academic Identification Pass</div>
                 </div>
               </div>
               <div class="metallic-hologram-seal">
@@ -3689,24 +3681,46 @@ function renderStudentDashboard() {
             </div>
 
             <div class="back-card-content">
-              <div class="back-meta-item">
-                <span class="back-label">Student Name:</span>
-                <span class="back-val">${sanitizeInput(s.name)}</span>
+              <div class="back-meta-grid-2col">
+                <div class="back-meta-item">
+                  <span class="back-label">Student ID:</span>
+                  <span class="back-val font-mono">${s.student_id || s.rollNo || s.id}</span>
+                </div>
+                <div class="back-meta-item">
+                  <span class="back-label">Roll Number:</span>
+                  <span class="back-val">#${s.rollNo}</span>
+                </div>
+                <div class="back-meta-item">
+                  <span class="back-label">Class &amp; Batch:</span>
+                  <span class="back-val">${sanitizeInput(s.batchName || s.className)}</span>
+                </div>
+                <div class="back-meta-item">
+                  <span class="back-label">Date of Birth:</span>
+                  <span class="back-val">${formatDate(s.dob)}</span>
+                </div>
+                <div class="back-meta-item">
+                  <span class="back-label">Father / Guardian:</span>
+                  <span class="back-val">${sanitizeInput(s.guardianName || 'Parent / Guardian')}</span>
+                </div>
+                <div class="back-meta-item">
+                  <span class="back-label">Emergency Phone:</span>
+                  <span class="back-val">${sanitizeInput(s.guardianMobile || s.mobile)}</span>
+                </div>
+                <div class="back-meta-item">
+                  <span class="back-label">Blood Group:</span>
+                  <span class="back-val">${s.bloodGroup || 'Not Specified'}</span>
+                </div>
+                <div class="back-meta-item">
+                  <span class="back-label">Academic Session:</span>
+                  <span class="back-val">2026–2027</span>
+                </div>
               </div>
-              <div class="back-meta-item">
-                <span class="back-label">Enrolled Batch:</span>
-                <span class="back-val">${sanitizeInput(s.batchName || s.className)}</span>
-              </div>
-              <div class="back-meta-item highlight-dues-box">
-                <span class="back-label">Tuition Clearance:</span>
-                <span class="back-dues-pill ${isFeeCleared ? 'no-dues' : 'has-dues'}">
-                  <i aria-hidden="true" class="fa-solid ${isFeeCleared ? 'fa-circle-check' : 'fa-triangle-exclamation'}"></i>
-                  ${isFeeCleared ? '100% Fee Cleared · Active Pass' : `₹${pendingFee.toLocaleString('en-IN')} Pending Balance`}
-                </span>
-              </div>
-              <div class="back-meta-grid">
-                <div><span>Total Fee:</span> <strong>₹${displayTotalFee.toLocaleString('en-IN')}</strong></div>
-                <div><span>Total Paid:</span> <strong style="color: #34D399;">₹${displayPaidFee.toLocaleString('en-IN')}</strong></div>
+
+              <!-- Inspiring Institutional Academic Quote -->
+              <div class="back-quote-box">
+                <i aria-hidden="true" class="fa-solid fa-quote-left quote-icon"></i>
+                <p class="quote-text">“Education is the most powerful weapon which you can use to change the world.”</p>
+                <div class="quote-author">— Nelson Mandela • Pragyan Academic Motto</div>
               </div>
             </div>
 
@@ -3716,7 +3730,7 @@ function renderStudentDashboard() {
                   <span class="back-sign-title">DIRECTOR</span>
                   <div class="signature-script">Chandan Kumar</div>
                 </div>
-                <div class="back-seal-center" title="Pragyan Seal">
+                <div class="back-seal-center" title="Pragyan Institute Seal">
                   <i aria-hidden="true" class="fa-solid fa-stamp"></i>
                 </div>
                 <div class="back-sign-block" style="text-align: right;">
@@ -4343,40 +4357,42 @@ function renderStudentDashboard() {
   function printStudentVIPCard(student) {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
-    const isCleared = !student.pendingFee || Number(student.pendingFee) <= 0;
     const initialLetter = sanitizeInput(student.name?.charAt(0) || 'S');
     const safeName = sanitizeInput(student.name);
     const safeRoll = sanitizeInput(student.rollNo);
     const safeClass = sanitizeInput(student.className);
     const safeMobile = sanitizeInput(student.mobile);
+    const safeDob = formatDate(student.dob);
+    const safeGuardian = sanitizeInput(student.guardianName || 'Parent / Guardian');
     const safePhoto = sanitizeUrl(student.photoUrl);
 
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
         <head>
-          <title>VIP Scholar Card - ${safeName} - Pragyan Institute</title>
+          <title>Student ID Pass - ${safeName} - Pragyan Institute</title>
           <style>
             @page { size: A4 portrait; margin: 15mm; }
             body { font-family: 'Segoe UI', Arial, sans-serif; background: #FAF9F6; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-            .id-card-print { width: 340px; height: 215px; border-radius: 14px; background: #064E3B; color: #fff; padding: 16px; box-sizing: border-box; position: relative; border: 2px solid #F59E0B; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+            .id-card-print { width: 340px; height: 220px; border-radius: 14px; background: #064E3B; color: #fff; padding: 16px; box-sizing: border-box; position: relative; border: 2px solid #F59E0B; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
             .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 8px; }
             .title { font-size: 13px; font-weight: 800; letter-spacing: 0.5px; }
-            .body { display: flex; gap: 12px; margin-top: 12px; }
+            .body { display: flex; gap: 12px; margin-top: 10px; }
             .photo { width: 68px; height: 68px; border-radius: 8px; border: 2px solid #F59E0B; object-fit: cover; background: #04382B; }
-            .info { flex: 1; font-size: 11px; line-height: 1.5; }
-            .name { font-size: 14px; font-weight: 800; color: #FCD34D; margin-bottom: 4px; }
-            .badge { display: inline-block; background: ${isCleared ? '#10B981' : '#F59E0B'}; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: bold; }
-            .footer { margin-top: 10px; font-size: 8.5px; text-align: center; color: rgba(255,255,255,0.7); }
+            .info { flex: 1; font-size: 11px; line-height: 1.45; }
+            .name { font-size: 14px; font-weight: 800; color: #FCD34D; margin-bottom: 3px; }
+            .badge { display: inline-block; background: #10B981; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: bold; }
+            .quote { margin-top: 8px; font-style: italic; font-size: 9px; color: #FDE68A; text-align: center; border-top: 1px dashed rgba(255,255,255,0.2); padding-top: 5px; }
+            .footer { margin-top: 6px; font-size: 8.5px; text-align: center; color: rgba(255,255,255,0.85); display: flex; justify-content: space-between; }
           </style>
         </head>
         <body>
           <h2 style="color: #064E3B; margin-bottom: 4px;">PRAGYAN INSTITUTE LALGANJ</h2>
-          <p style="color: #6B7280; font-size: 12px; margin-top: 0; margin-bottom: 20px;">Official Student VIP ID Pass — Academic Session 2026–27</p>
+          <p style="color: #6B7280; font-size: 12px; margin-top: 0; margin-bottom: 20px;">Official Student ID Pass — Academic Session 2026–27</p>
           <div class="id-card-print">
             <div class="header">
               <div class="title">PRAGYAN INSTITUTE</div>
-              <span class="badge">VIP SCHOLAR</span>
+              <span class="badge">SCHOLAR PASS</span>
             </div>
             <div class="body">
               ${safePhoto ? `<img src="${safePhoto}" class="photo" alt="Photo">` : `<div class="photo" style="display:flex;align-items:center;justify-content:center;font-size:24px;color:#fff;">${initialLetter}</div>`}
@@ -4384,11 +4400,16 @@ function renderStudentDashboard() {
                 <div class="name">${safeName}</div>
                 <div><strong>Roll No:</strong> #${safeRoll}</div>
                 <div><strong>Class:</strong> ${safeClass}</div>
-                <div><strong>Mobile:</strong> ${safeMobile}</div>
-                <div><strong>Status:</strong> ${isCleared ? '🟢 Fees Cleared' : '⚠️ Due Balance'}</div>
+                <div><strong>DOB:</strong> ${safeDob}</div>
+                <div><strong>Contact:</strong> ${safeMobile}</div>
+                <div><strong>Guardian:</strong> ${safeGuardian}</div>
               </div>
             </div>
-            <div class="footer">Lalganj, Vaishali, Bihar • Mentors: Prof. Ravi Ranjan & Chandan Kumar</div>
+            <div class="quote">“Education is the most powerful weapon which you can use to change the world.”</div>
+            <div class="footer">
+              <span>Director: Chandan Kumar</span>
+              <span>Academic Head: Prof. Ravi Ranjan</span>
+            </div>
           </div>
           <script>window.onload = function() { window.print(); };<\/script>
         </body>
