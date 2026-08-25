@@ -771,7 +771,7 @@
           <h3 style="color: #1E293B; margin-bottom: 0.35rem; font-weight: 800;">Unable to Connect to Class Forum</h3>
           <p style="color: #64748B; font-size: 0.88rem; line-height: 1.5; margin-bottom: 1.25rem;">${escapeHtml(err.message)}</p>
           <div style="display: flex; gap: 0.6rem; justify-content: center; flex-wrap: wrap;">
-            <button type="button" class="btn btn-emerald" onclick="if (typeof openLoginModal === 'function') openLoginModal(); else if (typeof showLoginModal === 'function') showLoginModal(); else if (typeof AppState !== 'undefined' && typeof AppState.logout === 'function') AppState.logout(); else location.reload();" style="padding: 0.65rem 1.5rem; font-weight: 800; border-radius: 8px;">
+            <button type="button" class="btn btn-emerald" onclick="if (typeof window.relogin === 'function') window.relogin(); else if (typeof openLoginModal === 'function') openLoginModal(); else location.reload();" style="padding: 0.65rem 1.5rem; font-weight: 800; border-radius: 8px; cursor: pointer;">
               <i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i> Sign In Again
             </button>
             <button type="button" class="btn" onclick="PragyanStreamChat.reconnect()" style="padding: 0.65rem 1.5rem; font-weight: 800; border-radius: 8px; background: #F1F5F9; color: #334155; border: 1px solid #CBD5E1;">

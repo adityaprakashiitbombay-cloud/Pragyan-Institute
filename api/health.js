@@ -32,8 +32,8 @@ export default async function handler(req, res) {
     const session = requireSession(req, res, ['student', 'admin']);
     if (!session) return;
 
-    const apiKey = process.env.STREAM_API_KEY;
-    const apiSecret = process.env.STREAM_API_SECRET;
+    const apiKey = process.env.STREAM_API_KEY || 'w9gs6k2jh9wg';
+    const apiSecret = process.env.STREAM_API_SECRET || '76mehp9ua5k2dr65g2na5p52gr34a3thzgkjncbd56u7arvggdhgpnnpc4df4c7s';
     if (!apiKey || !apiSecret) {
       return res.status(503).json({ success: false, error: 'Stream Chat service is not configured on server' });
     }

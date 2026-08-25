@@ -3360,6 +3360,20 @@ const supaPayload = pushableReqs.map(r => ({
     showLoginView();
   }
 
+  function relogin(targetRole) {
+    handleLogout();
+    openPortal();
+    showLoginView();
+    if (targetRole) switchLoginRole(targetRole);
+    setTimeout(() => {
+      const input = document.getElementById('portalMobileInput');
+      if (input) {
+        input.focus();
+        try { input.select(); } catch (_) {}
+      }
+    }, 100);
+  }
+
   /* --------------------------------------------------------------------------
    * Dashboard View Switcher & Renderer
    * -------------------------------------------------------------------------- */
@@ -15943,9 +15957,15 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
     }
   }
 
-  // Expose AppState to window for sync and testing
+  // Expose AppState and portal controllers to window for sync, testing and re-authentication
   if (typeof window !== 'undefined') {
     window.AppState = AppState;
+    window.openPortal = openPortal;
+    window.closePortal = closePortal;
+    window.handleLogout = handleLogout;
+    window.relogin = relogin;
+    window.openLoginModal = relogin;
+    window.showLoginModal = relogin;
   }
 
 })();

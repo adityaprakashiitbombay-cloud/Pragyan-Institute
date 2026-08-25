@@ -47,11 +47,11 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
   <!-- CSS Design System -->
-  <link rel="stylesheet" href="./css/variables.css?v=90.0.a82e0f4a">
-  <link rel="stylesheet" href="./css/main.css?v=90.0.a82e0f4a">
-  <link rel="stylesheet" href="./css/components.css?v=90.0.a82e0f4a">
-  <link rel="stylesheet" href="./css/animations.css?v=90.0.a82e0f4a">
-  <link rel="stylesheet" href="./css/portal.css?v=90.0.a82e0f4a">
+  <link rel="stylesheet" href="./css/variables.css?v=90.0.6e88f8b5">
+  <link rel="stylesheet" href="./css/main.css?v=90.0.6e88f8b5">
+  <link rel="stylesheet" href="./css/components.css?v=90.0.6e88f8b5">
+  <link rel="stylesheet" href="./css/animations.css?v=90.0.6e88f8b5">
+  <link rel="stylesheet" href="./css/portal.css?v=90.0.6e88f8b5">
 
   <!-- Schema.org JSON-LD Structured Data for Google Top Ranking & Knowledge Graph -->
   <script type="application/ld+json">
@@ -1538,24 +1538,24 @@
   <!-- Application Scripts -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
-  <script defer src="./js/config.js?v=90.0.a82e0f4a"></script>
+  <script defer src="./js/config.js?v=90.0.6e88f8b5"></script>
   <!-- Canonical batch/fee/faculty table. Must load before app.js and portal.js,
        which read window.PRAGYAN_ACADEMIC instead of keeping their own copies. -->
-  <script defer src="./js/academic-config.js?v=90.0.a82e0f4a"></script>
-  <script defer src="./js/supabase-sync.js?v=90.0.a82e0f4a"></script>
-  <script type="module" src="./js/blog-markdown.js?v=90.0.a82e0f4a"></script>
+  <script defer src="./js/academic-config.js?v=90.0.6e88f8b5"></script>
+  <script defer src="./js/supabase-sync.js?v=90.0.6e88f8b5"></script>
+  <script type="module" src="./js/blog-markdown.js?v=90.0.6e88f8b5"></script>
         <script src="https://cdn.jsdelivr.net/npm/stream-chat@8.52.0/dist/browser.full-bundle.min.js"></script>
-        <script defer src="./js/stream-community-chat.js?v=90.0.a82e0f4a"></script>
-  <script defer src="./js/push-client.js?v=90.0.a82e0f4a"></script>
-  <script defer src="./js/chat.js?v=90.0.a82e0f4a"></script>
-  <script defer src="./js/app.js?v=90.0.a82e0f4a"></script>
-  <script defer src="./js/portal.js?v=90.0.a82e0f4a"></script>
+        <script defer src="./js/stream-community-chat.js?v=90.0.6e88f8b5"></script>
+  <script defer src="./js/push-client.js?v=90.0.6e88f8b5"></script>
+  <script defer src="./js/chat.js?v=90.0.6e88f8b5"></script>
+  <script defer src="./js/app.js?v=90.0.6e88f8b5"></script>
+  <script defer src="./js/portal.js?v=90.0.6e88f8b5"></script>
 
   <!-- PWA Service Worker Registration for Instant Offline Caching -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=90.0.a82e0f4a').then(reg => {
+        navigator.serviceWorker.register('./sw.js?v=90.0.6e88f8b5').then(reg => {
           reg.update().catch(() => {});
         }).catch(err => console.log('SW reg error:', err));
       });
