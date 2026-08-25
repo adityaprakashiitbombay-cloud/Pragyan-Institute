@@ -557,8 +557,7 @@ export default async function handler(req, res) {
 
     if (result.error) {
       // Graceful fallback for newly introduced optional tables before operator applies SQL migration in Supabase SQL editor
-      if (operation === 'select' && (table === 'class_schedules' || table === 'institute_holidays') &&
-          (result.error.code === '42P01' || result.error.message?.includes('schema cache') || result.error.message?.includes('does not exist'))) {
+      if (operation === 'select' && (result.error.code === '42P01' || result.error.message?.includes('schema cache') || result.error.message?.includes('does not exist') || result.error.message?.includes('relation'))) {
         return res.status(200).json({ success: true, data: [] });
       }
 

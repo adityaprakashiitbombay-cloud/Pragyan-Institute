@@ -657,17 +657,28 @@
             }
           });
 
-          // Auto-recovery for expired session tokens (401 across tables):
+          // Auto-recovery for expired session tokens (401 across private tables):
           // Clear stale token and immediately pull live public catalogue to prevent offline cache lock
-          if (hasSession && authFailedCount === tables.length) {
-            console.warn('[SupabaseSync] Stale session token detected (401 across queries). Resetting session and syncing public catalogue.');
+          const privateTables = tables.filter(t => !['notices', 'batches', 'blog_posts', 'class_schedules', 'institute_holidays'].includes(t));
+          const isAuthExpired = hasSession && authFailedCount > 0 && (
+            (privateTables.length > 0 && authFailedCount >= privateTables.length) ||
+            failedTables.includes('students') ||
+            failedTables.includes('fee_receipts')
+          );
+
+          if (isAuthExpired) {
+            console.warn('[SupabaseSync] Expired or invalid session token detected. Resetting stale token and syncing live public catalogue.');
             this.sessionToken = null;
             this.sessionRole = null;
             sessionStorage.removeItem('pragyan_portal_token');
             sessionStorage.removeItem('pragyan_portal_role');
+            sessionStorage.removeItem('pragyan_portal_session');
             localStorage.removeItem('pragyan_portal_token');
             localStorage.removeItem('pragyan_portal_role');
-            if (typeof AppState !== 'undefined' && AppState.token) AppState.token = null;
+            localStorage.removeItem('pragyan_portal_session');
+            if (typeof AppState !== 'undefined') {
+              if (AppState.token) AppState.token = null;
+            }
 
             const publicTables = ['notices', 'batches', 'blog_posts', 'class_schedules', 'institute_holidays'];
             const publicResults = await Promise.allSettled(
@@ -690,8 +701,8 @@
             }
           }
 
-          // If critical tables failed, rollback and preserve local cache
-          const isCriticalFailure = failedTables.includes('students') && failedTables.includes('fee_receipts');
+          // If critical tables failed, rollback and preserve local cache ONLY if truly offline and nothing succeeded
+          const isCriticalFailure = failedTables.includes('students') && failedTables.includes('fee_receipts') && !isAuthExpired;
           if (failedTables.length === tables.length || isCriticalFailure) {
             console.error(`❌ Sync failed for critical tables: ${failedTables.join(', ')}. Preserving local state.`);
             this._connected = false;

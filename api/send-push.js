@@ -32,7 +32,7 @@ export default async function handler(req, res) {
   const cronSecret = process.env.CRON_SECRET;
   const isCron = Boolean(cronSecret && (cronHeader === `Bearer ${cronSecret}` || req.headers['x-cron-secret'] === cronSecret));
 
-  if (!isCron) {
+  if (req.method === 'POST' && !isCron) {
     session = requireSession(req, res, ['admin']);
     if (!session) return;
   }
