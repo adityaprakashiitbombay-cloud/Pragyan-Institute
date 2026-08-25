@@ -14611,25 +14611,25 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
 
     pane.innerHTML = `
       <div class="dash-card schedule-header-card" style="margin-bottom: 1.25rem;">
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1.25rem;">
           <div>
-            <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.35rem;">
+            <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.45rem;">
               <span class="section-tag"><i aria-hidden="true" class="fa-solid fa-calendar-week"></i> Academic Scheduling</span>
               <span class="pill-item pill-emerald"><i aria-hidden="true" class="fa-solid fa-cloud-arrow-up"></i> Supabase Cloud Synced</span>
             </div>
-            <h3 style="font-size:1.35rem; font-weight:800; color:var(--text-mahogany); margin:0;">
+            <h3 class="schedule-header-title">
               Class Timetable, Weekly Repeating & Holiday Controls
             </h3>
-            <p style="color:var(--text-muted); font-size:0.88rem; margin:0.3rem 0 0 0;">
+            <p class="schedule-header-subtitle">
               Configure daily periods, replicate standard timetables across the entire week with 1 click, toggle sudden class-offs, and declare official holidays.
             </p>
           </div>
           
-          <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-            <button type="button" class="btn" id="btnAdminAddPeriod" style="background:var(--primary-emerald); color:#fff; font-weight:700; border-radius:8px; padding:0.6rem 1rem;">
+          <div style="display:flex; gap:0.65rem; flex-wrap:wrap;">
+            <button type="button" class="btn" id="btnAdminAddPeriod" style="background:#10B981; color:#FFFFFF; font-weight:800; border-radius:8px; padding:0.65rem 1.15rem; border:1.5px solid #34D399; box-shadow:0 4px 12px rgba(16,185,129,0.35);">
               <i aria-hidden="true" class="fa-solid fa-plus"></i> Add Period
             </button>
-            <button type="button" class="btn" id="btnAdminAddHoliday" style="background:#F59E0B; color:#fff; font-weight:700; border-radius:8px; padding:0.6rem 1rem;">
+            <button type="button" class="btn" id="btnAdminAddHoliday" style="background:linear-gradient(135deg, #FDE68A 0%, #F59E0B 100%); color:#78350F; font-weight:800; border-radius:8px; padding:0.65rem 1.15rem; border:1.5px solid #FCD34D; box-shadow:0 4px 12px rgba(245,158,11,0.3);">
               <i aria-hidden="true" class="fa-solid fa-umbrella-beach"></i> Declare Holiday
             </button>
           </div>
@@ -14637,16 +14637,16 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
       </div>
 
       <!-- Controls & Filter Toolbar -->
-      <div class="dash-card schedule-toolbar" style="margin-bottom: 1.25rem; background: #FFFFFF;">
+      <div class="dash-card schedule-toolbar" style="margin-bottom: 1.25rem;">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1rem;">
           <!-- Batch Selector -->
-          <div class="schedule-batch-selector-wrap" style="display:flex; align-items:center; gap:0.6rem;">
-            <label for="adminScheduleBatchSelect" style="font-weight:700; font-size:0.9rem; color:var(--text-mahogany); white-space:nowrap;">
-              <i aria-hidden="true" class="fa-solid fa-users-rectangle" style="color:var(--primary-emerald);"></i> Select Batch:
+          <div class="schedule-batch-selector-wrap" style="display:flex; align-items:center; gap:0.65rem;">
+            <label for="adminScheduleBatchSelect" style="font-weight:800; font-size:0.95rem; color:#0F172A; white-space:nowrap;">
+              <i aria-hidden="true" class="fa-solid fa-users-rectangle" style="color:#047857;"></i> Select Batch:
             </label>
-            <select id="adminScheduleBatchSelect" class="form-input schedule-batch-select" aria-label="Select Batch" style="min-width:240px; font-weight:700; padding:0.45rem 0.75rem; border-radius:8px;">
+            <select id="adminScheduleBatchSelect" class="form-input schedule-batch-select" aria-label="Select Batch" style="min-width:240px;">
               ${batches.map(b => {
-                const bId = b.id || b.batch_id;
+                const bId = b.batchId || b.id || b.batch_id;
                 const bName = b.name || b.batch_name || bId;
                 return `<option value="${escapeHtml(bId)}" ${bId === activeAdminScheduleBatchId ? 'selected' : ''}>${escapeHtml(bName)} (${escapeHtml(bId)})</option>`;
               }).join('')}
@@ -14655,10 +14655,10 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
 
           <!-- Quick Action Buttons: Repeat Week & Class Off -->
           <div class="schedule-quick-actions-bar">
-            <button type="button" class="btn" id="btnReplicateWeek" style="background:#EFF6FF; border:1.5px solid #3B82F6; color:#1D4ED8; font-weight:700; border-radius:8px; padding:0.45rem 0.85rem; font-size:0.85rem;" title="Copy this day's timetable to all other days (Monday to Saturday)">
+            <button type="button" class="btn" id="btnReplicateWeek" style="background:linear-gradient(135deg, #1E40AF 0%, #2563EB 100%); border:1.5px solid #1D4ED8; color:#FFFFFF; font-weight:800; border-radius:8px; padding:0.55rem 1rem; font-size:0.85rem; box-shadow:0 3px 10px rgba(37,99,235,0.25);" title="Copy this day's timetable to all other days (Monday to Saturday)">
               <i aria-hidden="true" class="fa-solid fa-bolt"></i> ⚡ Repeat for Whole Week (Mon–Sat)
             </button>
-            <button type="button" class="btn" id="btnToggleDayOff" style="background:${isAllOff ? '#ECFDF5' : '#FEF2F2'}; border:1.5px solid ${isAllOff ? '#10B981' : '#EF4444'}; color:${isAllOff ? '#047857' : '#B91C1C'}; font-weight:700; border-radius:8px; padding:0.45rem 0.85rem; font-size:0.85rem;">
+            <button type="button" class="btn" id="btnToggleDayOff" style="background:${isAllOff ? 'linear-gradient(135deg, #065F46 0%, #047857 100%)' : 'linear-gradient(135deg, #DC2626 0%, #B91C1C 100%)'}; border:1.5px solid ${isAllOff ? '#047857' : '#991B1B'}; color:#FFFFFF; font-weight:800; border-radius:8px; padding:0.55rem 1rem; font-size:0.85rem; box-shadow:0 3px 10px ${isAllOff ? 'rgba(4,120,87,0.25)' : 'rgba(220,38,38,0.25)'};">
               <i aria-hidden="true" class="${isAllOff ? 'fa-solid fa-circle-check' : 'fa-solid fa-ban'}"></i> ${isAllOff ? 'Resume All Classes' : '🚫 Mark Entire Day as Class Off'}
             </button>
           </div>
@@ -14672,7 +14672,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
             const hasOff = periodsForD.length > 0 && periodsForD.every(p => !!p.is_cancelled);
             return `
               <button type="button" class="student-week-chip ${isActive ? 'active' : ''}" data-day="${d}" aria-label="Day ${d}">
-                ${d} (${periodsForD.length}) ${hasOff ? '🚫' : ''}
+                ${d} (${periodsForD.length}) ${hasOff ? '<span style="color:#DC2626; font-weight:900;">🚫</span>' : ''}
               </button>
             `;
           }).join('')}
@@ -14681,28 +14681,28 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
 
       <!-- Periods Grid Section -->
       <div class="dash-card" style="margin-bottom: 1.5rem;">
-        <div class="dash-card-header" style="margin-bottom:1.15rem;">
-          <div class="dash-card-title">
-            <i aria-hidden="true" class="fa-solid fa-clock-rotate-left"></i> Periods for ${escapeHtml(activeAdminScheduleDay)} — ${escapeHtml(batchDisplayName)}
+        <div class="dash-card-header" style="margin-bottom:1.15rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+          <div class="dash-card-title" style="font-size:1.15rem; font-weight:800; color:#0F172A;">
+            <i aria-hidden="true" class="fa-solid fa-clock-rotate-left" style="color:#047857;"></i> Periods for ${escapeHtml(activeAdminScheduleDay)} — ${escapeHtml(batchDisplayName)}
           </div>
-          <span style="font-size:0.85rem; font-weight:700; color:var(--text-muted);">
+          <span style="font-size:0.88rem; font-weight:800; color:#0F172A; background:#F1F5F9; border:1px solid #CBD5E1; padding:0.3rem 0.75rem; border-radius:6px;">
             Total: <strong>${currentPeriods.length}</strong> period${currentPeriods.length === 1 ? '' : 's'}
           </span>
         </div>
 
         ${currentPeriods.length === 0 ? `
-          <div style="text-align:center; padding:3rem 1.5rem; background:var(--bg-surface-cream); border-radius:12px; border:1.5px dashed var(--border-sand);">
-            <i aria-hidden="true" class="fa-solid fa-calendar-xmark" style="font-size:2.4rem; color:var(--text-sand); margin-bottom:0.75rem; display:block;"></i>
-            <h4 style="font-size:1.1rem; font-weight:800; color:var(--text-mahogany); margin-bottom:0.35rem;">No Periods Scheduled for ${escapeHtml(activeAdminScheduleDay)}</h4>
-            <p style="color:var(--text-muted); font-size:0.88rem; max-width:480px; margin:0 auto 1.25rem auto;">
+          <div style="text-align:center; padding:3rem 1.5rem; background:#F8FAFC; border-radius:12px; border:2px dashed #CBD5E1;">
+            <i aria-hidden="true" class="fa-solid fa-calendar-xmark" style="font-size:2.6rem; color:#64748B; margin-bottom:0.75rem; display:block;"></i>
+            <h4 style="font-size:1.15rem; font-weight:800; color:#0F172A; margin-bottom:0.35rem;">No Periods Scheduled for ${escapeHtml(activeAdminScheduleDay)}</h4>
+            <p style="color:#475569; font-size:0.9rem; font-weight:500; max-width:480px; margin:0 auto 1.25rem auto;">
               Create periods one-by-one or use standard template to quickly seed the batch timetable.
             </p>
             <div style="display:flex; justify-content:center; gap:0.75rem; flex-wrap:wrap;">
-              <button type="button" class="btn" id="btnAdminEmptyAddPeriod" style="background:var(--primary-emerald); color:#fff; font-weight:700; padding:0.5rem 1.1rem; border-radius:8px;">
+              <button type="button" class="btn" id="btnAdminEmptyAddPeriod" style="background:#10B981; color:#FFFFFF; font-weight:800; padding:0.55rem 1.2rem; border-radius:8px; border:1.5px solid #34D399;">
                 <i aria-hidden="true" class="fa-solid fa-plus"></i> Add First Period
               </button>
-              <button type="button" class="btn" id="btnAdminSeedDefault" style="background:#FAF9F6; border:1.5px solid var(--border-sand); color:var(--text-mahogany); font-weight:700; padding:0.5rem 1.1rem; border-radius:8px;">
-                <i aria-hidden="true" class="fa-solid fa-wand-magic-sparkles" style="color:var(--primary-emerald);"></i> Auto-Populate Standard Subjects
+              <button type="button" class="btn" id="btnAdminSeedDefault" style="background:#FFFFFF; border:1.5px solid #047857; color:#047857; font-weight:800; padding:0.55rem 1.2rem; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.04);">
+                <i aria-hidden="true" class="fa-solid fa-wand-magic-sparkles" style="color:#047857;"></i> Auto-Populate Standard Subjects
               </button>
             </div>
           </div>
@@ -14719,34 +14719,34 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
                   </div>
 
                   <div class="period-subject-title">
-                    <i aria-hidden="true" class="${p.is_cancelled ? 'fa-solid fa-ban' : 'fa-solid fa-book-bookmark'}" style="color:${p.is_cancelled ? '#DC2626' : 'var(--primary-emerald)'};"></i>
+                    <i aria-hidden="true" class="${p.is_cancelled ? 'fa-solid fa-ban' : 'fa-solid fa-book-bookmark'}" style="color:${p.is_cancelled ? '#DC2626' : '#047857'};"></i>
                     <span style="${p.is_cancelled ? 'text-decoration:line-through; color:#991B1B;' : ''}">${escapeHtml(p.subject)}</span>
                   </div>
 
-                  <div class="period-meta-row" style="margin-top:0.75rem;">
+                  <div class="period-meta-row">
                     <div class="period-meta-item">
                       <i aria-hidden="true" class="fa-solid fa-chalkboard-user"></i>
                       <span><strong>Teacher:</strong> ${escapeHtml(p.teacher || 'Not Assigned')}</span>
                     </div>
                     <div class="period-meta-item">
-                      <i aria-hidden="true" class="fa-solid fa-door-open"></i>
+                      <i aria-hidden="true" class="fa-solid fa-door-open" style="color:#2563EB;"></i>
                       <span><strong>Classroom:</strong> ${escapeHtml(p.room || 'Main Hall')}</span>
                     </div>
                     <div class="period-meta-item">
-                      <i aria-hidden="true" class="fa-solid fa-signal"></i>
-                      <span><strong>Status:</strong> ${p.is_cancelled ? '<span style="color:#DC2626; font-weight:800;">🚫 Cancelled / Class Off</span>' : '<span style="color:#047857; font-weight:800;">🟢 Active & Scheduled</span>'}</span>
+                      <i aria-hidden="true" class="fa-solid fa-signal" style="color:#D97706;"></i>
+                      <span><strong>Status:</strong> ${p.is_cancelled ? '<span class="status-pill status-cancelled" style="background:#FEE2E2; color:#991B1B; border:1px solid #FCA5A5; font-weight:800; font-size:0.78rem; padding:0.2rem 0.55rem; border-radius:99px;"><i aria-hidden="true" class="fa-solid fa-ban"></i> Cancelled / Class Off</span>' : '<span class="status-pill status-verified" style="background:#D1FAE5; color:#065F46; border:1px solid #6EE7B7; font-weight:800; font-size:0.78rem; padding:0.2rem 0.55rem; border-radius:99px;"><i aria-hidden="true" class="fa-solid fa-circle-check"></i> Active & Scheduled</span>'}</span>
                     </div>
                   </div>
                 </div>
 
                 <div class="period-card-actions">
-                  <button type="button" class="btn btn-sm btn-edit-period" data-id="${escapeHtml(p.id)}" aria-label="Edit period" style="background:#F3F4F6; border:1px solid #D1D5DB; color:var(--text-mahogany); font-weight:700; border-radius:6px; padding:0.35rem 0.65rem; font-size:0.8rem;">
+                  <button type="button" class="btn btn-sm btn-edit-period" data-id="${escapeHtml(p.id)}" aria-label="Edit period" style="background:#F1F5F9; border:1.5px solid #94A3B8; color:#0F172A; font-weight:800; border-radius:6px; padding:0.4rem 0.75rem; font-size:0.82rem;">
                     <i aria-hidden="true" class="fa-solid fa-pen-to-square"></i> Edit
                   </button>
-                  <button type="button" class="btn btn-sm btn-toggle-period-off" data-id="${escapeHtml(p.id)}" aria-label="Toggle class off" style="background:${p.is_cancelled ? '#ECFDF5' : '#FEF2F2'}; border:1px solid ${p.is_cancelled ? '#A7F3D0' : '#FECACA'}; color:${p.is_cancelled ? '#047857' : '#DC2626'}; font-weight:700; border-radius:6px; padding:0.35rem 0.65rem; font-size:0.8rem;">
+                  <button type="button" class="btn btn-sm btn-toggle-period-off" data-id="${escapeHtml(p.id)}" aria-label="Toggle class off" style="background:${p.is_cancelled ? '#D1FAE5' : '#FEE2E2'}; border:1.5px solid ${p.is_cancelled ? '#34D399' : '#F87171'}; color:${p.is_cancelled ? '#065F46' : '#991B1B'}; font-weight:800; border-radius:6px; padding:0.4rem 0.75rem; font-size:0.82rem;">
                     <i aria-hidden="true" class="${p.is_cancelled ? 'fa-solid fa-rotate-left' : 'fa-solid fa-ban'}"></i> ${p.is_cancelled ? 'Resume' : 'Class Off'}
                   </button>
-                  <button type="button" class="btn btn-sm btn-delete-period" data-id="${escapeHtml(p.id)}" aria-label="Delete period" style="background:#FFF1F2; border:1px solid #FECDD3; color:#E11D48; font-weight:700; border-radius:6px; padding:0.35rem 0.65rem; font-size:0.8rem;">
+                  <button type="button" class="btn btn-sm btn-delete-period" data-id="${escapeHtml(p.id)}" aria-label="Delete period" style="background:#FFE4E6; border:1.5px solid #FDA4AF; color:#BE123C; font-weight:800; border-radius:6px; padding:0.4rem 0.75rem; font-size:0.82rem;">
                     <i aria-hidden="true" class="fa-solid fa-trash"></i>
                   </button>
                 </div>
@@ -14758,22 +14758,25 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
 
       <!-- Institute Holidays & Breaks Section -->
       <div class="dash-card">
-        <div class="dash-card-header">
+        <div class="dash-card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
           <div>
-            <div class="dash-card-title"><i aria-hidden="true" class="fa-solid fa-umbrella-beach"></i> Official Institute Holidays & Breaks</div>
-            <div style="font-size:0.82rem; color:var(--text-muted); margin-top:0.2rem;">
+            <div class="dash-card-title" style="font-size:1.15rem; font-weight:800; color:#78350F;">
+              <i aria-hidden="true" class="fa-solid fa-umbrella-beach" style="color:#D97706;"></i> Official Institute Holidays & Breaks
+            </div>
+            <div style="font-size:0.86rem; color:#475569; font-weight:500; margin-top:0.2rem;">
               Holidays automatically display banners across student portals and indicate day-off alerts.
             </div>
           </div>
-          <button type="button" class="btn" id="btnAdminSectionAddHoliday" style="background:#F59E0B; color:#fff; font-weight:700; border-radius:8px; padding:0.4rem 0.85rem; font-size:0.85rem;">
+          <button type="button" class="btn" id="btnAdminSectionAddHoliday" style="background:linear-gradient(135deg, #FDE68A 0%, #F59E0B 100%); color:#78350F; font-weight:800; border-radius:8px; padding:0.45rem 0.95rem; font-size:0.85rem; border:1.5px solid #FCD34D; box-shadow:0 3px 10px rgba(245,158,11,0.25);">
             <i aria-hidden="true" class="fa-solid fa-plus"></i> New Holiday
           </button>
         </div>
 
         ${allHolidays.length === 0 ? `
-          <div style="padding:1.5rem; text-align:center; color:var(--text-muted); background:var(--bg-surface-cream); border-radius:8px;">
-            <i aria-hidden="true" class="fa-solid fa-sun" style="font-size:1.8rem; opacity:0.6; display:block; margin-bottom:0.4rem;"></i>
-            No active holidays or breaks configured. Click "New Holiday" to declare one.
+          <div style="padding:2rem 1.5rem; text-align:center; color:#475569; background:#F8FAFC; border-radius:12px; border:2px dashed #CBD5E1; margin-top:1rem;">
+            <i aria-hidden="true" class="fa-solid fa-sun" style="font-size:2rem; color:#F59E0B; opacity:0.8; display:block; margin-bottom:0.4rem;"></i>
+            <h5 style="font-size:1rem; font-weight:800; color:#0F172A; margin-bottom:0.25rem;">No Holidays Declared</h5>
+            <div style="font-size:0.86rem; color:#64748B;">No active holidays or breaks configured. Click "New Holiday" to declare one.</div>
           </div>
         ` : `
           <div class="holiday-list-grid">
@@ -14783,19 +14786,19 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
                   <div class="holiday-title">
                     <span>🏖️ ${escapeHtml(h.title || 'Institute Holiday')}</span>
                   </div>
-                  <div class="holiday-dates" style="margin-top:0.35rem;">
+                  <div class="holiday-dates">
                     <i aria-hidden="true" class="fa-regular fa-calendar"></i> ${escapeHtml(h.start_date || '')} ${h.end_date && h.end_date !== h.start_date ? `to ${escapeHtml(h.end_date)}` : ''}
                   </div>
-                  <div style="font-size:0.82rem; color:var(--text-muted); margin-top:0.35rem;">
-                    <strong>Target:</strong> ${h.target_batch === 'ALL' || !h.target_batch ? '<span class="status-pill status-verified" style="font-size:0.75rem;">All Batches</span>' : `<span class="status-pill status-adjusted" style="font-size:0.75rem;">${escapeHtml(h.target_batch)}</span>`}
+                  <div style="font-size:0.85rem; color:#334155; font-weight:600; margin-top:0.5rem;">
+                    <strong>Target:</strong> ${h.target_batch === 'ALL' || !h.target_batch ? '<span class="status-pill status-verified" style="background:#D1FAE5; color:#065F46; border:1px solid #6EE7B7; font-weight:800; font-size:0.78rem; padding:0.2rem 0.55rem; border-radius:6px;">All Batches</span>' : `<span class="status-pill status-adjusted" style="background:#EDE9FE; color:#5B21B6; border:1px solid #DDD6FE; font-weight:800; font-size:0.78rem; padding:0.2rem 0.55rem; border-radius:6px;">${escapeHtml(h.target_batch)}</span>`}
                   </div>
-                  ${h.description ? `<div style="font-size:0.8rem; color:#475569; margin-top:0.4rem; font-style:italic;">"${escapeHtml(h.description)}"</div>` : ''}
+                  ${h.description ? `<div style="font-size:0.86rem; color:#1E293B; margin-top:0.45rem; font-weight:500; font-style:italic;">"${escapeHtml(h.description)}"</div>` : ''}
                 </div>
-                <div style="display:flex; justify-content:flex-end; gap:0.5rem; border-top:1px dashed #FDE68A; padding-top:0.6rem; margin-top:0.6rem;">
-                  <button type="button" class="btn btn-sm btn-edit-holiday" data-id="${escapeHtml(h.id)}" aria-label="Edit holiday" style="background:#FEF3C7; color:#92400E; border:1px solid #FDE68A; font-weight:700; border-radius:6px; padding:0.25rem 0.6rem; font-size:0.78rem;">
+                <div style="display:flex; justify-content:flex-end; gap:0.5rem; border-top:1px dashed #FDE68A; padding-top:0.65rem; margin-top:0.65rem;">
+                  <button type="button" class="btn btn-sm btn-edit-holiday" data-id="${escapeHtml(h.id)}" aria-label="Edit holiday" style="background:#FEF3C7; color:#92400E; border:1.5px solid #FCD34D; font-weight:800; border-radius:6px; padding:0.35rem 0.75rem; font-size:0.8rem;">
                     <i aria-hidden="true" class="fa-solid fa-pen-to-square"></i> Edit
                   </button>
-                  <button type="button" class="btn btn-sm btn-delete-holiday" data-id="${escapeHtml(h.id)}" aria-label="Remove holiday" style="background:#FEF2F2; color:#DC2626; border:1px solid #FECACA; font-weight:700; border-radius:6px; padding:0.25rem 0.6rem; font-size:0.78rem;">
+                  <button type="button" class="btn btn-sm btn-delete-holiday" data-id="${escapeHtml(h.id)}" aria-label="Remove holiday" style="background:#FEE2E2; color:#991B1B; border:1.5px solid #FCA5A5; font-weight:800; border-radius:6px; padding:0.35rem 0.75rem; font-size:0.8rem;">
                     <i aria-hidden="true" class="fa-solid fa-trash"></i> Remove
                   </button>
                 </div>
