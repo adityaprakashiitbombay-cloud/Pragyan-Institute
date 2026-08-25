@@ -57,6 +57,50 @@ function resetRateLimit(identifier) {
   loginAttempts.delete(identifier);
 }
 
+// ── BUG-05: forensic login auditing ─────────────────────────────────────────
+// Successes always log; failures are throttled to the first hit per identifier
+// per warm instance so brute-force floods cannot also flood the audit table.
+// Best-effort: auth must never 500 because telemetry did. Uses its own
+// service-role client (the 429 path fires before any handler client exists).
+const loginFailSeen = new Map();
+
+function clientIpHash(req) {
+  const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown')
+    .toString().split(',')[0].trim();
+  const salt = process.env.PORTAL_SESSION_SECRET || 'pragyan-ip-salt';
+  return crypto.createHash('sha256').update(ip + salt).digest('hex').slice(0, 16);
+}
+
+function logAuditEvent({ ok, role, actor, identifier, reason = '', req }) {
+  try {
+    const supa = getSupabase();
+    if (!supa) return;
+    const key = `${role}:${identifier}`;
+    if (!ok) {
+      const n = (loginFailSeen.get(key) || 0) + 1;
+      loginFailSeen.set(key, n);
+      if (n > 1 && n % 5 !== 0) return; // 1st failure, then every 5th
+    } else {
+      loginFailSeen.delete(key);
+    }
+    supa.from('audit_logs').insert({
+      log_id: `AUD-LOGIN-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      timestamp: new Date().toISOString(),
+      actor: actor || identifier,
+      action_type: ok ? 'LOGIN_SUCCESS' : 'LOGIN_FAILED',
+      student_name: role === 'student' ? (actor || identifier) : 'N/A',
+      student_roll: identifier,
+      description: `${ok ? 'Successful' : 'Failed'} ${role} login${reason ? ` (${reason})` : ''} · ip_hash=${clientIpHash(req)}`,
+      details: { role, identifier, ip_hash: clientIpHash(req), outcome: ok ? 'success' : 'failure' }
+    }).then(({ error }) => {
+      if (error) console.warn('[auth-login] audit insert note:', error.message);
+    });
+  } catch (e) {
+    console.warn('[auth-login] audit error:', e.message);
+  }
+}
+
+
 export default async function handler(req, res) {
   if (applyCors(req, res)) return;
   if (req.method !== 'POST') {
@@ -77,7 +121,8 @@ export default async function handler(req, res) {
     // Check rate limit
     const rateLimitCheck = checkRateLimit(normalizeRateLimitKey(safeId));
     if (!rateLimitCheck.allowed) {
-      return res.status(429).json({ success: false, error: rateLimitCheck.message });
+      logAuditEvent({ ok: false, role, actor: safeId, identifier: safeId, reason: 'rate-limited', req });
+        return res.status(429).json({ success: false, error: rateLimitCheck.message });
     }
 
     const supabase = getSupabase();
@@ -111,7 +156,8 @@ export default async function handler(req, res) {
       }
 
       if (!admin) {
-        return res.status(401).json({ success: false, error: 'Invalid admin username or password' });
+        logAuditEvent({ ok: false, role: 'admin', actor: safeAdminId, identifier: safeAdminId, reason: 'bad credentials', req });
+      return res.status(401).json({ success: false, error: 'Invalid admin username or password' });
       }
 
       // Reset rate limit on successful login
@@ -163,8 +209,16 @@ export default async function handler(req, res) {
         sub: adminId,
         role: 'admin',
         name: admin.name,
+        username: admin.username || adminId,
+        is_head: admin.is_head === true || String(admin.username || '').toLowerCase() === 'chandan',
+        head: admin.is_head === true || String(admin.username || '').toLowerCase() === 'chandan',
         tv: tokenVersion,
         sid: sessionId
+      });
+      // BUG-05: forensic login audit (best-effort, never blocks auth).
+      logAuditEvent({
+        ok: true, role: 'admin', actor: admin.name || adminId,
+        identifier: safeAdminId, req
       });
       return res.status(200).json({
         success: true,
@@ -334,6 +388,10 @@ export default async function handler(req, res) {
       const student = matchedStudent;
       const studentId = student.student_id || student.id;
       const token = createSession({ sub: studentId, role: 'student', name: student.name });
+      logAuditEvent({
+        ok: true, role: 'student', actor: student.name || studentId,
+        identifier: safeStudentId, req
+      });
       return res.status(200).json({
         success: true,
         role: 'student',

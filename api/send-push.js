@@ -1,9 +1,6 @@
 import { getSupabase, requireSession, applyCors } from './_lib/auth.js';
 import { pushToSubscription } from './_lib/webpush.js';
 
-// Default VAPID keypair fallback for local dev & Vercel deployment
-const DEFAULT_VAPID_PUBLIC_KEY = 'BP3tVwB7SjSNTEn7SsPHvzeTySIm17F7AA8Kdcbc0FMUHGBdE8K0tmvEmVVLY3dw9ypIMIG4oOKFNGJAZ1sndMQ';
-const DEFAULT_VAPID_PRIVATE_KEY = 'MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQglvAU5VuajVTFhOoC4EmlieeCySWkSuzcnoyU6MEPixShRANCAAT97VcAe0o0jUxJ-0rDx783k8kiJtexewAPCnXG3NBTFBxgXRPCtLZrxJlVS2N3cPcqSDCBuKDihTRiQGdbJ3TE';
 const DEFAULT_VAPID_SUBJECT = 'mailto:pragyan.lalganj@gmail.com';
 
 function stripTags(str) {
@@ -11,7 +8,7 @@ function stripTags(str) {
 }
 
 function formatINR(num) {
-  return '₹' + Number(num || 0).toLocaleString('en-IN');
+return '₹' + Number(num || 0).toLocaleString('en-IN');
 }
 
 /** Interpolate {{student_name}}, {{batch_name}}, {{pending_dues}}, etc. */
@@ -36,7 +33,7 @@ export default async function handler(req, res) {
   const isCron = Boolean(cronSecret && (cronHeader === `Bearer ${cronSecret}` || req.headers['x-cron-secret'] === cronSecret));
 
   if (!isCron) {
-    session = requireSession(req, res, ['admin', 'student']);
+    session = requireSession(req, res, ['admin']);
     if (!session) return;
   }
 
@@ -72,13 +69,35 @@ export default async function handler(req, res) {
     return res.status(405).json({ success: false, error: 'Method Not Allowed' });
   }
 
-  let body = req.body || {};
+  // BUG-12: per-caller broadcast brake (max 10 dispatches / hour / caller).
+const BROADCAST_RATE_LIMIT = { windowMs: 60 * 60 * 1000, max: 10 };
+const broadcastBuckets = new Map();
+function broadcastAllowed(callerKey) {
+  const now = Date.now();
+  const bucket = broadcastBuckets.get(callerKey);
+  if (!bucket || bucket.windowStart + BROADCAST_RATE_LIMIT.windowMs < now) {
+    broadcastBuckets.set(callerKey, { count: 1, windowStart: now });
+    if (broadcastBuckets.size > 2000) {
+      for (const [k, v] of broadcastBuckets) {
+        if (v.windowStart + BROADCAST_RATE_LIMIT.windowMs < now) broadcastBuckets.delete(k);
+      }
+    }
+    return true;
+  }
+  bucket.count += 1;
+  return bucket.count <= BROADCAST_RATE_LIMIT.max;
+}
+let body = req.body || {};
   if (typeof body === 'string') {
     try { body = JSON.parse(body); } catch (_) { body = {}; }
   }
   const rawTitle = stripTags(body.title || 'Pragyan Institute Update').slice(0, 100);
   const rawBody = stripTags(body.body || '').slice(0, 300);
-  if (!rawBody) {
+  const callerKey = isCron ? 'cron' : (session?.sub || session?.username ||
+  (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'ip').toString().split(',')[0].trim());
+if (!broadcastAllowed(callerKey)) {
+return res.status(429).json({ success: false, error: 'Broadcast limit reached (10/hour). Try later.' });
+}if (!rawBody) {
     return res.status(400).json({ success: false, error: 'Notification message body is required' });
   }
 
@@ -103,10 +122,14 @@ export default async function handler(req, res) {
   const ttlSeconds = ttlHours * 3600;
 
   const vapidKeys = {
-    publicKey: process.env.VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC_KEY,
-    privateKey: process.env.VAPID_PRIVATE_KEY || DEFAULT_VAPID_PRIVATE_KEY
+    publicKey: process.env.VAPID_PUBLIC_KEY,
+    privateKey: process.env.VAPID_PRIVATE_KEY
   };
-  const vapidSubject = process.env.VAPID_SUBJECT || DEFAULT_VAPID_SUBJECT;
+  const vapidSubject = process.env.VAPID_SUBJECT;
+  // BUG-01: fail closed — no embedded credential fallback exists anymore.
+  if (!vapidKeys.publicKey || !vapidKeys.privateKey || !vapidSubject) {
+    return res.status(500).json({ success: false, error: 'VAPID credentials unconfigured' });
+  }
 
   try {
     let subsQuery = supabase
@@ -124,7 +147,7 @@ export default async function handler(req, res) {
 
     if (!subscriptions || subscriptions.length === 0) {
       // Record attempt in broadcast logs even if 0 audience
-      const senderName = session?.username || (isCron ? 'SYSTEM (CRON)' : 'CHANDAN KUMAR');
+const senderName = isCron ? 'SYSTEM (CRON)' : (session?.username || session?.sub || 'ADMIN');
       await supabase.from('push_broadcast_logs').insert([{
         title: rawTitle,
         body: rawBody,
@@ -156,7 +179,8 @@ export default async function handler(req, res) {
     if (studentIds.length > 0) {
       const { data: students } = await supabase
         .from('students')
-        .select('*');
+        .select('id, student_id, roll_no, name, class_name, pending_fee')
+        .in('student_id', studentIds);
       if (students) {
         for (const s of students) {
           s.pending_balance = Number(s.pending_fee ?? s.pending_fees ?? 0);
@@ -236,7 +260,7 @@ export default async function handler(req, res) {
         .catch(() => {});
     }
 
-    const senderName = session?.username || (isCron ? 'SYSTEM (CRON)' : 'CHANDAN KUMAR');
+    const senderName = isCron ? 'SYSTEM (CRON)' : (session?.username || session?.sub || 'ADMIN');
     await supabase.from('push_broadcast_logs').insert([{
       title: rawTitle,
       body: rawBody,

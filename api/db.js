@@ -540,6 +540,14 @@ export default async function handler(req, res) {
       }
       result = await addWhere(supabase.from(table).update(updateData), filters.where).select(readColumns(table));
     } else {
+      // BUG-06/07: purging the ENTIRE audit trail is a head-admin-only power.
+      // Regular admins are refused before a single row is touched.
+      if (table === 'audit_logs' && filters.all === true) {
+        const isHead = session && (session.head === true || session.is_head === true);
+        if (!isHead) {
+          return res.status(403).json({ success: false, error: 'Only the head administrator can purge audit logs' });
+        }
+      }
       if (!filters.where || Object.keys(filters.where).length === 0) {
         // An unfiltered delete would empty the table.
         return res.status(400).json({ success: false, error: 'A delete filter is required' });

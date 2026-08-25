@@ -119,6 +119,18 @@ export async function runPushNotificationTests(assert) {
   assert(portalCss.includes(".notice-tags-composer-box") && portalCss.includes(".btn-insert-notice-tag"), 'T28.50: portal.css styles notice personalization tags box and interactive chips');
   assert(portalJs.includes("noticeSendPushBroadcastChk"), 'T28.51: js/portal.js provides instant lockscreen push notification checkbox on posting notices');
   assert(portalJs.includes("editNoticeModal") && portalJs.includes("Dynamic Personalization Tags"), 'T28.52: js/portal.js provides personalization tags in edit notice modal');
+
+  // ── Hardening round: BUG-01/02/03/08/11/12 ──────────────────────────────────
+  const sendPushJsH = read('api/send-push.js');
+  assert(!sendPushJsH.includes('DEFAULT_VAPID_PRIVATE_KEY') && !sendPushJsH.includes("DEFAULT_VAPID_PUBLIC_KEY"),
+    'T28.H1: no hardcoded VAPID keypair fallback constants remain');
+  assert(sendPushJsH.includes("VAPID credentials unconfigured"), 'T28.H2: dispatch fails closed when VAPID env is absent');
+  assert(!sendPushJsH.includes("'admin', 'student'"), 'T28.H3: student role removed from dispatcher session gate');
+  assert((sendPushJsH.match(/requireSession\(req, res, \['admin'\]\)/g) || []).length >= 1,
+    'T28.H4: dispatcher requires an admin-only session');
+  assert(!sendPushJsH.includes("dispatched_by: 'CHANDAN KUMAR'") && sendPushJsH.includes('session?.username || session?.sub'),
+    'T28.H5: dispatched_by derives from the authenticated caller (no attribution spoof)');
+  assert(sendPushJsH.includes(".in('student_id', studentIds)"), 'T28.H6: student interpolation fetch is scoped by id-list');
+  assert(/\u20B9/.test(sendPushJsH), 'T28.H7: formatINR emits the real rupee glyph');
+  assert(sendPushJsH.includes('BROADCAST_RATE_LIMIT'), 'T28.H8: per-caller broadcast rate limit exists');
 }
-
-

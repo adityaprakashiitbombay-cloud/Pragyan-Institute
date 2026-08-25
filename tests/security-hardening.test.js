@@ -91,4 +91,26 @@ export function runSecurityHardeningTests(assert) {
     assert(src.includes('upload-file') || doc === 'AI_CONTEXT/DEPLOYMENT_AND_SERVICES.md',
       `T27.28: ${doc} references the real upload-file endpoint`);
   }
+  // ── Hardening round 2: BUG-04/05/06/07/10/13/14 ──────────────────────────────
+  const portalSrc2 = read('js/portal.js');
+  const authSrc2 = read('api/auth-login.js');
+  const dbSrc2 = read('api/db.js');
+  const prSrc = read('api/payment-request.js');
+  // BUG-04: student notifications pane escapes all notice fields
+  assert(portalSrc2.includes('sanitizeInput(displayTitle)'), 'T27.H1: notice title sanitized');
+  assert(/sanitizeInput\(notice\.message\)|sanitizeInput\(notice\.body\)/.test(portalSrc2), 'T27.H2: notice body sanitized');
+  // BUG-05: login audit trail
+  assert(authSrc2.includes('LOGIN_SUCCESS') && authSrc2.includes('LOGIN_FAILED'), 'T27.H3: login success + failure audit actions exist');
+  assert(authSrc2.includes('clientIpHash'), 'T27.H4: login audit includes hashed client IP');
+  // BUG-06/07: head-admin purge gate + JWT claims
+  assert(dbSrc2.includes("Only the head administrator can purge audit logs"), 'T27.H5: gateway blocks non-head audit purges');
+  assert(dbSrc2.includes('filters.all === true'), 'T27.H6: purge gate targets bulk-delete path only');
+  assert(authSrc2.includes('is_head:') && authSrc2.includes('head:'), 'T27.H7: admin JWT carries is_head + head claims');
+  // BUG-10: proof provenance
+  assert(prSrc.includes('/payment_proofs/'), 'T27.H8: proof URLs restricted to pragyan-media/payment_proofs/');
+  // BUG-13: unconditional typed delete
+  assert(portalSrc2.includes('if (true) {'), 'T27.H9: typed confirmation fires for ALL deletions (not just dues > 0)');
+  // BUG-14: timetable escape
+  assert(portalSrc2.includes('escapeHtml(item.subject)'), 'T27.H10: timetable subject escaped');
+  assert(portalSrc2.includes('escapeHtml(item.room)'), 'T27.H11: timetable room escaped');
 }

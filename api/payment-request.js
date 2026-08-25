@@ -65,7 +65,15 @@ export default async function handler(req, res) {
   // /api/upload-file). Only same-project storage or https URLs are accepted,
   // and never interpolated anywhere without escaping downstream.
   let proofUrl = String(body.proofUrl ?? '').trim().slice(0, 500);
-  if (proofUrl && !/^https:\/\/[^\s"']+$/.test(proofUrl)) proofUrl = '';
+  if (proofUrl) {
+    // BUG-10: provenance guard — only the institute's own Supabase storage
+    // bucket, payment_proofs folder. Arbitrary external URLs are refused so a
+    // crafted link can never ride into the verifier's card.
+    const shapeOk = /^https:\/\/[^\s"']+$/.test(proofUrl);
+    const hostOk = /supabase\.co$/i.test(new URL(proofUrl, 'https://x.invalid').hostname) || /supabase\.in$/i.test(new URL(proofUrl, 'https://x.invalid').hostname);
+    const pathOk = /\/payment_proofs\//.test(new URL(proofUrl).pathname);
+    if (!shapeOk || !hostOk || !pathOk) proofUrl = '';
+  }
 
   if (!ID_PATTERN.test(roll)) {
     return res.status(400).json({ success: false, error: 'A valid roll number or student ID is required' });

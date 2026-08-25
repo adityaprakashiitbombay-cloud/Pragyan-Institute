@@ -2167,67 +2167,48 @@
     },
     getBatches() {
       if (this._batchesCache) return this._batchesCache;
-      let batches = [];
+      let batches = null;
       try {
-        batches = JSON.parse(localStorage.getItem(STORAGE_KEY_BATCHES) || '[]');
-      } catch(e) {}
-      if (!Array.isArray(batches) || batches.length === 0) {
-        batches = buildSeedBatches();
-        localStorage.setItem(STORAGE_KEY_BATCHES, JSON.stringify(batches));
+        const raw = localStorage.getItem(STORAGE_KEY_BATCHES) || localStorage.getItem('pragyan_db_batches_master');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) batches = parsed;
+        }
+      } catch(e) { batches = null; }
+
+      if (!batches) {
+        batches = canonicalBatchCards().map(c => batchRow(ACADEMIC.BATCH_BY_ID[c.key], {}));
+        this.safeSetItem(STORAGE_KEY_BATCHES, batches);
+        this.safeSetItem('pragyan_db_batches_master', batches);
       } else {
-        // Normalise stored / Supabase rows against the canonical config, and
-        // guarantee all twelve batches are present. Three bugs lived here:
-        //
-        //   • The id fell back to a literal 'BAT-01' for any row missing one, so
-        //     unrelated batches collided on a single id.
-        //   • The fee ladder read `name.includes('8th') ? 800 : Junior ? 700 :
-        //     1000`, which billed Class 11th and 12th at ₹1,000 instead of
-        //     ₹1,500 and Special English 1st-5th at ₹1,000 instead of ₹500.
-        //   • `icon` was set to a Font Awesome class ('fa-bullseye'), but the
-        //     three grids that render a batch interpolate it as text — so the
-        //     admin saw the literal string "fa-graduation-cap Class 10th".
         const byId = new Map();
+        const ordered = [];
         batches.forEach(b => {
+          if (!b || typeof b !== 'object') return;
           const rawName = b.name || b.className || b.batch_name || b.batchName || '';
           const batchId = getBatchCategoryKey(b.batch_id || b.id || rawName);
           const canonical = ACADEMIC && ACADEMIC.BATCH_BY_ID[batchId];
-          if (!canonical) {
-            // An unrecognised batch is kept rather than dropped — it may be a
-            // real batch the institute added directly in the database — but it
-            // is given a stable id derived from its own name, never 'BAT-01'.
-            const fallbackId = String(b.batch_id || b.id || rawName || 'BAT-UNKNOWN').toUpperCase();
-            byId.set(fallbackId, {
-              ...b,
-              id: fallbackId,
-              batch_id: fallbackId,
-              name: rawName || 'General Batch',
-              className: rawName || 'General Batch',
-              batchName: rawName || 'General Batch',
-              batch_name: rawName || 'General Batch',
-              monthlyFee: Number(b.monthlyFee ?? b.monthly_fee ?? 0),
-              monthly_fee: Number(b.monthlyFee ?? b.monthly_fee ?? 0),
-              timing: b.timing || b.timings || 'Mon – Sat: As per timetable',
-              timings: b.timing || b.timings || 'Mon – Sat: As per timetable',
-              room: b.room || b.room_no || 'As allotted',
-              teacher: b.teacher || 'Faculty Mentors',
-              badge: b.badge || '📚 Batch',
-              icon: '📚'
-            });
-            return;
-          }
-          // Fees come from the config, not the stored row: the fee schedule is
-          // institute policy and a stale cached row must not undercut it.
-          byId.set(canonical.batchId, batchRow(canonical, b));
-        });
-        canonicalBatchCards().forEach(card => {
-          if (!byId.has(card.key)) {
-            byId.set(card.key, batchRow(ACADEMIC.BATCH_BY_ID[card.key], {}));
-          }
-        });
-        // Canonical order first, then any extra batches the institute added.
-        const ordered = canonicalBatchCards().map(c => byId.get(c.key)).filter(Boolean);
-        byId.forEach((row, key) => {
-          if (!ACADEMIC || !ACADEMIC.BATCH_BY_ID[key]) ordered.push(row);
+          const bKey = canonical ? canonical.batchId : String(b.batch_id || b.id || rawName || 'BAT-UNKNOWN').toUpperCase();
+          if (byId.has(bKey)) return;
+          const row = canonical ? batchRow(canonical, b) : {
+            ...b,
+            id: bKey,
+            batch_id: bKey,
+            name: rawName || 'General Batch',
+            className: rawName || 'General Batch',
+            batchName: rawName || 'General Batch',
+            batch_name: rawName || 'General Batch',
+            monthlyFee: Number(b.monthlyFee ?? b.monthly_fee ?? 0),
+            monthly_fee: Number(b.monthlyFee ?? b.monthly_fee ?? 0),
+            timing: b.timing || b.timings || 'Mon – Sat: As per timetable',
+            timings: b.timing || b.timings || 'Mon – Sat: As per timetable',
+            room: b.room || b.room_no || 'As allotted',
+            teacher: b.teacher || (Array.isArray(b.teachers) ? b.teachers.join(' & ') : 'Faculty Mentors'),
+            badge: b.badge || '📚 Batch',
+            icon: '📚'
+          };
+          byId.set(bKey, row);
+          ordered.push(row);
         });
         batches = ordered;
       }
@@ -2286,20 +2267,23 @@
     },
 
     getClassSchedules() {
-      if (Array.isArray(this._classSchedulesCache) && this._classSchedulesCache.length > 0) {
+      // BUG-09: an explicit empty dataset (admin deleted everything, or cloud
+      // sync wrote []) is a VALID state and must never trigger re-seeding.
+      // Canonical defaults are seeded ONLY when the storage key has never
+      // existed (clean first install).
+      if (Array.isArray(this._classSchedulesCache)) {
         return this._classSchedulesCache;
       }
       try {
         const raw = localStorage.getItem(STORAGE_KEY_SCHEDULES);
-        if (raw) {
+        if (raw !== null) {
           const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            this._classSchedulesCache = parsed;
-            return this._classSchedulesCache;
-          }
+          this._classSchedulesCache = Array.isArray(parsed) ? parsed : [];
+          return this._classSchedulesCache;
         }
       } catch (e) {
         this._classSchedulesCache = [];
+        return this._classSchedulesCache;
       }
 
       // Seed initial canonical schedule for all batches Mon-Sat
@@ -7263,16 +7247,14 @@ function renderStudentDashboard() {
             </ul>
           </div>
 
-          <!-- CONFIRMATION FORM -->
+          <!-- CONFIRMATION FORM (typed roll confirmation is UNCONDITIONAL) -->
           <form id="deleteStudentConfirmForm">
-            ${hasDues ? `
               <div style="margin-bottom: 1.15rem;">
                 <label for="deleteConfirmRollInput" style="font-size: 0.84rem; font-weight: 700; color: #991B1B; display: block; margin-bottom: 0.35rem;">
                   Type student roll number (<span style="font-family: monospace; background: #FEE2E2; color: #991B1B; padding: 2px 6px; border-radius: 4px; font-weight: 800;">${target.rollNo}</span>) to authorize permanent deletion:
                 </label>
                 <input type="text" id="deleteConfirmRollInput" class="portal-input" placeholder="Type ${target.rollNo} here" required style="border: 1.5px solid #F87171; font-weight: 700; font-size: 0.95rem;">
               </div>
-            ` : ''}
 
             <div style="display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.25rem;">
               <button type="button" class="btn" onclick="document.getElementById('deleteStudentModal').remove()" style="background: #F1F5F9; color: #334155; border: 1px solid #CBD5E1; padding: 0.7rem 1.25rem; font-weight: 700; border-radius: 6px; cursor: pointer;">
@@ -7294,8 +7276,8 @@ function renderStudentDashboard() {
     wireModalA11y(modalEl, { closeOnBackdrop: false });
     modalEl.querySelector('#deleteStudentConfirmForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      if (hasDues) {
-        const inputRoll = modalEl.querySelector('#deleteConfirmRollInput')?.value.trim();
+if (true) {
+const inputRoll = modalEl.querySelector('#deleteConfirmRollInput')?.value.trim();
         if (inputRoll !== String(target.rollNo)) {
           alert(`Confirmation Mismatch: You must type the exact roll number '${target.rollNo}' to confirm deletion of this student with pending dues.`);
           modalEl.querySelector('#deleteConfirmRollInput')?.focus();
@@ -14635,15 +14617,20 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
     const teachers = batchObj?.teachers ? batchObj.teachers.map(titleCaseName) : ['Prof. Ravi Ranjan', 'Chandan Kumar'];
     const room = batchObj?.room || 'Main Hall';
 
-    // Remove existing for this batch & day
-    const filtered = allSchedules.filter(s => {
+    // Find existing periods for this batch & day to track IDs that need cloud deletion
+    const oldPeriodsForDay = allSchedules.filter(s => {
       if (!s || typeof s !== 'object') return false;
       const sBatch = s.batch_id || s.batchId || '';
       const sDay = String(s.day_of_week || s.dayOfWeek || '').toLowerCase();
       const isSameBatch = (sBatch === batchId) || (getBatchCategoryKey(sBatch) === bKey) || (String(sBatch).toUpperCase() === String(batchId).toUpperCase());
       const isSameDay = sDay === String(day).toLowerCase();
-      return !(isSameBatch && isSameDay);
+      return isSameBatch && isSameDay;
     });
+    const oldIds = oldPeriodsForDay.map(s => String(s.id)).filter(Boolean);
+
+    // Remove existing for this batch & day locally
+    const filtered = allSchedules.filter(s => !oldPeriodsForDay.some(op => op.id === s.id));
+    const newSeededPeriods = [];
     
     subjects.forEach((subj, idx) => {
       const slot = slots[idx] || '04:00 PM – 05:00 PM';
@@ -14651,9 +14638,10 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
       const startTime = parts[0] || '04:00 PM';
       const endTime = parts[1] || '05:00 PM';
       const teacher = teachers[idx % teachers.length] || 'Faculty Mentors';
+      const detId = `SCHED-${batchId}-${String(day).slice(0, 3).toUpperCase()}-${idx + 1}`;
 
-      filtered.push({
-        id: `SCHED-${batchId}-${String(day).slice(0, 3).toUpperCase()}-${Date.now()}-${idx + 1}`,
+      const periodObj = {
+        id: detId,
         batch_id: batchId,
         batchId: batchId,
         day_of_week: day,
@@ -14670,17 +14658,26 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
         sort_order: idx + 1,
         sortOrder: idx + 1,
         created_at: new Date().toISOString()
-      });
+      };
+      filtered.push(periodObj);
+      newSeededPeriods.push(periodObj);
     });
+
+    // Delete obsolete old IDs from Supabase if any exist
+    const newIdSet = new Set(newSeededPeriods.map(p => p.id));
+    const obsoleteIds = oldIds.filter(id => !newIdSet.has(id));
+    if (obsoleteIds.length > 0 && typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
+      await SupabaseSync.mutate('class_schedules', 'delete', null, { where: { id: obsoleteIds } }).catch(e => console.warn(e));
+    }
 
     await AppState.saveClassSchedules(filtered);
     renderAdminScheduleTab();
   }
 
-  async function replicateDayScheduleAcrossWeek(batchId, sourceDay) {
+  async function replicateDayScheduleAcrossWeek(batchId, sourceDay, includeSunday = false) {
     const rawSchedules = AppState.getClassSchedules ? AppState.getClassSchedules() : [];
     const allSchedules = Array.isArray(rawSchedules) ? rawSchedules : [];
-    const bKey = getBatchCategoryKey(batchId);
+    const bKey = getBatchCategoryKey(batchId) || batchId;
     const sourcePeriods = allSchedules.filter(s => {
       if (!s || typeof s !== 'object') return false;
       const sBatch = s.batch_id || s.batchId || '';
@@ -14694,24 +14691,35 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
       return;
     }
 
-    if (!confirm(`⚡ Replicate ${sourceDay}'s schedule to all weekdays (Monday through Saturday) for batch ${batchId}?\n\nThis will apply ${sourcePeriods.length} period(s) to Monday, Tuesday, Wednesday, Thursday, Friday, and Saturday.`)) {
+    const weekdays = includeSunday
+      ? ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+      : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+    const targetDesc = includeSunday ? 'all 7 days (Monday through Sunday)' : 'all weekdays (Monday through Saturday)';
+
+    if (!confirm(`⚡ Replicate ${sourceDay}'s schedule to ${targetDesc} for batch ${batchId}?\n\nThis will update all periods across ${weekdays.length} days to match ${sourceDay}.`)) {
       return;
     }
 
-    const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    // Remove old periods for these weekdays for this batch
-    let updated = allSchedules.filter(s => {
+    // Find old periods for these weekdays for this batch
+    const oldWeekPeriods = allSchedules.filter(s => {
       if (!s || typeof s !== 'object') return false;
       const sBatch = s.batch_id || s.batchId || '';
       const isSameBatch = (sBatch === batchId) || (getBatchCategoryKey(sBatch) === bKey) || (String(sBatch).toUpperCase() === String(batchId).toUpperCase());
       const isWeekDay = weekdays.map(w => w.toLowerCase()).includes(String(s.day_of_week || s.dayOfWeek || '').toLowerCase());
-      return !(isSameBatch && isWeekDay);
+      return isSameBatch && isWeekDay;
     });
+    const oldIds = oldWeekPeriods.map(s => String(s.id)).filter(Boolean);
+
+    // Keep other schedules not belonging to this batch weekdays
+    const otherSchedules = allSchedules.filter(s => !oldWeekPeriods.some(op => op.id === s.id));
+    const newReplicatedPeriods = [];
 
     weekdays.forEach(targetDay => {
       sourcePeriods.forEach((sp, idx) => {
-        updated.push({
-          id: `SCHED-${batchId}-${targetDay.slice(0, 3).toUpperCase()}-${Date.now()}-${idx + 1}`,
+        const detId = `SCHED-${batchId}-${targetDay.slice(0, 3).toUpperCase()}-${idx + 1}`;
+        newReplicatedPeriods.push({
+          id: detId,
           batch_id: batchId,
           batchId: batchId,
           day_of_week: targetDay,
@@ -14732,8 +14740,16 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
       });
     });
 
+    // Delete obsolete old IDs from Supabase so no orphaned duplicate rows remain in cloud database
+    const newIdSet = new Set(newReplicatedPeriods.map(p => p.id));
+    const obsoleteIds = oldIds.filter(id => !newIdSet.has(id));
+    if (obsoleteIds.length > 0 && typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
+      await SupabaseSync.mutate('class_schedules', 'delete', null, { where: { id: obsoleteIds } }).catch(e => console.warn(e));
+    }
+
+    const updated = [...otherSchedules, ...newReplicatedPeriods];
     await AppState.saveClassSchedules(updated);
-    alert(`✅ Weekly timetable successfully replicated for ${batchId} (Mon–Sat) and synced with cloud database!`);
+    alert(`✅ Weekly timetable successfully updated for ${batchId} (${includeSunday ? 'Mon–Sun' : 'Mon–Sat'}) and synced with cloud database!`);
     renderAdminScheduleTab();
   }
 
@@ -15181,11 +15197,14 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
           </div>
 
           <!-- Quick Action Buttons: Repeat Week & Class Off -->
-          <div class="schedule-quick-actions-bar">
-            <button type="button" class="btn btn-repeat-week" id="btnReplicateWeek" style="background:linear-gradient(135deg, #1E40AF 0%, #2563EB 100%); border:1.5px solid #1D4ED8; color:#FFFFFF; font-weight:800; border-radius:8px; padding:0.55rem 1rem; font-size:0.85rem; box-shadow:0 3px 10px rgba(37,99,235,0.25);" title="Copy this day's timetable to all other days (Monday to Saturday)">
+          <div class="schedule-quick-actions-bar" style="display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center;">
+            <button type="button" class="btn btn-repeat-week" id="btnReplicateWeek" style="background:linear-gradient(135deg, #1E40AF 0%, #2563EB 100%); border:1.5px solid #1D4ED8; color:#FFFFFF; font-weight:800; border-radius:8px; padding:0.55rem 0.9rem; font-size:0.84rem; box-shadow:0 3px 10px rgba(37,99,235,0.25);" title="Copy this day's timetable to Monday through Saturday">
               <i aria-hidden="true" class="fa-solid fa-bolt"></i> <span>⚡ Repeat for Whole Week (Mon–Sat)</span>
             </button>
-            <button type="button" class="btn btn-toggle-day-off" id="btnToggleDayOff" style="background:${isAllOff ? 'linear-gradient(135deg, #065F46 0%, #047857 100%)' : 'linear-gradient(135deg, #DC2626 0%, #B91C1C 100%)'}; border:1.5px solid ${isAllOff ? '#047857' : '#991B1B'}; color:#FFFFFF; font-weight:800; border-radius:8px; padding:0.55rem 1rem; font-size:0.85rem; box-shadow:0 3px 10px ${isAllOff ? 'rgba(4,120,87,0.25)' : 'rgba(220,38,38,0.25)'};">
+            <button type="button" class="btn btn-repeat-full-week" id="btnReplicateWeekFull" style="background:linear-gradient(135deg, #047857 0%, #059669 100%); border:1.5px solid #10B981; color:#FFFFFF; font-weight:800; border-radius:8px; padding:0.55rem 0.9rem; font-size:0.84rem; box-shadow:0 3px 10px rgba(4,120,87,0.25);" title="Copy this day's timetable to the entire week (Monday through Sunday)">
+              <i aria-hidden="true" class="fa-solid fa-repeat"></i> <span>🔁 Repeat for Whole Week (Mon–Sun)</span>
+            </button>
+            <button type="button" class="btn btn-toggle-day-off" id="btnToggleDayOff" style="background:${isAllOff ? 'linear-gradient(135deg, #065F46 0%, #047857 100%)' : 'linear-gradient(135deg, #DC2626 0%, #B91C1C 100%)'}; border:1.5px solid ${isAllOff ? '#047857' : '#991B1B'}; color:#FFFFFF; font-weight:800; border-radius:8px; padding:0.55rem 0.9rem; font-size:0.84rem; box-shadow:0 3px 10px ${isAllOff ? 'rgba(4,120,87,0.25)' : 'rgba(220,38,38,0.25)'};">
               <i aria-hidden="true" class="${isAllOff ? 'fa-solid fa-circle-check' : 'fa-solid fa-ban'}"></i> <span>${isAllOff ? 'Resume All Classes' : '🚫 Mark Day as Class Off'}</span>
             </button>
           </div>
@@ -15380,9 +15399,14 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
       seedDefaultScheduleForBatchAndDay(activeAdminScheduleBatchId, activeAdminScheduleDay);
     });
 
-    // Replicate for Whole Week
+    // Replicate for Whole Week (Mon–Sat)
     pane.querySelector('#btnReplicateWeek')?.addEventListener('click', () => {
-      replicateDayScheduleAcrossWeek(activeAdminScheduleBatchId, activeAdminScheduleDay);
+      replicateDayScheduleAcrossWeek(activeAdminScheduleBatchId, activeAdminScheduleDay, false);
+    });
+
+    // Replicate for Full Week (Mon–Sun)
+    pane.querySelector('#btnReplicateWeekFull')?.addEventListener('click', () => {
+      replicateDayScheduleAcrossWeek(activeAdminScheduleBatchId, activeAdminScheduleDay, true);
     });
 
     // Toggle Entire Day Off
@@ -16147,17 +16171,39 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
     if (!confirm(confirmMsg)) return;
 
     try {
+      const bKey = getBatchCategoryKey(batchId);
       const allBatches = AppState.getBatches().filter(b => {
-        const id1 = b.batchId || b.id || b.batch_id;
-        const name1 = b.name || b.batch_name || b.className;
-        return id1 !== batchId && 
-               getBatchCategoryKey(id1 || name1) !== getBatchCategoryKey(batchId) &&
-               String(id1).toLowerCase() !== String(batchId).toLowerCase();
+        const id1 = b.batchId || b.id || b.batch_id || '';
+        const name1 = b.name || b.batch_name || b.className || '';
+        const k1 = getBatchCategoryKey(id1 || name1);
+        const isMatch = id1 === batchId || 
+                        String(id1).toLowerCase() === String(batchId).toLowerCase() ||
+                        (bKey && k1 && k1 === bKey);
+        return !isMatch;
       });
       
       // Delete mutation from Supabase cloud
       if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
-        await SupabaseSync.mutate('batches', 'delete', null, { where: { batch_id: batchId } });
+        await SupabaseSync.mutate('batches', 'delete', null, { where: { batch_id: batchId } }).catch(() => {});
+        if (bKey && bKey !== batchId) {
+          await SupabaseSync.mutate('batches', 'delete', null, { where: { batch_id: bKey } }).catch(() => {});
+        }
+      }
+
+      // Clean up timetable periods associated with this deleted batch
+      const allSchedules = AppState.getClassSchedules ? AppState.getClassSchedules() : [];
+      const batchSchedules = allSchedules.filter(s => {
+        if (!s || typeof s !== 'object') return false;
+        const sBatch = s.batch_id || s.batchId || '';
+        return sBatch === batchId || (bKey && getBatchCategoryKey(sBatch) === bKey) || String(sBatch).toUpperCase() === String(batchId).toUpperCase();
+      });
+      const schedIdsToDelete = batchSchedules.map(s => String(s.id)).filter(Boolean);
+      if (schedIdsToDelete.length > 0) {
+        const remainingSchedules = allSchedules.filter(s => !schedIdsToDelete.includes(String(s.id)));
+        await AppState.saveClassSchedules(remainingSchedules);
+        if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
+          await SupabaseSync.mutate('class_schedules', 'delete', null, { where: { id: schedIdsToDelete } }).catch(e => console.warn(e));
+        }
       }
 
       AppState._batchesCache = null;
@@ -16168,7 +16214,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
 
       AppState._batchesCache = null;
       renderAdminBatchesTab();
-      alert(`🗑️ Batch "${batchId}" successfully deleted from Supabase cloud!`);
+      alert(`🗑️ Batch "${batchId}" successfully deleted from course master and cloud database!`);
     } catch (err) {
       console.error('Error deleting batch:', err);
       alert('❌ Failed to delete batch: ' + (err?.message || err));

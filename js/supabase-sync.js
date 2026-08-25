@@ -1099,10 +1099,18 @@
                   const w = filters.where;
                   localRows = localRows.filter(item => {
                     for (const [k, v] of Object.entries(w)) {
-                      if (item[k] !== undefined && item[k] === v) return false;
-                      if (k === 'id' && item.db_uuid && item.db_uuid === v) return false;
-                      if (k === 'student_id' && item.id && item.id === v) return false;
-                      if (k === 'slug' && item.slug && item.slug === v) return false;
+                      if (Array.isArray(v)) {
+                        if (item[k] !== undefined && v.includes(item[k])) return false;
+                        if (k === 'id' && item.db_uuid && v.includes(item.db_uuid)) return false;
+                        if (k === 'student_id' && item.id && v.includes(item.id)) return false;
+                        if (k === 'batch_id' && item.id && v.includes(item.id)) return false;
+                      } else {
+                        if (item[k] !== undefined && item[k] === v) return false;
+                        if (k === 'id' && item.db_uuid && item.db_uuid === v) return false;
+                        if (k === 'student_id' && item.id && item.id === v) return false;
+                        if (k === 'batch_id' && item.id && item.id === v) return false;
+                        if (k === 'slug' && item.slug && item.slug === v) return false;
+                      }
                     }
                     return true;
                   });

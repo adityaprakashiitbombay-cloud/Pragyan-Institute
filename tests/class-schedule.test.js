@@ -100,4 +100,10 @@ export function runClassScheduleTests(assert) {
     'T31.33: css/portal.css optimizes period action buttons and header actions for touch devices');
   assert(portalCss.includes('scroll-snap-type: x mandatory') && portalCss.includes('.student-schedule-week-bar'),
     'T31.34: css/portal.css configures smooth touch scrolling for weekly day selection bar');
+
+  // ── Hardening round: BUG-09 empty-vs-uninitialized state ────────────────────
+  const portalSrc = read('js/portal.js').replace(/\r\n/g, '\n');
+  assert(portalSrc.includes('BUG-09: an explicit empty dataset'), 'T31.H1: getter documents the empty-is-valid invariant');
+  assert(portalSrc.includes('if (Array.isArray(this._classSchedulesCache)) {'), 'T31.H2: empty array is returned as a valid cached state');
+  assert(/raw !== null/.test(portalSrc), 'T31.H3: defaults seed ONLY when storage key has never existed');
 }
