@@ -3549,8 +3549,14 @@ function renderStudentDashboard() {
 
             <div class="metallic-id-details-row">
               <div><span>Roll:</span> <strong>#${s.rollNo}</strong></div>
-              <div class="metallic-status-cell">
-                <span>Status:</span>
+              <div><span>Batch:</span> <strong>${sanitizeInput(s.className)}</strong></div>
+              <div><span>Contact:</span> <strong>${sanitizeInput(s.mobile)}</strong></div>
+              <div><span>Guardian:</span> <strong>${sanitizeInput(s.guardianName || 'Parent/Guardian')}</strong></div>
+            </div>
+
+            <div class="metallic-status-highlight-strip">
+              <div class="metallic-status-strip-left">
+                <span class="metallic-strip-label">Status:</span>
                 ${isFeeCleared ? `
                   <span class="metallic-status-pill pill-cleared">
                     <span class="status-pulsing-gem"></span>
@@ -3564,8 +3570,10 @@ function renderStudentDashboard() {
                   </span>
                 `}
               </div>
-              <div><span>Contact:</span> <strong>${sanitizeInput(s.mobile)}</strong></div>
-              <div><span>Guardian:</span> <strong>${sanitizeInput(s.guardianName || 'Parent/Guardian')}</strong></div>
+              <div class="metallic-status-strip-right">
+                <span class="metallic-strip-label">Tuition:</span>
+                <strong>₹${displayTotalFee.toLocaleString('en-IN')}</strong>
+              </div>
             </div>
 
             <div class="metallic-id-barcode-wrap">

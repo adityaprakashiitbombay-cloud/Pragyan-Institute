@@ -1287,13 +1287,12 @@
 .metallic-id-details-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.35rem 0.75rem;
+  gap: 0.4rem 0.85rem;
   background: rgba(0, 0, 0, 0.55);
   padding: 0.5rem 0.85rem;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   font-size: 0.82rem;
-  margin-block: 0.2rem;
 }
 
 .metallic-id-details-row > div {
@@ -1317,6 +1316,49 @@
   white-space: nowrap;
 }
 
+/* Dedicated Highlight Status & Tuition Strip */
+.metallic-status-highlight-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  background: rgba(0, 0, 0, 0.65);
+  padding: 0.45rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.metallic-status-strip-left {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.metallic-status-strip-right {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  flex-shrink: 0;
+}
+
+.metallic-status-strip-right strong {
+  color: #FDE68A;
+  font-weight: 800;
+  font-size: 0.88rem;
+}
+
+.metallic-strip-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #D1D5DB;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
 .metallic-status-cell {
   grid-column: span 1;
 }
@@ -1325,11 +1367,11 @@
 .metallic-status-pill {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  font-size: 0.76rem;
+  gap: 0.35rem;
+  font-size: 0.74rem;
   font-weight: 900;
-  letter-spacing: 0.08em;
-  padding: 0.25rem 0.75rem;
+  letter-spacing: 0.06em;
+  padding: 0.22rem 0.65rem;
   border-radius: 99px;
   box-sizing: border-box;
   text-transform: uppercase;
@@ -1337,6 +1379,7 @@
   line-height: 1;
   position: relative;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .metallic-status-pill.pill-cleared {
