@@ -23,14 +23,6 @@ body {
   overflow-x: hidden;
 }
 
-/* Performance Optimization: Defer rendering work for off-screen sections */
-.faculty-section,
-.batches-section,
-.gallery-section,
-.contact-section {
-  content-visibility: auto;
-  contain-intrinsic-size: 1px 600px;
-}
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading);
@@ -565,11 +557,16 @@ html.scroll-locked body {
     justify-content: flex-start;
     overflow-x: auto;
     overscroll-behavior-x: contain;
-    scroll-snap-type: x proximity;
+    scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
-    padding: 0.25rem 1.25rem 0.85rem;
+    padding: 0.35rem 1.25rem 0.85rem;
     margin-inline: -1.25rem;
-    scrollbar-width: thin;
+    gap: 0.6rem;
+    scrollbar-width: none;
+  }
+
+  .tabs-container::-webkit-scrollbar {
+    display: none;
   }
 
   .tabs-container .tab-btn {

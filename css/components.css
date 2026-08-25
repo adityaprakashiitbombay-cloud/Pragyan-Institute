@@ -2035,95 +2035,176 @@
     color: var(--secondary-sage-text) !important;
   }
 
-  /* Batches Section on Mobile: Swipeable tabs + uncompressed cards */
+  /* Batches Section on Mobile: Smooth swipeable tabs, centered billing toggle, and luxurious cards */
   .tabs-container {
     display: flex !important;
     justify-content: flex-start !important;
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch !important;
     scroll-snap-type: x mandatory !important;
-    padding: 0.25rem 0.25rem 0.65rem !important;
-    gap: 0.45rem !important;
-    margin-bottom: 1.25rem !important;
+    margin-left: -1rem !important;
+    margin-right: -1rem !important;
+    padding: 0.35rem 1rem 0.85rem 1rem !important;
+    gap: 0.6rem !important;
+    margin-bottom: 1.5rem !important;
     scrollbar-width: none !important;
   }
   .tabs-container::-webkit-scrollbar {
     display: none !important;
   }
   .tab-btn {
-    scroll-snap-align: start !important;
+    scroll-snap-align: center !important;
     white-space: nowrap !important;
-    padding: 0.45rem 1rem !important;
-    font-size: 0.84rem !important;
+    padding: 0.55rem 1.15rem !important;
+    font-size: 0.88rem !important;
+    font-weight: 700 !important;
     flex-shrink: 0 !important;
+    min-height: 44px !important;
+    border-radius: var(--radius-full) !important;
+    border: 1.5px solid var(--border-sand) !important;
+    background: var(--bg-surface-cream, #F4EFEA) !important;
+    color: var(--text-charcoal) !important;
+    transition: all 0.2s ease !important;
+  }
+  .tab-btn.active {
+    background: var(--primary-terracotta) !important;
+    color: #ffffff !important;
+    border-color: var(--primary-terracotta) !important;
+    box-shadow: 0 4px 14px rgba(181, 84, 58, 0.35) !important;
   }
   .billing-toggle-wrap {
-    margin-bottom: 1.5rem !important;
-    font-size: 0.88rem !important;
-    gap: 0.65rem !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 0 auto 1.75rem auto !important;
+    padding: 0.5rem 1.15rem !important;
+    background: #ffffff !important;
+    border: 1px solid var(--border-sand) !important;
+    border-radius: var(--radius-full) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+    font-size: 0.9rem !important;
+    font-weight: 700 !important;
+    gap: 0.75rem !important;
+    width: fit-content !important;
+    max-width: 90% !important;
+  }
+  .billing-toggle-wrap .save-badge {
+    background: rgba(6, 78, 59, 0.12) !important;
+    color: #065F46 !important;
+    border: 1px solid rgba(6, 78, 59, 0.25) !important;
+    font-size: 0.76rem !important;
+    font-weight: 800 !important;
+    padding: 0.2rem 0.55rem !important;
+    border-radius: 99px !important;
   }
   .batches-grid {
     grid-template-columns: 1fr !important;
-    gap: 1.25rem !important;
-    padding-top: 0.5rem !important;
+    gap: 1.5rem !important;
+    padding-top: 0.75rem !important;
   }
   .batch-card {
-    padding: 1.35rem 1.1rem 1.25rem !important;
-    border-radius: 16px !important;
+    background: linear-gradient(180deg, #FFFFFF 0%, #FAF6F0 100%) !important;
+    padding: 1.6rem 1.25rem 1.35rem !important;
+    border-radius: 18px !important;
+    border: 1.5px solid var(--border-sand) !important;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.06) !important;
+    position: relative !important;
+  }
+  .batch-card.popular {
+    border: 2px solid var(--primary-terracotta) !important;
+    box-shadow: 0 8px 24px rgba(181, 84, 58, 0.16) !important;
   }
   .popular-tag {
-    top: -12px !important;
-    font-size: 0.72rem !important;
-    padding: 0.25rem 0.85rem !important;
+    top: -13px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    font-size: 0.76rem !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.05em !important;
+    padding: 0.3rem 1rem !important;
+    border-radius: var(--radius-full) !important;
+    background: var(--primary-terracotta) !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(181, 84, 58, 0.35) !important;
+    z-index: 5 !important;
   }
   .batch-header {
-    margin-bottom: 0.75rem !important;
-    padding-bottom: 0.65rem !important;
+    margin-bottom: 0.85rem !important;
+    padding-bottom: 0.75rem !important;
+    border-bottom: 1px solid var(--border-sand) !important;
   }
   .batch-class {
-    font-size: 1.2rem !important;
+    font-size: 1.3rem !important;
+    font-weight: 800 !important;
+    color: var(--text-mahogany) !important;
     line-height: 1.25 !important;
   }
   .batch-timing {
-    font-size: 0.78rem !important;
-    margin-top: 0.2rem !important;
+    font-size: 0.82rem !important;
+    font-weight: 700 !important;
+    color: var(--secondary-sage-text) !important;
+    margin-top: 0.3rem !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.4rem !important;
   }
   .batch-price-row {
-    margin-bottom: 0.75rem !important;
-    gap: 0.25rem !important;
+    margin-bottom: 0.85rem !important;
+    display: flex !important;
+    align-items: baseline !important;
+    gap: 0.35rem !important;
   }
   .batch-price {
-    font-size: 1.95rem !important;
+    font-size: 2.2rem !important;
+    font-weight: 800 !important;
+    color: var(--text-mahogany) !important;
+    font-family: var(--font-heading) !important;
   }
   .batch-period {
-    font-size: 0.8rem !important;
+    font-size: 0.88rem !important;
+    font-weight: 600 !important;
+    color: var(--text-muted) !important;
   }
   .batch-features {
-    gap: 0.5rem !important;
-    margin-bottom: 1.15rem !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.6rem !important;
+    margin-bottom: 1.35rem !important;
   }
   .batch-features li {
-    font-size: 0.86rem !important;
-    line-height: 1.35 !important;
-    gap: 0.5rem !important;
+    font-size: 0.88rem !important;
+    line-height: 1.45 !important;
+    display: flex !important;
     align-items: flex-start !important;
+    gap: 0.6rem !important;
+    color: var(--text-charcoal) !important;
   }
   .check-icon {
-    width: 17px !important;
-    height: 17px !important;
-    min-width: 17px !important;
-    font-size: 0.68rem !important;
+    width: 18px !important;
+    height: 18px !important;
+    min-width: 18px !important;
+    border-radius: 50% !important;
+    background: rgba(6, 78, 59, 0.12) !important;
+    color: #065F46 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 0.7rem !important;
     margin-top: 2px !important;
+    flex-shrink: 0 !important;
   }
   .batch-card .btn {
     width: 100% !important;
-    min-height: 44px !important;
-    padding: 0.6rem 1rem !important;
-    font-size: 0.88rem !important;
+    min-height: 48px !important;
+    padding: 0.65rem 1rem !important;
+    font-size: 0.92rem !important;
+    font-weight: 800 !important;
+    border-radius: var(--radius-full) !important;
     justify-content: center !important;
     display: inline-flex !important;
     align-items: center !important;
-    gap: 0.45rem !important;
+    gap: 0.5rem !important;
+    box-shadow: 0 4px 14px rgba(181, 84, 58, 0.25) !important;
   }
 }
 
@@ -2927,31 +3008,43 @@
 .blog-share-btn:hover { background-color: var(--primary-emerald-hover); transform: translateY(-2px); }
 .blog-share-btn i { font-size: 1.05rem; }
 
-@media (max-width: 767px) {
+@media (max-width: 768px) {
   .blog-section {
     padding-block: 3.5rem 4.5rem;
   }
   .blog-tabs {
-    display: flex;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scroll-snap-type: x mandatory;
-    gap: 0.5rem;
-    padding: 0.25rem 0.25rem 0.75rem;
-    margin-bottom: 1.5rem;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    justify-content: flex-start !important;
+    overflow-x: auto !important;
+    overscroll-behavior-x: contain !important;
+    -webkit-overflow-scrolling: touch !important;
+    scroll-snap-type: x mandatory !important;
+    gap: 0.6rem !important;
+    padding: 0.4rem 1rem 0.9rem !important;
+    margin-inline: -1rem !important;
+    margin-bottom: 1.75rem !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+    box-sizing: border-box !important;
+    width: calc(100% + 2rem) !important;
   }
-  .blog-tabs::-webkit-scrollbar { display: none; }
+  .blog-tabs::-webkit-scrollbar { display: none !important; }
   .blog-tab {
-    flex-shrink: 0;
-    scroll-snap-align: start;
-    white-space: nowrap;
-    font-size: 0.86rem;
-    padding: 0.5rem 1rem;
-    min-height: 44px;
-    border-radius: var(--radius-full);
+    flex-shrink: 0 !important;
+    flex-grow: 0 !important;
+    scroll-snap-align: start !important;
+    white-space: nowrap !important;
+    font-size: 0.84rem !important;
+    font-weight: 700 !important;
+    padding: 0.55rem 1.15rem !important;
+    min-height: 44px !important;
+    border-radius: var(--radius-full) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    touch-action: manipulation;
+    letter-spacing: 0.01em;
   }
   .blog-grid {
     gap: 1.35rem;

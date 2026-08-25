@@ -755,7 +755,7 @@
     const ui = BATCH_UI[b.batchId] || {};
     const src = extra || {};
     const timing = src.timing || src.timings || ui.timing || 'Mon – Sat: As per timetable';
-    const fee = (Number.isFinite(Number(src.monthly_fee ?? src.monthlyFee)) && Number(src.monthly_fee ?? src.monthlyFee) > 0)
+    const fee = (Number.isFinite(Number(src.monthly_fee ?? src.monthlyFee)) && Number(src.monthly_fee ?? src.monthlyFee) >= 0)
       ? Number(src.monthly_fee ?? src.monthlyFee)
       : b.monthlyFee;
     const rawTeachers = Array.isArray(src.teachers) && src.teachers.length > 0
@@ -769,6 +769,7 @@
     return {
       id: b.batchId,
       batch_id: b.batchId,
+      batchId: b.batchId,
       name: src.name || b.name,
       className: src.class_name || src.className || b.name,
       batchName: src.name || b.name,
@@ -790,7 +791,7 @@
       icon: batchIcon(b.batchId),
       billingDay: Number(src.billing_day || src.billingDay || b.billingDay || 1),
       reminderTier: b.reminderTier,
-      stream: b.stream || src.stream || ''
+      stream: src.stream || b.stream || ''
     };
   }
 
@@ -2207,26 +2208,36 @@
     async saveBatches(batches) {
       this._batchesCache = batches;
       localStorage.setItem(STORAGE_KEY_BATCHES, JSON.stringify(batches));
+      localStorage.setItem('pragyan_db_batches_master', JSON.stringify(batches));
       this.markMutation();
 
       try {
         if (Array.isArray(batches) && batches.length > 0) {
-          const supaPayload = batches.map(b => ({
-            batch_id: b.id || b.batch_id,
-            name: b.name || b.batch_name || b.className || '',
-            class_name: b.className || b.class_name || b.name || '',
-            monthly_fee: Number(b.monthlyFee ?? b.monthly_fee) || classMonthlyFee(b.id || b.name || ''),
-            annual_fee: Number(b.annualFee ?? b.annual_fee) || cfgAnnual(Number(b.monthlyFee ?? b.monthly_fee) || 0),
-            billing_day: Number(b.billingDay ?? b.billing_day ?? 1),
-            timing: b.timing || b.timings || '',
-            room: b.room || '',
-            teacher: b.teacher || '',
-            teachers: Array.isArray(b.teachers) ? b.teachers : (b.teacher ? b.teacher.split(/[&,]/).map(t => t.trim()).filter(Boolean) : []),
-            subjects: Array.isArray(b.subjects) ? b.subjects : (b.subject ? [b.subject] : []),
-            capacity: Number(b.capacity || 40),
-            tagline: b.tagline || b.badge || '',
-            status: b.status || 'Active'
-          }));
+          const supaPayload = batches.map(b => {
+            const bId = b.batchId || b.id || b.batch_id;
+            const name = b.name || b.batch_name || b.batchName || b.className || '';
+            const className = b.className || b.class_name || b.name || '';
+            const fee = Number.isFinite(Number(b.monthlyFee ?? b.monthly_fee)) ? Number(b.monthlyFee ?? b.monthly_fee) : classMonthlyFee(bId || name || '');
+            const rawTeachers = Array.isArray(b.teachers) ? b.teachers : (b.teacher ? b.teacher.split(/[&,]/).map(t => t.trim()).filter(Boolean) : ['Chandan Kumar']);
+            const rawSubjects = Array.isArray(b.subjects) ? b.subjects : (b.subject ? [b.subject] : []);
+
+            return {
+              batch_id: bId,
+              name: name,
+              class_name: className,
+              stream: b.stream || '',
+              monthly_fee: fee,
+              annual_fee: Number.isFinite(Number(b.annualFee ?? b.annual_fee)) ? Number(b.annualFee ?? b.annual_fee) : cfgAnnual(fee),
+              billing_day: Number(b.billingDay ?? b.billing_day ?? 1),
+              timing: b.timing || b.timings || '',
+              room: b.room || b.room_no || '',
+              teachers: rawTeachers,
+              subjects: rawSubjects,
+              capacity: Number(b.capacity || 40),
+              tagline: b.tagline || b.badge || '',
+              status: b.status || 'Active'
+            };
+          });
           if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate) {
             const r = await SupabaseSync.mutate('batches', 'upsert', supaPayload, { conflict: 'batch_id' });
             if (!r?.success) console.warn('saveBatches write failed:', r?.error);
@@ -2912,13 +2923,12 @@ const supaPayload = pushableReqs.map(r => ({
   }
 
   function unlockPageScroll() {
-    if (!portalScrollLocked) return;
     portalScrollLocked = false;
     if (window.PragyanUI && typeof window.PragyanUI.unlockScroll === 'function') {
-      window.PragyanUI.unlockScroll();
-    } else {
-      document.body.style.overflow = '';
+      try { window.PragyanUI.unlockScroll(); } catch(e) {}
     }
+    document.documentElement.classList.remove('scroll-locked');
+    document.body.style.overflow = '';
   }
 
   function openPortal() {
@@ -2962,9 +2972,26 @@ const supaPayload = pushableReqs.map(r => ({
       portalOverlay.style.opacity = '0';
       portalOverlay.style.visibility = 'hidden';
     }
+    // Purge any lingering sub-modals
+    document.querySelectorAll('.inner-modal-backdrop, .portal-modal-backdrop').forEach(m => {
+      try { m.remove(); } catch (_) {}
+    });
+    scrollLockDepth = 0;
     unlockPageScroll();
+    document.documentElement.classList.remove('scroll-locked');
+    document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.pointerEvents = '';
     sessionStorage.setItem('pragyan_portal_open', 'false');
     localStorage.setItem('pragyan_portal_open', 'false');
+    if (window.PragyanUI) {
+      if (typeof window.PragyanUI.forceUnlockScroll === 'function') {
+        try { window.PragyanUI.forceUnlockScroll(); } catch (_) {}
+      }
+      if (typeof window.PragyanUI.revealElements === 'function') {
+        try { window.PragyanUI.revealElements(); } catch (_) {}
+      }
+    }
   }
 
   function checkExistingSession() {
@@ -3197,10 +3224,12 @@ const supaPayload = pushableReqs.map(r => ({
   }
 
   async function handleLogout() {
-    if (typeof SupabaseSync !== 'undefined' && SupabaseSync.destroy) {
-      try { SupabaseSync.destroy(); } catch(e) {}
-    }
+    // 1. Remove all open dialogs or lingering modal backdrops
+    document.querySelectorAll('.inner-modal-backdrop, .portal-modal-backdrop').forEach(m => {
+      try { m.remove(); } catch (_) {}
+    });
 
+    // 2. Clear all storage session items
     sessionStorage.removeItem(STORAGE_KEY_SESSION);
     sessionStorage.removeItem('pragyan_portal_token');
     sessionStorage.removeItem('pragyan_portal_role');
@@ -3216,9 +3245,38 @@ const supaPayload = pushableReqs.map(r => ({
 
     AppState.currentUser = null;
     AppState.currentRole = null;
-    if (typeof SupabaseSync !== 'undefined' && SupabaseSync.setSession) {
-      try { await SupabaseSync.setSession(null, null); } catch(e) {}
+    AppState.token = null;
+
+    // 3. Clear session in sync engine without destroying it so public data remains active
+    if (typeof SupabaseSync !== 'undefined') {
+      if (typeof SupabaseSync.clearSession === 'function') {
+        try { SupabaseSync.clearSession(); } catch (_) {}
+      } else if (typeof SupabaseSync.setSession === 'function') {
+        try { await SupabaseSync.setSession(null, null); } catch (_) {}
+      }
+      if (!SupabaseSync.isInitialized && typeof SupabaseSync.init === 'function') {
+        try { SupabaseSync.init(); } catch (_) {}
+      }
     }
+
+    // 4. Force release all scroll locks and reset all counters
+    scrollLockDepth = 0;
+    portalScrollLocked = false;
+    document.documentElement.classList.remove('scroll-locked');
+    document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.pointerEvents = '';
+    if (window.PragyanUI) {
+      if (typeof window.PragyanUI.forceUnlockScroll === 'function') {
+        try { window.PragyanUI.forceUnlockScroll(); } catch (_) {}
+      } else if (typeof window.PragyanUI.unlockScroll === 'function') {
+        try { window.PragyanUI.unlockScroll(); } catch (_) {}
+      }
+      if (typeof window.PragyanUI.revealElements === 'function') {
+        try { window.PragyanUI.revealElements(); } catch (_) {}
+      }
+    }
+
     showLoginView();
   }
 
@@ -4389,7 +4447,9 @@ function renderStudentDashboard() {
         isCancelled: !!sch.is_cancelled
       }));
     } else if (currentSelectedDay !== 'Sunday') {
-      const subjectList = BATCH_SUBJECTS[studentBatchKey] || BATCH_SUBJECTS[batchId] || [];
+      const subjectList = (Array.isArray(myBatch.subjects) && myBatch.subjects.length > 0)
+        ? myBatch.subjects.map(s => typeof s === 'string' ? s : (s.name || ''))
+        : (BATCH_SUBJECTS[studentBatchKey] || BATCH_SUBJECTS[batchId] || []);
       const slotList = BATCH_SLOTS[studentBatchKey] || BATCH_SLOTS[batchId] || [];
       renderedScheduleItems = subjectList.map((subject, i) => ({
         subject,
@@ -6511,12 +6571,16 @@ function renderStudentDashboard() {
           const sessions = (data.success && Array.isArray(data.sessions)) ? data.sessions : [];
 
           if (!sessions.length) {
+            const isMobile = /Android|iPhone|iPod|Mobile/i.test(navigator.userAgent);
+            const isTablet = /iPad|Tablet/i.test(navigator.userAgent);
+            const iconClass = isMobile ? 'fa-mobile-screen-button' : (isTablet ? 'fa-tablet-screen-button' : 'fa-laptop');
+            const deviceLabel = isMobile ? 'Current Mobile Browser' : (isTablet ? 'Current Tablet Browser' : 'Current Web Browser');
             container.innerHTML = `
               <div class="admin-device-card is-current">
-                <div class="device-icon-wrap"><i aria-hidden="true" class="fa-solid fa-laptop"></i></div>
+                <div class="device-icon-wrap"><i aria-hidden="true" class="fa-solid ${iconClass}"></i></div>
                 <div class="device-info-wrap">
                   <div class="device-title-row">
-                    <span class="device-name">Current Web Browser</span>
+                    <span class="device-name">${escapeHtml(deviceLabel)}</span>
                     <span class="device-badge device-badge-current"><i aria-hidden="true" class="fa-solid fa-circle-check"></i> This Device (Active)</span>
                   </div>
                   <div class="device-meta-row">
@@ -6609,7 +6673,24 @@ function renderStudentDashboard() {
           });
 
         } catch (err) {
-          container.innerHTML = `<div class="admin-device-err"><i aria-hidden="true" class="fa-solid fa-circle-exclamation"></i> Could not load device list: ${escapeHtml(err.message)}</div>`;
+          const isMobile = /Android|iPhone|iPod|Mobile/i.test(navigator.userAgent);
+          const isTablet = /iPad|Tablet/i.test(navigator.userAgent);
+          const iconClass = isMobile ? 'fa-mobile-screen-button' : (isTablet ? 'fa-tablet-screen-button' : 'fa-laptop');
+          const deviceLabel = isMobile ? 'Current Mobile Browser' : (isTablet ? 'Current Tablet Browser' : 'Current Web Browser');
+          container.innerHTML = `
+            <div class="admin-device-card is-current">
+              <div class="device-icon-wrap"><i aria-hidden="true" class="fa-solid ${iconClass}"></i></div>
+              <div class="device-info-wrap">
+                <div class="device-title-row">
+                  <span class="device-name">${escapeHtml(deviceLabel)}</span>
+                  <span class="device-badge device-badge-current"><i aria-hidden="true" class="fa-solid fa-circle-check"></i> This Device (Active)</span>
+                </div>
+                <div class="device-meta-row">
+                  <span><i aria-hidden="true" class="fa-solid fa-network-wired"></i> Local/Cached Session</span>
+                </div>
+              </div>
+            </div>
+          `;
         }
       }
 
@@ -12842,10 +12923,14 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
 
   function blogReadLocal() {
     try {
+      if (window.SupabaseSync && typeof window.SupabaseSync.getAll === 'function') {
+        const synced = window.SupabaseSync.getAll('blog_posts');
+        if (Array.isArray(synced) && synced.length > 0) return synced;
+      }
       const stored = localStorage.getItem(BLOG_STORAGE_KEY);
       if (stored !== null) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
       const seeds = (typeof window !== 'undefined' && Array.isArray(window.SEED_BLOG_POSTS) && window.SEED_BLOG_POSTS.length)
         ? window.SEED_BLOG_POSTS
@@ -12928,11 +13013,14 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
           if (rawV) viewsMap = JSON.parse(rawV);
         } catch (_) {}
 
-        const synced = livePosts.map(lp => ({
-          ...lp,
-          is_published: !!lp.is_published,
-          views_count: Math.max(Number(lp.views_count) || 0, Number(viewsMap[lp.slug]) || 0)
-        }));
+        const synced = livePosts.map(lp => {
+          const normalized = window.SupabaseSync?.normalizeBlogPost ? window.SupabaseSync.normalizeBlogPost(lp) : lp;
+          return {
+            ...normalized,
+            is_published: !!lp.is_published,
+            views_count: Math.max(Number(lp.views_count) || 0, Number(viewsMap[lp.slug]) || 0)
+          };
+        });
 
         blogWriteLocal(synced);
         renderAdminBlogTab(true);
@@ -12951,19 +13039,23 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
     }
   }
 
-  // Cross-tab real-time blog views listener
+  // Cross-tab real-time blog views & post updates listener
   try {
     const blogBc = new BroadcastChannel('pragyan_portal_sync');
     blogBc.addEventListener('message', (e) => {
-      if (e.data && e.data.type === 'BLOG_VIEWS_UPDATED' && e.data.slug) {
-        const posts = blogReadLocal();
-        const target = posts.find(p => p.slug === e.data.slug);
-        if (target) {
-          target.views_count = Math.max(Number(target.views_count) || 0, Number(e.data.count) || 0);
-          blogWriteLocal(posts);
-          const pane = document.getElementById('adminTabPane-blog');
-          if (pane && (pane.classList.contains('active') || pane.style.display !== 'none')) {
-            renderAdminBlogTab(true);
+      if (e.data && (e.data.type === 'BLOG_POST_UPDATED' || e.data.type === 'BLOG_VIEWS_UPDATED')) {
+        if (e.data.type === 'BLOG_POST_UPDATED') {
+          syncAdminBlogPostsFromCloud(true);
+        } else if (e.data.slug) {
+          const posts = blogReadLocal();
+          const target = posts.find(p => p.slug === e.data.slug);
+          if (target) {
+            target.views_count = Math.max(Number(target.views_count) || 0, Number(e.data.count) || 0);
+            blogWriteLocal(posts);
+            const pane = document.getElementById('adminTabPane-blog');
+            if (pane && (pane.classList.contains('active') || pane.style.display !== 'none')) {
+              renderAdminBlogTab(true);
+            }
           }
         }
       }
@@ -15433,9 +15525,9 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
     const currentClass = isEdit ? (existing.className || existing.class_name || existing.name || '') : '';
 
     const modalHtml = `
-      <div class="inner-modal-backdrop active portal-modal-backdrop" id="${modalId}" role="dialog" aria-modal="true" aria-labelledby="batchModalTitle" style="display:flex; align-items:center; justify-content:center; position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:99999; padding:1rem;">
-        <div class="inner-modal-content" style="background:#FFFFFF; border-radius:14px; max-width:680px; width:100%; max-height:90vh; overflow-y:auto; box-shadow:0 20px 40px rgba(0,0,0,0.25); border:1.5px solid #047857;">
-          <div class="modal-header" style="background: linear-gradient(135deg, #064E3B 0%, #047857 100%); color: #fff; padding: 1.25rem 1.5rem; border-radius: 12px 12px 0 0; display:flex; justify-content:space-between; align-items:flex-start;">
+      <div class="inner-modal-backdrop active portal-modal-backdrop" id="${modalId}" role="dialog" aria-modal="true" aria-labelledby="batchModalTitle">
+        <div class="inner-modal-content batch-modal-content-box">
+          <div class="modal-header batch-modal-header-top">
             <div>
               <h3 class="modal-title" id="batchModalTitle" style="color: #fff; font-size: 1.25rem; font-weight: 800; display: flex; align-items: center; gap: 0.5rem; margin:0;">
                 <i aria-hidden="true" class="fa-solid fa-layer-group"></i> ${isEdit ? 'Edit Batch &amp; Tariff Master' : 'Create New Class Batch'}
@@ -15449,26 +15541,26 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
             </button>
           </div>
 
-          <form id="formAddEditBatch" style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1.1rem;">
-            <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 1rem;">
+          <form id="formAddEditBatch" class="batch-modal-form">
+            <div class="batch-modal-grid-2col-split">
               <div>
-                <label for="batchFormCode" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany); display: block; margin-bottom: 0.3rem;">Batch Code *</label>
-                <input type="text" id="batchFormCode" class="form-input" aria-label="Batch Code" style="width: 100%; padding: 0.55rem; border-radius: 8px; font-weight: 800; font-family: monospace;" value="${escapeHtml(suggestedId)}" ${isEdit ? 'readonly' : 'required'} />
+                <label for="batchFormCode" class="batch-modal-label">Batch Code *</label>
+                <input type="text" id="batchFormCode" class="form-input batch-modal-input" style="font-weight: 800; font-family: monospace;" aria-label="Batch Code" value="${escapeHtml(suggestedId)}" ${isEdit ? 'readonly' : 'required'} />
               </div>
               <div>
-                <label for="batchFormName" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany); display: block; margin-bottom: 0.3rem;">Batch Display Name *</label>
-                <input type="text" id="batchFormName" class="form-input" aria-label="Batch Display Name" style="width: 100%; padding: 0.55rem; border-radius: 8px;" placeholder="e.g. Class 11th - Medical (NEET) FastTrack" value="${escapeHtml(currentName)}" required />
+                <label for="batchFormName" class="batch-modal-label">Batch Display Name *</label>
+                <input type="text" id="batchFormName" class="form-input batch-modal-input" aria-label="Batch Display Name" placeholder="e.g. Class 11th - Medical (NEET) FastTrack" value="${escapeHtml(currentName)}" required />
               </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="batch-modal-grid-2col">
               <div>
-                <label for="batchFormClass" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany); display: block; margin-bottom: 0.3rem;">Class Standard / Level *</label>
-                <input type="text" id="batchFormClass" class="form-input" aria-label="Class Standard or Level" style="width: 100%; padding: 0.55rem; border-radius: 8px;" placeholder="e.g. Class 11th" value="${escapeHtml(currentClass)}" required />
+                <label for="batchFormClass" class="batch-modal-label">Class Standard / Level *</label>
+                <input type="text" id="batchFormClass" class="form-input batch-modal-input" aria-label="Class Standard or Level" placeholder="e.g. Class 11th" value="${escapeHtml(currentClass)}" required />
               </div>
               <div>
-                <label for="batchFormStream" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany); display: block; margin-bottom: 0.3rem;">Academic Stream *</label>
-                <select id="batchFormStream" class="form-input" aria-label="Academic Stream" style="width: 100%; padding: 0.55rem; border-radius: 8px;" required>
+                <label for="batchFormStream" class="batch-modal-label">Academic Stream *</label>
+                <select id="batchFormStream" class="form-input batch-modal-input" aria-label="Academic Stream" required>
                   <option value="Foundation" ${currentStream === 'Foundation' ? 'selected' : ''}>Foundation (Classes 8th–10th)</option>
                   <option value="Science" ${currentStream === 'Science' ? 'selected' : ''}>Science (PCM / PCB / NEET / JEE)</option>
                   <option value="Commerce" ${currentStream === 'Commerce' ? 'selected' : ''}>Commerce (Accountancy &amp; Economics)</option>
@@ -15478,58 +15570,58 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
               </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; background: var(--bg-surface-cream, #F8FAFC); padding: 1rem; border-radius: 10px; border: 1.5px solid var(--border-sand, #E2E8F0);">
+            <div class="batch-modal-fee-box">
               <div>
-                <label for="batchFormMonthlyFee" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany); display: block; margin-bottom: 0.3rem;">Monthly Fee (₹) *</label>
-                <input type="number" id="batchFormMonthlyFee" class="form-input" aria-label="Monthly Tuition Fee in Rupees" min="0" step="50" style="width: 100%; padding: 0.55rem; border-radius: 8px; font-weight: 800; color: var(--primary-emerald);" value="${currentFee}" required />
+                <label for="batchFormMonthlyFee" class="batch-modal-label">Monthly Fee (₹) *</label>
+                <input type="number" id="batchFormMonthlyFee" class="form-input batch-modal-input fee-highlight" aria-label="Monthly Tuition Fee in Rupees" min="0" step="50" value="${currentFee}" required />
               </div>
               <div>
-                <label for="batchFormAnnualFee" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany); display: block; margin-bottom: 0.3rem;">Annual Fee (₹)</label>
-                <input type="number" id="batchFormAnnualFee" class="form-input" aria-label="Annual Fee in Rupees" min="0" step="500" style="width: 100%; padding: 0.55rem; border-radius: 8px;" value="${currentAnnual}" />
+                <label for="batchFormAnnualFee" class="batch-modal-label">Annual Fee (₹)</label>
+                <input type="number" id="batchFormAnnualFee" class="form-input batch-modal-input" aria-label="Annual Fee in Rupees" min="0" step="500" value="${currentAnnual}" />
               </div>
               <div>
-                <label for="batchFormBillingDay" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany); display: block; margin-bottom: 0.3rem;">Billing Day of Mo.</label>
-                <input type="number" id="batchFormBillingDay" class="form-input" aria-label="Billing Day of Month" min="1" max="28" style="width: 100%; padding: 0.55rem; border-radius: 8px;" value="${currentBillingDay}" />
-              </div>
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
-              <div>
-                <label for="batchFormTiming" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany); display: block; margin-bottom: 0.3rem;">Lecture Timings</label>
-                <input type="text" id="batchFormTiming" class="form-input" aria-label="Lecture Timings" style="width: 100%; padding: 0.55rem; border-radius: 8px;" placeholder="e.g. 04:00 PM – 06:00 PM" value="${escapeHtml(currentTiming)}" />
-              </div>
-              <div>
-                <label for="batchFormRoom" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany); display: block; margin-bottom: 0.3rem;">Classroom / Room No</label>
-                <input type="text" id="batchFormRoom" class="form-input" aria-label="Classroom or Room Number" style="width: 100%; padding: 0.55rem; border-radius: 8px;" placeholder="e.g. Room 101" value="${escapeHtml(currentRoom)}" />
-              </div>
-              <div>
-                <label for="batchFormCapacity" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany); display: block; margin-bottom: 0.3rem;">Seat Capacity</label>
-                <input type="number" id="batchFormCapacity" class="form-input" aria-label="Seat Capacity" min="1" max="500" style="width: 100%; padding: 0.55rem; border-radius: 8px;" value="${currentCapacity}" />
+                <label for="batchFormBillingDay" class="batch-modal-label">Billing Day of Mo.</label>
+                <input type="number" id="batchFormBillingDay" class="form-input batch-modal-input" aria-label="Billing Day of Month" min="1" max="28" value="${currentBillingDay}" />
               </div>
             </div>
 
-            <div>
-              <label for="batchFormTeachers" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany); display: block; margin-bottom: 0.3rem;">
-                Faculty Mentors <span style="font-weight: normal; color: var(--text-muted);">(Comma separated)</span>
-              </label>
-              <input type="text" id="batchFormTeachers" class="form-input" aria-label="Faculty Mentors" style="width: 100%; padding: 0.55rem; border-radius: 8px;" placeholder="e.g. Chandan Kumar (Director), Dr. Verma" value="${escapeHtml(currentTeachers)}" />
+            <div class="batch-modal-grid-3col">
+              <div>
+                <label for="batchFormTiming" class="batch-modal-label">Lecture Timings</label>
+                <input type="text" id="batchFormTiming" class="form-input batch-modal-input" aria-label="Lecture Timings" placeholder="e.g. 04:00 PM – 06:00 PM" value="${escapeHtml(currentTiming)}" />
+              </div>
+              <div>
+                <label for="batchFormRoom" class="batch-modal-label">Classroom / Room No</label>
+                <input type="text" id="batchFormRoom" class="form-input batch-modal-input" aria-label="Classroom or Room Number" placeholder="e.g. Room 101" value="${escapeHtml(currentRoom)}" />
+              </div>
+              <div>
+                <label for="batchFormCapacity" class="batch-modal-label">Seat Capacity</label>
+                <input type="number" id="batchFormCapacity" class="form-input batch-modal-input" aria-label="Seat Capacity" min="1" max="500" value="${currentCapacity}" />
+              </div>
             </div>
 
             <div>
-              <label for="batchFormSubjects" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany); display: block; margin-bottom: 0.3rem;">
-                Core Syllabus Subjects <span style="font-weight: normal; color: var(--text-muted);">(Comma separated)</span>
+              <label for="batchFormTeachers" class="batch-modal-label">
+                Faculty Mentors <span class="batch-modal-hint">(Comma separated)</span>
               </label>
-              <input type="text" id="batchFormSubjects" class="form-input" aria-label="Core Syllabus Subjects" style="width: 100%; padding: 0.55rem; border-radius: 8px;" placeholder="e.g. Physics, Chemistry, Biology, Weekly Test" value="${escapeHtml(currentSubjects)}" />
+              <input type="text" id="batchFormTeachers" class="form-input batch-modal-input" aria-label="Faculty Mentors" placeholder="e.g. Chandan Kumar (Director), Dr. Verma" value="${escapeHtml(currentTeachers)}" />
             </div>
 
-            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem;">
+            <div>
+              <label for="batchFormSubjects" class="batch-modal-label">
+                Core Syllabus Subjects <span class="batch-modal-hint">(Comma separated)</span>
+              </label>
+              <input type="text" id="batchFormSubjects" class="form-input batch-modal-input" aria-label="Core Syllabus Subjects" placeholder="e.g. Physics, Chemistry, Biology, Weekly Test" value="${escapeHtml(currentSubjects)}" />
+            </div>
+
+            <div class="batch-modal-grid-tagline">
               <div>
-                <label for="batchFormTagline" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany); display: block; margin-bottom: 0.3rem;">Batch Badge / Tagline</label>
-                <input type="text" id="batchFormTagline" class="form-input" aria-label="Batch Badge or Tagline" style="width: 100%; padding: 0.55rem; border-radius: 8px;" placeholder="e.g. Premium Board + Foundation" value="${escapeHtml(currentTagline)}" />
+                <label for="batchFormTagline" class="batch-modal-label">Batch Badge / Tagline</label>
+                <input type="text" id="batchFormTagline" class="form-input batch-modal-input" aria-label="Batch Badge or Tagline" placeholder="e.g. Premium Board + Foundation" value="${escapeHtml(currentTagline)}" />
               </div>
               <div>
-                <label for="batchFormStatus" style="font-weight: 700; font-size: 0.85rem; color: var(--text-mahogany); display: block; margin-bottom: 0.3rem;">Batch Status</label>
-                <select id="batchFormStatus" class="form-input" aria-label="Batch Status" style="width: 100%; padding: 0.55rem; border-radius: 8px;">
+                <label for="batchFormStatus" class="batch-modal-label">Batch Status</label>
+                <select id="batchFormStatus" class="form-input batch-modal-input" aria-label="Batch Status">
                   <option value="Active" ${currentStatus === 'Active' ? 'selected' : ''}>Active</option>
                   <option value="Upcoming" ${currentStatus === 'Upcoming' ? 'selected' : ''}>Upcoming</option>
                   <option value="Archived" ${currentStatus === 'Archived' ? 'selected' : ''}>Archived</option>
@@ -15537,11 +15629,11 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
               </div>
             </div>
 
-            <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 0.5rem; border-top: 1px solid #E5E7EB; padding-top: 1.1rem;">
-              <button type="button" id="btnCancelBatchModal" class="btn" style="background: #F3F4F6; color: var(--text-mahogany); font-weight: 700; border-radius: 8px; padding: 0.55rem 1.25rem; cursor:pointer;">
+            <div class="batch-modal-actions-footer">
+              <button type="button" id="btnCancelBatchModal" class="btn btn-batch-modal-cancel">
                 Cancel
               </button>
-              <button type="submit" id="btnSubmitBatchForm" class="btn" style="background: var(--primary-emerald); color: #fff; font-weight: 800; border-radius: 8px; padding: 0.55rem 1.5rem; box-shadow: 0 4px 12px rgba(6, 78, 59, 0.2); cursor:pointer;">
+              <button type="submit" id="btnSubmitBatchForm" class="btn btn-batch-modal-submit">
                 <i aria-hidden="true" class="fa-solid fa-cloud-arrow-up"></i> ${isEdit ? 'Save &amp; Sync Changes' : 'Create &amp; Publish Batch'}
               </button>
             </div>
@@ -15628,6 +15720,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
         }
 
         // Save locally and mutate to Supabase
+        AppState._batchesCache = null;
         await AppState.saveBatches(allBatches);
 
         // Audit log entry
@@ -15642,6 +15735,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
         );
 
         dialog.close();
+        AppState._batchesCache = null;
         renderAdminBatchesTab();
 
         alert(`✅ Batch ${batch_id} successfully ${isEdit ? 'updated' : 'created'} and synced to Supabase cloud!`);
@@ -15683,11 +15777,13 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
         await SupabaseSync.mutate('batches', 'delete', null, { where: { batch_id: batchId } });
       }
 
+      AppState._batchesCache = null;
       await AppState.saveBatches(allBatches);
 
       const adminUser = AppState.currentUser || { name: 'Admin' };
       AppState.addAuditLog(adminUser.name || 'Admin', 'BATCH_DELETE', 'All Classes', batchId, `Admin ${adminUser.name} deleted batch ${batchId} from course master`, { batchId });
 
+      AppState._batchesCache = null;
       renderAdminBatchesTab();
       alert(`🗑️ Batch "${batchId}" successfully deleted from Supabase cloud!`);
     } catch (err) {

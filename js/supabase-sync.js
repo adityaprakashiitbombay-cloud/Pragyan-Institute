@@ -105,6 +105,26 @@
       return this.pullAll();
     },
 
+    setSession(token, role) {
+      this.sessionToken = token || null;
+      this.sessionRole = role || null;
+      if (!this.isInitialized) {
+        return this.init();
+      }
+      this._schedulePull(50);
+      return Promise.resolve({ success: true });
+    },
+
+    clearSession() {
+      this.sessionToken = null;
+      this.sessionRole = null;
+      if (!this.isInitialized) {
+        return this.init();
+      }
+      this._schedulePull(50);
+      return Promise.resolve({ success: true });
+    },
+
     // ── Page lifecycle ───────────────────────────────────────────────────────
     /**
      * Binds the unload/restore handlers exactly once.
@@ -491,6 +511,18 @@
         throw new Error(`Gateway ${operation} ${table} failed (${response.status}): ${String(msg).slice(0, 200)}`);
       }
       return Array.isArray(json.data) ? json.data : (json.data ?? []);
+    },
+
+    getAll(table) {
+      const key = KEY_MAP[table];
+      if (!key) return [];
+      try {
+        const raw = localStorage.getItem(key);
+        const parsed = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (_) {
+        return [];
+      }
     },
 
     // ── Read All Records from a Table ───────────────────────────────────────
@@ -881,19 +913,44 @@
               delete rowObj.id;
             }
           } else if (table === 'batches') {
-            const bId = rowObj.batch_id || rowObj.id;
+            const bId = rowObj.batch_id || rowObj.batchId || rowObj.id;
             if (bId) {
               rowObj.batch_id = bId;
               changedIds.push(bId);
+            }
+            if (rowObj.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rowObj.id)) {
+              delete rowObj.id;
+            }
+            if (rowObj.name || rowObj.batch_name || rowObj.batchName || rowObj.className) {
+              rowObj.name = rowObj.name || rowObj.batch_name || rowObj.batchName || rowObj.className;
+            }
+            if (rowObj.class_name || rowObj.className || rowObj.name) {
+              rowObj.class_name = rowObj.class_name || rowObj.className || rowObj.name;
             }
             if (rowObj.monthlyFee !== undefined && rowObj.monthly_fee === undefined) {
               rowObj.monthly_fee = Number(rowObj.monthlyFee);
             }
             delete rowObj.monthlyFee;
-            if (rowObj.className && !rowObj.name) {
-              rowObj.name = rowObj.className;
+            if (rowObj.annualFee !== undefined && rowObj.annual_fee === undefined) {
+              rowObj.annual_fee = Number(rowObj.annualFee);
             }
+            delete rowObj.annualFee;
+            if (rowObj.billingDay !== undefined && rowObj.billing_day === undefined) {
+              rowObj.billing_day = Number(rowObj.billingDay);
+            }
+            delete rowObj.billingDay;
+            if (rowObj.timings && !rowObj.timing) {
+              rowObj.timing = rowObj.timings;
+            }
+            delete rowObj.timings;
+            if (rowObj.room_no && !rowObj.room) {
+              rowObj.room = rowObj.room_no;
+            }
+            delete rowObj.room_no;
+            delete rowObj.teacher;
             delete rowObj.className;
+            delete rowObj.batchName;
+            delete rowObj.batchId;
           } else if (table === 'admins') {
             const aId = rowObj.admin_id || rowObj.id;
             if (aId) {
@@ -1023,6 +1080,56 @@
           }
         } else {
           return { success: false, error: `Unknown operation: ${operation}` };
+        }
+
+        // S5.5: Immediately synchronize local master store with confirmed database changes
+        if (KEY_MAP[table]) {
+          try {
+            const masterKey = KEY_MAP[table];
+            const rawStored = localStorage.getItem(masterKey);
+            let localRows = rawStored ? JSON.parse(rawStored) : [];
+            if (Array.isArray(localRows)) {
+              if (operation === 'delete') {
+                if (filters.all === true) {
+                  localRows = [];
+                } else if (filters.where) {
+                  const w = filters.where;
+                  localRows = localRows.filter(item => {
+                    for (const [k, v] of Object.entries(w)) {
+                      if (item[k] !== undefined && item[k] === v) return false;
+                      if (k === 'id' && item.db_uuid && item.db_uuid === v) return false;
+                      if (k === 'student_id' && item.id && item.id === v) return false;
+                      if (k === 'slug' && item.slug && item.slug === v) return false;
+                    }
+                    return true;
+                  });
+                }
+              } else if (operation === 'insert' || operation === 'upsert' || operation === 'update') {
+                const returnedRows = Array.isArray(result) ? result : (result && typeof result === 'object' && Object.keys(result).length ? [result] : rows);
+                returnedRows.forEach(retRow => {
+                  if (!retRow || typeof retRow !== 'object') return;
+                  const normalizedRow = table === 'blog_posts' ? this.normalizeBlogPost(retRow) :
+                                        table === 'batches' ? this.normalizeBatch(retRow) :
+                                        table === 'class_schedules' ? this.normalizeSchedule(retRow) :
+                                        table === 'institute_holidays' ? this.normalizeHoliday(retRow) :
+                                        retRow;
+                  if (!normalizedRow) return;
+                  const matchIdx = localRows.findIndex(x => {
+                    if (normalizedRow.id && x.id === normalizedRow.id) return true;
+                    if (table === 'blog_posts' && normalizedRow.slug && x.slug === normalizedRow.slug) return true;
+                    if (table === 'batches' && (normalizedRow.batch_id || normalizedRow.batchId) && (x.batch_id === normalizedRow.batch_id || x.batchId === normalizedRow.batchId || x.id === (normalizedRow.batch_id || normalizedRow.batchId))) return true;
+                    return false;
+                  });
+                  if (matchIdx >= 0) {
+                    localRows[matchIdx] = Object.assign({}, localRows[matchIdx], normalizedRow);
+                  } else {
+                    localRows.unshift(normalizedRow);
+                  }
+                });
+              }
+              this.safeStore(masterKey, localRows);
+            }
+          } catch (_) {}
         }
 
         // S6: Broadcast with changed IDs payload

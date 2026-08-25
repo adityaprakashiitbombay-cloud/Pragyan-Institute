@@ -49,5 +49,5 @@ jobs:
         run: node .github/scripts/monthly-fees.js
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          API_BASE_URL: ${{ vars.API_BASE_URL || 'https://pragyaninstitute.com' }}
+          API_BASE_URL: ${{ vars.API_BASE_URL || 'https://www.pragyaninstitute.com' }}
           FORCE_DAY: ${{ inputs.force_day }}

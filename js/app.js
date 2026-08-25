@@ -64,7 +64,15 @@
   }
   function unlockScroll() {
     scrollLockCount = Math.max(0, scrollLockCount - 1);
-    if (scrollLockCount === 0) document.documentElement.classList.remove('scroll-locked');
+    if (scrollLockCount === 0) {
+      document.documentElement.classList.remove('scroll-locked');
+      document.body.style.overflow = '';
+    }
+  }
+  function forceUnlockScroll() {
+    scrollLockCount = 0;
+    document.documentElement.classList.remove('scroll-locked');
+    document.body.style.overflow = '';
   }
 
   function visibleFocusable(container) {
@@ -485,7 +493,7 @@
     const elements = Array.prototype.slice.call(document.querySelectorAll(
       '.reveal-on-scroll, .mentor-compact-card, .teacher-card, .batch-card,' +
       ' .gallery-card, .contact-card, .map-card, .faq-wrap, .scholarship-policy-card,' +
-      ' .academy-pillar, .academy-card, .academy-banner'
+      ' .academy-pillar, .academy-card, .academy-banner, .blog-card'
     ));
     if (!elements.length) return;
 
@@ -512,17 +520,30 @@
         entry.target.classList.add('is-visible');
         obs.unobserve(entry.target);
       });
-    }, { threshold: 0.05, rootMargin: '0px 0px 60px 0px' });
+    }, { threshold: 0.01, rootMargin: '0px 0px 300px 0px' });
 
-    elements.forEach(el => {
-      if (el.classList.contains('is-visible')) return;
-      const rect = el.getBoundingClientRect();
-      if (rect.top < (window.innerHeight || document.documentElement.clientHeight) && rect.bottom > 0) {
-        el.classList.add('is-visible');
-      } else {
-        observer.observe(el);
-      }
-    });
+    const checkVisibleNow = () => {
+      const vh = window.innerHeight || document.documentElement.clientHeight || 800;
+      elements.forEach(el => {
+        if (el.classList.contains('is-visible')) return;
+        const rect = el.getBoundingClientRect();
+        if (rect.top < vh + 300 && rect.bottom > -100) {
+          el.classList.add('is-visible');
+        } else {
+          observer.observe(el);
+        }
+      });
+    };
+
+    checkVisibleNow();
+
+    if (!window._scrollRevealBound) {
+      window._scrollRevealBound = true;
+      const revealThrottled = rafThrottle(checkVisibleNow);
+      window.addEventListener('scroll', revealThrottled, { passive: true });
+      window.addEventListener('resize', revealThrottled, { passive: true });
+      window.addEventListener('touchmove', revealThrottled, { passive: true });
+    }
   }
 
   /* --------------------------------------------------------------------------
@@ -1143,6 +1164,8 @@
   window.PragyanUI = Object.assign(window.PragyanUI || {}, {
     lockScroll,
     unlockScroll,
+    forceUnlockScroll,
+    revealElements: initScrollReveal,
     trapTabKey,
     setInert,
     visibleFocusable,
@@ -1869,26 +1892,6 @@ function initMentorRatings() {
       });
     });
   });
-}
-
-function initBlog() {
-  const tabsWrap = document.querySelector('.blog-tabs');
-  tabsWrap?.querySelectorAll('.blog-tab').forEach(btn => {
-    btn.addEventListener('click', () => onBlogTabClick(btn));
-  });
-
-  const grid = document.getElementById('blogGrid');
-  grid?.addEventListener('click', (e) => {
-    const opener = e.target.closest('[data-slug]');
-    if (!opener) return;
-    e.preventDefault();
-    openBlogReader(opener.dataset.slug);
-  });
-
-  window.addEventListener('hashchange', handleHashForBlog);
-
-  restoreBlogCategoryFromHash();
-  fetchPublishedPosts().then(() => { handleHashForBlog(); });
 }
 
 function initStreamToggles() {

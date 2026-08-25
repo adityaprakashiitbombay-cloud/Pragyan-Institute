@@ -488,15 +488,27 @@ export default async function handler(req, res) {
         if (table === 'push_subscriptions') filters.conflict = 'endpoint';
         else if (table === 'blog_posts') filters.conflict = 'slug';
         else if (table === 'class_schedules' || table === 'institute_holidays') filters.conflict = 'id';
+        else if (table === 'batches') filters.conflict = 'batch_id';
         else return res.status(400).json({ success: false, error: 'Missing conflict column for upsert' });
       }
       let upsertRows = rows(data);
-      if (table === 'blog_posts' && filters.conflict === 'slug') {
+      if (table === 'blog_posts' || table === 'batches') {
         upsertRows = upsertRows.map(r => {
           if (!r || typeof r !== 'object') return r;
           const rowCopy = { ...r };
           if (rowCopy.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rowCopy.id)) {
             delete rowCopy.id;
+          }
+          if (table === 'batches') {
+            delete rowCopy.className;
+            delete rowCopy.batchName;
+            delete rowCopy.batchId;
+            delete rowCopy.monthlyFee;
+            delete rowCopy.annualFee;
+            delete rowCopy.billingDay;
+            delete rowCopy.timings;
+            delete rowCopy.room_no;
+            delete rowCopy.teacher;
           }
           return rowCopy;
         });
@@ -509,8 +521,21 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, error: 'An update filter is required' });
       }
       const updateData = (data && typeof data === 'object' && !Array.isArray(data)) ? { ...data } : data;
-      if (updateData && typeof updateData === 'object' && table === 'blog_posts') {
-        delete updateData.id;
+      if (updateData && typeof updateData === 'object' && (table === 'blog_posts' || table === 'batches')) {
+        if (updateData.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(updateData.id)) {
+          delete updateData.id;
+        }
+        if (table === 'batches') {
+          delete updateData.className;
+          delete updateData.batchName;
+          delete updateData.batchId;
+          delete updateData.monthlyFee;
+          delete updateData.annualFee;
+          delete updateData.billingDay;
+          delete updateData.timings;
+          delete updateData.room_no;
+          delete updateData.teacher;
+        }
       }
       result = await addWhere(supabase.from(table).update(updateData), filters.where).select(readColumns(table));
     } else {

@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ping Pragyan Live Portal & Health Endpoint
+        env:
+          VERCEL_PROJECT_URL: ${{ secrets.VERCEL_PROJECT_URL }}
         run: |
           echo "⏰ Sending keep-alive health check at $(date -u)..."
           
@@ -25,7 +27,8 @@ jobs:
           fi
           
           # 2. Ping Health Endpoint
-          HEALTH_URL="${{ secrets.VERCEL_PROJECT_URL || 'https://www.pragyaninstitute.com' }}/api/health"
+          TARGET_URL="${VERCEL_PROJECT_URL:-https://www.pragyaninstitute.com}"
+          HEALTH_URL="${TARGET_URL%/}/api/health"
           API_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L "$HEALTH_URL")
           echo "📡 API Health Check Status: $API_STATUS"
           

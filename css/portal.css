@@ -6615,6 +6615,10 @@ button, a, input, select, textarea {
   .push-hub-grid {
     grid-template-columns: 1fr;
   }
+  .push-simulator-col .push-card {
+    position: static !important;
+    top: auto !important;
+  }
 }
 
 .push-card {
@@ -7178,6 +7182,8 @@ button, a, input, select, textarea {
 /* Touch & Mobile Responsiveness for Push Alerts Hub */
 @media (max-width: 768px) {
   .admin-push-hub {
+    display: flex;
+    flex-direction: column;
     gap: 1rem;
   }
 
@@ -7186,21 +7192,23 @@ button, a, input, select, textarea {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.75rem;
+    border-radius: 12px;
   }
 
   .push-hub-title {
-    font-size: clamp(1.1rem, 4vw, 1.3rem);
-    line-height: 1.25;
+    font-size: 1.22rem;
+    line-height: 1.3;
   }
 
   .push-hub-subtitle {
     font-size: 0.82rem;
-    line-height: 1.4;
+    line-height: 1.45;
   }
 
   .push-hub-status-badge {
     font-size: 0.75rem;
-    padding: 0.3rem 0.7rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 99px;
   }
 
   /* Dual View: Hide table, show card list on mobile */
@@ -7219,54 +7227,17 @@ button, a, input, select, textarea {
     flex-direction: column;
     align-items: stretch;
     gap: 0.65rem;
+    padding: 0.85rem;
+    background: #F8FAFC;
+    border-radius: 12px;
+    border: 1px solid #E2E8F0;
   }
 
   .push-presets-container .push-presets-bar {
     min-width: 0;
     width: 100%;
     box-sizing: border-box;
-  }
-
-  .btn-register-device {
-    width: 100%;
-    justify-content: center;
-    min-height: 44px;
-    font-size: 0.85rem;
-  }
-
-  /* Compact Stats Grid on Mobile */
-  .push-stats-grid {
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 0.65rem;
-  }
-
-  .push-stats-grid .stat-card {
-    padding: 0.85rem 0.95rem;
-    gap: 0.75rem;
-  }
-
-  .push-stats-grid .stat-icon {
-    width: 40px;
-    height: 40px;
-    font-size: 1.15rem;
-    border-radius: 10px;
-  }
-
-  .push-stats-grid .stat-value {
-    font-size: 1.35rem;
-  }
-
-  .push-stats-grid .stat-label {
-    font-size: 0.72rem;
-  }
-
-  .push-stats-grid .stat-delta {
-    font-size: 0.7rem;
-  }
-
-  /* Swipeable Presets Strip on Mobile */
-  .push-presets-bar {
-    padding: 0.6rem 0.75rem;
+    padding: 0.5rem 0.65rem;
     overflow-x: auto;
     flex-wrap: nowrap;
     white-space: nowrap;
@@ -7274,6 +7245,7 @@ button, a, input, select, textarea {
     -webkit-overflow-scrolling: touch;
     scroll-snap-type: x mandatory;
     gap: 0.45rem;
+    border: 1px solid #CBD5E1;
   }
 
   .push-presets-bar::-webkit-scrollbar {
@@ -7303,8 +7275,53 @@ button, a, input, select, textarea {
     transform: scale(0.96);
   }
 
+  .btn-register-device {
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
+    font-size: 0.88rem;
+    border-radius: 8px;
+  }
+
+  /* Compact Stats Grid on Mobile */
+  .push-stats-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.65rem;
+  }
+
+  .push-stats-grid .stat-card:last-child {
+    grid-column: span 2;
+  }
+
+  .push-stats-grid .stat-card {
+    padding: 0.8rem 0.85rem;
+    gap: 0.65rem;
+    border-radius: 10px;
+  }
+
+  .push-stats-grid .stat-icon {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    font-size: 1.1rem;
+    border-radius: 8px;
+  }
+
+  .push-stats-grid .stat-value {
+    font-size: 1.25rem;
+  }
+
+  .push-stats-grid .stat-label {
+    font-size: 0.7rem;
+  }
+
+  .push-stats-grid .stat-delta {
+    font-size: 0.68rem;
+  }
+
   .push-card {
-    padding: 1rem;
+    padding: 1rem 0.95rem;
+    border-radius: 12px;
   }
 
   .push-card-heading {
@@ -7326,6 +7343,7 @@ button, a, input, select, textarea {
     box-sizing: border-box;
     display: flex;
     align-items: center;
+    line-height: 1.35;
   }
 
   .push-radio-label:active {
@@ -7409,9 +7427,32 @@ button, a, input, select, textarea {
     transform: scale(0.96);
   }
 
+  .push-grid-2col {
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .push-dispatch-wrap {
+    margin-top: 0.85rem;
+  }
+
+  .btn-dispatch-push-main {
+    width: 100%;
+    min-height: 48px;
+    font-size: 0.95rem;
+    justify-content: center;
+  }
+
   /* Lockscreen Mockup Fluid Scaling */
+  .push-simulator-col .push-card {
+    position: static !important;
+    top: auto !important;
+    margin-top: 0.5rem;
+  }
+
   .phone-mockup-frame {
-    max-width: 300px;
+    max-width: 290px;
     width: 100%;
     box-sizing: border-box;
     border-width: 8px;
@@ -7448,14 +7489,6 @@ button, a, input, select, textarea {
     justify-content: center;
     font-size: 0.72rem;
   }
-}
-
-@media (max-width: 640px) {
-  .push-grid-2col {
-    grid-template-columns: 1fr;
-    gap: 0.6rem;
-    margin-bottom: 0.75rem;
-  }
 
   .push-prompt-actions {
     margin-left: 0;
@@ -7473,15 +7506,25 @@ button, a, input, select, textarea {
 @media (max-width: 480px) {
   .push-stats-grid {
     grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
   }
 
   .push-stats-grid .stat-card:last-child {
     grid-column: span 2;
   }
 
+  .push-stats-grid .stat-card {
+    padding: 0.65rem 0.75rem;
+    gap: 0.5rem;
+  }
+
+  .push-stats-grid .stat-value {
+    font-size: 1.15rem;
+  }
+
   .phone-mockup-frame {
     width: 100%;
-    max-width: 100%;
+    max-width: 270px;
     border-width: 6px;
     border-radius: 22px;
     padding: 1rem 0.6rem 1.25rem 0.6rem;
@@ -8755,35 +8798,304 @@ button, a, input, select, textarea {
   background: #FEE2E2;
 }
 
+/* ==========================================================================
+ * BATCHES & COURSE MASTER MODAL STYLING
+ * ========================================================================== */
+.batch-modal-content-box {
+  background: #FFFFFF;
+  border-radius: 14px;
+  max-width: 680px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+  border: 1.5px solid #047857;
+  box-sizing: border-box;
+}
+
+.batch-modal-header-top {
+  background: linear-gradient(135deg, #064E3B 0%, #047857 100%);
+  color: #fff;
+  padding: 1.25rem 1.5rem;
+  border-radius: 12px 12px 0 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.batch-modal-form {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  box-sizing: border-box;
+}
+
+.batch-modal-label {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text-mahogany, #2D1810);
+  display: block;
+  margin-bottom: 0.3rem;
+}
+
+.batch-modal-hint {
+  font-weight: normal;
+  color: var(--text-muted, #64748B);
+  font-size: 0.78rem;
+}
+
+.batch-modal-input {
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  box-sizing: border-box;
+  font-size: 0.9rem;
+}
+
+.batch-modal-input.fee-highlight {
+  font-weight: 800;
+  color: var(--primary-emerald, #064E3B);
+}
+
+.batch-modal-grid-2col-split {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 1rem;
+}
+
+.batch-modal-grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.batch-modal-fee-box {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1rem;
+  background: var(--bg-surface-cream, #F8FAFC);
+  padding: 1rem;
+  border-radius: 10px;
+  border: 1.5px solid var(--border-sand, #E2E8F0);
+}
+
+.batch-modal-grid-3col {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1rem;
+}
+
+.batch-modal-grid-tagline {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1rem;
+}
+
+.batch-modal-actions-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  border-top: 1px solid #E5E7EB;
+  padding-top: 1.1rem;
+}
+
+.btn-batch-modal-cancel {
+  background: #F3F4F6;
+  color: var(--text-mahogany, #2D1810);
+  font-weight: 700;
+  border-radius: 8px;
+  padding: 0.6rem 1.35rem;
+  cursor: pointer;
+  border: none;
+  font-size: 0.88rem;
+}
+
+.btn-batch-modal-submit {
+  background: var(--primary-emerald, #064E3B);
+  color: #fff;
+  font-weight: 800;
+  border-radius: 8px;
+  padding: 0.6rem 1.6rem;
+  box-shadow: 0 4px 12px rgba(6, 78, 59, 0.2);
+  cursor: pointer;
+  border: none;
+  font-size: 0.88rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
 @media (max-width: 768px) {
   .admin-batches-header {
-    padding: 1.1rem;
+    padding: 1.1rem 1rem;
     flex-direction: column;
     align-items: flex-start;
+    border-radius: 12px;
+  }
+  .admin-batches-header-title {
+    font-size: 1.22rem;
+  }
+  .admin-batches-header-sub {
+    font-size: 0.82rem;
+    line-height: 1.45;
   }
   .admin-batches-header-actions {
     width: 100%;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.85rem;
   }
   .admin-batches-header-actions .btn {
     width: 100%;
     justify-content: center;
+    min-height: 44px;
+    font-size: 0.88rem;
+  }
+  .admin-batches-kpi-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.65rem;
+  }
+  .admin-batch-kpi-card {
+    padding: 0.75rem 0.85rem;
+    gap: 0.65rem;
+    border-radius: 10px;
+  }
+  .admin-batch-kpi-icon {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    font-size: 1.05rem;
+    border-radius: 8px;
+  }
+  .admin-batch-kpi-label {
+    font-size: 0.68rem;
+  }
+  .admin-batch-kpi-value {
+    font-size: 1.18rem;
   }
   .admin-batches-toolbar {
     flex-direction: column;
     align-items: stretch;
+    gap: 0.65rem;
   }
   .admin-batches-search-wrap {
     width: 100%;
   }
+  .admin-batches-search-input {
+    width: 100%;
+    min-height: 44px;
+    font-size: 0.88rem;
+    box-sizing: border-box;
+  }
   .admin-batches-filter-group {
     width: 100%;
     flex-direction: column;
+    gap: 0.5rem;
   }
   .admin-batches-filter-select {
     width: 100%;
+    min-height: 44px;
+    font-size: 0.85rem;
+    box-sizing: border-box;
   }
   .admin-batches-grid {
     grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  .admin-batch-card {
+    border-radius: 12px;
+  }
+  .admin-batch-card-top {
+    padding: 1rem 1rem 0.85rem;
+  }
+  .admin-batch-card-title {
+    font-size: 1.15rem;
+    line-height: 1.3;
+  }
+  .admin-batch-card-body {
+    padding: 0.85rem 1rem;
+    gap: 0.65rem;
+  }
+  .admin-batch-card-footer {
+    padding: 0.75rem 1rem;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.45rem;
+  }
+  .btn-batch-action {
+    flex: 1 1 auto;
+    justify-content: center;
+    min-height: 42px;
+    font-size: 0.82rem;
+    padding: 0.45rem 0.65rem;
+    box-sizing: border-box;
+  }
+  .btn-batch-delete {
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+    min-height: 42px;
+    flex: 0 0 42px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Modal Mobile Overrides */
+  .batch-modal-content-box {
+    max-height: 94vh;
+    border-radius: 12px;
+    margin: 0.5rem;
+  }
+  .batch-modal-header-top {
+    padding: 1rem 1.15rem;
+  }
+  .batch-modal-form {
+    padding: 1.15rem 1rem;
+    gap: 0.9rem;
+  }
+  .batch-modal-grid-2col-split,
+  .batch-modal-grid-2col,
+  .batch-modal-grid-3col,
+  .batch-modal-grid-tagline {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  .batch-modal-fee-box {
+    grid-template-columns: 1fr;
+    padding: 0.85rem;
+    gap: 0.75rem;
+  }
+  .batch-modal-actions-footer {
+    flex-direction: column-reverse;
+    gap: 0.5rem;
+  }
+  .btn-batch-modal-cancel,
+  .btn-batch-modal-submit {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-batches-kpi-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+  .admin-batches-kpi-grid .admin-batch-kpi-card:last-child {
+    grid-column: span 2;
+  }
+  .admin-batch-kpi-card {
+    padding: 0.65rem 0.7rem;
+    gap: 0.5rem;
+  }
+  .admin-batch-kpi-value {
+    font-size: 1.08rem;
   }
 }
 

@@ -35,6 +35,8 @@
 
 import { getSupabase, requireSession, applyCors } from './_lib/auth.js';
 import { pushToSubscription } from './_lib/webpush.js';
+import { dispatchWithQuota, EMAIL_CATEGORIES } from './_lib/email-quota.js';
+import { sendEmailViaResend, DEFAULT_FROM } from './_lib/resend-sender.js';
 
 // How each documented failure code from the RPC maps onto HTTP. Anything the
 // function might grow later falls through to 400 rather than being reported as
@@ -154,6 +156,81 @@ export default async function handler(req, res) {
         }
       }
     } catch (_) { /* push notification is best-effort */ }
+
+    // Best-effort email receipt dispatch to student/parent
+    try {
+      const studentId = result.student_id;
+      const receiptNo = result.receipt_no || (result.receipt && result.receipt.receipt_no) || 'REC';
+      const amountPaid = Number(result.amount_paid || (result.receipt && result.receipt.amount) || 0);
+
+      if (studentId) {
+        const { data: stuRow } = await supabase
+          .from('students')
+          .select('id, student_id, name, email, pending_fee, class_name')
+          .or(`student_id.eq.${studentId},id.eq.${studentId}`)
+          .single();
+
+        const stuEmail = (stuRow?.email || '').trim();
+        if (stuEmail && stuEmail.includes('@')) {
+          const studentName = stuRow.name || 'Student';
+          const remainingDue = Number(stuRow.pending_fee || 0);
+          const emailSubject = `Payment Verified: Receipt #${receiptNo} — Pragyan Institute`;
+          const emailHtml = `
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 580px; margin: 0 auto; border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden; background: #FFFFFF;">
+              <div style="background: linear-gradient(135deg, #064E3B 0%, #022C22 100%); padding: 24px 20px; color: #FFFFFF; text-align: center;">
+                <h1 style="margin: 0; font-size: 20px; font-weight: 800; letter-spacing: 0.5px;">PRAGYAN INSTITUTE</h1>
+                <p style="margin: 4px 0 0; font-size: 13px; opacity: 0.9;">Official Fee Payment Confirmation & Receipt</p>
+              </div>
+              <div style="padding: 24px 20px; color: #1E293B;">
+                <p style="font-size: 15px; margin-top: 0;">Dear <strong>${studentName}</strong>,</p>
+                <p style="font-size: 14px; line-height: 1.5; color: #334155;">Your online fee payment of <strong style="color: #059669; font-size: 16px;">₹${amountPaid.toLocaleString('en-IN')}</strong> has been successfully verified and approved.</p>
+                
+                <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; margin: 18px 0;">
+                  <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+                    <tr><td style="padding: 6px 0; color: #64748B;">Receipt Number:</td><td style="padding: 6px 0; font-weight: 700; text-align: right; font-family: monospace;">${receiptNo}</td></tr>
+                    <tr><td style="padding: 6px 0; color: #64748B;">Student ID:</td><td style="padding: 6px 0; font-weight: 700; text-align: right;">${studentId}</td></tr>
+                    <tr><td style="padding: 6px 0; color: #64748B;">Amount Credited:</td><td style="padding: 6px 0; font-weight: 800; text-align: right; color: #059669;">₹${amountPaid.toLocaleString('en-IN')}</td></tr>
+                    <tr><td style="padding: 6px 0; color: #64748B;">Remaining Balance:</td><td style="padding: 6px 0; font-weight: 700; text-align: right;">₹${remainingDue.toLocaleString('en-IN')}</td></tr>
+                    <tr><td style="padding: 6px 0; color: #64748B;">Payment Method:</td><td style="padding: 6px 0; font-weight: 700; text-align: right;">Online UPI / Digital Transfer</td></tr>
+                  </table>
+                </div>
+
+                <p style="font-size: 13px; color: #64748B; margin-bottom: 20px;">You can view and download your full computerized stamped PDF receipt anytime by logging into the Student Portal.</p>
+                
+                <div style="text-align: center; margin: 20px 0 10px;">
+                  <a href="https://www.pragyaninstitute.com/portal.html" style="display: inline-block; background: #064E3B; color: #FFFFFF; text-decoration: none; padding: 10px 22px; border-radius: 6px; font-weight: 700; font-size: 13px;">View Student Portal</a>
+                </div>
+              </div>
+              <div style="background: #F1F5F9; padding: 12px; font-size: 11px; color: #64748B; text-align: center;">
+                Pragyan Institute • At Moti Market, Near Jagdamba Sthan, Lalganj, Vaishali, Bihar
+              </div>
+            </div>
+          `;
+
+          await dispatchWithQuota({
+            category: EMAIL_CATEGORIES.RECEIPT,
+            items: [{ email: stuEmail, student_id: studentId }],
+            getEmail: (it) => it.email,
+            getDedupeKey: (it) => `RECEIPT-${receiptNo}-${it.student_id}`,
+            reference: `RECEIPT-${receiptNo}`,
+            send: async (item) => {
+              const resendKey = process.env.RESEND_API_KEY;
+              const resendFrom = process.env.RESEND_FROM_EMAIL || DEFAULT_FROM;
+              const sendRes = await sendEmailViaResend({
+                apiKey: resendKey,
+                from: resendFrom,
+                to: item.email,
+                subject: emailSubject,
+                html: emailHtml
+              });
+              return { result: sendRes, report: { email: item.email } };
+            }
+          }).catch(mailErr => console.warn('[approve-payment] email dispatch failed:', mailErr?.message));
+        }
+      }
+    } catch (emailErr) {
+      console.warn('[approve-payment] email receipt notification caught:', emailErr?.message);
+    }
 
     return res.status(200).json({ success: true, data: result, idempotent: Boolean(result.idempotent) });
   } catch (err) {

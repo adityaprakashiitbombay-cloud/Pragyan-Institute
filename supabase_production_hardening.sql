@@ -286,6 +286,8 @@ ALTER TABLE public.notices             ADD COLUMN IF NOT EXISTS updated_at times
 ALTER TABLE public.batches             ADD COLUMN IF NOT EXISTS annual_fee numeric(10,2);
 ALTER TABLE public.batches             ADD COLUMN IF NOT EXISTS class_code text;
 ALTER TABLE public.batches             ADD COLUMN IF NOT EXISTS class_name text;
+ALTER TABLE public.batches             ADD COLUMN IF NOT EXISTS stream text DEFAULT '';
+ALTER TABLE public.batches             ADD COLUMN IF NOT EXISTS teacher text DEFAULT '';
 ALTER TABLE public.batches             ADD COLUMN IF NOT EXISTS billing_day smallint;
 ALTER TABLE public.batches             ADD COLUMN IF NOT EXISTS teachers jsonb DEFAULT '[]'::jsonb;
 ALTER TABLE public.batches             ADD COLUMN IF NOT EXISTS schedule jsonb DEFAULT '[]'::jsonb;
@@ -297,6 +299,7 @@ ALTER TABLE public.batches             ADD COLUMN IF NOT EXISTS tagline text;
 ALTER TABLE public.batches             ADD COLUMN IF NOT EXISTS status text DEFAULT 'Active';
 ALTER TABLE public.batches             ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
 ALTER TABLE public.batches             ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
+CREATE UNIQUE INDEX IF NOT EXISTS idx_batches_batch_id ON public.batches (batch_id);
 
 ALTER TABLE public.fee_receipts        ADD COLUMN IF NOT EXISTS collected_by text DEFAULT '';
 ALTER TABLE public.fee_receipts        ADD COLUMN IF NOT EXISTS note text DEFAULT '';
@@ -1917,4 +1920,54 @@ CREATE POLICY "service_role_full_holidays"  ON public.institute_holidays FOR ALL
 REVOKE ALL ON public.class_schedules  FROM anon, authenticated;
 REVOKE ALL ON public.institute_holidays FROM anon, authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.class_schedules  TO authenticated;
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.institute_holidays TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.institute_holidays TO authenticated;
+
+-- ============================================================================
+-- SECTION 21: SUPABASE STORAGE BUCKETS & POLICIES (pragyan-media)
+-- ----------------------------------------------------------------------------
+-- Creates and hardens the public media storage bucket 'pragyan-media' used for:
+-- - blog_covers/ and blog_photos/ (Article covers and in-post photography)
+-- - profile_pictures/ (Student ID card photos)
+-- - admin_avatars/ (Faculty profile portraits)
+-- - notice_attachments/ (PDF & image notices)
+-- - payment_proofs/ (Student payment verification slips)
+-- ============================================================================
+
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'pragyan-media',
+  'pragyan-media',
+  true,
+  5242880,
+  ARRAY['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+)
+ON CONFLICT (id) DO UPDATE SET
+  public = true,
+  file_size_limit = 5242880,
+  allowed_mime_types = ARRAY['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+
+-- Clean and recreate storage policies for pragyan-media
+DO $do$
+BEGIN
+  DROP POLICY IF EXISTS "Public Access pragyan-media" ON storage.objects;
+  DROP POLICY IF EXISTS "Service Role Access pragyan-media" ON storage.objects;
+  DROP POLICY IF EXISTS "Authenticated Upload pragyan-media" ON storage.objects;
+EXCEPTION WHEN OTHERS THEN
+  NULL;
+END $do$;
+
+CREATE POLICY "Public Access pragyan-media"
+ON storage.objects FOR SELECT
+USING (bucket_id = 'pragyan-media');
+
+CREATE POLICY "Service Role Access pragyan-media"
+ON storage.objects FOR ALL
+TO service_role
+USING (bucket_id = 'pragyan-media')
+WITH CHECK (bucket_id = 'pragyan-media');
+
+CREATE POLICY "Authenticated Upload pragyan-media"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (bucket_id = 'pragyan-media');
+
