@@ -605,13 +605,13 @@
           const currentStudentId = currentStudent ? (currentStudent.id || currentStudent.student_id || currentStudent.rollNo) : null;
 
           // Role-aware table set. Row scoping for signed-in roles is enforced
-          // SERVER-SIDE by the gateway; anonymous visitors may only pull the
-          // public catalogue — every other table would 401 and poison the
-          // failure accounting on the marketing site.
+          // SERVER-SIDE by the gateway; anonymous visitors only pull public catalogue,
+          // and students only pull student-accessible tables.
           const hasSession = Boolean(this.sessionToken ||
             sessionStorage.getItem('pragyan_portal_token') || localStorage.getItem('pragyan_portal_token'));
+          
           const tables = hasSession
-            ? ALL_TABLES
+            ? (activeRole === 'student' ? ['students', 'notices', 'fee_receipts', 'fee_billing_ledger', 'student_requests', 'batches', 'admins', 'class_schedules', 'institute_holidays'] : ALL_TABLES)
             : ['notices', 'batches', 'blog_posts'];
 
           // Fetch all tables in parallel with allSettled. Row scoping for the
@@ -627,6 +627,7 @@
           // S2: Transactional validation
           const data = {};
           const failedTables = [];
+          let authFailedCount = 0;
 
           fetchResults.forEach((res, idx) => {
             const table = tables[idx];
@@ -634,9 +635,46 @@
               data[table] = res.value.rows;
             } else {
               failedTables.push(table);
-              console.warn(`⚠️ Failed to sync table: ${table}`, res.reason?.message || 'Unknown error');
+              const errMsg = String(res.reason?.message || '');
+              if (errMsg.includes('401') || errMsg.includes('no active session') || errMsg.includes('Invalid session')) {
+                authFailedCount++;
+              }
+              console.warn(`⚠️ Failed to sync table: ${table}`, errMsg || 'Unknown error');
             }
           });
+
+          // Auto-recovery for expired session tokens (401 across tables):
+          // Clear stale token and immediately pull live public catalogue to prevent offline cache lock
+          if (hasSession && authFailedCount === tables.length) {
+            console.warn('[SupabaseSync] Stale session token detected (401 across queries). Resetting session and syncing public catalogue.');
+            this.sessionToken = null;
+            this.sessionRole = null;
+            sessionStorage.removeItem('pragyan_portal_token');
+            sessionStorage.removeItem('pragyan_portal_role');
+            localStorage.removeItem('pragyan_portal_token');
+            localStorage.removeItem('pragyan_portal_role');
+            if (typeof AppState !== 'undefined' && AppState.token) AppState.token = null;
+
+            const publicTables = ['notices', 'batches', 'blog_posts', 'class_schedules', 'institute_holidays'];
+            const publicResults = await Promise.allSettled(
+              publicTables.map(async table => ({ table, rows: await this.readAll(table) }))
+            );
+            const pubData = {};
+            publicResults.forEach(r => {
+              if (r.status === 'fulfilled' && Array.isArray(r.value?.rows)) {
+                pubData[r.value.table] = r.value.rows;
+              }
+            });
+            if (Object.keys(pubData).length > 0) {
+              this.updateLocalState(pubData);
+              this._connected = true;
+              this.updateStatus('synced');
+              this.callbacks.forEach(cb => {
+                try { cb('full_sync', pubData); } catch (e) { console.warn('Callback error:', e); }
+              });
+              return { success: true, data: pubData, sessionExpired: true };
+            }
+          }
 
           // If critical tables failed, rollback and preserve local cache
           const isCriticalFailure = failedTables.includes('students') && failedTables.includes('fee_receipts');
@@ -702,6 +740,34 @@
     },
 
     async pull() { return this.pullAll(); },
+
+    /**
+     * Force purges local table caches and re-fetches the latest live data from cloud.
+     */
+    async clearCacheAndResync() {
+      console.log('[SupabaseSync] Force cache reset & cloud re-sync triggered...');
+      try {
+        ALL_TABLES.forEach(t => {
+          const k = KEY_MAP[t];
+          if (k) localStorage.removeItem(k);
+        });
+        if (typeof AppState !== 'undefined') {
+          AppState._studentsCache = null;
+          AppState._batchesCache = null;
+          AppState._noticesCache = null;
+          AppState._feeReceiptsCache = null;
+          AppState._requestsCache = null;
+          AppState._classSchedulesCache = null;
+          AppState._holidaysCache = null;
+        }
+      } catch (err) {
+        console.warn('[SupabaseSync] Cache clear notice:', err.message);
+      }
+      this.isSyncing = false;
+      this._pendingPull = false;
+      this.updateStatus('syncing');
+      return this.pullAll();
+    },
 
     // ── H2: Write Mutations (Push localStorage → Supabase) with Idempotency ───
     /**
@@ -2054,7 +2120,24 @@
         // and a Font Awesome glyph reads out as noise otherwise.
         icon.setAttribute('aria-hidden', 'true');
         span.textContent = state.text;
-        badge.title = state.title;
+        badge.title = `${state.title} · Click to force re-sync`;
+
+        if (!badge._clickBound) {
+          badge._clickBound = true;
+          badge.style.cursor = 'pointer';
+          badge.addEventListener('click', async (e) => {
+            e.preventDefault();
+            this.updateStatus('syncing');
+            try {
+              await this.clearCacheAndResync();
+              if (typeof window !== 'undefined' && typeof window.showNotification === 'function') {
+                window.showNotification('🔄 Live cloud re-sync complete!', 'success');
+              }
+            } catch (err) {
+              console.warn('[SupabaseSync] Click re-sync note:', err.message);
+            }
+          });
+        }
       });
 
       this._announceOfflineTransition(key);

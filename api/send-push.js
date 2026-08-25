@@ -125,10 +125,10 @@ return res.status(429).json({ success: false, error: 'Broadcast limit reached (1
     publicKey: process.env.VAPID_PUBLIC_KEY,
     privateKey: process.env.VAPID_PRIVATE_KEY
   };
-  const vapidSubject = process.env.VAPID_SUBJECT;
+  const vapidSubject = process.env.VAPID_SUBJECT || process.env.RESEND_FROM_EMAIL || DEFAULT_VAPID_SUBJECT || 'mailto:pragyan.lalganj@gmail.com';
   // BUG-01: fail closed — no embedded credential fallback exists anymore.
   if (!vapidKeys.publicKey || !vapidKeys.privateKey || !vapidSubject) {
-    return res.status(500).json({ success: false, error: 'VAPID credentials unconfigured' });
+    return res.status(500).json({ success: false, error: 'VAPID credentials unconfigured on server. Please configure VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY in environment variables.' });
   }
 
   try {

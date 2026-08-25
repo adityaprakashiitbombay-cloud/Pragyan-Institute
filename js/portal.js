@@ -14144,21 +14144,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
       let subs = [];
       let logs = [];
 
-      try {
-        const res = await fetch('/api/send-push', {
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.success) {
-            if (devicesEl) devicesEl.textContent = Number(data.subscribers || 0).toLocaleString('en-IN');
-            if (data.recentLogs && Array.isArray(data.recentLogs)) {
-              logs = data.recentLogs;
-            }
-          }
-        }
-      } catch (_) {}
-
+      // 1. Try authenticated database gateway directly first
       if (window.SupabaseSync && typeof window.SupabaseSync._apiDb === 'function') {
         const [subRows, logRows] = await Promise.allSettled([
           window.SupabaseSync._apiDb('push_subscriptions', 'select', { filters: { limit: 1000 } }),
@@ -14175,6 +14161,26 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
         if (logRows.status === 'fulfilled' && Array.isArray(logRows.value)) {
           logs = logRows.value;
         }
+      }
+
+      // 2. Fallback to /api/send-push GET if needed
+      if (subs.length === 0 && logs.length === 0) {
+        try {
+          const res = await fetch('/api/send-push', {
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.success) {
+              if (devicesEl && (devicesEl.textContent === '--' || devicesEl.textContent === '0')) {
+                devicesEl.textContent = Number(data.subscribers || 0).toLocaleString('en-IN');
+              }
+              if (data.recentLogs && Array.isArray(data.recentLogs) && logs.length === 0) {
+                logs = data.recentLogs;
+              }
+            }
+          }
+        } catch (_) {}
       }
 
       if (logs.length > 0) {
