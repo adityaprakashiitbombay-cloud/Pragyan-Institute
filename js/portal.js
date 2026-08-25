@@ -3461,13 +3461,7 @@ function renderStudentDashboard() {
       notifBtn.innerHTML = `<i aria-hidden="true" class="fa-solid fa-bell"></i> Notification Tab ${count > 0 ? `<span class="badge" style="background:#059669; color:#fff; padding:1px 7px; border-radius:99px; font-size: 0.8rem; margin-left:6px; font-weight:700;">${count}</span>` : ''}`;
     }
 
-    // Render Student Tabs
-    renderStudentDetailsTab();
-    renderStudentBatchTab();
-    renderStudentNotifications();
-    renderStudentFeeTab();
-
-    // Preserve active student tab
+    // Preserve and render ONLY the active student tab
     const targetTab = AppState.activeStudentTab || 'details';
     switchStudentTab(targetTab);
 
@@ -5447,18 +5441,7 @@ function renderStudentDashboard() {
       }
     }
 
-    renderAdminStudentList();
-    renderAdminAnalyticsTab();
-    renderAdminEmailTab();
-    renderCommunityChatTab();
-    renderAdminNoticesManager();
-    renderAdminRequestsManager();
-    renderAdminAuditHistoryTab();
-    renderAdminSettingsTab();
-    renderAdminBlogTab();
-    renderAdminBatchesTab();
-
-    // Preserve the currently active admin tab!
+    // Lazy Tab Render: Render ONLY the currently active admin tab!
     let targetTab = AppState.activeAdminTab || 'students';
     if (targetTab === 'email' && !isMainAdmin()) {
       targetTab = 'students';
@@ -7065,10 +7048,14 @@ function renderStudentDashboard() {
       bindStudentTableActions(pane);
     };
 
-    // Search filter input
+    // Search filter input (debounced for 60fps responsive typing)
+    let studentSearchDebounce = null;
     pane.querySelector('#adminSearchStudent')?.addEventListener('input', (e) => {
       directorySearchQuery = e.target.value;
-      updateTable();
+      if (studentSearchDebounce) clearTimeout(studentSearchDebounce);
+      studentSearchDebounce = setTimeout(() => {
+        updateTable();
+      }, 120);
     });
 
     // Class filter select
@@ -13020,17 +13007,21 @@ const inputRoll = modalEl.querySelector('#deleteConfirmRollInput')?.value.trim()
       renderAdminAuditHistoryTab();
     });
 
+    let auditSearchDebounce = null;
     const searchIn = pane.querySelector('#adminAuditSearchInput');
     searchIn?.addEventListener('input', (e) => {
       currentAuditSearch = e.target.value;
       const start = e.target.selectionStart;
       const end = e.target.selectionEnd;
-      renderAdminAuditHistoryTab();
-      const updatedIn = document.getElementById('adminAuditSearchInput');
-      if (updatedIn) {
-        updatedIn.focus();
-        updatedIn.setSelectionRange(start, end);
-      }
+      if (auditSearchDebounce) clearTimeout(auditSearchDebounce);
+      auditSearchDebounce = setTimeout(() => {
+        renderAdminAuditHistoryTab();
+        const updatedIn = document.getElementById('adminAuditSearchInput');
+        if (updatedIn) {
+          updatedIn.focus();
+          updatedIn.setSelectionRange(start, end);
+        }
+      }, 120);
     });
 
     pane.querySelectorAll('[data-audit-filter]').forEach(btn => {
