@@ -62,6 +62,25 @@ export default async function handler(req, res) {
       const CHAT_TOKEN_TTL_SECONDS = 24 * 60 * 60;
       const exp = Math.floor(Date.now() / 1000) + CHAT_TOKEN_TTL_SECONDS;
       const token = serverClient.createToken(userId, exp);
+
+      // Persist / synchronize stream_user_id for this user in Supabase Postgres
+      try {
+        const supabase = getSupabase();
+        if (supabase) {
+          if (isAdmin) {
+            const adminUser = session.username || 'chandan';
+            supabase.from('admins').update({ stream_user_id: userId }).ilike('username', adminUser).then(() => {}).catch(() => {});
+          } else {
+            const sid = session.student_id || session.sub || session.roll;
+            if (sid) {
+              supabase.from('students').update({ stream_user_id: userId }).or(`student_id.eq.${sid},id.eq.${sid}`).then(() => {}).catch(() => {});
+            }
+          }
+        }
+      } catch (dbErr) {
+        console.warn('[health/stream-token] DB stream_user_id sync note:', dbErr.message);
+      }
+
       return res.status(200).json({
         success: true,
         apiKey,

@@ -275,6 +275,7 @@ ALTER TABLE public.students            ADD COLUMN IF NOT EXISTS total_fee numeri
 ALTER TABLE public.students            ADD COLUMN IF NOT EXISTS paid_fee numeric(10,2) DEFAULT 0;
 ALTER TABLE public.students            ADD COLUMN IF NOT EXISTS pending_fee numeric(10,2) DEFAULT 0;
 ALTER TABLE public.students            ADD COLUMN IF NOT EXISTS password_hash text;
+ALTER TABLE public.students            ADD COLUMN IF NOT EXISTS stream_user_id text;
 ALTER TABLE public.students            ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
 ALTER TABLE public.students            ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
 
@@ -331,6 +332,7 @@ ALTER TABLE public.admins              ADD COLUMN IF NOT EXISTS photo_url text D
 ALTER TABLE public.admins              ADD COLUMN IF NOT EXISTS upi_id text;
 ALTER TABLE public.admins              ADD COLUMN IF NOT EXISTS is_head boolean DEFAULT false;
 ALTER TABLE public.admins              ADD COLUMN IF NOT EXISTS token_version integer NOT NULL DEFAULT 1;
+ALTER TABLE public.admins              ADD COLUMN IF NOT EXISTS stream_user_id text;
 ALTER TABLE public.admins              ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
 ALTER TABLE public.admins              ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
 
