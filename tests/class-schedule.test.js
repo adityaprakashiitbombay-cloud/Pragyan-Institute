@@ -100,6 +100,10 @@ export function runClassScheduleTests(assert) {
     'T31.33: css/portal.css optimizes period action buttons and header actions for touch devices');
   assert(portalCss.includes('scroll-snap-type: x mandatory') && portalCss.includes('.student-schedule-week-bar'),
     'T31.34: css/portal.css configures smooth touch scrolling for weekly day selection bar');
+  assert(portalJs.includes('chkAutoRepeatWeekly') && portalJs.includes('isRecurringWeekly'),
+    'T31.35: js/portal.js implements interactive toggle switch for weekly routine repeating across Mon-Sun');
+  assert(portalJs.includes('Weekly Repeating Routine (Mon–Sun)') && portalJs.includes('isWeeklyRecurringActive'),
+    'T31.36: js/portal.js dynamically displays weekly repeating routine badge in student timetable profile');
 
   // ── Hardening round: BUG-09 empty-vs-uninitialized state ────────────────────
   const portalSrc = read('js/portal.js').replace(/\r\n/g, '\n');

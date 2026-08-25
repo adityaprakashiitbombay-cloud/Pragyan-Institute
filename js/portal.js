@@ -2369,6 +2369,26 @@
       }
     },
 
+    isRecurringWeekly(batchId) {
+      if (!batchId) return true;
+      const bKey = (typeof getBatchCategoryKey === 'function' ? getBatchCategoryKey(batchId) : '') || String(batchId).toUpperCase();
+      try {
+        const val = localStorage.getItem('pragyan_recurring_week_' + bKey);
+        if (val !== null) return val === 'true';
+        const globalVal = localStorage.getItem('pragyan_recurring_week_global');
+        if (globalVal !== null) return globalVal === 'true';
+      } catch (e) {}
+      return true;
+    },
+
+    setRecurringWeekly(batchId, isActive) {
+      const bKey = (typeof getBatchCategoryKey === 'function' ? getBatchCategoryKey(batchId) : '') || String(batchId).toUpperCase();
+      try {
+        localStorage.setItem('pragyan_recurring_week_' + bKey, isActive ? 'true' : 'false');
+        localStorage.setItem('pragyan_recurring_week_global', isActive ? 'true' : 'false');
+      } catch (e) {}
+    },
+
     getInstituteHolidays() {
       if (Array.isArray(this._instituteHolidaysCache)) return this._instituteHolidaysCache;
       try {
@@ -4484,6 +4504,7 @@ function renderStudentDashboard() {
     });
 
     // Fetch dynamic schedules from database / AppState for ALL enrolled batches
+    const isWeeklyRecurringActive = enrolledBatchesList.some(b => AppState.isRecurringWeekly ? AppState.isRecurringWeekly(b.batchId || b.id) : true);
     const rawSchedules = AppState.getClassSchedules ? AppState.getClassSchedules() : [];
     const allSchedules = Array.isArray(rawSchedules) ? rawSchedules : [];
     let renderedScheduleItems = [];
@@ -4536,7 +4557,7 @@ function renderStudentDashboard() {
             sortOrder: Number(sch.sort_order || sch.sortOrder || 1)
           });
         });
-      } else if (currentSelectedDay !== 'Sunday') {
+      } else if (currentSelectedDay !== 'Sunday' || isWeeklyRecurringActive) {
         const slotList = BATCH_SLOTS[bKey] || BATCH_SLOTS[bId] || [];
         batchSubjects.forEach((subject, i) => {
           renderedScheduleItems.push({
@@ -4653,9 +4674,16 @@ function renderStudentDashboard() {
           <div class="dash-card-header" style="flex-direction: column; align-items: stretch; gap: 0.75rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
               <div class="dash-card-title"><i aria-hidden="true" class="fa-solid fa-calendar-days"></i> Daily Class Timetable</div>
-              <span class="student-timetable-live-badge" style="font-size: 0.8rem; color: var(--text-muted); background: #FAF9F6; padding: 0.2rem 0.55rem; border-radius: 6px; border: 1px solid var(--border-sand); font-weight: 600; display: inline-flex; align-items: center; gap: 0.35rem;">
-                <i aria-hidden="true" class="fa-solid fa-bolt" style="color: var(--primary-emerald);"></i> Live Supabase Cloud
-              </span>
+              <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+                ${isWeeklyRecurringActive ? `
+                  <span class="status-pill status-verified" style="font-size: 0.76rem; padding: 2px 7px; display: inline-flex; align-items: center; gap: 0.3rem;">
+                    <i aria-hidden="true" class="fa-solid fa-repeat"></i> Weekly Repeating Routine (Mon–Sun)
+                  </span>
+                ` : ''}
+                <span class="student-timetable-live-badge" style="font-size: 0.8rem; color: var(--text-muted); background: #FAF9F6; padding: 0.2rem 0.55rem; border-radius: 6px; border: 1px solid var(--border-sand); font-weight: 600; display: inline-flex; align-items: center; gap: 0.35rem;">
+                  <i aria-hidden="true" class="fa-solid fa-bolt" style="color: var(--primary-emerald);"></i> Live Supabase Cloud
+                </span>
+              </div>
             </div>
 
             <!-- Day Selector Tabs -->
@@ -15141,6 +15169,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
       currentPeriods.sort((a, b) => (Number(a.sort_order || a.sortOrder || 1) - Number(b.sort_order || b.sortOrder || 1)));
 
       const isAllOff = currentPeriods.length > 0 && currentPeriods.every(p => !!p.is_cancelled);
+      const isRecurringActive = AppState.isRecurringWeekly ? AppState.isRecurringWeekly(activeAdminScheduleBatchId) : true;
       const selectedBatchObj = cfg?.resolveBatch ? cfg.resolveBatch(activeAdminScheduleBatchId) : null;
       const fallbackBatchFromState = batches.find(b => (b.batchId || b.id || b.batch_id) === activeAdminScheduleBatchId || getBatchCategoryKey(b.batchId || b.id || b.name || '') === activeKey);
       const batchName = selectedBatchObj?.name || fallbackBatchFromState?.name || fallbackBatchFromState?.batch_name || activeAdminScheduleBatchId;
@@ -15198,6 +15227,18 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
 
           <!-- Quick Action Buttons: Repeat Week & Class Off -->
           <div class="schedule-quick-actions-bar" style="display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center;">
+            <!-- Interactive Weekly Repeating Toggle -->
+            <div class="schedule-recurring-toggle-box" style="display:inline-flex; align-items:center; gap:0.55rem; background:#F8FAFC; border:1.5px solid #CBD5E1; border-radius:8px; padding:0.35rem 0.75rem; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+              <label for="chkAutoRepeatWeekly" style="margin:0; display:inline-flex; align-items:center; cursor:pointer; gap:0.45rem; font-size:0.83rem; font-weight:800; color:#1E293B;">
+                <input type="checkbox" id="chkAutoRepeatWeekly" ${isRecurringActive ? 'checked' : ''} style="cursor:pointer; width:16px; height:16px; accent-color:#047857;">
+                <i aria-hidden="true" class="fa-solid fa-repeat" style="color:${isRecurringActive ? '#047857' : '#64748B'};"></i>
+                <span>Repeat Mon–Sun:</span>
+              </label>
+              <span class="status-pill ${isRecurringActive ? 'status-verified' : 'status-pending'}" id="recurringStatusPill" style="font-size:0.75rem; font-weight:800; padding:2px 7px;">
+                ${isRecurringActive ? 'Active (All 7 Days)' : 'Manual'}
+              </span>
+            </div>
+
             <button type="button" class="btn btn-repeat-week" id="btnReplicateWeek" style="background:linear-gradient(135deg, #1E40AF 0%, #2563EB 100%); border:1.5px solid #1D4ED8; color:#FFFFFF; font-weight:800; border-radius:8px; padding:0.55rem 0.9rem; font-size:0.84rem; box-shadow:0 3px 10px rgba(37,99,235,0.25);" title="Copy this day's timetable to Monday through Saturday">
               <i aria-hidden="true" class="fa-solid fa-bolt"></i> <span>⚡ Repeat for Whole Week (Mon–Sat)</span>
             </button>
@@ -15397,6 +15438,17 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
     // Seed Standard Subjects
     pane.querySelector('#btnAdminSeedDefault')?.addEventListener('click', () => {
       seedDefaultScheduleForBatchAndDay(activeAdminScheduleBatchId, activeAdminScheduleDay);
+    });
+
+    // Toggle Weekly Routine Repeating (Mon–Sun Auto-Sync)
+    pane.querySelector('#chkAutoRepeatWeekly')?.addEventListener('change', async (e) => {
+      const isChecked = e.target.checked;
+      AppState.setRecurringWeekly(activeAdminScheduleBatchId, isChecked);
+      if (isChecked) {
+        await replicateDayScheduleAcrossWeek(activeAdminScheduleBatchId, activeAdminScheduleDay, true);
+      } else {
+        renderAdminScheduleTab();
+      }
     });
 
     // Replicate for Whole Week (Mon–Sat)
