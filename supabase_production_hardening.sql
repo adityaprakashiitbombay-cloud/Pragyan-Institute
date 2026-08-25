@@ -1196,6 +1196,8 @@ END;
 $fn$;
 
 -- Compatibility view: fee_email_log aliasing email_dispatch_log
+DROP TABLE IF EXISTS public.fee_email_log CASCADE;
+DROP VIEW IF EXISTS public.fee_email_log CASCADE;
 CREATE OR REPLACE VIEW public.fee_email_log AS
   SELECT
     id,
