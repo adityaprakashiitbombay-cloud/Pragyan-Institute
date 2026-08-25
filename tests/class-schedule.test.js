@@ -90,4 +90,14 @@ export function runClassScheduleTests(assert) {
     'T31.29: js/portal.js normalizes selected batch ID to canonical key on change event');
   assert(portalJs.includes("getBatchCategoryKey(schB) === activeKey") && portalJs.includes("activeKey = getBatchCategoryKey(activeAdminScheduleBatchId)"),
     'T31.30: js/portal.js filters timetable periods by resolved canonical batch key');
+
+  // --- 10. Mobile Responsiveness & Touch Optimization ---
+  assert(portalCss.includes('.schedule-header-actions') && portalCss.includes('.schedule-toolbar-top'),
+    'T31.31: css/portal.css defines semantic responsive container classes for schedule header and toolbar');
+  assert(portalCss.includes('@media (max-width: 768px)') && portalCss.includes('.schedule-quick-actions-bar'),
+    'T31.32: css/portal.css configures mobile breakpoint for schedule toolbar and quick actions');
+  assert(portalCss.includes('.period-card-actions') && portalCss.includes('.btn-schedule-action'),
+    'T31.33: css/portal.css optimizes period action buttons and header actions for touch devices');
+  assert(portalCss.includes('scroll-snap-type: x mandatory') && portalCss.includes('.student-schedule-week-bar'),
+    'T31.34: css/portal.css configures smooth touch scrolling for weekly day selection bar');
 }
