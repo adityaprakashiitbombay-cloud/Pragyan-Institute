@@ -24,22 +24,47 @@ export default async function handler(req, res) {
     (req.headers['x-vercel-matched-path'] && req.headers['x-vercel-matched-path'].includes('stream-token'));
 
   if (isStreamToken) {
-    if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+    if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
     const session = requireSession(req, res, ['student', 'admin']);
     if (!session) return;
 
     const apiKey = process.env.STREAM_API_KEY;
     const apiSecret = process.env.STREAM_API_SECRET;
-    if (!apiKey || !apiSecret) return res.status(503).json({ error: 'Chat is not configured' });
+    if (!apiKey || !apiSecret) return res.status(503).json({ success: false, error: 'Chat is not configured' });
 
-    const prefix = session.role === 'admin' ? 'admin' : 'student';
-    const userId = `${prefix}_${String(session.sub).replace(/[^a-zA-Z0-9_-]/g, '')}`;
-    // F-R7: tokens expire with a predictable 7-day window instead of living
-    // forever. stream-chat's createToken(userId, exp) embeds the claim.
-    const CHAT_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
-    const exp = Math.floor(Date.now() / 1000) + CHAT_TOKEN_TTL_SECONDS;
-    const token = StreamChat.getInstance(apiKey, apiSecret).createToken(userId, exp);
-    return res.status(200).json({ apiKey, userId, token, expiresAt: new Date(exp * 1000).toISOString() });
+    const isAdmin = session.role === 'admin';
+    const prefix = isAdmin ? 'admin' : 'student';
+    const rawId = session.sub || 'unknown';
+    const userId = `${prefix}_${String(rawId).toLowerCase().replace(/[^a-zA-Z0-9_-]/g, '')}`;
+    const userName = session.name || (isAdmin ? 'Institute Admin' : 'Student');
+    const userRole = isAdmin ? 'admin' : 'user';
+
+    try {
+      const serverClient = StreamChat.getInstance(apiKey, apiSecret);
+      await serverClient.upsertUser({
+        id: userId,
+        name: userName,
+        role: userRole,
+        image: `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=064E3B&color=fff`,
+      });
+
+      const CHAT_TOKEN_TTL_SECONDS = 24 * 60 * 60;
+      const exp = Math.floor(Date.now() / 1000) + CHAT_TOKEN_TTL_SECONDS;
+      const token = serverClient.createToken(userId, exp);
+      return res.status(200).json({
+        success: true,
+        apiKey,
+        userId,
+        userName,
+        userRole,
+        token,
+        exp,
+        expiresAt: new Date(exp * 1000).toISOString()
+      });
+    } catch (err) {
+      console.error('[health/stream-token] Error:', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
   }
 
   // Health check route
