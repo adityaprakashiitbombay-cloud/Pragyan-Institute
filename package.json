@@ -18,7 +18,7 @@
     "bcryptjs": "^2.4.3",
     "jsonwebtoken": "^9.0.2",
     "resend": "^4.1.2",
-    "stream-chat": "^8.52.0"
+    "stream-chat": "^8.61.0"
   },
   "engines": {
     "node": "20.x"
