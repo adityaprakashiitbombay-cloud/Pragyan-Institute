@@ -2901,7 +2901,8 @@ const supaPayload = pushableReqs.map(r => ({
     document.querySelectorAll('.open-portal-trigger').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
-        openPortal();
+        const tab = btn.dataset.portalTab || btn.dataset.tab;
+        openPortal(tab);
       });
     });
 
@@ -3000,7 +3001,7 @@ const supaPayload = pushableReqs.map(r => ({
     document.body.style.overflow = '';
   }
 
-  function openPortal() {
+  function openPortal(initialTab) {
     if (!portalOverlay) portalOverlay = document.getElementById('portalOverlay');
     if (portalOverlay) {
       portalOverlay.classList.add('active');
@@ -3011,6 +3012,11 @@ const supaPayload = pushableReqs.map(r => ({
     lockPageScroll();
     sessionStorage.setItem('pragyan_portal_open', 'true');
     localStorage.setItem('pragyan_portal_open', 'true');
+
+    if (initialTab) {
+      AppState.activeStudentTab = initialTab;
+      AppState.activeAdminTab = initialTab;
+    }
 
     // Trigger instant cloud sync whenever portal opens
     if (typeof SupabaseSync !== 'undefined' && SupabaseSync.pullAll) {
@@ -3028,6 +3034,10 @@ const supaPayload = pushableReqs.map(r => ({
       AppState.currentRole = session.role;
       AppState.currentUser = AppState.currentUser || session.user;
       showDashboard(session.role);
+      if (initialTab) {
+        if (session.role === 'student') switchStudentTab(initialTab);
+        else switchAdminTab(initialTab);
+      }
     } else {
       showLoginView();
     }
@@ -3106,9 +3116,11 @@ const supaPayload = pushableReqs.map(r => ({
       localStorage.removeItem('pragyan_portal_open');
 
       // Only open portal if URL hash specifically requests it
-      const wantsPortalByHash = window.location.hash === '#portal' || window.location.hash === '#login';
+      const hash = window.location.hash;
+      const wantsPortalByHash = hash === '#portal' || hash === '#login' || hash === '#community' || hash === '#forum';
       if (wantsPortalByHash) {
-        openPortal();
+        const targetTab = (hash === '#community' || hash === '#forum') ? 'community' : null;
+        openPortal(targetTab);
       }
     }
   }
@@ -3459,6 +3471,11 @@ function renderStudentDashboard() {
     const notifBtn = document.querySelector('.student-tab-btn[data-tab="notifications"]');
     if (notifBtn) {
       notifBtn.innerHTML = `<i aria-hidden="true" class="fa-solid fa-bell"></i> Notification Tab ${count > 0 ? `<span class="badge" style="background:#059669; color:#fff; padding:1px 7px; border-radius:99px; font-size: 0.8rem; margin-left:6px; font-weight:700;">${count}</span>` : ''}`;
+    }
+
+    const studentCommBtn = document.getElementById('studentTabBtnCommunity');
+    if (studentCommBtn) {
+      studentCommBtn.style.display = ENABLE_COMMUNITY_CHAT ? 'inline-flex' : 'none';
     }
 
     // Preserve and render ONLY the active student tab
@@ -5442,6 +5459,11 @@ function renderStudentDashboard() {
       }
     }
 
+    const adminCommBtn = document.getElementById('adminTabBtnCommunity');
+    if (adminCommBtn) {
+      adminCommBtn.style.display = ENABLE_COMMUNITY_CHAT ? 'inline-flex' : 'none';
+    }
+
     // Lazy Tab Render: Render ONLY the currently active admin tab!
     let targetTab = AppState.activeAdminTab || 'students';
     if (targetTab === 'email' && !isMainAdmin()) {
@@ -6277,8 +6299,6 @@ function renderStudentDashboard() {
   }
 
   function switchAdminTab(tabName) {
-    if (tabName === 'community') tabName = 'students';
-
     // Access control: Only main admin (Chandan Kumar) can switch to email tab
     if (tabName === 'email' && !isMainAdmin()) {
       alert('🔒 Access Restricted: Mass Email Dispatch & Invoicing campaigns can only be authorized and dispatched by Main Institute Admin (Chandan Kumar).');
