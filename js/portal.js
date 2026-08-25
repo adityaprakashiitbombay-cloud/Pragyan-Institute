@@ -732,6 +732,34 @@
     return opts.join('\n                  ');
   }
 
+  function batchSelectOptions(currentValue, placeholder) {
+    const current = String(currentValue || '').trim();
+    const currentKey = current ? getBatchCategoryKey(current) : '';
+    const cards = canonicalBatchCards();
+    const opts = [];
+    if (placeholder) {
+      opts.push(`<option value="" data-batch-id="" data-monthly="0"${!currentKey ? ' selected' : ''}>${placeholder}</option>`);
+    }
+    let matched = false;
+    cards.forEach(b => {
+      const isSel = currentKey === b.key;
+      if (isSel) matched = true;
+      const cfg = academicConfig();
+      const canonicalName = (cfg && cfg.BATCH_BY_ID[b.key] && cfg.BATCH_BY_ID[b.key].className) || b.name;
+      opts.push(
+        `<option value="${canonicalName}" data-batch-id="${b.key}" data-monthly="${b.rate}"${isSel ? ' selected' : ''}>` +
+        `${b.icon} ${b.name} — ₹${b.rate.toLocaleString('en-IN')}/Month</option>`
+      );
+    });
+    if (current && !matched && !placeholder) {
+      opts.unshift(
+        `<option value="${current.replace(/"/g, '&quot;')}" data-monthly="" selected>` +
+        `⚠️ ${current} (unrecognised — keep as is)</option>`
+      );
+    }
+    return opts.join('\n                  ');
+  }
+
   /**
    * Seed rows for the batches cache, built from the canonical config so the two
    * seed paths in this file cannot disagree. They previously did, and on the ids
@@ -4385,16 +4413,22 @@ function renderStudentDashboard() {
     }) || resolvedBatchObj || batches[0] || {};
 
     const batchId = myBatch.batchId || myBatch.batch_id || myBatch.id || resolvedBatchObj?.batchId || resolvedBatchObj?.id || studentBatchKey || 'BAT-10';
-    const canonicalOwn = resolvedBatchObj || (ACADEMIC ? ACADEMIC.resolveBatch(batchId || studentBatch || '') : null);
-    const batchName    = myBatch.name || myBatch.batch_name || (canonicalOwn ? canonicalOwn.name : studentBatch) || 'Your Batch';
-    const batchTiming  = myBatch.timing || myBatch.timings || (canonicalOwn ? canonicalOwn.timing : 'Contact Institute') || 'Contact Institute';
-    const batchRoom    = myBatch.room || myBatch.room_no || (canonicalOwn ? canonicalOwn.room : 'As allotted') || 'As allotted';
-    const batchFee     = Number(myBatch.monthlyFee ?? myBatch.monthly_fee) || (canonicalOwn ? canonicalOwn.monthlyFee : 0);
-    const batchTeacher = myBatch.teacher
-      || (canonicalOwn ? canonicalOwn.teachers.map(titleCaseName).join(' & ') : 'Faculty Mentors');
+    const batchTiming = myBatch.timing || myBatch.timings || (resolvedBatchObj ? resolvedBatchObj.timing : 'Contact Institute') || 'Contact Institute';
+    const batchRoom = myBatch.room || myBatch.room_no || (resolvedBatchObj ? resolvedBatchObj.room : 'As allotted') || 'As allotted';
 
-    const teacherList = batchTeacher.split(/[&,]/).map(t => t.trim()).filter(Boolean);
-    const enrolledInBatchCount = AppState.getStudents().filter(st => getBatchCategoryKey(st.className || st.batchName || st.class_name || '') === studentBatchKey).length;
+    const cfg = academicConfig();
+    let enrolledBatchesList = (cfg && cfg.resolveBatches)
+      ? cfg.resolveBatches(studentBatch)
+      : [];
+
+    if (enrolledBatchesList.length === 0) {
+      const single = (cfg && cfg.resolveBatch) ? cfg.resolveBatch(studentBatch) : null;
+      if (single) enrolledBatchesList.push(single);
+      else if (batches.length > 0) enrolledBatchesList.push(batches[0]);
+    }
+
+    const isMultiClass = enrolledBatchesList.length > 1;
+    const totalEnrolledMonthlyFee = enrolledBatchesList.reduce((sum, b) => sum + (Number(b.monthlyFee ?? b.monthly_fee) || 0), 0);
 
     // Determine current day in IST
     const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -4407,88 +4441,166 @@ function renderStudentDashboard() {
     }
     const currentSelectedDay = AppState._activeStudentScheduleDay;
 
-    // Check for active holidays affecting this student
+    // Check for active holidays affecting any of this student's enrolled batches
     const allHolidays = AppState.getInstituteHolidays ? AppState.getInstituteHolidays() : [];
     const todayDateStr = new Date().toISOString().split('T')[0];
     const activeHolidays = allHolidays.filter(h => {
       const target = (h.target_batch || h.targetBatch || 'ALL').trim().toUpperCase();
-      const matchBatch = target === 'ALL' ||
-                         target === (batchId || '').toUpperCase() ||
-                         target === (studentBatchKey || '').toUpperCase() ||
-                         getBatchCategoryKey(target) === studentBatchKey;
+      const matchBatch = target === 'ALL' || enrolledBatchesList.some(b => {
+        const bKey = b.batchId || b.id || '';
+        return target === bKey.toUpperCase() || getBatchCategoryKey(target) === getBatchCategoryKey(bKey);
+      });
       const sDate = h.start_date || h.startDate || '';
       const eDate = h.end_date || h.endDate || sDate;
       return matchBatch && sDate <= todayDateStr && todayDateStr <= eDate;
     });
 
-    // Fetch dynamic schedules from database / AppState
+    // Fetch dynamic schedules from database / AppState for ALL enrolled batches
     const allSchedules = AppState.getClassSchedules ? AppState.getClassSchedules() : [];
-    let daySchedules = allSchedules.filter(sch => {
-      const schB = (sch.batch_id || sch.batchId || '').trim();
-      const matchB = (schB === batchId) ||
-                     (schB === studentBatchKey) ||
-                     (getBatchCategoryKey(schB) === studentBatchKey) ||
-                     (schB.toLowerCase() === (studentBatch || '').toLowerCase()) ||
-                     (schB.toLowerCase() === (batchId || '').toLowerCase());
-      const matchD = (sch.day_of_week || sch.dayOfWeek || '').toLowerCase() === currentSelectedDay.toLowerCase();
-      return matchB && matchD;
+    let renderedScheduleItems = [];
+    const allTeachersSet = new Set();
+    const allSubjectsList = [];
+
+    enrolledBatchesList.forEach(bObj => {
+      const bId = bObj.batchId || bObj.id || '';
+      const bKey = getBatchCategoryKey(bId);
+      const bDb = batches.find(db => getBatchCategoryKey(db.batch_id || db.id || db.name || '') === bKey) || bObj;
+      const bTiming = bDb.timing || bDb.timings || bObj.timing || 'Contact Institute';
+      const bRoom = bDb.room || bDb.room_no || bObj.room || 'As allotted';
+      const bTeacher = bDb.teacher || (bObj.teachers ? bObj.teachers.map(titleCaseName).join(' & ') : 'Faculty Mentors');
+      const teacherList = bTeacher.split(/[&,]/).map(t => t.trim()).filter(Boolean);
+      teacherList.forEach(t => allTeachersSet.add(t));
+
+      const batchSubjects = (Array.isArray(bDb.subjects) && bDb.subjects.length > 0)
+        ? bDb.subjects.map(sub => typeof sub === 'string' ? sub : (sub.name || ''))
+        : (Array.isArray(myBatch.subjects) && myBatch.subjects.length > 0)
+          ? myBatch.subjects.map(sub => typeof sub === 'string' ? sub : (sub.name || ''))
+          : (BATCH_SUBJECTS[bKey] || BATCH_SUBJECTS[bId] || []);
+      batchSubjects.forEach(sub => {
+        if (!allSubjectsList.includes(sub)) allSubjectsList.push(sub);
+      });
+
+      let daySchedules = allSchedules.filter(sch => {
+        const schB = (sch.batch_id || sch.batchId || '').trim();
+        const matchB = (schB === bId) ||
+                       (schB === bKey) ||
+                       (getBatchCategoryKey(schB) === bKey) ||
+                       (schB.toLowerCase() === (bObj.name || '').toLowerCase()) ||
+                       (schB.toLowerCase() === (bId || '').toLowerCase());
+        const matchD = (sch.day_of_week || sch.dayOfWeek || '').toLowerCase() === currentSelectedDay.toLowerCase();
+        return matchB && matchD;
+      });
+
+      if (daySchedules.length > 0) {
+        daySchedules.sort((a, b) => (Number(a.sort_order || a.sortOrder || 1) - Number(b.sort_order || b.sortOrder || 1)));
+        daySchedules.forEach(sch => {
+          renderedScheduleItems.push({
+            batchName: bObj.name || bObj.className || 'Batch Class',
+            batchId: bId,
+            subject: sch.subject,
+            time: (sch.start_time && sch.end_time) ? `${sch.start_time} – ${sch.end_time}` : (sch.start_time || bTiming),
+            teacher: sch.teacher || bTeacher || 'Assigned Faculty',
+            room: sch.room || bRoom,
+            isCancelled: !!sch.is_cancelled,
+            sortOrder: Number(sch.sort_order || sch.sortOrder || 1)
+          });
+        });
+      } else if (currentSelectedDay !== 'Sunday') {
+        const slotList = BATCH_SLOTS[bKey] || BATCH_SLOTS[bId] || [];
+        batchSubjects.forEach((subject, i) => {
+          renderedScheduleItems.push({
+            batchName: bObj.name || bObj.className || 'Batch Class',
+            batchId: bId,
+            subject,
+            time: slotList[i] || bTiming,
+            teacher: teacherList[i % teacherList.length] || 'Faculty Mentors',
+            room: bRoom,
+            isCancelled: false,
+            sortOrder: i + 1
+          });
+        });
+      }
     });
 
-    daySchedules.sort((a, b) => (Number(a.sort_order || a.sortOrder || 1) - Number(b.sort_order || b.sortOrder || 1)));
-
-    // Fallback to canonical subject slots if no custom DB entries for this day yet
-    let renderedScheduleItems = [];
-    if (daySchedules.length > 0) {
-      renderedScheduleItems = daySchedules.map(sch => ({
-        subject: sch.subject,
-        time: (sch.start_time && sch.end_time) ? `${sch.start_time} – ${sch.end_time}` : (sch.start_time || batchTiming),
-        teacher: sch.teacher || 'Assigned Faculty',
-        room: sch.room || batchRoom,
-        isCancelled: !!sch.is_cancelled
-      }));
-    } else if (currentSelectedDay !== 'Sunday') {
-      const subjectList = (Array.isArray(myBatch.subjects) && myBatch.subjects.length > 0)
-        ? myBatch.subjects.map(s => typeof s === 'string' ? s : (s.name || ''))
-        : (BATCH_SUBJECTS[studentBatchKey] || BATCH_SUBJECTS[batchId] || []);
-      const slotList = BATCH_SLOTS[studentBatchKey] || BATCH_SLOTS[batchId] || [];
-      renderedScheduleItems = subjectList.map((subject, i) => ({
-        subject,
-        time: slotList[i] || batchTiming,
-        teacher: teacherList[i % teacherList.length] || 'Faculty Mentors',
-        room: batchRoom,
-        isCancelled: false
-      }));
-    }
+    const combinedTeacherList = Array.from(allTeachersSet);
 
     pane.innerHTML = `
-      <div class="dash-card batch-overview-card">
-        <div class="batch-info-header">
-          <div>
-            <span class="section-tag" style="margin-bottom: 0.4rem;"><i aria-hidden="true" class="fa-solid fa-chalkboard-user"></i> Enrolled Batch</span>
-            <div class="batch-title-tag">${escapeHtml(batchName)}</div>
-            <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem;">
-              <i aria-hidden="true" class="fa-solid fa-clock" style="color: var(--primary-emerald);"></i> ${escapeHtml(batchTiming)} &nbsp;|&nbsp; 
-              <i aria-hidden="true" class="fa-solid fa-door-open" style="color: var(--primary-emerald);"></i> Classroom: ${escapeHtml(batchRoom)}
-            </p>
+      ${isMultiClass ? `
+        <div class="dash-card batch-overview-card" style="border: 2px solid #059669; background: linear-gradient(135deg, #F0FDF4 0%, #FFFFFF 100%); margin-bottom: 1.25rem;">
+          <div class="batch-info-header" style="border-bottom: 1.5px solid #86EFAC; padding-bottom: 0.85rem; margin-bottom: 1rem;">
+            <div>
+              <span class="section-tag" style="background: #D1FAE5; color: #065F46; font-weight: 800; padding: 0.25rem 0.65rem; border-radius: 99px; font-size: 0.8rem;">
+                <i aria-hidden="true" class="fa-solid fa-layer-group"></i> Multi-Class Scholar Enrollment
+              </span>
+              <div class="batch-title-tag" style="color: #064E3B; font-size: 1.35rem; margin-top: 0.4rem;">
+                ${escapeHtml(enrolledBatchesList.map(b => b.name).join(' + '))}
+              </div>
+              <p style="color: #166534; font-size: 0.88rem; margin-top: 0.25rem;">
+                Active across <strong>${enrolledBatchesList.length} academic classes</strong> • Combined Standard Rate: <strong>₹${totalEnrolledMonthlyFee.toLocaleString('en-IN')}/mo</strong>
+              </p>
+            </div>
+            <span class="pill-item pill-emerald"><i aria-hidden="true" class="fa-solid fa-user-check"></i> ${enrolledBatchesList.length} Classes Active</span>
           </div>
-          <span class="pill-item pill-emerald"><i aria-hidden="true" class="fa-solid fa-user-check"></i> Active Session</span>
-        </div>
 
-        <div class="batch-overview-metrics-grid">
-          <div class="batch-metric-box">
-            <div class="batch-metric-label">MONTHLY FEE</div>
-            <div class="batch-metric-value fee-val">₹${batchFee.toLocaleString()}</div>
-          </div>
-          <div class="batch-metric-box">
-            <div class="batch-metric-label">BATCH CODE</div>
-            <div class="batch-metric-value">${escapeHtml(batchId)}</div>
-          </div>
-          <div class="batch-metric-box">
-            <div class="batch-metric-label">STUDENTS IN BATCH</div>
-            <div class="batch-metric-value">${enrolledInBatchCount || '—'}</div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem;">
+            ${enrolledBatchesList.map((b, idx) => {
+              const bKey = getBatchCategoryKey(b.batchId || b.id);
+              const bDb = batches.find(db => getBatchCategoryKey(db.batch_id || db.id || db.name || '') === bKey) || b;
+              const bTiming = bDb.timing || bDb.timings || b.timing || 'Contact Institute';
+              const bRoom = bDb.room || bDb.room_no || b.room || 'As allotted';
+              const bTeacher = bDb.teacher || (b.teachers ? b.teachers.map(titleCaseName).join(' & ') : 'Faculty Mentors');
+              const bFee = Number(bDb.monthlyFee ?? bDb.monthly_fee ?? b.monthlyFee ?? 0);
+
+              return `
+                <div style="background: #ffffff; border: 1.5px solid #BBF7D0; border-radius: 10px; padding: 1rem; box-shadow: 0 2px 6px rgba(6,78,59,0.06);">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <span style="font-weight: 800; font-size: 0.95rem; color: #065F46;">
+                      ${batchIcon(b.batchId)} Class ${idx + 1}: ${escapeHtml(b.name)}
+                    </span>
+                    <span style="background: #ECFDF5; color: #065F46; padding: 2px 7px; border-radius: 4px; font-weight: 700; font-size: 0.8rem;">
+                      ₹${bFee.toLocaleString('en-IN')}/mo
+                    </span>
+                  </div>
+                  <div style="font-size: 0.82rem; color: #4B5563; line-height: 1.5;">
+                    <div><i aria-hidden="true" class="fa-solid fa-clock" style="color: #059669; width: 16px;"></i> ${escapeHtml(bTiming)}</div>
+                    <div><i aria-hidden="true" class="fa-solid fa-door-open" style="color: #059669; width: 16px;"></i> ${escapeHtml(bRoom)}</div>
+                    <div><i aria-hidden="true" class="fa-solid fa-chalkboard-user" style="color: #059669; width: 16px;"></i> ${escapeHtml(bTeacher)}</div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
           </div>
         </div>
-      </div>
+      ` : `
+        <div class="dash-card batch-overview-card" style="margin-bottom: 1.25rem;">
+          <div class="batch-info-header">
+            <div>
+              <span class="section-tag" style="margin-bottom: 0.4rem;"><i aria-hidden="true" class="fa-solid fa-chalkboard-user"></i> Enrolled Batch</span>
+              <div class="batch-title-tag">${escapeHtml(enrolledBatchesList[0]?.name || studentBatch)}</div>
+              <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem;">
+                <i aria-hidden="true" class="fa-solid fa-clock" style="color: var(--primary-emerald);"></i> ${escapeHtml(batches.find(b => getBatchCategoryKey(b.batch_id || b.id || b.name || '') === getBatchCategoryKey(enrolledBatchesList[0]?.batchId))?.timing || enrolledBatchesList[0]?.timing || 'Contact Institute')} &nbsp;|&nbsp; 
+                <i aria-hidden="true" class="fa-solid fa-door-open" style="color: var(--primary-emerald);"></i> Classroom: ${escapeHtml(batches.find(b => getBatchCategoryKey(b.batch_id || b.id || b.name || '') === getBatchCategoryKey(enrolledBatchesList[0]?.batchId))?.room || enrolledBatchesList[0]?.room || 'As allotted')}
+              </p>
+            </div>
+            <span class="pill-item pill-emerald"><i aria-hidden="true" class="fa-solid fa-user-check"></i> Active Session</span>
+          </div>
+
+          <div class="batch-overview-metrics-grid">
+            <div class="batch-metric-box">
+              <div class="batch-metric-label">MONTHLY FEE</div>
+              <div class="batch-metric-value fee-val">₹${(enrolledBatchesList[0]?.monthlyFee || 0).toLocaleString()}</div>
+            </div>
+            <div class="batch-metric-box">
+              <div class="batch-metric-label">BATCH CODE</div>
+              <div class="batch-metric-value">${escapeHtml(enrolledBatchesList[0]?.batchId || 'BAT-10')}</div>
+            </div>
+            <div class="batch-metric-box">
+              <div class="batch-metric-label">STUDENTS IN BATCH</div>
+              <div class="batch-metric-value">${AppState.getStudents().filter(st => getBatchCategoryKey(st.className || st.batchName || st.class_name || '') === getBatchCategoryKey(enrolledBatchesList[0]?.batchId)).length || '—'}</div>
+            </div>
+          </div>
+        </div>
+      `}
 
       ${activeHolidays.length > 0 ? `
         <div class="schedule-holiday-banner" style="background: linear-gradient(135deg, #FEF3C7 0%, #FFFBEB 100%); border: 1.5px solid #F59E0B; border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 1rem;">
@@ -4544,8 +4656,9 @@ function renderStudentDashboard() {
                     <i class="${item.isCancelled ? 'fa-solid fa-ban' : 'fa-solid fa-book-bookmark'}" aria-hidden="true"></i>
                   </div>
                   <div class="schedule-subject-details">
-                    <div class="schedule-subject-title ${item.isCancelled ? 'cancelled-text' : ''}">
+                    <div class="schedule-subject-title ${item.isCancelled ? 'cancelled-text' : ''}" style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.35rem;">
                       <strong>${escapeHtml(item.subject)}</strong>
+                      ${isMultiClass ? `<span style="background: #DCFCE7; color: #166534; border: 1px solid #86EFAC; font-size: 0.75rem; font-weight: 700; padding: 1px 7px; border-radius: 4px;">${escapeHtml(item.batchName)}</span>` : ''}
                     </div>
                     <div class="schedule-subject-meta">
                       <span class="schedule-meta-chip"><i aria-hidden="true" class="fa-solid fa-chalkboard-user"></i> ${escapeHtml(item.teacher)}</span>
@@ -4566,37 +4679,36 @@ function renderStudentDashboard() {
 
         <div class="dash-card">
           <div class="dash-card-header">
-            <div class="dash-card-title"><i aria-hidden="true" class="fa-solid fa-user-tie"></i> Assigned Faculty</div>
+            <div class="dash-card-title"><i aria-hidden="true" class="fa-solid fa-user-tie"></i> Assigned Faculty Mentors</div>
           </div>
           <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-            ${teacherList.map(t => `
+            ${combinedTeacherList.map(t => `
               <div style="display: flex; align-items: center; gap: 0.875rem; padding: 0.75rem; background: var(--bg-surface-cream); border-radius: var(--radius-sm);">
                 <div style="width: 42px; height: 42px; border-radius: 50%; background: var(--primary-emerald); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size:1.1rem;">
                   ${t.charAt(0).toUpperCase()}
                 </div>
                 <div>
                   <div style="font-weight: 700; font-size: 0.92rem; color: var(--text-mahogany);">${escapeHtml(t)}</div>
-                  <div style="font-size: 0.8rem; color: var(--text-muted);">Faculty Mentor — ${escapeHtml(batchName)}</div>
+                  <div style="font-size: 0.8rem; color: var(--text-muted);">Faculty Mentor — Pragyan Institute</div>
                 </div>
               </div>
             `).join('')}
           </div>
 
-          ${((Array.isArray(myBatch.subjects) && myBatch.subjects.length > 0) ? myBatch.subjects : (BATCH_SUBJECTS[studentBatchKey] || [])).length > 0 ? `
+          ${allSubjectsList.length > 0 ? `
             <div style="margin-top: 1.25rem; border-top: 1px solid var(--border-sand); padding-top: 1rem;">
               <div style="font-size: 0.85rem; font-weight: 800; color: var(--text-mahogany); margin-bottom: 0.6rem; display: flex; align-items: center; gap: 0.4rem;">
-                <i aria-hidden="true" class="fa-solid fa-book-open" style="color: var(--primary-emerald);"></i> Core Subjects &amp; Syllabus Topics
+                <i aria-hidden="true" class="fa-solid fa-book-open" style="color: var(--primary-emerald);"></i> Enrolled Core Subjects &amp; Syllabus Topics
               </div>
               <div style="display: flex; flex-wrap: wrap; gap: 0.45rem;">
-                ${((Array.isArray(myBatch.subjects) && myBatch.subjects.length > 0) ? myBatch.subjects : (BATCH_SUBJECTS[studentBatchKey] || [])).map(sub => `
+                ${allSubjectsList.map(sub => `
                   <span style="background: #F0FDF4; border: 1px solid #BBF7D0; color: #166534; font-size: 0.78rem; font-weight: 700; padding: 0.25rem 0.6rem; border-radius: 99px;">
-                    ${escapeHtml(typeof sub === 'string' ? sub : (sub.name || ''))}
+                    ${escapeHtml(sub)}
                   </span>
                 `).join('')}
               </div>
             </div>
           ` : ''}
-        </div>
       </div>
     `;
 
@@ -7182,6 +7294,16 @@ function renderStudentDashboard() {
 
     const teacherName = getActiveTeacherName();
 
+    const cfg = academicConfig();
+    const existingBatches = (cfg && cfg.resolveBatches)
+      ? cfg.resolveBatches(target.className || target.class_name || '')
+      : [];
+
+    const initialClassCount = Math.max(1, Math.min(3, existingBatches.length || 1));
+    const initialClass1 = existingBatches[0] ? existingBatches[0].className : (target.className || target.class_name || 'Class 10th (ACHIEVER)');
+    const initialClass2 = existingBatches[1] ? existingBatches[1].className : '';
+    const initialClass3 = existingBatches[2] ? existingBatches[2].className : '';
+
     // This student's own canonical monthly rate, resolved once for every preset
     // and label in the modal. 0 means the batch could not be resolved, in which
     // case the rate-dependent chips are omitted rather than shown at a guess.
@@ -7379,11 +7501,63 @@ function renderStudentDashboard() {
                   <label for="mgmtStuDob" style="font-size: 0.85rem; font-weight: 600;">Date of Birth (DOB) *</label>
                   <input type="date" id="mgmtStuDob" class="portal-input" value="${target.dob}" required>
                 </div>
-                <div>
-                  <label for="mgmtStuClass" style="font-size: 0.85rem; font-weight: 600;">Class / Batch Assignment</label>
-                  <select id="mgmtStuClass" class="portal-input">
-                    ${batchAssignmentOptions(target.className || target.class_name || '')}
-                  </select>
+
+                <div class="col-span-2" style="background: #F0FDF4; border: 1.5px solid #86EFAC; border-radius: 10px; padding: 1rem; margin-bottom: 0.25rem;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                    <label style="font-size: 0.9rem; font-weight: 800; color: #065F46; margin: 0; display: flex; align-items: center; gap: 0.4rem;">
+                      <i class="fa-solid fa-layer-group" aria-hidden="true" style="color: #059669;"></i>
+                      Class &amp; Batch Enrollment Options (1, 2, or 3 Classes)
+                    </label>
+                    <div class="multi-class-count-selector" style="display: inline-flex; background: #DCFCE7; padding: 3px; border-radius: 8px; border: 1px solid #86EFAC;">
+                      <button type="button" class="btn-class-count-pill ${initialClassCount === 1 ? 'active' : ''}" data-count="1" style="padding: 4px 12px; font-size: 0.8rem; font-weight: 700; border-radius: 6px; border: none; cursor: pointer; background: ${initialClassCount === 1 ? '#059669' : 'transparent'}; color: ${initialClassCount === 1 ? '#fff' : '#065F46'};">
+                        1 Class
+                      </button>
+                      <button type="button" class="btn-class-count-pill ${initialClassCount === 2 ? 'active' : ''}" data-count="2" style="padding: 4px 12px; font-size: 0.8rem; font-weight: 700; border-radius: 6px; border: none; cursor: pointer; background: ${initialClassCount === 2 ? '#059669' : 'transparent'}; color: ${initialClassCount === 2 ? '#fff' : '#065F46'};">
+                        2 Classes (Dual Batch)
+                      </button>
+                      <button type="button" class="btn-class-count-pill ${initialClassCount === 3 ? 'active' : ''}" data-count="3" style="padding: 4px 12px; font-size: 0.8rem; font-weight: 700; border-radius: 6px; border: none; cursor: pointer; background: ${initialClassCount === 3 ? '#059669' : 'transparent'}; color: ${initialClassCount === 3 ? '#fff' : '#065F46'};">
+                        3 Classes (Triple Batch)
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.85rem;" id="mgmtClassDropdownsContainer">
+                    <!-- Class 1 Dropdown (Primary Batch) -->
+                    <div id="mgmtClass1Wrap">
+                      <label for="mgmtStuClass1" style="font-size: 0.82rem; font-weight: 700; color: #166534; display: block; margin-bottom: 0.25rem;">
+                        🎯 Primary Class / Batch 1 <span style="color: #DC2626;">*</span>
+                      </label>
+                      <select id="mgmtStuClass1" class="portal-input mgmt-class-select" style="width: 100%; font-weight: 600; background: #fff;">
+                        ${batchSelectOptions(initialClass1)}
+                      </select>
+                    </div>
+
+                    <!-- Class 2 Dropdown (Secondary Batch) -->
+                    <div id="mgmtClass2Wrap" style="display: ${initialClassCount >= 2 ? 'block' : 'none'};">
+                      <label for="mgmtStuClass2" style="font-size: 0.82rem; font-weight: 700; color: #166534; display: block; margin-bottom: 0.25rem;">
+                        ➕ Secondary Class / Batch 2 (Add-on)
+                      </label>
+                      <select id="mgmtStuClass2" class="portal-input mgmt-class-select" style="width: 100%; font-weight: 600; background: #fff;">
+                        ${batchSelectOptions(initialClass2, '-- Select 2nd Batch / Class --')}
+                      </select>
+                    </div>
+
+                    <!-- Class 3 Dropdown (Tertiary Batch) -->
+                    <div id="mgmtClass3Wrap" style="display: ${initialClassCount >= 3 ? 'block' : 'none'};">
+                      <label for="mgmtStuClass3" style="font-size: 0.82rem; font-weight: 700; color: #166534; display: block; margin-bottom: 0.25rem;">
+                        ➕ Tertiary Class / Batch 3 (Special)
+                      </label>
+                      <select id="mgmtStuClass3" class="portal-input mgmt-class-select" style="width: 100%; font-weight: 600; background: #fff;">
+                        ${batchSelectOptions(initialClass3, '-- Select 3rd Batch / Class --')}
+                      </select>
+                    </div>
+                  </div>
+
+                  <!-- Real-time combined fee breakdown preview -->
+                  <div id="mgmtClassFeeCalcPreview" style="margin-top: 0.75rem; padding: 0.5rem 0.75rem; background: #fff; border: 1px solid #BBF7D0; border-radius: 6px; font-size: 0.82rem; color: #166534; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+                    <span id="mgmtClassFeeFormulaText">Enrollment: calculating...</span>
+                    <span style="font-weight: 800; font-size: 0.9rem; color: #059669;" id="mgmtClassFeeTotalBadge">₹0/mo</span>
+                  </div>
                 </div>
                 <div>
                   <label for="mgmtStuMonthlyFee" style="font-size: 0.85rem; font-weight: 600;">Custom Monthly Fee (₹/mo)</label>
@@ -7881,22 +8055,85 @@ function renderStudentDashboard() {
       e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10);
     });
 
-    // Moving a student to a different batch re-rates their monthly fee — but
-    // only when the field still holds the old batch's standard rate, so a
-    // deliberate concession or sibling discount is never overwritten. Without
-    // this, promoting a Class 8th student to Class 12th PCM kept them on ₹800
-    // and under-billed them ₹700 every month thereafter.
-    const mgmtClassSelect = modalEl.querySelector('#mgmtStuClass');
+    // Multi-Class Enrollment State Management & Dynamic Calculation
+    let activeClassCount = initialClassCount;
+    const countPills = modalEl.querySelectorAll('.btn-class-count-pill');
+    const class1Select = modalEl.querySelector('#mgmtStuClass1');
+    const class2Select = modalEl.querySelector('#mgmtStuClass2');
+    const class3Select = modalEl.querySelector('#mgmtStuClass3');
+    const class2Wrap = modalEl.querySelector('#mgmtClass2Wrap');
+    const class3Wrap = modalEl.querySelector('#mgmtClass3Wrap');
+    const formulaText = modalEl.querySelector('#mgmtClassFeeFormulaText');
+    const totalBadge = modalEl.querySelector('#mgmtClassFeeTotalBadge');
     const mgmtFeeInput = modalEl.querySelector('#mgmtStuMonthlyFee');
-    mgmtClassSelect?.addEventListener('change', () => {
-      if (!mgmtFeeInput) return;
-      const opt = mgmtClassSelect.options[mgmtClassSelect.selectedIndex];
-      const nextRate = Number(opt?.dataset.monthly) || classMonthlyFee(mgmtClassSelect.value);
-      if (!nextRate) return;
-      const currentValue = Number(mgmtFeeInput.value);
-      const wasStandard = !currentValue || currentValue === studentMonthlyFee(target);
-      if (wasStandard) mgmtFeeInput.value = nextRate;
+
+    function recalculateMultiClassEnrollment(isUserClassSelectionChange = false) {
+      const c1 = class1Select?.value || '';
+      const c2 = (activeClassCount >= 2) ? (class2Select?.value || '') : '';
+      const c3 = (activeClassCount >= 3) ? (class3Select?.value || '') : '';
+
+      const chosenClasses = [c1, c2, c3].filter(Boolean);
+      const cfgAcademic = academicConfig();
+      const resolved = (cfgAcademic && cfgAcademic.resolveBatches)
+        ? cfgAcademic.resolveBatches(chosenClasses)
+        : [];
+
+      let standardSum = 0;
+      let breakdownParts = [];
+      if (resolved.length > 0) {
+        resolved.forEach(b => {
+          standardSum += Number(b.monthlyFee || 0);
+          breakdownParts.push(`${b.name} (₹${Number(b.monthlyFee || 0).toLocaleString('en-IN')})`);
+        });
+      } else if (c1) {
+        standardSum = classMonthlyFee(c1);
+        breakdownParts.push(`${c1} (₹${standardSum.toLocaleString('en-IN')})`);
+      }
+
+      if (formulaText) {
+        formulaText.innerHTML = (breakdownParts.length > 0)
+          ? `<strong>Enrollment (${breakdownParts.length} Class${breakdownParts.length > 1 ? 'es' : ''}):</strong> ${breakdownParts.join(' + ')}`
+          : `<strong>Enrollment:</strong> Please select at least 1 class`;
+      }
+      if (totalBadge) {
+        totalBadge.textContent = `₹${standardSum.toLocaleString('en-IN')}/mo`;
+      }
+
+      if (mgmtFeeInput) {
+        const currentValue = Number(mgmtFeeInput.value);
+        const wasStandard = !currentValue || currentValue === studentMonthlyFee(target);
+        if (wasStandard || isUserClassSelectionChange) {
+          mgmtFeeInput.value = standardSum;
+        }
+      }
+    }
+
+    countPills.forEach(pill => {
+      pill.addEventListener('click', () => {
+        const count = parseInt(pill.dataset.count, 10) || 1;
+        activeClassCount = count;
+
+        countPills.forEach(p => {
+          const isActive = (parseInt(p.dataset.count, 10) === count);
+          p.classList.toggle('active', isActive);
+          p.style.background = isActive ? '#059669' : 'transparent';
+          p.style.color = isActive ? '#fff' : '#065F46';
+        });
+
+        if (class2Wrap) class2Wrap.style.display = (count >= 2) ? 'block' : 'none';
+        if (class3Wrap) class3Wrap.style.display = (count >= 3) ? 'block' : 'none';
+
+        recalculateMultiClassEnrollment(true);
+      });
     });
+
+    [class1Select, class2Select, class3Select].forEach(sel => {
+      sel?.addEventListener('change', () => {
+        recalculateMultiClassEnrollment(true);
+      });
+    });
+
+    recalculateMultiClassEnrollment(false);
 
     // Form 4: Edit Profile Submit
     modalEl.querySelector('#mgmtEditProfileForm')?.addEventListener('submit', async (e) => {
@@ -7919,6 +8156,12 @@ function renderStudentDashboard() {
         return;
       }
 
+      const c1 = modalEl.querySelector('#mgmtStuClass1')?.value || '';
+      const c2 = (activeClassCount >= 2) ? (modalEl.querySelector('#mgmtStuClass2')?.value || '') : '';
+      const c3 = (activeClassCount >= 3) ? (modalEl.querySelector('#mgmtStuClass3')?.value || '') : '';
+      const chosenClasses = [c1, c2, c3].filter(Boolean);
+      const combinedClassName = (chosenClasses.length > 0) ? chosenClasses.join(' + ') : c1;
+
       // Both sides fall back to the canonical fee for the student's class rather
       // than a flat ₹1,000, so clearing the field cannot silently re-rate a
       // ₹1,500 senior student down to ₹1,000.
@@ -7930,8 +8173,11 @@ function renderStudentDashboard() {
       target.name = modalEl.querySelector('#mgmtStuName').value.trim();
       target.mobile = cleanMobile;
       target.dob = modalEl.querySelector('#mgmtStuDob').value;
-      target.className = modalEl.querySelector('#mgmtStuClass').value;
-      target.batchName = target.className;
+      target.className = combinedClassName;
+      target.class_name = combinedClassName;
+      target.batchName = combinedClassName;
+      target.batch_name = combinedClassName;
+      target.enrolledBatches = chosenClasses;
       target.monthlyFee = newMonthlyFee;
       target.email = modalEl.querySelector('#mgmtStuEmail').value.trim();
       target.guardianName = modalEl.querySelector('#mgmtStuGuardian').value.trim();
@@ -7961,7 +8207,7 @@ function renderStudentDashboard() {
         mode: 'Profile Detail Synchronization',
         status: 'Synchronized',
         by: teacherName,
-        note: `Profile updated by ${teacherName}`
+        note: `Profile & multi-class enrollment updated by ${teacherName}`
       });
 
       if (feeRateChanged) {
@@ -7990,7 +8236,13 @@ function renderStudentDashboard() {
         await AppState.saveNotices(notices);
       }
 
-      await AppState.saveStudents(students);
+      // Mark dirty on all key representations so delta save synchronizes immediately
+      AppState.markStudentDirty(target.id);
+      if (target.student_id) AppState.markStudentDirty(target.student_id);
+      if (target.rollNo) AppState.markStudentDirty(target.rollNo);
+
+      const changedIds = [target.id, target.student_id, target.rollNo, target.roll_no].filter(Boolean);
+      await AppState.saveStudents(students, changedIds);
 
       // Now safe to release the replaced storage object (post-persist).
       if (oldPhotoToPurge && typeof SupabaseSync !== 'undefined' && SupabaseSync.deleteFile) {
@@ -8029,10 +8281,20 @@ function renderStudentDashboard() {
         await AppState.saveFeeAccounts(feeAccounts);
       }
 
-      AppState.addAuditLog(teacherName, 'PROFILE_EDITED', target.name, target.rollNo, `Updated profile details for ${target.name}`, { name: target.name, mobile: target.mobile });
+      AppState.addAuditLog(teacherName, 'PROFILE_EDITED', target.name, target.rollNo, `Updated profile details and enrolled classes (${target.className}) for ${target.name}`, { name: target.name, mobile: target.mobile, className: target.className });
+
+      // Immediate active session rehydration for current student
+      if (AppState.currentUser && (
+        String(AppState.currentUser.id || '').toLowerCase() === String(target.id || '').toLowerCase() ||
+        String(AppState.currentUser.student_id || '').toLowerCase() === String(target.student_id || '').toLowerCase() ||
+        String(AppState.currentUser.rollNo || '').toLowerCase() === String(target.rollNo || '').toLowerCase()
+      )) {
+        AppState.currentUser = { ...AppState.currentUser, ...target };
+        renderStudentDashboard();
+      }
 
       modalEl.remove();
-      alert(`✅ Profile for ${target.name} updated and synchronized across portal!`);
+      alert(`✅ Profile for ${target.name} updated and synchronized across portal with classes: ${target.className}!`);
       renderAdminDashboard();
     });
   }

@@ -196,13 +196,45 @@ export function resolveBatch(classNameOrBatchId) {
     const resolved = batchId === null ? resolveEnglishBatch(trimmed) : batchId;
     return BATCH_BY_ID.get(resolved) || null;
   }
+
+  // If string contains composite multi-class delimiter (+, &, and), resolve first valid batch
+  if (/[+&,]|\band\b/i.test(trimmed)) {
+    const parts = resolveBatches(trimmed);
+    if (parts.length > 0) return parts[0];
+  }
+
   return null;
 }
 
-/** Monthly fee for a class name. `fallback` is returned when unresolvable. */
+/**
+ * Resolve all distinct canonical batch objects from a single or composite class string.
+ * Supports 1 class, 2 classes, or 3 classes joined with '+', '&', or commas.
+ */
+export function resolveBatches(classNameOrBatchIds) {
+  if (!classNameOrBatchIds) return [];
+  const rawList = Array.isArray(classNameOrBatchIds)
+    ? classNameOrBatchIds
+    : String(classNameOrBatchIds).split(/[+&,]|\band\b/i);
+
+  const seenIds = new Set();
+  const result = [];
+  for (const item of rawList) {
+    const b = resolveBatch(item);
+    if (b && !seenIds.has(b.batchId)) {
+      seenIds.add(b.batchId);
+      result.push(b);
+    }
+  }
+  return result;
+}
+
+/** Monthly fee for a class name (sums all enrolled batches for multi-class combinations). */
 export function monthlyFeeFor(className, fallback = null) {
-  const batch = resolveBatch(className);
-  return batch ? batch.monthlyFee : fallback;
+  const batches = resolveBatches(className);
+  if (batches.length > 0) {
+    return batches.reduce((sum, b) => sum + b.monthlyFee, 0);
+  }
+  return fallback;
 }
 
 /** The CC pair of the YYCCSS barcode for a class name. */
@@ -217,9 +249,9 @@ export function classCodeFor(className) {
  */
 export function isStudentInScope(className, batchIds) {
   if (batchIds === 'ALL') return true;
-  const batch = resolveBatch(className);
-  if (!batch) return false;
-  return batchIds.includes(batch.batchId);
+  const batches = resolveBatches(className);
+  if (batches.length === 0) return false;
+  return batches.some(b => batchIds.includes(b.batchId));
 }
 
 // ----------------------------------------------------------------------------

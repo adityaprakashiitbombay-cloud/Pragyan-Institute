@@ -857,6 +857,9 @@
               rowObj.student_id = sId;
               changedIds.push(sId);
             }
+            if (rowObj.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rowObj.id)) {
+              delete rowObj.id;
+            }
             if (rowObj.className && !rowObj.class_name) rowObj.class_name = rowObj.className;
             if (rowObj.rollNo && !rowObj.roll_no) rowObj.roll_no = rowObj.rollNo;
             if (rowObj.guardianName && !rowObj.guardian_name) rowObj.guardian_name = rowObj.guardianName;

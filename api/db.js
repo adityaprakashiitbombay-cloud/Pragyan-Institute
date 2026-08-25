@@ -489,10 +489,11 @@ export default async function handler(req, res) {
         else if (table === 'blog_posts') filters.conflict = 'slug';
         else if (table === 'class_schedules' || table === 'institute_holidays') filters.conflict = 'id';
         else if (table === 'batches') filters.conflict = 'batch_id';
+        else if (table === 'students') filters.conflict = 'student_id';
         else return res.status(400).json({ success: false, error: 'Missing conflict column for upsert' });
       }
       let upsertRows = rows(data);
-      if (table === 'blog_posts' || table === 'batches') {
+      if (table === 'blog_posts' || table === 'batches' || table === 'students') {
         upsertRows = upsertRows.map(r => {
           if (!r || typeof r !== 'object') return r;
           const rowCopy = { ...r };
@@ -521,7 +522,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, error: 'An update filter is required' });
       }
       const updateData = (data && typeof data === 'object' && !Array.isArray(data)) ? { ...data } : data;
-      if (updateData && typeof updateData === 'object' && (table === 'blog_posts' || table === 'batches')) {
+      if (updateData && typeof updateData === 'object' && (table === 'blog_posts' || table === 'batches' || table === 'students')) {
         if (updateData.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(updateData.id)) {
           delete updateData.id;
         }

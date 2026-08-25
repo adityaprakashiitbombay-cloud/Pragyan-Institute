@@ -177,12 +177,44 @@
       var resolved = batchId === null ? resolveEnglishBatch(trimmed) : batchId;
       return BATCH_BY_ID[resolved] || null;
     }
+
+    // If string contains composite multi-class delimiter (+, &, and), resolve first valid batch
+    if (/[+&,]|\band\b/i.test(trimmed)) {
+      var parts = resolveBatches(trimmed);
+      if (parts.length > 0) return parts[0];
+    }
+
     return null;
   }
 
+  function resolveBatches(classNameOrBatchIds) {
+    if (!classNameOrBatchIds) return [];
+    var rawList = Array.isArray(classNameOrBatchIds)
+      ? classNameOrBatchIds
+      : String(classNameOrBatchIds).split(/[+&,]|\band\b/i);
+
+    var seenIds = {};
+    var result = [];
+    for (var i = 0; i < rawList.length; i++) {
+      var b = resolveBatch(rawList[i]);
+      if (b && !seenIds[b.batchId]) {
+        seenIds[b.batchId] = true;
+        result.push(b);
+      }
+    }
+    return result;
+  }
+
   function monthlyFeeFor(className, fallback) {
-    var batch = resolveBatch(className);
-    return batch ? batch.monthlyFee : (fallback === undefined ? null : fallback);
+    var batches = resolveBatches(className);
+    if (batches.length > 0) {
+      var total = 0;
+      for (var i = 0; i < batches.length; i++) {
+        total += batches[i].monthlyFee;
+      }
+      return total;
+    }
+    return (fallback === undefined ? null : fallback);
   }
 
   function classCodeFor(className) {
@@ -192,9 +224,12 @@
 
   function isStudentInScope(className, batchIds) {
     if (batchIds === 'ALL') return true;
-    var batch = resolveBatch(className);
-    if (!batch) return false;
-    return batchIds.indexOf(batch.batchId) !== -1;
+    var batches = resolveBatches(className);
+    if (batches.length === 0) return false;
+    for (var i = 0; i < batches.length; i++) {
+      if (batchIds.indexOf(batches[i].batchId) !== -1) return true;
+    }
+    return false;
   }
 
   function billingIdempotencyKey(studentId, monthKey) {
@@ -265,6 +300,7 @@
     annualPrice: annualPrice,
     scheduleForDay: scheduleForDay,
     resolveBatch: resolveBatch,
+    resolveBatches: resolveBatches,
     monthlyFeeFor: monthlyFeeFor,
     classCodeFor: classCodeFor,
     isStudentInScope: isStudentInScope,

@@ -115,7 +115,7 @@ export function runBatchDriftTests(assert) {
   // generator must be the only thing feeding them. A literal <option> next to
   // one of these ids means someone hand-listed a subset again.
   const portal = cleaned.get('js/portal.js');
-  const ASSIGNMENT_SELECTS = ['newStuClass', 'mgmtStuClass'];
+  const ASSIGNMENT_SELECTS = ['newStuClass', 'mgmtStuClass1'];
   const handListed = [];
   for (const id of ASSIGNMENT_SELECTS) {
     const block = portal.match(new RegExp(`<select id="${id}"[\\s\\S]{0,900}?</select>`));
@@ -124,7 +124,7 @@ export function runBatchDriftTests(assert) {
       continue;
     }
     if (/<option\s/.test(block[0])) handListed.push(`${id} has literal <option> markup`);
-    if (!/batchAssignmentOptions\s*\(/.test(block[0])) handListed.push(`${id} does not call batchAssignmentOptions()`);
+    if (!/batch(?:Assignment|Select)Options\s*\(/.test(block[0])) handListed.push(`${id} does not call batchAssignmentOptions()`);
   }
   assert(
     handListed.length === 0,
