@@ -724,17 +724,30 @@
     }
   }
 
+  let isInitializing = false;
+
   async function init(containerEl) {
     if (!containerEl) return;
-    containerEl.innerHTML = `
-      <div style="padding: 4rem 1.5rem; text-align: center; color: #64748B;">
-        <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 2.5rem; color: #064E3B;" aria-hidden="true"></i>
-        <p style="margin-top: 1.25rem; font-weight: 800; font-size: 1.05rem; color: #1E293B;">Connecting to Pragyan Realtime Class Gateway…</p>
-        <p style="font-size: 0.85rem; color: #64748B;">Syncing live class channels and message archives from Stream cloud...</p>
-      </div>
-    `;
+    
+    // Guard against repeated re-initialization: if already connected and mounted in container, retain active DOM and typing focus
+    if (client && client.userID && containerEl.querySelector('.stream-chat-wrapper')) {
+      return;
+    }
+
+    if (isInitializing) return;
+    isInitializing = true;
 
     try {
+      if (!containerEl.querySelector('.stream-chat-wrapper')) {
+        containerEl.innerHTML = `
+          <div style="padding: 4rem 1.5rem; text-align: center; color: #64748B;">
+            <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 2.5rem; color: #064E3B;" aria-hidden="true"></i>
+            <p style="margin-top: 1.25rem; font-weight: 800; font-size: 1.05rem; color: #1E293B;">Connecting to Pragyan Realtime Class Gateway…</p>
+            <p style="font-size: 0.85rem; color: #64748B;">Syncing live class channels and message archives from Stream cloud...</p>
+          </div>
+        `;
+      }
+
       await loadScript('https://cdn.jsdelivr.net/npm/stream-chat@8.52.0/dist/browser.full-bundle.min.js');
       if (typeof StreamChat === 'undefined') throw new Error('Stream Chat SDK failed to load.');
 
@@ -780,6 +793,8 @@
           </div>
         </div>
       `;
+    } finally {
+      isInitializing = false;
     }
   }
 

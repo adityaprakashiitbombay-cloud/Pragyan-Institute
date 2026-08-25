@@ -2828,7 +2828,9 @@ const supaPayload = pushableReqs.map(r => ({
           activeEl.tagName === 'INPUT' || 
           activeEl.tagName === 'TEXTAREA' || 
           activeEl.tagName === 'SELECT' || 
-          activeEl.isContentEditable
+          activeEl.isContentEditable ||
+          (activeEl.id && activeEl.id.includes('stream')) ||
+          (activeEl.className && String(activeEl.className).includes('stream'))
         );
 
         if (!isUserTyping) {
@@ -2836,17 +2838,17 @@ const supaPayload = pushableReqs.map(r => ({
           const isPortalOpen = overlay && (overlay.classList.contains('active') || overlay.style.display === 'flex');
           if (isPortalOpen) {
             if (AppState.currentRole === 'admin') {
-              if (typeof renderAdminDashboard === 'function') {
+              if (AppState.activeAdminTab !== 'community' && typeof renderAdminDashboard === 'function') {
                 renderAdminDashboard();
               }
             } else if (AppState.currentRole === 'student') {
-              if (typeof renderStudentDashboard === 'function') {
+              if (AppState.activeStudentTab !== 'community' && typeof renderStudentDashboard === 'function') {
                 renderStudentDashboard();
               }
             }
           }
         }
-      }, 250);
+      }, 500);
 
       SupabaseSync.onChange((event, data) => {
         console.log('⚡ SupabaseSync live change event received in UI:', event);
@@ -9206,6 +9208,11 @@ const inputRoll = modalEl.querySelector('#deleteConfirmRollInput')?.value.trim()
           </div>
         </div>
       `;
+      return;
+    }
+
+    // Guard against destructive re-renders: if Stream chat is already mounted and active in this pane, retain DOM & state
+    if (activePane.querySelector('.stream-chat-wrapper')) {
       return;
     }
 
