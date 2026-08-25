@@ -4098,18 +4098,23 @@ function renderStudentDashboard() {
           return;
         }
         if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-          showToast('✅ Mobile lockscreen notifications are already active on this device!', 'success');
-          window.PushClient.syncSubscription(s);
+          showToast('🔔 Sending test alert to your device...', 'info');
+          await window.PushClient.syncSubscription(s);
+          await window.PushClient.sendLocalTestNotification('🔔 Pragyan Institute Alerts Active', 'Notification test confirmed! Real-time alerts are live.');
+          await window.PushClient.sendCloudTestNotification();
+          showToast('✅ Test alert sent! Check your notification bar or lockscreen.', 'success');
           return;
         }
         btnPush.disabled = true;
         btnPush.innerHTML = '<i aria-hidden="true" class="fa-solid fa-spinner fa-spin"></i> Activating...';
         const ok = await window.PushClient.requestAndSubscribe(s);
         if (ok) {
-          showToast('🎉 Mobile lockscreen push notifications enabled successfully!', 'success');
+          showToast('🎉 Mobile lockscreen push notifications enabled!', 'success');
           btnPush.disabled = false;
           btnPush.style.backgroundColor = '#059669';
           btnPush.innerHTML = '<i aria-hidden="true" class="fa-solid fa-bell"></i> <span>🟢 Alerts Active</span>';
+          await window.PushClient.sendLocalTestNotification('🎉 Notifications Enabled!', 'You will receive instant alerts for tests, attendance, and fee receipts.');
+          await window.PushClient.sendCloudTestNotification();
         } else {
           btnPush.disabled = false;
           btnPush.innerHTML = '<i aria-hidden="true" class="fa-solid fa-bell"></i> <span>Enable Notifications</span>';
@@ -4588,9 +4593,14 @@ function renderStudentDashboard() {
         </div>
         <div>
           ${isPushGranted ? `
-            <span style="background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.4); padding: 0.45rem 0.95rem; border-radius: 99px; font-size: 0.82rem; font-weight: 700; display: inline-flex; align-items: center; gap: 0.35rem;">
-              <i aria-hidden="true" class="fa-solid fa-circle-check" style="color: #6EE7B7;"></i> Active on Device
-            </span>
+            <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+              <span style="background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.4); padding: 0.45rem 0.95rem; border-radius: 99px; font-size: 0.82rem; font-weight: 700; display: inline-flex; align-items: center; gap: 0.35rem;">
+                <i aria-hidden="true" class="fa-solid fa-circle-check" style="color: #6EE7B7;"></i> Active on Device
+              </span>
+              <button type="button" class="btn" id="btnStudentNoticesTestPush" style="background: #F59E0B; color: #78350F; font-weight: 800; font-size: 0.82rem; padding: 0.45rem 0.9rem; border-radius: 8px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
+                <i aria-hidden="true" class="fa-solid fa-paper-plane"></i> Send Test Alert
+              </button>
+            </div>
           ` : `
             <button type="button" class="btn" id="btnStudentNoticesEnablePush" style="background: #F59E0B; color: #78350F; font-weight: 800; font-size: 0.84rem; padding: 0.5rem 1.15rem; border-radius: 8px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 0.45rem; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);">
               <i aria-hidden="true" class="fa-solid fa-bell"></i> Enable Notifications
@@ -4661,6 +4671,15 @@ function renderStudentDashboard() {
       };
     });
 
+    // 1-Click Test Push Button on Notice Tab
+    pane.querySelector('#btnStudentNoticesTestPush')?.addEventListener('click', async () => {
+      if (!window.PushClient) return;
+      showToast('🔔 Sending test notification to this phone...', 'info');
+      await window.PushClient.sendLocalTestNotification('🔔 Pragyan Institute Notice Alert', 'Real-time notice push notification test delivered successfully.');
+      await window.PushClient.sendCloudTestNotification();
+      showToast('✅ Test alert delivered! Check your phone notification bar or lockscreen.', 'success');
+    });
+
     // 1-Click Enable Notifications button on Notice Tab
     pane.querySelector('#btnStudentNoticesEnablePush')?.addEventListener('click', async () => {
       if (!window.PushClient) {
@@ -4675,6 +4694,8 @@ function renderStudentDashboard() {
       const ok = await window.PushClient.requestAndSubscribe(s);
       if (ok) {
         showToast('🎉 Mobile lockscreen notifications enabled successfully!', 'success');
+        await window.PushClient.sendLocalTestNotification('🎉 Pragyan Institute Alerts Active!', 'Real-time notifications confirmed active on this phone.');
+        await window.PushClient.sendCloudTestNotification();
         renderStudentNotifications(filterCat);
       } else {
         if (btn) {

@@ -17,7 +17,7 @@
 //      with { ignoreSearch: true }.
 // ============================================================================
 
-const CACHE_NAME = 'pragyan-portal-v90.0.3b90edbc';
+const CACHE_NAME = 'pragyan-portal-v90.0.d6915bd2';
 
 // Static assets to pre-cache for instant loads
 const PRECACHE_ASSETS = [
@@ -26,19 +26,19 @@ const PRECACHE_ASSETS = [
   './pay.html',
   './features.html',
   './manifest.json',
-  './css/variables.css?v=90.0.3b90edbc',
-  './css/main.css?v=90.0.3b90edbc',
-  './css/components.css?v=90.0.3b90edbc',
-  './css/animations.css?v=90.0.3b90edbc',
-  './css/portal.css?v=90.0.3b90edbc',
-  './js/blog-markdown.js?v=90.0.3b90edbc',
-  './js/push-client.js?v=90.0.3b90edbc',
-  './js/config.js?v=90.0.3b90edbc',
-  './js/academic-config.js?v=90.0.3b90edbc',
-  './js/supabase-sync.js?v=90.0.3b90edbc',
-  './js/chat.js?v=90.0.3b90edbc',
-  './js/app.js?v=90.0.3b90edbc',
-  './js/portal.js?v=90.0.3b90edbc',
+  './css/variables.css?v=90.0.d6915bd2',
+  './css/main.css?v=90.0.d6915bd2',
+  './css/components.css?v=90.0.d6915bd2',
+  './css/animations.css?v=90.0.d6915bd2',
+  './css/portal.css?v=90.0.d6915bd2',
+  './js/blog-markdown.js?v=90.0.d6915bd2',
+  './js/push-client.js?v=90.0.d6915bd2',
+  './js/config.js?v=90.0.d6915bd2',
+  './js/academic-config.js?v=90.0.d6915bd2',
+  './js/supabase-sync.js?v=90.0.d6915bd2',
+  './js/chat.js?v=90.0.d6915bd2',
+  './js/app.js?v=90.0.d6915bd2',
+  './js/portal.js?v=90.0.d6915bd2',
   './assets/images/favicon.ico',
   './assets/images/logo.png',
   './assets/images/apple-touch-icon.png',
@@ -203,29 +203,46 @@ self.addEventListener('push', event => {
   try {
     data = event.data ? event.data.json() : {};
   } catch (_) {
-    data = { title: 'Pragyan Institute Update', body: event.data ? event.data.text() : 'You have a new notification.' };
+    try {
+      data = { title: 'Pragyan Institute Update', body: event.data ? event.data.text() : 'You have a new notification.' };
+    } catch (__) {
+      data = { title: 'Pragyan Institute Alert', body: 'New notification received.' };
+    }
   }
 
   const title = data.title || 'Pragyan Institute Alert';
+  const origin = self.location ? self.location.origin : '';
+  const iconUrl = (data.icon && data.icon.startsWith('http')) ? data.icon : (origin + '/assets/images/logo.png');
+  const badgeUrl = (data.badge && data.badge.startsWith('http')) ? data.badge : (origin + '/assets/images/logo.png');
+
   const options = {
-    body: data.body || '',
-    icon: data.icon || './assets/images/logo.png',
-    badge: data.badge || './assets/images/logo.png',
+    body: data.body || 'You have a new institutional update.',
+    icon: iconUrl,
+    badge: badgeUrl,
     image: data.image || undefined,
-    tag: data.tag || 'pragyan-broadcast',
+    tag: data.tag || ('pragyan-' + Date.now()),
     renotify: true,
+    requireInteraction: data.priority === 'high',
     data: {
-      url: data.url || './',
+      url: data.url || (origin + '/'),
       actions: data.actions || []
     },
-    vibrate: data.priority === 'high' ? [200, 100, 200] : [100, 50, 100],
+    vibrate: data.priority === 'high' ? [200, 100, 200, 100, 200] : [100, 50, 100],
     actions: Array.isArray(data.actions) ? data.actions.slice(0, 2).map(act => ({
       action: act.action || 'open',
       title: act.title || 'Open'
     })) : []
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    self.registration.showNotification(title, options).catch(err => {
+      console.warn('[SW] showNotification error, falling back to minimal payload:', err);
+      return self.registration.showNotification(title, {
+        body: options.body,
+        icon: iconUrl
+      });
+    })
+  );
 });
 
 self.addEventListener('notificationclick', event => {

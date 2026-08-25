@@ -292,6 +292,54 @@
         console.warn('[PushClient] Sync error:', err);
       }
       return false;
+    },
+
+    /** Immediately test native notification locally on this device */
+    sendLocalTestNotification: async function (title, body) {
+      if (!this.isSupported() || Notification.permission !== 'granted') return false;
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        if (reg && typeof reg.showNotification === 'function') {
+          await reg.showNotification(title || '🎉 Pragyan Institute Alerts Active!', {
+            body: body || 'Your device is successfully configured to receive instant lockscreen notifications.',
+            icon: '/assets/images/logo.png',
+            badge: '/assets/images/logo.png',
+            vibrate: [200, 100, 200, 100, 200],
+            tag: 'test-alert-' + Date.now(),
+            renotify: true,
+            requireInteraction: true
+          });
+          return true;
+        }
+      } catch (err) {
+        console.warn('[PushClient] Local test notification error:', err);
+      }
+      return false;
+    },
+
+    /** Test end-to-end cloud push notification via serverless endpoint */
+    sendCloudTestNotification: async function () {
+      try {
+        const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pragyan_portal_token')) ||
+          (typeof localStorage !== 'undefined' && localStorage.getItem('pragyan_portal_token')) || null;
+        const res = await fetch('/api/send-push', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({
+            title: '🔔 Pragyan Institute Test Alert',
+            body: 'Cloud push delivery test confirmed! Real-time notifications are active on this device.',
+            priority: 'high'
+          })
+        });
+        const data = await res.json();
+        return data && data.success;
+      } catch (err) {
+        console.warn('[PushClient] Cloud test error:', err);
+        return false;
+      }
     }
   };
 

@@ -193,7 +193,12 @@ export async function pushToSubscription(subscription, payloadObj, opts) {
       body
     });
     const ok = res.status === 200 || res.status === 201;
-    return { ok, status: res.status, prune: res.status === 404 || res.status === 410 };
+    let resText = '';
+    if (!ok) {
+      try { resText = await res.text(); } catch (_) {}
+      console.warn(`[WebPush] Push dispatch rejected by push gateway (${res.status}): ${resText}`);
+    }
+    return { ok, status: res.status, prune: res.status === 404 || res.status === 410, error: resText || `HTTP ${res.status}` };
   } catch (err) {
     return { ok: false, status: 0, prune: false, error: err.message };
   }

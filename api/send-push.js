@@ -36,7 +36,7 @@ export default async function handler(req, res) {
   const isCron = Boolean(cronSecret && (cronHeader === `Bearer ${cronSecret}` || req.headers['x-cron-secret'] === cronSecret));
 
   if (!isCron) {
-    session = requireSession(req, res, ['admin']);
+    session = requireSession(req, res, ['admin', 'student']);
     if (!session) return;
   }
 
@@ -82,8 +82,15 @@ export default async function handler(req, res) {
     return res.status(400).json({ success: false, error: 'Notification message body is required' });
   }
 
-  const target = typeof body.target === 'object' && body.target !== null ? body.target : { type: 'ALL' };
-  const targetType = ['ALL', 'BATCHES', 'STUDENT', 'DUES'].includes(target.type) ? target.type : 'ALL';
+  let target = typeof body.target === 'object' && body.target !== null ? body.target : { type: 'ALL' };
+  let targetType = ['ALL', 'BATCHES', 'STUDENT', 'DUES'].includes(target.type) ? target.type : 'ALL';
+
+  if (session && session.role === 'student') {
+    // Non-admin student is strictly restricted to test-push to their own student account
+    targetType = 'STUDENT';
+    const sId = session.sub || session.student_id;
+    target = { type: 'STUDENT', students: [sId, session.student_id, session.roll_no].filter(Boolean) };
+  }
   const actions = Array.isArray(body.actions) ? body.actions.slice(0, 2).map(a => ({
     action: stripTags(a.action || 'view').slice(0, 30),
     title: stripTags(a.title || 'Open').slice(0, 40),
