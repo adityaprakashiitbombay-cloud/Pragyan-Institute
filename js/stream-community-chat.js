@@ -564,10 +564,17 @@
             </div>
           </div>
 
-          <div style="text-align: right; flex-shrink: 0; display: none;" class="desktop-banner-stats">
-            <span style="font-size: 0.72rem; color: #D1FAE5; background: rgba(0,0,0,0.2); padding: 0.25rem 0.55rem; border-radius: 6px; font-weight: 700; display: inline-block;">
-              👥 Enrolled Students: ${studentCount}
-            </span>
+          <div style="display: flex; align-items: center; gap: 0.6rem; flex-shrink: 0;">
+            ${isAdmin ? `
+              <button type="button" class="btn-clear-group-chat" data-ch-id="${escapeHtml(activeChannelId)}" data-ch-name="${escapeHtml(activeMeta.name)}" style="background: rgba(220, 38, 38, 0.28); color: #FFFFFF; border: 1px solid rgba(254, 202, 202, 0.45); padding: 0.35rem 0.75rem; border-radius: 8px; font-size: 0.78rem; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; transition: all 0.2s ease; box-shadow: 0 2px 6px rgba(0,0,0,0.12);" title="Clear and purge message history for this class group">
+                <i class="fa-solid fa-trash-can" aria-hidden="true"></i> <span>Clear Chat</span>
+              </button>
+            ` : ''}
+            <div style="text-align: right; display: none;" class="desktop-banner-stats">
+              <span style="font-size: 0.72rem; color: #D1FAE5; background: rgba(0,0,0,0.2); padding: 0.25rem 0.55rem; border-radius: 6px; font-weight: 700; display: inline-block;">
+                👥 Enrolled Students: ${studentCount}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -646,6 +653,13 @@
         }
       });
 
+      client.on('channel.truncated', event => {
+        if (activeChannel && (event.channel_id === activeChannel.id || event.cid === activeChannel.cid)) {
+          if (activeChannel.state) activeChannel.state.messages = [];
+          refreshMsgList();
+        }
+      });
+
       client.on('user.presence.changed', () => {
         const cntEl = container.querySelector('#stream-online-count');
         if (cntEl && activeChannel) {
@@ -699,22 +713,80 @@
       }
     });
 
-    // 6. Admin message delete
-    container.querySelectorAll('[data-del-msg]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const msgId = btn.dataset.delMsg;
-        if (!confirm('Are you sure you want to permanently delete this message for everyone?')) return;
+    // 6. Admin message delete (Delegated on container)
+    container.addEventListener('click', async e => {
+      const delBtn = e.target.closest('[data-del-msg]');
+      if (!delBtn) return;
+      
+      const msgId = delBtn.dataset.delMsg;
+      if (!msgId) return;
+      
+      if (!confirm('Are you sure you want to permanently delete this message for everyone?')) return;
+      delBtn.disabled = true;
+      delBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+      try {
+        if (client) await client.deleteMessage(msgId);
+        if (activeChannel?.state?.messages) {
+          activeChannel.state.messages = activeChannel.state.messages.filter(m => m.id !== msgId);
+        }
+        refreshMsgList();
+      } catch (err) {
+        console.error('[Delete Msg Error]', err);
+        alert('Delete failed: ' + err.message);
+        delBtn.disabled = false;
+        delBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i> Delete';
+      }
+    });
+
+    // 7. Admin Clear Group Chat (Purge all messages in channel)
+    const clearBtn = container.querySelector('.btn-clear-group-chat');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', async () => {
+        const chId = clearBtn.dataset.chId || activeChannelId;
+        const chName = clearBtn.dataset.chName || 'this class';
+
+        const confirmed = confirm(
+          `⚠️ Clear All Messages for "${chName}"?\n\nAre you sure you want to permanently clear the entire chat history for all students and faculty in this group?\n\nThis action cannot be undone.`
+        );
+        if (!confirmed) return;
+
+        const originalHtml = clearBtn.innerHTML;
+        clearBtn.disabled = true;
+        clearBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Clearing...';
+
         try {
-          await client.deleteMessage(msgId);
-          if (activeChannel?.state?.messages) {
-            activeChannel.state.messages = activeChannel.state.messages.filter(m => m.id !== msgId);
+          const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pragyan_portal_token')) || '';
+          const res = await fetch('/api/health?action=stream-clear', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ channelId: chId, channelType: 'livestream', hardDelete: true })
+          });
+
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            throw new Error(data.error || 'Failed to clear channel on server');
           }
+
+          if (activeChannel) {
+            try { await activeChannel.truncate(); } catch (_) {}
+            if (activeChannel.state) activeChannel.state.messages = [];
+          }
+
           refreshMsgList();
-        } catch (e) {
-          alert('Delete failed: ' + e.message);
+          alert(`🧹 Group chat for "${chName}" has been successfully cleared.`);
+        } catch (err) {
+          console.error('[StreamChat Clear Error]', err);
+          alert(`❌ Failed to clear group chat: ${err.message}`);
+        } finally {
+          clearBtn.disabled = false;
+          clearBtn.innerHTML = originalHtml;
         }
       });
-    });
+    }
   }
 
   function scrollBottom() {

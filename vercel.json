@@ -19,6 +19,10 @@
       "destination": "/api/health?action=stream-token"
     },
     {
+      "source": "/api/stream-clear",
+      "destination": "/api/health?action=stream-clear"
+    },
+    {
       "source": "/api/student-id",
       "destination": "/api/upload-file"
     },

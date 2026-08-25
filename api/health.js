@@ -102,6 +102,61 @@ export default async function handler(req, res) {
     }
   }
 
+  // Stream channel purge / clear sub-route (Admin Only)
+  const isStreamClear = (req.url && (req.url.includes('stream-clear') || req.url.includes('action=stream-clear') || req.url.includes('route=stream-clear'))) ||
+    req.query?.action === 'stream-clear' ||
+    req.query?.route === 'stream-clear' ||
+    (req.headers['x-matched-path'] && req.headers['x-matched-path'].includes('stream-clear')) ||
+    (req.headers['x-vercel-matched-path'] && req.headers['x-vercel-matched-path'].includes('stream-clear'));
+
+  if (isStreamClear) {
+    if (req.method !== 'POST') {
+      return res.status(405).json({ success: false, error: 'Method not allowed' });
+    }
+    const session = requireSession(req, res, ['admin']);
+    if (!session) return;
+
+    const apiKey = process.env.STREAM_API_KEY || 'w9gs6k2jh9wg';
+    const apiSecret = process.env.STREAM_API_SECRET || '76mehp9ua5k2dr65g2na5p52gr34a3thzgkjncbd56u7arvggdhgpnnpc4df4c7s';
+    if (!apiKey || !apiSecret) {
+      return res.status(503).json({ success: false, error: 'Stream Chat service is not configured on server' });
+    }
+
+    const { channelId, channelType = 'livestream', hardDelete = true } = req.body || {};
+    if (!channelId) {
+      return res.status(400).json({ success: false, error: 'channelId is required' });
+    }
+
+    try {
+      const serverClient = StreamChat.getInstance(apiKey, apiSecret);
+      const channel = serverClient.channel(channelType, channelId);
+
+      const adminName = session.name || 'Chandan Kumar';
+      const adminId = `admin_${String(session.username || 'chandan').toLowerCase()}`;
+
+      // Truncate the channel history on Stream cloud
+      await channel.truncate({
+        hard_delete: hardDelete,
+        message: {
+          text: `🧹 Group chat history was cleared by Administrator (${adminName}).`,
+          user: {
+            id: adminId,
+            name: adminName,
+            role: 'admin'
+          }
+        }
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: `Group chat ${channelId} successfully cleared.`
+      });
+    } catch (err) {
+      console.error('[health/stream-clear] Channel clear error:', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
   // Health check route
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
 
