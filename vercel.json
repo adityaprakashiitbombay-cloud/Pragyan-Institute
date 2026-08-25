@@ -15,6 +15,10 @@
       "destination": "/api/send-email"
     },
     {
+      "source": "/api/stream-token",
+      "destination": "/api/health?action=stream-token"
+    },
+    {
       "source": "/api/student-id",
       "destination": "/api/upload-file"
     },

@@ -202,7 +202,7 @@
       (typeof localStorage !== 'undefined' && localStorage.getItem('pragyan_portal_token')) || '';
     if (!token) throw new Error('Please sign in to access the class forum.');
 
-    const res = await fetch('/api/stream-token', {
+    const res = await fetch('/api/health?action=stream-token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
     });
