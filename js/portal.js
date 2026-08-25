@@ -444,7 +444,8 @@
   let _academicWarned = false;
 
   function academicConfig() {
-    if (ACADEMIC) return ACADEMIC;
+    const live = (typeof window !== 'undefined' && window.PRAGYAN_ACADEMIC) || ACADEMIC;
+    if (live) return live;
     if (!_academicWarned) {
       _academicWarned = true;
       console.error('[Portal] js/academic-config.js did not load — batch fees and filters are unavailable.');
@@ -4406,7 +4407,8 @@ function renderStudentDashboard() {
     const studentBatch = s.batchName || s.className || s.class_name || '';
 
     const studentBatchKey = getBatchCategoryKey(studentBatch);
-    const resolvedBatchObj = (typeof ACADEMIC !== 'undefined' && ACADEMIC.resolveBatch) ? ACADEMIC.resolveBatch(studentBatch) : null;
+    const cfg = academicConfig();
+    const resolvedBatchObj = cfg?.resolveBatch ? cfg.resolveBatch(studentBatch) : null;
     const myBatch = batches.find(b => {
       const bKey = getBatchCategoryKey(b.name || b.batch_name || b.className || b.id || b.batch_id || b.batchId || '');
       return bKey && (bKey === studentBatchKey);
@@ -4416,7 +4418,6 @@ function renderStudentDashboard() {
     const batchTiming = myBatch.timing || myBatch.timings || (resolvedBatchObj ? resolvedBatchObj.timing : 'Contact Institute') || 'Contact Institute';
     const batchRoom = myBatch.room || myBatch.room_no || (resolvedBatchObj ? resolvedBatchObj.room : 'As allotted') || 'As allotted';
 
-    const cfg = academicConfig();
     let enrolledBatchesList = (cfg && cfg.resolveBatches)
       ? cfg.resolveBatches(studentBatch)
       : [];
@@ -14580,7 +14581,8 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
     const bKey = getBatchCategoryKey(batchId);
     const subjects = BATCH_SUBJECTS[bKey] || ['Mathematics', 'Science', 'English'];
     const slots = BATCH_SLOTS[bKey] || ['04:00 PM – 05:00 PM', '05:00 PM – 06:00 PM', '06:00 PM – 07:00 PM'];
-    const batchObj = (typeof ACADEMIC !== 'undefined' && ACADEMIC.resolveBatch) ? ACADEMIC.resolveBatch(batchId) : null;
+    const cfg = academicConfig();
+    const batchObj = cfg?.resolveBatch ? cfg.resolveBatch(batchId) : null;
     const teachers = batchObj?.teachers ? batchObj.teachers.map(titleCaseName) : ['Prof. Ravi Ranjan', 'Chandan Kumar'];
     const room = batchObj?.room || 'Main Hall';
 
@@ -15040,33 +15042,35 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
     const pane = document.getElementById('adminTabPane-schedule');
     if (!pane) return;
 
-    const batches = AppState.getBatches ? AppState.getBatches() : ((typeof ACADEMIC !== 'undefined' && ACADEMIC.BATCHES) ? ACADEMIC.BATCHES : []);
-    const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    try {
+      const cfg = academicConfig();
+      const batches = AppState.getBatches ? AppState.getBatches() : (cfg?.BATCHES || []);
+      const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-    const allSchedules = AppState.getClassSchedules ? AppState.getClassSchedules() : [];
-    const allHolidays = AppState.getInstituteHolidays ? AppState.getInstituteHolidays() : [];
+      const allSchedules = AppState.getClassSchedules ? AppState.getClassSchedules() : [];
+      const allHolidays = AppState.getInstituteHolidays ? AppState.getInstituteHolidays() : [];
 
-    const activeKey = getBatchCategoryKey(activeAdminScheduleBatchId);
+      const activeKey = getBatchCategoryKey(activeAdminScheduleBatchId);
 
-    // Filter periods for selected batch & day
-    const currentPeriods = allSchedules.filter(sch => {
-      const schB = sch.batch_id || sch.batchId || '';
-      const matchB = (schB === activeAdminScheduleBatchId) ||
-                     (getBatchCategoryKey(schB) === activeKey) ||
-                     (String(schB).toUpperCase() === String(activeAdminScheduleBatchId).toUpperCase());
-      const schD = String(sch.day_of_week || sch.dayOfWeek || '').toLowerCase();
-      const matchD = schD === activeAdminScheduleDay.toLowerCase();
-      return matchB && matchD;
-    });
+      // Filter periods for selected batch & day
+      const currentPeriods = allSchedules.filter(sch => {
+        const schB = sch.batch_id || sch.batchId || '';
+        const matchB = (schB === activeAdminScheduleBatchId) ||
+                       (getBatchCategoryKey(schB) === activeKey) ||
+                       (String(schB).toUpperCase() === String(activeAdminScheduleBatchId).toUpperCase());
+        const schD = String(sch.day_of_week || sch.dayOfWeek || '').toLowerCase();
+        const matchD = schD === activeAdminScheduleDay.toLowerCase();
+        return matchB && matchD;
+      });
 
-    currentPeriods.sort((a, b) => (Number(a.sort_order || a.sortOrder || 1) - Number(b.sort_order || b.sortOrder || 1)));
+      currentPeriods.sort((a, b) => (Number(a.sort_order || a.sortOrder || 1) - Number(b.sort_order || b.sortOrder || 1)));
 
-    const isAllOff = currentPeriods.length > 0 && currentPeriods.every(p => !!p.is_cancelled);
-    const selectedBatchObj = (typeof ACADEMIC !== 'undefined' && ACADEMIC.resolveBatch) ? ACADEMIC.resolveBatch(activeAdminScheduleBatchId) : null;
-    const fallbackBatchFromState = batches.find(b => (b.batchId || b.id || b.batch_id) === activeAdminScheduleBatchId || getBatchCategoryKey(b.batchId || b.id || b.name || '') === activeKey);
-    const batchName = selectedBatchObj?.name || fallbackBatchFromState?.name || fallbackBatchFromState?.batch_name || activeAdminScheduleBatchId;
-    const batchTiming = fallbackBatchFromState?.timing || fallbackBatchFromState?.timings || (selectedBatchObj ? 'Regular Schedule' : 'As per timetable');
-    const batchDisplayName = `${batchName} (${batchTiming})`;
+      const isAllOff = currentPeriods.length > 0 && currentPeriods.every(p => !!p.is_cancelled);
+      const selectedBatchObj = cfg?.resolveBatch ? cfg.resolveBatch(activeAdminScheduleBatchId) : null;
+      const fallbackBatchFromState = batches.find(b => (b.batchId || b.id || b.batch_id) === activeAdminScheduleBatchId || getBatchCategoryKey(b.batchId || b.id || b.name || '') === activeKey);
+      const batchName = selectedBatchObj?.name || fallbackBatchFromState?.name || fallbackBatchFromState?.batch_name || activeAdminScheduleBatchId;
+      const batchTiming = fallbackBatchFromState?.timing || fallbackBatchFromState?.timings || (selectedBatchObj ? 'Regular Schedule' : 'As per timetable');
+      const batchDisplayName = `${batchName} (${batchTiming})`;
 
     pane.innerHTML = `
       <div class="dash-card schedule-header-card" style="margin-bottom: 1.25rem;">
@@ -15406,6 +15410,17 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
         }
       });
     });
+    } catch (err) {
+      console.error('[renderAdminScheduleTab]', err);
+      pane.innerHTML = `
+        <div class="dash-card" style="padding: 2rem; text-align: center; color: #DC2626;">
+          <i aria-hidden="true" class="fa-solid fa-triangle-exclamation" style="font-size: 2rem; margin-bottom: 0.75rem;"></i>
+          <h4 style="font-weight: 800; margin-bottom: 0.5rem;">Failed to load Class Schedule controls</h4>
+          <p style="font-size: 0.9rem; color: #64748B; margin-bottom: 1.25rem;">${escapeHtml(err?.message || 'An unexpected error occurred while preparing schedule view.')}</p>
+          <button type="button" class="btn btn-emerald" onclick="location.reload()" style="padding: 0.5rem 1.25rem; font-weight: 700;">Refresh Dashboard</button>
+        </div>
+      `;
+    }
   }
 
   /* ==========================================================================
