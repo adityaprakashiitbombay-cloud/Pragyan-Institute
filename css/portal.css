@@ -10053,3 +10053,50 @@ button, a, input, select, textarea {
     display: none;
   }
 }
+
+/* Stream Community Chat Mentions, Highlights & Pinned Styles */
+.stream-mention-pill {
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.stream-mention-pill:hover {
+  background: rgba(16, 185, 129, 0.25) !important;
+  transform: translateY(-1px);
+}
+
+.stream-msg-highlight {
+  position: relative;
+  overflow: hidden;
+}
+
+.stream-msg-highlight::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: #F59E0B;
+}
+
+.stream-msg-pinned {
+  animation: streamFadeIn 0.3s ease;
+}
+
+@keyframes streamFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.auto-item:hover {
+  background: #F0FDF4 !important;
+}
+
+#stream-pinned-bar {
+  animation: streamSlideDown 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes streamSlideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}

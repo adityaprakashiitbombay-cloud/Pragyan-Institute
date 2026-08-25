@@ -4,7 +4,8 @@
  * Dedicated GetStream.io realtime chat channel for EVERY individual class
  * (Class 1st to 12th + Special English courses).
  * - Students automatically enter their specific class forum.
- * - Administrators have full multi-class access and moderation across all classes.
+ * - Administrators have full multi-class access, moderation, pin & highlight tools.
+ * - Mentions (@student), Slash Commands (/hg, /pin, /notice, /clear), Pinned Bar.
  * - Persistent message history, real-time WebSockets, verified badges.
  * ========================================================================== */
 (function () {
@@ -180,6 +181,15 @@
     }
   };
 
+  const ADMIN_SLASH_COMMANDS = [
+    { cmd: '/hg', usage: '/hg <message>', label: 'Highlight Text', desc: 'Broadcast highlighted announcement in glowing gold callout banner', icon: '⭐' },
+    { cmd: '/highlight', usage: '/highlight <message>', label: 'Highlight Text', desc: 'Broadcast highlighted announcement in glowing gold callout banner', icon: '🌟' },
+    { cmd: '/pin', usage: '/pin <message>', label: 'Post & Pin Message', desc: 'Send message and immediately pin it to the top of group', icon: '📌' },
+    { cmd: '/notice', usage: '/notice <message>', label: 'Official Notice', desc: 'Post as an official class notice announcement', icon: '📢' },
+    { cmd: '/clear', usage: '/clear', label: 'Clear Group Chat', desc: 'Prompt to purge entire message history for this class', icon: '🧹' },
+    { cmd: '/help', usage: '/help', label: 'Show Commands', desc: 'View list of available admin slash commands and shortcuts', icon: '❓' }
+  ];
+
   function escapeHtml(s) {
     if (typeof window !== 'undefined' && window.escapeHtml) return window.escapeHtml(s);
     return String(s ?? '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
@@ -223,7 +233,6 @@
         if (batch) return batch.batchId;
       }
 
-      // Check student roll number code (e.g. 261001 -> 10 -> Class 10th)
       const roll = String(user.student_id || user.rollNo || user.id || '');
       if (roll.length >= 4 && window.PRAGYAN_ACADEMIC && typeof window.PRAGYAN_ACADEMIC.resolveBatch === 'function') {
         const classCode = roll.substring(2, 4);
@@ -248,6 +257,22 @@
     }
   }
 
+  function getStudentsListForMention(query = '') {
+    try {
+      const allStudents = (typeof AppState !== 'undefined' && AppState.getStudents) ? AppState.getStudents() : [];
+      const q = String(query || '').toLowerCase().trim();
+      if (!q) return allStudents.slice(0, 10);
+      return allStudents.filter(s => {
+        const name = (s.name || s.studentName || '').toLowerCase();
+        const roll = (s.rollNo || s.roll_no || s.student_id || '').toLowerCase();
+        const cName = (s.className || s.class_name || '').toLowerCase();
+        return name.includes(q) || roll.includes(q) || cName.includes(q);
+      }).slice(0, 10);
+    } catch (_) {
+      return [];
+    }
+  }
+
   async function setupChannels() {
     channelsMap.clear();
     const isAdmin = currentUser.role === 'admin';
@@ -265,7 +290,7 @@
       channelsMap.set(chId, ch);
     }
 
-    // Resilience fallback: if student's specific batch was not resolved, expose all channels so student is never blocked
+    // Fallback: if student's specific batch was not resolved, expose all channels so student is never blocked
     if (!isAdmin && channelsMap.size === 0) {
       for (const b of batches) {
         const chId = `batch-${b.batchId}`;
@@ -275,9 +300,7 @@
       }
     }
 
-    // Set default active channel:
-    // - For students: their enrolled class batch channel
-    // - For admin: Class 10th (or the first available batch)
+    // Set default active channel
     if (!isAdmin) {
       if (myBatch && channelsMap.has(`batch-${myBatch}`)) {
         activeChannelId = `batch-${myBatch}`;
@@ -311,7 +334,6 @@
     activeChannelId = targetChannelId;
     activeChannel = channelsMap.get(targetChannelId);
 
-    // Show instant loading state in message feed
     const list = container.querySelector('#stream-msg-list');
     if (list) {
       list.innerHTML = `
@@ -322,7 +344,6 @@
       `;
     }
 
-    // Always watch to fetch latest cloud messages and subscribe to real-time events
     try {
       await activeChannel.watch({ state: true, presence: true });
     } catch (e) {
@@ -352,7 +373,6 @@
       };
     }
 
-    // Extract student Roll No
     let roll = '';
     const uid = String(user?.id || '');
     if (uid.startsWith('student_')) {
@@ -369,6 +389,26 @@
       badgeBorder: '#A7F3D0',
       subText: className
     };
+  }
+
+  function formatMessageBody(rawText, isHighlight = false) {
+    if (!rawText) return '';
+    let text = rawText;
+
+    // Clean slash prefixes
+    if (text.startsWith('/hg ')) text = text.slice(4).trim();
+    else if (text.startsWith('/highlight ')) text = text.slice(11).trim();
+    else if (text.startsWith('/pin ')) text = text.slice(5).trim();
+    else if (text.startsWith('/notice ')) text = text.slice(8).trim();
+
+    let safe = escapeHtml(text);
+
+    // Format @mentions with distinctive emerald badge
+    safe = safe.replace(/@([a-zA-Z0-9_#-]+(?:\s+[a-zA-Z0-9_#-]+)?)/g, (match, p1) => {
+      return `<span class="stream-mention-pill" style="background: rgba(16, 185, 129, 0.15); color: #064E3B; font-weight: 800; padding: 0.12rem 0.45rem; border-radius: 6px; border: 1px solid #6EE7B7; display: inline-flex; align-items: center; gap: 0.2rem; font-size: 0.88em; vertical-align: baseline;"><i class="fa-solid fa-at" style="font-size: 0.75em; color: #059669;" aria-hidden="true"></i>${p1}</span>`;
+    });
+
+    return safe.replace(/\n/g, '<br>');
   }
 
   function renderMsgList(messages) {
@@ -403,13 +443,61 @@
       const identity = extractUserBadge(m.user, channelMeta);
       const isFaculty = identity.isFaculty;
 
+      const isHighlight = (m.text && (m.text.startsWith('/hg ') || m.text.startsWith('/highlight '))) || m.is_highlighted || m.custom_type === 'highlight';
+      const isPinned = m.pinned || m.is_pinned || Boolean(m.pinned_at);
+      const isNotice = (m.text && m.text.startsWith('/notice ')) || m.is_notice;
+
       const avatar = m.user?.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.user?.name || 'User')}&background=${isFaculty ? 'D97706' : '064E3B'}&color=fff`;
-      const bubbleBg = isMine ? '#064E3B' : (isFaculty ? '#FFFDF5' : '#FFFFFF');
-      const bubbleColor = isMine ? '#FFFFFF' : '#1E293B';
-      const bubbleBorder = isMine ? '#064E3B' : (isFaculty ? '#FDE68A' : 'var(--border-sand, #E2E8F0)');
+      const formattedBody = formatMessageBody(m.text || '', isHighlight);
+
+      let bubbleContentHtml = '';
+      if (isHighlight) {
+        bubbleContentHtml = `
+          <div class="stream-msg-bubble stream-msg-highlight" style="background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%); color: #78350F; border: 2px solid #F59E0B; padding: 0.85rem 1.15rem; border-radius: 12px; font-size: 0.95rem; line-height: 1.55; box-shadow: 0 4px 20px rgba(245, 158, 11, 0.2); position: relative;">
+            <div style="font-size: 0.74rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; color: #B45309; margin-bottom: 0.4rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(217, 119, 6, 0.25); padding-bottom: 0.35rem;">
+              <span style="display: inline-flex; align-items: center; gap: 0.35rem;">
+                <span style="font-size: 0.95rem;">⭐</span> <strong>OFFICIAL ADMIN HIGHLIGHT</strong>
+              </span>
+              ${isPinned ? `<span style="font-size: 0.72rem; color: #92400E; background: #FDE68A; padding: 1px 6px; border-radius: 4px; font-weight: 800;"><i class="fa-solid fa-thumbtack"></i> Pinned</span>` : ''}
+            </div>
+            <div style="font-weight: 600; font-size: 0.95rem; color: #78350F;">
+              ${formattedBody}
+            </div>
+          </div>
+        `;
+      } else if (isNotice) {
+        bubbleContentHtml = `
+          <div class="stream-msg-bubble stream-msg-notice" style="background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%); color: #064E3B; border: 2px solid #10B981; padding: 0.85rem 1.15rem; border-radius: 12px; font-size: 0.95rem; line-height: 1.55; box-shadow: 0 4px 16px rgba(16, 185, 129, 0.15); position: relative;">
+            <div style="font-size: 0.74rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; color: #047857; margin-bottom: 0.4rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(16, 185, 129, 0.25); padding-bottom: 0.35rem;">
+              <span style="display: inline-flex; align-items: center; gap: 0.35rem;">
+                <span style="font-size: 0.95rem;">📢</span> <strong>OFFICIAL CLASS ANNOUNCEMENT</strong>
+              </span>
+              ${isPinned ? `<span style="font-size: 0.72rem; color: #065F46; background: #A7F3D0; padding: 1px 6px; border-radius: 4px; font-weight: 800;"><i class="fa-solid fa-thumbtack"></i> Pinned</span>` : ''}
+            </div>
+            <div style="font-weight: 600; font-size: 0.94rem; color: #064E3B;">
+              ${formattedBody}
+            </div>
+          </div>
+        `;
+      } else {
+        const bubbleBg = isMine ? '#064E3B' : (isFaculty ? '#FFFDF5' : '#FFFFFF');
+        const bubbleColor = isMine ? '#FFFFFF' : '#1E293B';
+        const bubbleBorder = isMine ? '#064E3B' : (isFaculty ? '#FDE68A' : 'var(--border-sand, #E2E8F0)');
+
+        bubbleContentHtml = `
+          <div class="stream-msg-bubble ${isPinned ? 'is-pinned-bubble' : ''}" style="background: ${bubbleBg}; color: ${bubbleColor}; border: 1.5px solid ${isPinned ? '#F59E0B' : bubbleBorder}; padding: 0.75rem 1rem; border-radius: 12px; font-size: 0.92rem; line-height: 1.5; word-break: break-word; overflow-wrap: anywhere; box-shadow: 0 2px 8px rgba(0,0,0,0.04); position: relative;">
+            ${isPinned ? `
+              <div style="font-size: 0.68rem; font-weight: 800; color: #D97706; margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.25rem;">
+                <i class="fa-solid fa-thumbtack"></i> Pinned by Faculty
+              </div>
+            ` : ''}
+            ${formattedBody}
+          </div>
+        `;
+      }
 
       return `
-        <div class="stream-msg-row ${isMine ? 'mine' : 'theirs'}" id="msg-${escapeHtml(m.id)}" style="display: flex; gap: 0.75rem; align-items: flex-start; margin-bottom: 1rem; ${isMine ? 'flex-direction: row-reverse;' : ''}">
+        <div class="stream-msg-row ${isMine ? 'mine' : 'theirs'} ${isPinned ? 'stream-msg-pinned' : ''}" id="msg-${escapeHtml(m.id)}" style="display: flex; gap: 0.75rem; align-items: flex-start; margin-bottom: 1rem; ${isMine ? 'flex-direction: row-reverse;' : ''}">
           <img src="${escapeHtml(avatar)}" alt="${escapeHtml(m.user?.name || '')}" style="width: 38px; height: 38px; border-radius: 50%; object-fit: cover; border: 2px solid ${isFaculty ? '#F59E0B' : (isMine ? '#10B981' : '#059669')}; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.08);">
           <div style="max-width: 82%; display: flex; flex-direction: column; ${isMine ? 'align-items: flex-end;' : 'align-items: flex-start;'}">
             
@@ -429,14 +517,15 @@
             </div>
 
             <!-- Message Bubble -->
-            <div class="stream-msg-bubble" style="background: ${bubbleBg}; color: ${bubbleColor}; border: 1.5px solid ${bubbleBorder}; padding: 0.75rem 1rem; border-radius: 12px; font-size: 0.92rem; line-height: 1.5; word-break: break-word; overflow-wrap: anywhere; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
-              ${escapeHtml(m.text || '')}
-            </div>
+            ${bubbleContentHtml}
 
-            <!-- Admin Moderation Action -->
+            <!-- Admin Moderation & Pin Action Row -->
             ${currentUser.role === 'admin' ? `
-              <div style="display: flex; gap: 0.4rem; margin-top: 0.25rem;">
-                <button type="button" class="btn-del-msg" data-del-msg="${escapeHtml(m.id)}" style="background: none; border: none; font-size: 0.72rem; color: #DC2626; cursor: pointer; padding: 0.15rem 0.35rem; border-radius: 4px; font-weight: 700; opacity: 0.85; transition: opacity 0.2s;" aria-label="Delete message">
+              <div style="display: flex; gap: 0.6rem; margin-top: 0.3rem; align-items: center;">
+                <button type="button" class="${isPinned ? 'btn-unpin-msg' : 'btn-pin-msg'}" data-${isPinned ? 'unpin' : 'pin'}-msg="${escapeHtml(m.id)}" style="background: none; border: none; font-size: 0.74rem; color: ${isPinned ? '#D97706' : '#059669'}; cursor: pointer; padding: 0.1rem 0.35rem; border-radius: 4px; font-weight: 800; opacity: 0.9; transition: all 0.2s;" title="${isPinned ? 'Unpin this message' : 'Pin to top of class forum'}">
+                  <i class="fa-solid fa-thumbtack" aria-hidden="true"></i> ${isPinned ? 'Unpin' : 'Pin'}
+                </button>
+                <button type="button" class="btn-del-msg" data-del-msg="${escapeHtml(m.id)}" style="background: none; border: none; font-size: 0.74rem; color: #DC2626; cursor: pointer; padding: 0.1rem 0.35rem; border-radius: 4px; font-weight: 800; opacity: 0.85; transition: all 0.2s;" aria-label="Delete message">
                   <i class="fa-solid fa-trash-can" aria-hidden="true"></i> Delete
                 </button>
               </div>
@@ -457,7 +546,6 @@
     const isAdmin = currentUser.role === 'admin';
     const channelList = Array.from(channelsMap.entries());
 
-    // Filter channels based on category and search query
     const filteredChannels = channelList.filter(([id]) => {
       const meta = CHANNEL_IDENTITIES[id] || {};
       const matchCat = selectedCategory === 'ALL' || meta.category === selectedCategory;
@@ -484,9 +572,12 @@
     const studentCount = getStudentCountForBatch(activeMeta.batchId);
     const onlineCount = activeChannel?.state?.watcher_count || 1;
     const categories = getCategoriesList();
+    const messages = activeChannel?.state?.messages || [];
+    const pinnedMessages = messages.filter(m => m.pinned || m.is_pinned || Boolean(m.pinned_at));
+    const latestPin = pinnedMessages.length ? pinnedMessages[pinnedMessages.length - 1] : null;
 
     container.innerHTML = `
-      <div class="stream-chat-wrapper" style="display: flex; flex-direction: column; height: clamp(520px, 80vh, 820px); max-height: calc(100dvh - 130px); background: #FFFFFF; border-radius: 14px; border: 1.5px solid var(--border-sand, #DDD5CD); overflow: hidden; box-shadow: 0 8px 30px rgba(0,0,0,0.08);">
+      <div class="stream-chat-wrapper" style="display: flex; flex-direction: column; height: clamp(540px, 82vh, 840px); max-height: calc(100dvh - 130px); background: #FFFFFF; border-radius: 14px; border: 1.5px solid var(--border-sand, #DDD5CD); overflow: hidden; box-shadow: 0 8px 30px rgba(0,0,0,0.08); position: relative;">
         
         <!-- TOP APP BAR & LIVE STATUS -->
         <div class="stream-top-bar" style="background: #042E23; color: #FFFFFF; padding: 0.6rem 1rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.1); flex-shrink: 0;">
@@ -499,7 +590,7 @@
                 Pragyan Class Forum
               </span>
               <span style="font-size: 0.75rem; color: #A7F3D0; margin-left: 0.4rem; opacity: 0.85;">
-                • ${isAdmin ? '🛡️ Admin Multi-Class Hub' : `🎓 ${escapeHtml(activeMeta.shortName)}`}
+                • ${isAdmin ? '🛡️ Faculty Multi-Class Hub' : `🎓 ${escapeHtml(activeMeta.shortName)}`}
               </span>
             </div>
           </div>
@@ -521,7 +612,7 @@
           </div>
         ` : ''}
 
-        <!-- CLASS GROUPS HORIZONTAL TABS BAR (Shown if more than 1 class available to user) -->
+        <!-- CLASS GROUPS HORIZONTAL TABS BAR -->
         ${filteredChannels.length > 1 ? `
           <div class="stream-channels-scroll-wrap" style="background: #FFFFFF; padding: 0.55rem 0.85rem; border-bottom: 1.5px solid var(--border-sand, #E2E8F0); display: flex; gap: 0.5rem; align-items: center; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex-shrink: 0;">
             ${filteredChannels.map(([id]) => {
@@ -578,17 +669,49 @@
           </div>
         </div>
 
+        <!-- STICKY PINNED MESSAGES BANNER -->
+        ${latestPin ? `
+          <div id="stream-pinned-bar" style="background: #FFFBEB; border-bottom: 1.5px solid #FCD34D; padding: 0.55rem 1rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; font-size: 0.82rem; color: #92400E; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
+            <div style="display: flex; align-items: center; gap: 0.55rem; overflow: hidden; flex: 1;">
+              <span style="background: #F59E0B; color: #FFF; padding: 0.15rem 0.5rem; border-radius: 6px; font-size: 0.72rem; font-weight: 900; display: inline-flex; align-items: center; gap: 0.3rem; flex-shrink: 0; letter-spacing: 0.3px;">
+                <i class="fa-solid fa-thumbtack" aria-hidden="true"></i> PINNED (${pinnedMessages.length})
+              </span>
+              <span class="pinned-preview-text" style="font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #78350F; font-size: 0.85rem;">
+                ${escapeHtml(latestPin.text || '')}
+              </span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.45rem; flex-shrink: 0;">
+              <button type="button" class="btn-jump-pin" data-msg-id="${escapeHtml(latestPin.id)}" style="background: #FEF3C7; color: #B45309; border: 1px solid #FCD34D; font-size: 0.75rem; font-weight: 800; padding: 0.25rem 0.65rem; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem;" title="Jump to pinned message">
+                <i class="fa-solid fa-arrow-down" aria-hidden="true"></i> Jump
+              </button>
+              ${isAdmin ? `
+                <button type="button" class="btn-unpin-msg" data-unpin-msg="${escapeHtml(latestPin.id)}" style="background: none; border: none; color: #DC2626; font-size: 0.95rem; cursor: pointer; padding: 0.2rem 0.4rem;" title="Unpin this announcement">
+                  <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </button>
+              ` : ''}
+            </div>
+          </div>
+        ` : ''}
+
         <!-- MESSAGES FEED CONTAINER -->
         <div id="stream-msg-list" style="flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 1.25rem 1rem; background: #FAF9F6; display: flex; flex-direction: column;">
-          ${renderMsgList(activeChannel?.state?.messages)}
+          ${renderMsgList(messages)}
         </div>
 
         <!-- REALTIME TYPING NOTIFIER -->
         <div id="stream-typing-box" style="padding: 0.2rem 1rem; font-size: 0.75rem; color: #64748B; font-style: italic; min-height: 20px; background: #FAF9F6; border-top: 1px solid rgba(0,0,0,0.03);"></div>
 
+        <!-- FLOATING AUTOCOMPLETE DROPDOWN (@MENTIONS & /SLASH COMMANDS) -->
+        <div id="stream-autocomplete-box" style="display: none; position: absolute; bottom: 68px; left: 1rem; right: 1rem; max-height: 230px; overflow-y: auto; background: #FFFFFF; border: 1.5px solid var(--border-sand, #CBD5E1); border-radius: 12px; box-shadow: 0 12px 36px rgba(0,0,0,0.18); z-index: 100; padding: 0.35rem 0;"></div>
+
         <!-- COMPOSER INPUT BAR -->
-        <form id="stream-chat-form" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem; background: #FFFFFF; border-top: 1.5px solid var(--border-sand, #DDD5CD); flex-shrink: 0;">
-          <input type="text" id="stream-msg-input" class="portal-input" placeholder="Message ${escapeHtml(activeMeta.shortName)} as ${escapeHtml(currentUser.name)}…" style="flex: 1; border-radius: 10px; font-size: 16px; min-height: 46px; padding: 0.6rem 0.95rem; border: 1.5px solid var(--border-sand, #CBD5E1); background: #FAF9F6; transition: border-color 0.2s;" autocomplete="off" aria-label="Chat message" required>
+        <form id="stream-chat-form" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem; background: #FFFFFF; border-top: 1.5px solid var(--border-sand, #DDD5CD); flex-shrink: 0; position: relative;">
+          ${isAdmin ? `
+            <button type="button" id="btn-quick-hg" title="Highlight announcement (/hg)" style="background: #FEF3C7; color: #D97706; border: 1.5px solid #FCD34D; width: 44px; height: 44px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; font-size: 1.15rem; cursor: pointer; flex-shrink: 0;" aria-label="Toggle Highlight prefix">
+              ⭐
+            </button>
+          ` : ''}
+          <input type="text" id="stream-msg-input" class="portal-input" placeholder="${isAdmin ? 'Type message, @mention student, /hg to highlight, or /pin…' : `Message ${escapeHtml(activeMeta.shortName)}…`}" style="flex: 1; border-radius: 10px; font-size: 16px; min-height: 46px; padding: 0.6rem 0.95rem; border: 1.5px solid var(--border-sand, #CBD5E1); background: #FAF9F6; transition: border-color 0.2s;" autocomplete="off" aria-label="Chat message" required>
           <button type="submit" class="btn btn-emerald" id="btn-stream-send" style="padding: 0.6rem 1.35rem; font-weight: 800; border-radius: 10px; display: inline-flex; align-items: center; gap: 0.45rem; min-height: 46px; font-size: 0.9rem; flex-shrink: 0; box-shadow: 0 4px 12px rgba(6,78,59,0.2);">
             <span>Send</span> <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
           </button>
@@ -622,7 +745,7 @@
       });
     });
 
-    // 3. Helper to refresh message list
+    // 3. Helper to refresh message list and pinned bar
     const refreshMsgList = () => {
       const list = container.querySelector('#stream-msg-list');
       if (list && activeChannel) {
@@ -631,7 +754,7 @@
       }
     };
 
-    // 4. Attach client-level real-time listener (if not already listening)
+    // 4. Attach client-level real-time listener
     if (client && !isListening) {
       isListening = true;
 
@@ -682,27 +805,212 @@
       });
     }
 
-    // 5. Send message form
-    const form = container.querySelector('#stream-chat-form');
+    // 5. Autocomplete popup controller (@mentions & /slash commands)
     const input = container.querySelector('#stream-msg-input');
-    const sendBtn = container.querySelector('#btn-stream-send');
+    const autoBox = container.querySelector('#stream-autocomplete-box');
+    const quickHgBtn = container.querySelector('#btn-quick-hg');
+    let autoSelectedIndex = 0;
+    let autoMode = null; // 'slash' | 'mention' | null
+
+    if (quickHgBtn && input) {
+      quickHgBtn.addEventListener('click', () => {
+        if (input.value.startsWith('/hg ')) {
+          input.value = input.value.replace(/^\/hg\s*/, '');
+        } else {
+          input.value = `/hg ${input.value.trim()}`;
+        }
+        input.focus();
+      });
+    }
+
+    function hideAutocomplete() {
+      if (autoBox) {
+        autoBox.style.display = 'none';
+        autoBox.innerHTML = '';
+      }
+      autoMode = null;
+      autoSelectedIndex = 0;
+    }
+
+    function renderSlashCommands(filterQuery) {
+      const q = filterQuery.toLowerCase().trim();
+      const filtered = ADMIN_SLASH_COMMANDS.filter(c => c.cmd.includes(q) || c.label.toLowerCase().includes(q));
+      if (!filtered.length) { hideAutocomplete(); return; }
+
+      autoMode = 'slash';
+      autoSelectedIndex = Math.min(autoSelectedIndex, filtered.length - 1);
+
+      autoBox.innerHTML = `
+        <div style="padding: 0.4rem 0.85rem; font-size: 0.74rem; font-weight: 800; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #F1F5F9;">
+          ⚡ Admin Commands
+        </div>
+        ${filtered.map((c, i) => `
+          <div class="auto-item ${i === autoSelectedIndex ? 'active' : ''}" data-cmd="${escapeHtml(c.usage)}" style="display: flex; align-items: center; justify-content: space-between; padding: 0.55rem 0.85rem; cursor: pointer; background: ${i === autoSelectedIndex ? '#ECFDF5' : '#FFFFFF'}; transition: background 0.1s;">
+            <div style="display: flex; align-items: center; gap: 0.6rem;">
+              <span style="font-size: 1.15rem;">${c.icon}</span>
+              <div>
+                <div style="font-weight: 800; font-size: 0.88rem; color: #064E3B;">${escapeHtml(c.cmd)} <small style="color: #64748B; font-weight: 600;">${escapeHtml(c.label)}</small></div>
+                <div style="font-size: 0.74rem; color: #64748B;">${escapeHtml(c.desc)}</div>
+              </div>
+            </div>
+            <span style="font-size: 0.7rem; background: #F1F5F9; color: #475569; padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: 700;">Tab</span>
+          </div>
+        `).join('')}
+      `;
+      autoBox.style.display = 'block';
+
+      autoBox.querySelectorAll('.auto-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const cmd = item.dataset.cmd;
+          input.value = `${cmd} `;
+          hideAutocomplete();
+          input.focus();
+        });
+      });
+    }
+
+    function renderMentions(filterQuery) {
+      const students = getStudentsListForMention(filterQuery);
+      if (!students.length) { hideAutocomplete(); return; }
+
+      autoMode = 'mention';
+      autoSelectedIndex = Math.min(autoSelectedIndex, students.length - 1);
+
+      autoBox.innerHTML = `
+        <div style="padding: 0.4rem 0.85rem; font-size: 0.74rem; font-weight: 800; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #F1F5F9;">
+          🎓 Mention Student (${students.length})
+        </div>
+        ${students.map((s, i) => {
+          const sName = s.name || s.studentName || 'Student';
+          const sRoll = s.rollNo || s.roll_no || s.student_id || '';
+          const sClass = s.className || s.class_name || 'Student';
+          const sAvatar = s.photoUrl || s.photo_url || s.photo || '';
+          return `
+            <div class="auto-item ${i === autoSelectedIndex ? 'active' : ''}" data-mention="@${escapeHtml(sName)}" style="display: flex; align-items: center; justify-content: space-between; padding: 0.55rem 0.85rem; cursor: pointer; background: ${i === autoSelectedIndex ? '#ECFDF5' : '#FFFFFF'}; transition: background 0.1s;">
+              <div style="display: flex; align-items: center; gap: 0.6rem;">
+                ${sAvatar ? `<img src="${escapeHtml(sAvatar)}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover;">` : `<div style="width: 28px; height: 28px; border-radius: 50%; background: #064E3B; color: #FFF; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800;">${sName.charAt(0)}</div>`}
+                <div>
+                  <div style="font-weight: 800; font-size: 0.86rem; color: #1E293B;">${escapeHtml(sName)}</div>
+                  <div style="font-size: 0.74rem; color: #64748B;">Roll #${escapeHtml(sRoll)} • ${escapeHtml(sClass)}</div>
+                </div>
+              </div>
+              <span style="font-size: 0.72rem; background: #E0E7FF; color: #3730A3; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 800;">@${escapeHtml(sRoll || 'Mention')}</span>
+            </div>
+          `;
+        }).join('')}
+      `;
+      autoBox.style.display = 'block';
+
+      autoBox.querySelectorAll('.auto-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const mentionText = item.dataset.mention;
+          insertMentionIntoInput(mentionText);
+        });
+      });
+    }
+
+    function insertMentionIntoInput(mentionText) {
+      const val = input.value;
+      const atIdx = val.lastIndexOf('@');
+      if (atIdx >= 0) {
+        input.value = val.substring(0, atIdx) + `${mentionText} `;
+      } else {
+        input.value = `${val} ${mentionText} `;
+      }
+      hideAutocomplete();
+      input.focus();
+    }
 
     input?.addEventListener('input', () => {
-      if (activeChannel) {
-        activeChannel.keystroke().catch(() => {});
+      const val = input.value;
+      if (activeChannel) activeChannel.keystroke().catch(() => {});
+
+      // Slash commands trigger
+      if (currentUser.role === 'admin' && val.startsWith('/')) {
+        renderSlashCommands(val.slice(1));
+        return;
+      }
+
+      // Mentions trigger
+      const lastAt = val.lastIndexOf('@');
+      if (lastAt >= 0 && lastAt === val.length - 1 || (lastAt >= 0 && !val.slice(lastAt).includes(' '))) {
+        const query = val.slice(lastAt + 1);
+        renderMentions(query);
+        return;
+      }
+
+      hideAutocomplete();
+    });
+
+    input?.addEventListener('keydown', e => {
+      if (!autoMode || !autoBox || autoBox.style.display === 'none') return;
+      const items = autoBox.querySelectorAll('.auto-item');
+      if (!items.length) return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        autoSelectedIndex = (autoSelectedIndex + 1) % items.length;
+        items.forEach((it, idx) => it.style.background = (idx === autoSelectedIndex) ? '#ECFDF5' : '#FFFFFF');
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        autoSelectedIndex = (autoSelectedIndex - 1 + items.length) % items.length;
+        items.forEach((it, idx) => it.style.background = (idx === autoSelectedIndex) ? '#ECFDF5' : '#FFFFFF');
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        const sel = items[autoSelectedIndex];
+        if (sel) sel.click();
+      } else if (e.key === 'Escape') {
+        hideAutocomplete();
       }
     });
 
+    // 6. Send message form
+    const form = container.querySelector('#stream-chat-form');
+    const sendBtn = container.querySelector('#btn-stream-send');
+
     form?.addEventListener('submit', async e => {
       e.preventDefault();
-      const text = (input.value || '').trim();
-      if (!text) return;
+      const rawText = (input.value || '').trim();
+      if (!rawText) return;
+
+      hideAutocomplete();
+
+      // Handle Slash Commands
+      if (rawText === '/clear') {
+        input.value = '';
+        container.querySelector('.btn-clear-group-chat')?.click();
+        return;
+      }
+      if (rawText === '/help') {
+        input.value = '';
+        alert('✨ Available Admin Commands:\n\n• /hg <text> — Broadcast highlighted announcement in gold callout card\n• /pin <text> — Post and pin announcement\n• /notice <text> — Broadcast class notice\n• /clear — Clear group message history\n• @<name> — Mention specific student');
+        return;
+      }
+
+      const isHighlight = rawText.startsWith('/hg ') || rawText.startsWith('/highlight ');
+      const isPinCommand = rawText.startsWith('/pin ');
+      const isNotice = rawText.startsWith('/notice ');
 
       input.value = '';
       if (sendBtn) sendBtn.disabled = true;
 
       try {
-        await activeChannel.sendMessage({ text });
+        const msgPayload = {
+          text: rawText,
+          is_highlighted: isHighlight,
+          is_notice: isNotice,
+          custom_type: isHighlight ? 'highlight' : (isNotice ? 'notice' : 'text')
+        };
+
+        const sent = await activeChannel.sendMessage(msgPayload);
+
+        // If sent with /pin, immediately pin it
+        if (isPinCommand && sent?.message?.id) {
+          try {
+            await handlePinAction(sent.message.id, true);
+          } catch (_) {}
+        }
+
         refreshMsgList();
       } catch (err) {
         console.error('[StreamChat Send Error]', err);
@@ -713,33 +1021,120 @@
       }
     });
 
-    // 6. Admin message delete (Delegated on container)
-    container.addEventListener('click', async e => {
-      const delBtn = e.target.closest('[data-del-msg]');
-      if (!delBtn) return;
+    // 7. Pin / Unpin Action Handler
+    async function handlePinAction(msgId, shouldPin) {
+      const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pragyan_portal_token')) || '';
       
-      const msgId = delBtn.dataset.delMsg;
-      if (!msgId) return;
-      
-      if (!confirm('Are you sure you want to permanently delete this message for everyone?')) return;
-      delBtn.disabled = true;
-      delBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-
       try {
-        if (client) await client.deleteMessage(msgId);
-        if (activeChannel?.state?.messages) {
-          activeChannel.state.messages = activeChannel.state.messages.filter(m => m.id !== msgId);
+        const res = await fetch('/api/health?action=stream-pin', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ messageId: msgId, pin: shouldPin })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || 'Failed to update pin state on server');
         }
-        refreshMsgList();
-      } catch (err) {
-        console.error('[Delete Msg Error]', err);
-        alert('Delete failed: ' + err.message);
-        delBtn.disabled = false;
-        delBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i> Delete';
+      } catch (srvErr) {
+        console.warn('[Pin server note]', srvErr.message);
+        if (client) {
+          if (shouldPin) {
+            try { await client.pinMessage({ id: msgId }); } catch (_) {}
+          } else {
+            try { await client.unpinMessage({ id: msgId }); } catch (_) {}
+          }
+        }
+      }
+
+      // Update local state and refresh
+      if (activeChannel?.state?.messages) {
+        const target = activeChannel.state.messages.find(m => m.id === msgId);
+        if (target) {
+          target.pinned = shouldPin;
+          target.is_pinned = shouldPin;
+          target.pinned_at = shouldPin ? new Date().toISOString() : null;
+        }
+      }
+
+      renderUI(container);
+    }
+
+    // 8. Event delegation on container for Pin, Unpin, Delete, Jump
+    container.addEventListener('click', async e => {
+      // Pin message
+      const pinBtn = e.target.closest('[data-pin-msg]');
+      if (pinBtn) {
+        e.preventDefault();
+        const msgId = pinBtn.dataset.pinMsg;
+        if (!msgId) return;
+        pinBtn.disabled = true;
+        pinBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+        await handlePinAction(msgId, true);
+        return;
+      }
+
+      // Unpin message
+      const unpinBtn = e.target.closest('[data-unpin-msg]');
+      if (unpinBtn) {
+        e.preventDefault();
+        const msgId = unpinBtn.dataset.unpinMsg;
+        if (!msgId) return;
+        unpinBtn.disabled = true;
+        unpinBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+        await handlePinAction(msgId, false);
+        return;
+      }
+
+      // Jump to pinned message
+      const jumpBtn = e.target.closest('.btn-jump-pin');
+      if (jumpBtn) {
+        e.preventDefault();
+        const msgId = jumpBtn.dataset.msgId;
+        if (!msgId) return;
+        const targetEl = container.querySelector(`#msg-${msgId}`);
+        if (targetEl) {
+          targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          targetEl.style.transition = 'box-shadow 0.3s ease, transform 0.3s ease';
+          targetEl.style.transform = 'scale(1.02)';
+          targetEl.style.boxShadow = '0 0 20px rgba(245, 158, 11, 0.6)';
+          setTimeout(() => {
+            targetEl.style.transform = '';
+            targetEl.style.boxShadow = '';
+          }, 1500);
+        }
+        return;
+      }
+
+      // Delete message
+      const delBtn = e.target.closest('[data-del-msg]');
+      if (delBtn) {
+        e.preventDefault();
+        const msgId = delBtn.dataset.delMsg;
+        if (!msgId) return;
+        if (!confirm('Are you sure you want to permanently delete this message for everyone?')) return;
+        delBtn.disabled = true;
+        delBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+        try {
+          if (client) await client.deleteMessage(msgId);
+          if (activeChannel?.state?.messages) {
+            activeChannel.state.messages = activeChannel.state.messages.filter(m => m.id !== msgId);
+          }
+          refreshMsgList();
+        } catch (err) {
+          console.error('[Delete Msg Error]', err);
+          alert('Delete failed: ' + err.message);
+          delBtn.disabled = false;
+          delBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i> Delete';
+        }
+        return;
       }
     });
 
-    // 7. Admin Clear Group Chat (Purge all messages in channel)
+    // 9. Admin Clear Group Chat (Purge all messages in channel)
     const clearBtn = container.querySelector('.btn-clear-group-chat');
     if (clearBtn) {
       clearBtn.addEventListener('click', async () => {
@@ -776,7 +1171,7 @@
             if (activeChannel.state) activeChannel.state.messages = [];
           }
 
-          refreshMsgList();
+          renderUI(container);
           alert(`🧹 Group chat for "${chName}" has been successfully cleared.`);
         } catch (err) {
           console.error('[StreamChat Clear Error]', err);
@@ -839,7 +1234,6 @@
       currentUser = { id: tokenData.userId, name: tokenData.userName, role: tokenData.userRole };
 
       // Connect user using authenticated user ID token
-      // Passing { id: tokenData.userId } directly avoids Stream WS code 6 username collisions
       if (!client.userID) {
         await client.connectUser({ id: tokenData.userId }, tokenData.token);
       }
@@ -890,6 +1284,8 @@
       if (pane) switchChannel(chId, pane);
     },
     deleteMessage: async (msgId) => { if (client) { await client.deleteMessage(msgId); } },
+    pinMessage: async (msgId) => { if (client) { await client.pinMessage({ id: msgId }); } },
+    unpinMessage: async (msgId) => { if (client) { await client.unpinMessage({ id: msgId }); } },
     disconnect
   };
 
