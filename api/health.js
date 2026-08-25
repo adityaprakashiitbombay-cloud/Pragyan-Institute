@@ -1,8 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { StreamChat } from 'stream-chat';
-import { getSupabase, requireSession, optionalSession, applyCors } from './_lib/auth.js';
+import { getSupabase, optionalSession, applyCors } from './_lib/auth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -18,86 +17,6 @@ function packageVersion() {
 export default async function handler(req, res) {
   if (applyCors(req, res)) return;
 
-  // Stream token generator route
-  const isStreamToken = (req.url && req.url.includes('stream-token')) ||
-    (req.headers['x-matched-path'] && req.headers['x-matched-path'].includes('stream-token')) ||
-    (req.headers['x-vercel-matched-path'] && req.headers['x-vercel-matched-path'].includes('stream-token'));
-
-  if (isStreamToken) {
-    if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-    const session = requireSession(req, res, ['student', 'admin']);
-    if (!session) return;
-
-    const apiKey = process.env.STREAM_API_KEY;
-    const apiSecret = process.env.STREAM_API_SECRET;
-    if (!apiKey || !apiSecret) return res.status(503).json({ success: false, error: 'Chat is not configured' });
-
-    const isAdmin = session.role === 'admin';
-    const prefix = isAdmin ? 'admin' : 'student';
-    // For admin, prioritize username (e.g. "chandan") then id/sub; for students, student_id/roll/sub
-    const rawId = (isAdmin ? (session.username || session.sub) : (session.sub || session.roll || session.student_id)) || 'unknown';
-    const userId = `${prefix}_${String(rawId).toLowerCase().replace(/[^a-zA-Z0-9_-]/g, '')}`;
-    const userName = session.name || (isAdmin ? 'Chandan Kumar' : 'Student');
-    const userRole = isAdmin ? 'admin' : 'user';
-
-    try {
-      const serverClient = StreamChat.getInstance(apiKey, apiSecret);
-      try {
-        await serverClient.upsertUser({
-          id: userId,
-          name: userName,
-          role: userRole,
-          image: `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=064E3B&color=fff`,
-        });
-      } catch (upsertErr) {
-        console.warn('[health/stream-token] upsertUser note:', upsertErr.message);
-        try {
-          await serverClient.partialUpdateUser({
-            id: userId,
-            set: { role: userRole }
-          });
-        } catch (_) {}
-      }
-
-      const CHAT_TOKEN_TTL_SECONDS = 24 * 60 * 60;
-      const exp = Math.floor(Date.now() / 1000) + CHAT_TOKEN_TTL_SECONDS;
-      const token = serverClient.createToken(userId, exp);
-
-      // Persist / synchronize stream_user_id for this user in Supabase Postgres
-      try {
-        const supabase = getSupabase();
-        if (supabase) {
-          if (isAdmin) {
-            const adminUser = session.username || 'chandan';
-            supabase.from('admins').update({ stream_user_id: userId }).ilike('username', adminUser).then(() => {}).catch(() => {});
-          } else {
-            const sid = session.student_id || session.sub || session.roll;
-            if (sid) {
-              supabase.from('students').update({ stream_user_id: userId }).or(`student_id.eq.${sid},id.eq.${sid}`).then(() => {}).catch(() => {});
-            }
-          }
-        }
-      } catch (dbErr) {
-        console.warn('[health/stream-token] DB stream_user_id sync note:', dbErr.message);
-      }
-
-      return res.status(200).json({
-        success: true,
-        apiKey,
-        userId,
-        userName,
-        userRole,
-        token,
-        exp,
-        expiresAt: new Date(exp * 1000).toISOString()
-      });
-    } catch (err) {
-      console.error('[health/stream-token] Error:', err.message);
-      return res.status(500).json({ success: false, error: err.message });
-    }
-  }
-
-  // Health check route
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
 
   let dbOnline = false;

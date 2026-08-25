@@ -198,23 +198,36 @@
   }
 
   async function fetchToken() {
-    const token = sessionStorage.getItem('pragyan_portal_token') || localStorage.getItem('pragyan_portal_token');
-    if (!token) throw new Error('Please sign in to access the community forum.');
+    const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pragyan_portal_token')) ||
+      (typeof localStorage !== 'undefined' && localStorage.getItem('pragyan_portal_token')) || '';
+    if (!token) throw new Error('Please sign in to access the class forum.');
+
     const res = await fetch('/api/stream-token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.success) throw new Error(data.error || `Token endpoint returned ${res.status}`);
+    if (!res.ok || !data.success) throw new Error(data.error || `Server connection failed with status ${res.status}`);
     return data;
   }
 
   function resolveBatchId() {
     try {
       const user = (typeof AppState !== 'undefined' && AppState.currentUser) || {};
-      const cn = user.className || user.class_name || '';
+      if (user.batchId && String(user.batchId).startsWith('BAT-')) return user.batchId;
+      if (user.batch_id && String(user.batch_id).startsWith('BAT-')) return user.batch_id;
+
+      const cn = user.className || user.class_name || user.class || user.batch || '';
       if (window.PRAGYAN_ACADEMIC && typeof window.PRAGYAN_ACADEMIC.resolveBatch === 'function') {
         const batch = window.PRAGYAN_ACADEMIC.resolveBatch(cn);
+        if (batch) return batch.batchId;
+      }
+
+      // Check student roll number code (e.g. 261001 -> 10 -> Class 10th)
+      const roll = String(user.student_id || user.rollNo || user.id || '');
+      if (roll.length >= 4 && window.PRAGYAN_ACADEMIC && typeof window.PRAGYAN_ACADEMIC.resolveBatch === 'function') {
+        const classCode = roll.substring(2, 4);
+        const batch = (window.PRAGYAN_ACADEMIC.BATCHES || []).find(b => b.classCode === classCode);
         if (batch) return batch.batchId;
       }
     } catch (_) {}
@@ -243,13 +256,23 @@
 
     // Register all class-specific batch channels
     for (const b of batches) {
-      if (!isAdmin && b.batchId !== myBatch) continue;
+      if (!isAdmin && myBatch && b.batchId !== myBatch) continue;
       const chId = `batch-${b.batchId}`;
       const meta = CHANNEL_IDENTITIES[chId] || { name: b.name || b.batchId };
       const ch = client.channel(CHANNEL_TYPE, chId, {
         name: meta.name
       });
       channelsMap.set(chId, ch);
+    }
+
+    // Resilience fallback: if student's specific batch was not resolved, expose all channels so student is never blocked
+    if (!isAdmin && channelsMap.size === 0) {
+      for (const b of batches) {
+        const chId = `batch-${b.batchId}`;
+        const meta = CHANNEL_IDENTITIES[chId] || { name: b.name || b.batchId };
+        const ch = client.channel(CHANNEL_TYPE, chId, { name: meta.name });
+        channelsMap.set(chId, ch);
+      }
     }
 
     // Set default active channel:
