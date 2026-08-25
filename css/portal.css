@@ -1716,43 +1716,247 @@
   transition: width 1s ease-in-out;
 }
 
+/* --------------------------------------------------------------------------
+ * 5. Student Profile: Batch & Daily Class Timetable
+ * -------------------------------------------------------------------------- */
+.profile-grid-layout {
+  display: grid;
+  grid-template-columns: 1.35fr 0.65fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.batch-overview-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
+.batch-metric-box {
+  background: var(--bg-surface-cream, #FAF9F6);
+  border: 1px solid var(--border-sand, #E2E8F0);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  min-width: 0;
+}
+
+.batch-metric-label {
+  font-size: 0.75rem;
+  color: var(--text-muted, #64748B);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.batch-metric-value {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text-mahogany, #1E293B);
+  margin-top: 0.2rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.batch-metric-value.fee-val {
+  color: var(--primary-emerald, #064E3B);
+}
+
+.schedule-day-tabs {
+  display: flex;
+  gap: 0.45rem;
+  overflow-x: auto;
+  padding: 0.25rem 0.15rem 0.5rem 0.15rem;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.schedule-day-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.btn-day-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  border-radius: 99px;
+  border: 1.5px solid var(--border-sand, #E2E8F0);
+  background: #ffffff;
+  color: var(--text-mahogany, #1E293B);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.btn-day-tab:hover {
+  border-color: var(--primary-emerald, #064E3B);
+  color: var(--primary-emerald, #064E3B);
+  transform: translateY(-1px);
+}
+
+.btn-day-tab.active {
+  background: linear-gradient(135deg, #064E3B 0%, #047857 100%);
+  color: #ffffff;
+  border-color: #047857;
+  box-shadow: 0 4px 12px rgba(6, 78, 59, 0.25);
+}
+
+.today-indicator-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #F59E0B;
+  display: inline-block;
+  box-shadow: 0 0 6px #F59E0B;
+}
+
+.btn-day-tab.active .today-indicator-dot {
+  background: #FDE68A;
+  box-shadow: 0 0 6px #FDE68A;
+}
+
 .schedule-list {
   display: flex;
   flex-direction: column;
-  gap: 0.875rem;
-  margin-top: 1rem;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
 }
 
 .schedule-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.875rem 1rem;
-  background-color: var(--bg-surface-cream);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-sand);
+  padding: 0.85rem 1.15rem;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1.5px solid var(--border-sand, #E2E8F0);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  transition: all 0.2s ease;
+  gap: 0.85rem;
 }
 
-.schedule-subject {
+.schedule-row:hover {
+  border-color: rgba(6, 78, 59, 0.35);
+  box-shadow: 0 4px 14px rgba(6, 78, 59, 0.07);
+  transform: translateY(-1px);
+}
+
+.schedule-row.schedule-row-cancelled {
+  background: #FEF2F2;
+  border-color: #FECACA;
+  border-left: 4px solid #EF4444;
+}
+
+.schedule-row-left {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  font-weight: 700;
-  color: var(--text-charcoal);
+  gap: 0.85rem;
+  min-width: 0;
+  flex: 1;
 }
 
-.schedule-subject i {
-  color: var(--primary-emerald);
+.schedule-subject-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--primary-emerald-light, #ECFDF5);
+  color: var(--primary-emerald, #064E3B);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 1.1rem;
+  flex-shrink: 0;
+  border: 1px solid rgba(6, 78, 59, 0.15);
+}
+
+.schedule-subject-icon.icon-cancelled {
+  background: #FEE2E2;
+  color: #DC2626;
+  border-color: rgba(220, 38, 38, 0.2);
+}
+
+.schedule-subject-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.schedule-subject-title {
+  font-size: 0.96rem;
+  font-weight: 800;
+  color: var(--text-mahogany, #1E293B);
+  line-height: 1.3;
+}
+
+.schedule-subject-title.cancelled-text {
+  text-decoration: line-through;
+  color: #991B1B;
+}
+
+.schedule-subject-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  color: var(--text-muted, #64748B);
+}
+
+.schedule-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.schedule-meta-chip i {
+  color: var(--primary-emerald, #064E3B);
+}
+
+.schedule-row-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+  flex-shrink: 0;
 }
 
 .schedule-time {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--primary-emerald);
-  background-color: var(--primary-emerald-light);
-  padding: 0.25rem 0.75rem;
-  border-radius: var(--radius-full);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--primary-emerald, #064E3B);
+  background: var(--primary-emerald-light, #ECFDF5);
+  padding: 0.25rem 0.65rem;
+  border-radius: 99px;
+  border: 1px solid rgba(6, 78, 59, 0.15);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.schedule-time.time-cancelled {
+  color: #991B1B;
+  background: #FEE2E2;
+  border-color: rgba(220, 38, 38, 0.2);
+}
+
+.schedule-cancelled-pill {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #DC2626;
+  background: #FEE2E2;
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid rgba(220, 38, 38, 0.25);
 }
 
 /* --------------------------------------------------------------------------
@@ -3886,23 +4090,91 @@
   }
 
   /* 7. Student Batch Details & Schedule on Mobile */
+  .profile-grid-layout {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+  }
+
   .batch-overview-card .batch-info-header {
     flex-direction: column !important;
     align-items: flex-start !important;
     gap: 0.5rem !important;
   }
 
+  .batch-overview-metrics-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 0.45rem !important;
+  }
+
+  .batch-metric-box {
+    padding: 0.55rem 0.65rem !important;
+    border-radius: 8px !important;
+  }
+
+  .batch-metric-label {
+    font-size: 0.66rem !important;
+  }
+
+  .batch-metric-value {
+    font-size: 1.05rem !important;
+  }
+
+  .student-timetable-header {
+    padding-bottom: 0.5rem !important;
+  }
+
+  .schedule-day-tabs {
+    gap: 0.35rem !important;
+    padding-bottom: 0.35rem !important;
+  }
+
+  .btn-day-tab {
+    padding: 0.35rem 0.65rem !important;
+    font-size: 0.78rem !important;
+  }
+
   .schedule-row {
     flex-direction: column !important;
-    align-items: flex-start !important;
-    gap: 0.25rem !important;
-    padding: 0.65rem 0.75rem !important;
+    align-items: stretch !important;
+    padding: 0.75rem 0.85rem !important;
+    gap: 0.55rem !important;
+    border-radius: 10px !important;
+  }
+
+  .schedule-row-left {
+    width: 100% !important;
+    gap: 0.65rem !important;
+  }
+
+  .schedule-subject-icon {
+    width: 34px !important;
+    height: 34px !important;
+    font-size: 0.95rem !important;
+    border-radius: 8px !important;
+  }
+
+  .schedule-subject-title {
+    font-size: 0.9rem !important;
+  }
+
+  .schedule-subject-meta {
+    font-size: 0.75rem !important;
+    gap: 0.5rem !important;
+  }
+
+  .schedule-row-right {
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+    border-top: 1px dashed rgba(0, 0, 0, 0.08) !important;
+    padding-top: 0.45rem !important;
+    margin-top: 0.15rem !important;
   }
 
   .schedule-time {
-    font-size: 0.8rem !important;
-    color: var(--primary-emerald) !important;
-    font-weight: 700 !important;
+    font-size: 0.76rem !important;
+    padding: 0.2rem 0.55rem !important;
   }
 
   /* 8. Student Fee Tab & Clearance Radial on Mobile */

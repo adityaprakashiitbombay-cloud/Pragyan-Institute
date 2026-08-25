@@ -4361,18 +4361,18 @@ function renderStudentDashboard() {
           <span class="pill-item pill-emerald"><i aria-hidden="true" class="fa-solid fa-user-check"></i> Active Session</span>
         </div>
 
-        <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-top:1rem;">
-          <div style="background:var(--bg-surface-cream); border-radius:10px; padding:0.75rem 1.1rem; flex:1; min-width:140px;">
-            <div style="font-size: 0.8rem; color:var(--text-muted); font-weight:600;">MONTHLY FEE</div>
-            <div style="font-size:1.3rem; font-weight:800; color:var(--primary-emerald);">₹${batchFee.toLocaleString()}</div>
+        <div class="batch-overview-metrics-grid">
+          <div class="batch-metric-box">
+            <div class="batch-metric-label">MONTHLY FEE</div>
+            <div class="batch-metric-value fee-val">₹${batchFee.toLocaleString()}</div>
           </div>
-          <div style="background:var(--bg-surface-cream); border-radius:10px; padding:0.75rem 1.1rem; flex:1; min-width:140px;">
-            <div style="font-size: 0.8rem; color:var(--text-muted); font-weight:600;">BATCH CODE</div>
-            <div style="font-size:1.1rem; font-weight:800; color:var(--text-mahogany);">${escapeHtml(batchId)}</div>
+          <div class="batch-metric-box">
+            <div class="batch-metric-label">BATCH CODE</div>
+            <div class="batch-metric-value">${escapeHtml(batchId)}</div>
           </div>
-          <div style="background:var(--bg-surface-cream); border-radius:10px; padding:0.75rem 1.1rem; flex:1; min-width:140px;">
-            <div style="font-size: 0.8rem; color:var(--text-muted); font-weight:600;">STUDENTS IN BATCH</div>
-            <div style="font-size:1.3rem; font-weight:800; color:var(--text-mahogany);">${enrolledInBatchCount || '—'}</div>
+          <div class="batch-metric-box">
+            <div class="batch-metric-label">STUDENTS IN BATCH</div>
+            <div class="batch-metric-value">${enrolledInBatchCount || '—'}</div>
           </div>
         </div>
       </div>
@@ -4393,23 +4393,24 @@ function renderStudentDashboard() {
       ` : ''}
 
       <div class="profile-grid-layout">
-        <div class="dash-card">
+        <div class="dash-card student-timetable-card">
           <div class="dash-card-header" style="flex-direction: column; align-items: stretch; gap: 0.75rem;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
               <div class="dash-card-title"><i aria-hidden="true" class="fa-solid fa-calendar-days"></i> Daily Class Timetable</div>
-              <span style="font-size: 0.8rem; color: var(--text-muted); background: #FAF9F6; padding: 0.2rem 0.5rem; border-radius: 6px; border: 1px solid var(--border-sand); font-weight: 600;">
+              <span class="student-timetable-live-badge" style="font-size: 0.8rem; color: var(--text-muted); background: #FAF9F6; padding: 0.2rem 0.55rem; border-radius: 6px; border: 1px solid var(--border-sand); font-weight: 600; display: inline-flex; align-items: center; gap: 0.35rem;">
                 <i aria-hidden="true" class="fa-solid fa-bolt" style="color: var(--primary-emerald);"></i> Live Supabase Cloud
               </span>
             </div>
 
             <!-- Day Selector Tabs -->
-            <div class="schedule-day-tabs" style="display: flex; gap: 0.4rem; overflow-x: auto; padding-bottom: 0.25rem;">
+            <div class="schedule-day-tabs">
               ${daysOfWeek.map(d => {
                 const isActive = d.toLowerCase() === currentSelectedDay.toLowerCase();
                 const isToday = d.toLowerCase() === todayIst.toLowerCase();
                 return `
-                  <button type="button" class="btn btn-day-tab ${isActive ? 'active' : ''}" data-day="${d}" aria-label="Select ${d}" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; font-weight: 700; border-radius: 99px; border: 1.5px solid ${isActive ? 'var(--primary-emerald)' : 'var(--border-sand)'}; background: ${isActive ? 'var(--primary-emerald)' : '#fff'}; color: ${isActive ? '#fff' : 'var(--text-mahogany)'}; cursor: pointer; white-space: nowrap;">
-                    ${d.slice(0, 3)} ${isToday ? '•' : ''}
+                  <button type="button" class="btn btn-day-tab ${isActive ? 'active' : ''} ${isToday ? 'is-today-tab' : ''}" data-day="${d}" aria-label="Select ${d}">
+                    <span>${d.slice(0, 3)}</span>
+                    ${isToday ? '<span class="today-indicator-dot" title="Today"></span>' : ''}
                   </button>
                 `;
               }).join('')}
@@ -4418,29 +4419,32 @@ function renderStudentDashboard() {
 
           <div class="schedule-list">
             ${renderedScheduleItems.length === 0 ? `
-              <div class="schedule-row" style="text-align: center; justify-content: center; padding: 2rem; color: var(--text-muted);">
-                <div>
-                  <i aria-hidden="true" class="fa-solid fa-bed" style="font-size: 1.8rem; margin-bottom: 0.5rem; display: block; color: var(--text-sand);"></i>
-                  <strong>No Classes Scheduled for ${escapeHtml(currentSelectedDay)}</strong>
-                  <div style="font-size: 0.82rem; margin-top: 0.25rem;">Enjoy your break or revise previous lecture topics!</div>
-                </div>
+              <div class="schedule-empty-card" style="text-align: center; justify-content: center; padding: 2.25rem 1.5rem; background: var(--bg-surface-cream); border-radius: 12px; border: 1.5px dashed var(--border-sand);">
+                <i aria-hidden="true" class="fa-solid fa-bed" style="font-size: 2rem; margin-bottom: 0.5rem; display: block; color: var(--text-sand);"></i>
+                <h4 style="font-weight: 800; font-size: 1.05rem; color: var(--text-mahogany); margin-bottom: 0.25rem;">No Classes Scheduled for ${escapeHtml(currentSelectedDay)}</h4>
+                <div style="font-size: 0.82rem; color: var(--text-muted);">Enjoy your break or revise previous lecture topics!</div>
               </div>
             ` : renderedScheduleItems.map(item => `
-              <div class="schedule-row ${item.isCancelled ? 'schedule-row-cancelled' : ''}" style="${item.isCancelled ? 'background: #FEF2F2; border-left: 3px solid #EF4444; opacity: 0.85;' : ''}">
-                <div class="schedule-subject">
-                  <i class="${item.isCancelled ? 'fa-solid fa-ban' : 'fa-solid fa-book-bookmark'}" aria-hidden="true" style="color: ${item.isCancelled ? '#DC2626' : 'var(--primary-emerald)'};"></i>
-                  <div style="display: inline-block; vertical-align: middle;">
-                    <div style="${item.isCancelled ? 'text-decoration: line-through; color: #991B1B;' : ''}">
+              <div class="schedule-row ${item.isCancelled ? 'schedule-row-cancelled' : ''}">
+                <div class="schedule-row-left">
+                  <div class="schedule-subject-icon ${item.isCancelled ? 'icon-cancelled' : ''}">
+                    <i class="${item.isCancelled ? 'fa-solid fa-ban' : 'fa-solid fa-book-bookmark'}" aria-hidden="true"></i>
+                  </div>
+                  <div class="schedule-subject-details">
+                    <div class="schedule-subject-title ${item.isCancelled ? 'cancelled-text' : ''}">
                       <strong>${escapeHtml(item.subject)}</strong>
                     </div>
-                    <div style="font-size: 0.78rem; color: var(--text-muted); font-weight: normal;">
-                      <i aria-hidden="true" class="fa-solid fa-chalkboard-user"></i> ${escapeHtml(item.teacher)} &bull; <i aria-hidden="true" class="fa-solid fa-door-open"></i> ${escapeHtml(item.room)}
+                    <div class="schedule-subject-meta">
+                      <span class="schedule-meta-chip"><i aria-hidden="true" class="fa-solid fa-chalkboard-user"></i> ${escapeHtml(item.teacher)}</span>
+                      <span class="schedule-meta-chip"><i aria-hidden="true" class="fa-solid fa-door-open"></i> ${escapeHtml(item.room)}</span>
                     </div>
                   </div>
                 </div>
-                <div style="text-align: right;">
-                  <div class="schedule-time" style="${item.isCancelled ? 'color: #991B1B;' : ''}">${escapeHtml(item.time)}</div>
-                  ${item.isCancelled ? '<span style="font-size: 0.75rem; font-weight: 700; color: #DC2626; background: #FEE2E2; padding: 0.1rem 0.4rem; border-radius: 4px;">🚫 Class Off</span>' : ''}
+                <div class="schedule-row-right">
+                  <div class="schedule-time ${item.isCancelled ? 'time-cancelled' : ''}">
+                    <i aria-hidden="true" class="fa-regular fa-clock"></i> ${escapeHtml(item.time)}
+                  </div>
+                  ${item.isCancelled ? '<span class="schedule-cancelled-pill">🚫 Class Off</span>' : ''}
                 </div>
               </div>
             `).join('')}
