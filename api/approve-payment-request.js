@@ -164,16 +164,39 @@ export default async function handler(req, res) {
       const amountPaid = Number(result.amount_paid || (result.receipt && result.receipt.amount) || 0);
 
       if (studentId) {
-        const { data: stuRow } = await supabase
+        const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        let query = supabase
           .from('students')
-          .select('id, student_id, name, email, pending_fee, class_name')
-          .or(`student_id.eq.${studentId},id.eq.${studentId}`)
-          .single();
+          .select('id, student_id, roll_no, name, email, pending_fee, class_name');
 
-        const stuEmail = (stuRow?.email || '').trim();
+        query = uuidPattern.test(String(studentId).trim())
+          ? query.or(`student_id.eq.${studentId},id.eq.${studentId}`)
+          : query.or(`student_id.eq.${studentId},roll_no.eq.${studentId}`);
+
+        const { data: stuRows } = await query.limit(1);
+        let stuRow = stuRows?.[0];
+
+        let stuEmail = (stuRow?.email || '').trim();
+        let studentName = stuRow?.name || 'Student';
+        let remainingDue = Number(stuRow?.pending_fee || 0);
+
+        // Fallback: check original student_request if email is missing on student profile
+        if (!stuEmail || !stuEmail.includes('@')) {
+          const { data: reqRows } = await supabase
+            .from('student_requests')
+            .select('student_name, new_data')
+            .eq('request_id', p_req_id)
+            .limit(1);
+          const reqRow = reqRows?.[0];
+          if (reqRow?.new_data?.email && typeof reqRow.new_data.email === 'string') {
+            stuEmail = reqRow.new_data.email.trim();
+          }
+          if (reqRow?.student_name && !stuRow?.name) {
+            studentName = reqRow.student_name;
+          }
+        }
+
         if (stuEmail && stuEmail.includes('@')) {
-          const studentName = stuRow.name || 'Student';
-          const remainingDue = Number(stuRow.pending_fee || 0);
           const emailSubject = `Payment Verified: Receipt #${receiptNo} — Pragyan Institute`;
           const emailHtml = `
             <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 580px; margin: 0 auto; border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden; background: #FFFFFF;">

@@ -7709,6 +7709,52 @@ function renderStudentDashboard() {
       await AppState.saveStudents(students);
       AppState.addAuditLog(teacherName, 'FEE_PAYMENT', target.name, target.rollNo, `Recorded partial fee payment of ₹${amount.toLocaleString()} via ${mode} for ${target.name}. Remaining dues: ₹${target.pendingFee.toLocaleString()}`, { amount, mode, receiptNo: recNo, note, remainingDues: target.pendingFee });
 
+      // Dispatch computerized stamped receipt email to student/parent
+      if (target.email && target.email.includes('@')) {
+        const studentEmail = target.email.trim();
+        const studentName = target.name || 'Student';
+        const receiptSubject = `Payment Receipt #${recNo} (₹${amount.toLocaleString('en-IN')}) — Pragyan Institute`;
+        const emailHtml = `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 580px; margin: 0 auto; border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden; background: #FFFFFF;">
+            <div style="background: linear-gradient(135deg, #064E3B 0%, #022C22 100%); padding: 24px 20px; color: #FFFFFF; text-align: center;">
+              <h1 style="margin: 0; font-size: 20px; font-weight: 800; letter-spacing: 0.5px;">PRAGYAN INSTITUTE</h1>
+              <p style="margin: 4px 0 0; font-size: 13px; opacity: 0.9;">Official Stamped Fee Receipt & Voucher</p>
+            </div>
+            <div style="padding: 24px 20px; color: #1E293B;">
+              <p style="font-size: 15px; margin-top: 0;">Dear <strong>${escapeHtml(studentName)}</strong>,</p>
+              <p style="font-size: 14px; line-height: 1.5; color: #334155;">We have successfully received and verified your fee payment of <strong style="color: #059669; font-size: 16px;">₹${amount.toLocaleString('en-IN')}</strong> (${escapeHtml(mode)}).</p>
+              
+              <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; margin: 18px 0;">
+                <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+                  <tr><td style="padding: 6px 0; color: #64748B;">Receipt Number:</td><td style="padding: 6px 0; font-weight: 700; text-align: right; font-family: monospace;">${recNo}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #64748B;">Student ID / Roll:</td><td style="padding: 6px 0; font-weight: 700; text-align: right;">${escapeHtml(target.rollNo || target.student_id || target.id || '')}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #64748B;">Batch / Class:</td><td style="padding: 6px 0; font-weight: 700; text-align: right;">${escapeHtml(target.className || target.class_name || '')}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #64748B;">Amount Credited:</td><td style="padding: 6px 0; font-weight: 800; text-align: right; color: #059669;">₹${amount.toLocaleString('en-IN')}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #64748B;">Collected By:</td><td style="padding: 6px 0; font-weight: 700; text-align: right;">${escapeHtml(teacherName)}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #64748B;">Remaining Dues:</td><td style="padding: 6px 0; font-weight: 700; text-align: right;">₹${Number(target.pendingFee || 0).toLocaleString('en-IN')}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #64748B;">Payment Mode:</td><td style="padding: 6px 0; font-weight: 700; text-align: right;">${escapeHtml(mode)}</td></tr>
+                </table>
+              </div>
+
+              <p style="font-size: 13px; color: #64748B; margin-bottom: 20px;">You can view and download your full computerized stamped PDF receipt voucher anytime from the Student Portal.</p>
+              
+              <div style="text-align: center; margin: 20px 0 10px;">
+                <a href="https://www.pragyaninstitute.com/portal.html" style="display: inline-block; background: #064E3B; color: #FFFFFF; text-decoration: none; padding: 10px 22px; border-radius: 6px; font-weight: 700; font-size: 13px;">View Student Portal</a>
+              </div>
+            </div>
+            <div style="background: #F1F5F9; padding: 12px; font-size: 11px; color: #64748B; text-align: center;">
+              Pragyan Institute • At Moti Market, Near Jagdamba Sthan, Lalganj, Vaishali, Bihar
+            </div>
+          </div>
+        `;
+
+        sendLiveResendEmail(studentEmail, receiptSubject, emailHtml, {
+          student_id: target.student_id || target.id || target.rollNo,
+          category: 'receipt',
+          reference: `RECEIPT-${recNo}`
+        }).catch(err => console.warn('Direct fee receipt email dispatch caught:', err.message));
+      }
+
       mgmtDialog.close();
       alert(`✅ Partial payment of ₹${amount.toLocaleString('en-IN')} recorded by ${teacherName}! Remaining dues: ₹${target.pendingFee.toLocaleString('en-IN')}. Official receipt issued.` + (cloudSynced ? '' : '\n⚠️ Saved on this device only — no student UUID was available to reach the cloud.'));
       renderAdminDashboard();
