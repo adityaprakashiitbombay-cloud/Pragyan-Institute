@@ -4541,6 +4541,23 @@ function renderStudentDashboard() {
   }
 
   // 3. Student Tab: Notification Tab
+  function interpolateStudentNotice(text, student) {
+    if (!text || typeof text !== 'string') return '';
+    const s = student || (typeof AppState !== 'undefined' && AppState.currentUser) || {};
+    const feeAcc = (typeof AppState !== 'undefined' && AppState.getStudentFeeAccount)
+      ? AppState.getStudentFeeAccount(s.id || s.student_id || s.rollNo, s)
+      : { totalDue: 0 };
+    const pendingFormatted = '₹' + Number(feeAcc.totalDue ?? s.pendingFee ?? s.pending_fee ?? 0).toLocaleString('en-IN');
+    return text
+      .replace(/\{\{\s*(?:student_name|name)\s*\}\}/gi, s.name || 'Student')
+      .replace(/\{\{\s*(?:batch_name|batch|class_name)\s*\}\}/gi, s.className || s.class_name || s.batchName || 'Academic Batch')
+      .replace(/\{\{\s*(?:pending_dues|dues|amount)\s*\}\}/gi, pendingFormatted)
+      .replace(/\{\{\s*(?:roll_no|roll|student_id|id)\s*\}\}/gi, s.rollNo || s.roll_no || s.student_id || s.id || '')
+      .replace(/\{\{\s*due_date\s*\}\}/gi, '5th of this month')
+      .replace(/\{\{\s*(?:guardian_name|father_name|guardian)\s*\}\}/gi, s.guardianName || s.fatherName || 'Guardian')
+      .replace(/\{\{\s*(?:phone|contact|mobile)\s*\}\}/gi, s.phone || s.contact || '');
+  }
+
   // 3. Student Tab: Notification Tab
   function renderStudentNotifications(filterCat = 'all') {
     const pane = document.getElementById('studentTabPane-notifications');
@@ -4630,7 +4647,10 @@ function renderStudentDashboard() {
             </div>
           ` : `
             <div style="display: flex; flex-direction: column; gap: 1rem;">
-              ${filtered.map(notice => `
+              ${filtered.map(notice => {
+                const displayTitle = interpolateStudentNotice(notice.title, s);
+                const displayBody = interpolateStudentNotice(notice.message, s);
+                return `
                 <div class="notice-item-card ${notice.unread ? 'unread' : ''}" style="border: 1px solid var(--border-sand); border-radius: 10px; padding: 1.15rem; background: #FAF9F6; transition: transform 0.15s ease;">
                   <div class="notice-top-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
                     <div style="display: flex; gap: 0.5rem; align-items: center;">
@@ -4643,8 +4663,8 @@ function renderStudentDashboard() {
                     </div>
                     <span class="notice-date" style="font-size: 0.8rem; color: var(--text-muted);"><i aria-hidden="true" class="fa-regular fa-clock"></i> ${formatDate(notice.date)}</span>
                   </div>
-                  <div class="notice-title" style="font-size: 1.05rem; font-weight: 700; color: var(--text-mahogany); margin-bottom: 0.4rem;">${sanitizeInput(notice.title)}</div>
-                  <div class="notice-body" style="font-size: 0.9rem; color: #374151; line-height: 1.6;">${sanitizeInput(notice.message)}</div>
+                  <div class="notice-title" style="font-size: 1.05rem; font-weight: 700; color: var(--text-mahogany); margin-bottom: 0.4rem;">${sanitizeInput(displayTitle)}</div>
+                  <div class="notice-body" style="font-size: 0.9rem; color: #374151; line-height: 1.6;">${sanitizeInput(displayBody)}</div>
                   ${(notice.attachmentUrl || notice.attachment_url) ? `
                     <div style="margin-top:0.85rem;">
                       ${(/\.(png|jpe?g|webp|gif)(\?.*)?$/i.test(notice.attachmentUrl || notice.attachment_url) || (notice.attachmentUrl || notice.attachment_url).startsWith('data:image/'))
@@ -4656,7 +4676,8 @@ function renderStudentDashboard() {
                     </div>
                   ` : ''}
                 </div>
-              `).join('')}
+              `;
+              }).join('')}
             </div>
           `}
         </div>
@@ -9572,18 +9593,46 @@ function renderStudentDashboard() {
             </div>
           </div>
 
+          <!-- Dynamic Personalization Tags Toolbar -->
+          <div class="notice-tags-composer-box">
+            <div class="notice-tags-composer-head">
+              <span class="notice-tags-composer-title">
+                <i aria-hidden="true" class="fa-solid fa-wand-magic-sparkles" style="color: #059669;"></i> Dynamic Student Personalization Tags:
+              </span>
+              <span class="notice-tags-composer-hint">(Click any tag below to insert into message)</span>
+            </div>
+            <div class="notice-tag-chips-wrap">
+              <button type="button" class="btn-insert-notice-tag" data-target="noticeBodyInput" data-tag="{{student_name}}" title="Inserts Student's Full Name">👤 {{student_name}}</button>
+              <button type="button" class="btn-insert-notice-tag" data-target="noticeBodyInput" data-tag="{{batch_name}}" title="Inserts Enrolled Batch Name">📚 {{batch_name}}</button>
+              <button type="button" class="btn-insert-notice-tag" data-target="noticeBodyInput" data-tag="{{pending_dues}}" title="Inserts Pending Tuition Fee Balance">💳 {{pending_dues}}</button>
+              <button type="button" class="btn-insert-notice-tag" data-target="noticeBodyInput" data-tag="{{roll_no}}" title="Inserts Student Roll Number">🆔 {{roll_no}}</button>
+              <button type="button" class="btn-insert-notice-tag" data-target="noticeBodyInput" data-tag="{{due_date}}" title="Inserts Monthly Due Date">📅 {{due_date}}</button>
+              <button type="button" class="btn-insert-notice-tag" data-target="noticeBodyInput" data-tag="{{guardian_name}}" title="Inserts Father/Guardian Name">👨‍👧 {{guardian_name}}</button>
+              <button type="button" class="btn-insert-notice-tag" data-target="noticeBodyInput" data-tag="{{phone}}" title="Inserts Contact Mobile Number">📞 {{phone}}</button>
+            </div>
+          </div>
+
           <div style="margin-bottom: 1rem;">
             <label for="noticeBodyInput" style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.35rem;">Announcement Details / Message Body *</label>
-            <textarea id="noticeBodyInput" class="portal-input" rows="6" placeholder="Write full details, examination timings, schedule, syllabus or notice description here..." required style="resize: vertical; width: 100%; min-height: 180px; font-family: inherit; font-size: 0.92rem; line-height: 1.55; box-sizing: border-box; padding: 0.85rem;">${draftBody.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+            <textarea id="noticeBodyInput" class="portal-input" rows="6" placeholder="Write full details, examination timings, schedule, syllabus or notice description here... (Personalization tags like {{student_name}} and {{pending_dues}} will be replaced automatically for each student)" required style="resize: vertical; width: 100%; min-height: 180px; font-family: inherit; font-size: 0.92rem; line-height: 1.55; box-sizing: border-box; padding: 0.85rem;">${draftBody.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
           </div>
           <div style="margin-bottom: 1.25rem;">
             <label for="noticeAttachmentInput" style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.35rem;">Attach Photo or PDF Document (Optional)</label>
             <input type="file" id="noticeAttachmentInput" class="portal-input" accept="image/*,.pdf,.doc,.docx" style="padding: 0.45rem;">
             <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">Stored securely in Supabase Storage bucket. Supports photos & PDF documents.</div>
           </div>
-          <button type="submit" class="btn btn-emerald" style="padding: 0.75rem 1.75rem;">
-            <i aria-hidden="true" class="fa-solid fa-bullhorn"></i> Post to Student Noticeboard
-          </button>
+
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-top: 1rem;">
+            <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; user-select: none; background: #ECFDF5; border: 1.5px solid #A7F3D0; border-radius: 8px; padding: 0.6rem 0.95rem;">
+              <input type="checkbox" id="noticeSendPushBroadcastChk" checked style="width: 18px; height: 18px; accent-color: var(--primary-emerald); cursor: pointer;">
+              <span style="font-weight: 700; font-size: 0.85rem; color: #065F46; display: inline-flex; align-items: center; gap: 0.35rem;">
+                <i aria-hidden="true" class="fa-solid fa-bell"></i> Send Instant Lockscreen Push Notification to Target Students
+              </span>
+            </label>
+            <button type="submit" class="btn btn-emerald" style="padding: 0.75rem 1.75rem;">
+              <i aria-hidden="true" class="fa-solid fa-bullhorn"></i> Post to Student Noticeboard
+            </button>
+          </div>
         </form>
       </div>
 
@@ -9672,6 +9721,24 @@ function renderStudentDashboard() {
       </div>
     `;
 
+    // Bind Notice Personalization Tags Insertion
+    pane.querySelectorAll('.btn-insert-notice-tag').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const tag = btn.dataset.tag;
+        const targetId = btn.dataset.target || 'noticeBodyInput';
+        const el = pane.querySelector('#' + targetId) || pane.querySelector('#noticeBodyInput');
+        if (el) {
+          const start = (typeof el.selectionStart === 'number') ? el.selectionStart : el.value.length;
+          const end = (typeof el.selectionEnd === 'number') ? el.selectionEnd : el.value.length;
+          const val = el.value;
+          el.value = val.substring(0, start) + tag + val.substring(end);
+          el.focus();
+          el.selectionStart = el.selectionEnd = start + tag.length;
+        }
+      });
+    });
+
     // Bind Notice Listeners
     pane.querySelector('#btnSelectAllBatches')?.addEventListener('click', () => {
       pane.querySelectorAll('.notice-batch-chk').forEach(chk => chk.checked = true);
@@ -9700,6 +9767,7 @@ function renderStudentDashboard() {
         : (chks.map(c => c.dataset.name).join(', ') || 'Custom');
       const message = pane.querySelector('#noticeBodyInput').value.trim();
       const attachmentFile = pane.querySelector('#noticeAttachmentInput')?.files[0];
+      const shouldSendPush = Boolean(pane.querySelector('#noticeSendPushBroadcastChk')?.checked);
 
       if (!title) { alert('⚠️ Please enter a notice title.'); return; }
       if (chks.length === 0) { alert('⚠️ Please select at least one target batch.'); return; }
@@ -9734,8 +9802,33 @@ function renderStudentDashboard() {
         const author = getActiveTeacherName();
         await AppState.addAuditLog(author, 'NOTICE_BROADCAST', targetBatch, title, `Broadcasted notice "${title}" to ${targetBatch}.`, { category, targetBatch });
 
+        // Dispatch instant cloud push broadcast to target students if checked
+        if (shouldSendPush) {
+          const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pragyan_portal_token')) ||
+            (typeof localStorage !== 'undefined' && localStorage.getItem('pragyan_portal_token')) || null;
+          const selectedBatchKeys = chks.map(c => c.value);
+          const targetType = (allChks.length > 0 && chks.length === allChks.length) ? 'ALL' : 'BATCHES';
+          fetch('/api/send-push', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {})
+            },
+            body: JSON.stringify({
+              title,
+              body: message,
+              target: {
+                type: targetType,
+                batches: selectedBatchKeys
+              },
+              priority: (category === 'urgent' || category === 'exam') ? 'high' : 'normal',
+              actions: [{ action: 'view_notice', title: 'Open Notice', url: '/#notices' }]
+            })
+          }).catch(e => console.warn('[NoticePush] Failed:', e));
+        }
+
         form.reset();
-        alert('🎉 Notice successfully posted to the student noticeboard!');
+        alert('🎉 Notice successfully posted to the student noticeboard!' + (shouldSendPush ? ' Push notification dispatched to student devices.' : ''));
         renderAdminDashboard();
       } catch (err) {
         console.error('Broadcast failed:', err);
@@ -9886,6 +9979,25 @@ function renderStudentDashboard() {
               </div>
             </div>
 
+            <!-- Dynamic Personalization Tags Toolbar for Edit Modal -->
+            <div class="notice-tags-composer-box">
+              <div class="notice-tags-composer-head">
+                <span class="notice-tags-composer-title">
+                  <i aria-hidden="true" class="fa-solid fa-wand-magic-sparkles" style="color: #059669;"></i> Dynamic Personalization Tags:
+                </span>
+                <span class="notice-tags-composer-hint">(Click to insert into message)</span>
+              </div>
+              <div class="notice-tag-chips-wrap">
+                <button type="button" class="btn-insert-notice-tag" data-target="editNoticeMessage" data-tag="{{student_name}}">👤 {{student_name}}</button>
+                <button type="button" class="btn-insert-notice-tag" data-target="editNoticeMessage" data-tag="{{batch_name}}">📚 {{batch_name}}</button>
+                <button type="button" class="btn-insert-notice-tag" data-target="editNoticeMessage" data-tag="{{pending_dues}}">💳 {{pending_dues}}</button>
+                <button type="button" class="btn-insert-notice-tag" data-target="editNoticeMessage" data-tag="{{roll_no}}">🆔 {{roll_no}}</button>
+                <button type="button" class="btn-insert-notice-tag" data-target="editNoticeMessage" data-tag="{{due_date}}">📅 {{due_date}}</button>
+                <button type="button" class="btn-insert-notice-tag" data-target="editNoticeMessage" data-tag="{{guardian_name}}">👨‍👧 {{guardian_name}}</button>
+                <button type="button" class="btn-insert-notice-tag" data-target="editNoticeMessage" data-tag="{{phone}}">📞 {{phone}}</button>
+              </div>
+            </div>
+
             <div>
               <label for="editNoticeMessage" style="display: block; font-size: 0.85rem; font-weight: 700; color: #374151; margin-bottom: 0.35rem;">
                 Announcement Details / Body Message *
@@ -9919,6 +10031,25 @@ function renderStudentDashboard() {
     `;
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     wireModalA11y('editNoticeModal', { closeOnBackdrop: false });
+
+    // Wire tag insertion in edit modal
+    const editModalEl = document.getElementById('editNoticeModal');
+    editModalEl?.querySelectorAll('.btn-insert-notice-tag').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const tag = btn.dataset.tag;
+        const targetId = btn.dataset.target || 'editNoticeMessage';
+        const el = editModalEl.querySelector('#' + targetId) || document.getElementById(targetId);
+        if (el) {
+          const start = (typeof el.selectionStart === 'number') ? el.selectionStart : el.value.length;
+          const end = (typeof el.selectionEnd === 'number') ? el.selectionEnd : el.value.length;
+          const val = el.value;
+          el.value = val.substring(0, start) + tag + val.substring(end);
+          el.focus();
+          el.selectionStart = el.selectionEnd = start + tag.length;
+        }
+      });
+    });
 
     // Remove attachment handler. The id is notice-specific: this button and the
     // one in the compose-notice pane both used to be id="btnRemoveAttachment",

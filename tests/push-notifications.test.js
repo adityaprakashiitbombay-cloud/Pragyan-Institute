@@ -111,6 +111,14 @@ export async function runPushNotificationTests(assert) {
   assert(portalJs.includes("btnRegisterCurrentDevice"), 'T28.45: js/portal.js provides 1-click admin device registration');
   const authJs = read('api/_lib/auth.js');
   assert(authJs.includes("optionalSession"), 'T28.46: api/_lib/auth.js exports optionalSession for push subscriber identification');
+
+  // --- 12. Noticeboard Personalization Tags & Push Dispatch ---
+  assert(portalJs.includes("notice-tags-composer-box") && portalJs.includes("btn-insert-notice-tag"), 'T28.47: js/portal.js provides dynamic personalization tags composer toolbar');
+  assert(portalJs.includes("{{student_name}}") && portalJs.includes("{{pending_dues}}") && portalJs.includes("{{batch_name}}"), 'T28.48: js/portal.js provides student name, batch, dues, roll number, and date tags');
+  assert(portalJs.includes("interpolateStudentNotice"), 'T28.49: js/portal.js defines interpolateStudentNotice for dynamic client-side rendering');
+  assert(portalCss.includes(".notice-tags-composer-box") && portalCss.includes(".btn-insert-notice-tag"), 'T28.50: portal.css styles notice personalization tags box and interactive chips');
+  assert(portalJs.includes("noticeSendPushBroadcastChk"), 'T28.51: js/portal.js provides instant lockscreen push notification checkbox on posting notices');
+  assert(portalJs.includes("editNoticeModal") && portalJs.includes("Dynamic Personalization Tags"), 'T28.52: js/portal.js provides personalization tags in edit notice modal');
 }
 
 
