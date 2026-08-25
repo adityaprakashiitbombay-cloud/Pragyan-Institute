@@ -2274,8 +2274,21 @@
         }
       } catch(e) { console.warn('saveBatches Supabase error:', e); }
     },
+    invalidateCaches() {
+      this._studentsCache = null;
+      this._noticesCache = null;
+      this._batchesCache = null;
+      this._requestsCache = null;
+      this._adminsCache = null;
+      this._auditLogsCache = null;
+      this._classSchedulesCache = null;
+      this._instituteHolidaysCache = null;
+    },
+
     getClassSchedules() {
-      if (this._classSchedulesCache) return this._classSchedulesCache;
+      if (Array.isArray(this._classSchedulesCache) && this._classSchedulesCache.length > 0) {
+        return this._classSchedulesCache;
+      }
       try {
         const raw = localStorage.getItem(STORAGE_KEY_SCHEDULES);
         if (raw) {
@@ -2285,18 +2298,36 @@
             return this._classSchedulesCache;
           }
         }
-      } catch (e) { this._classSchedulesCache = []; }
+      } catch (e) {
+        this._classSchedulesCache = [];
+      }
 
-      // Seed initial canonical schedule for all 12 batches Mon-Sat
+      // Seed initial canonical schedule for all batches Mon-Sat
       const initialSchedules = [];
       const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      const batchIds = Object.keys(BATCH_SUBJECTS);
+      const batchMap = (typeof BATCH_SUBJECTS !== 'undefined' && BATCH_SUBJECTS) ? BATCH_SUBJECTS : {
+        'BAT-10': ['Science (Physics & Chemistry)', 'Mathematics', 'Special English'],
+        'BAT-09': ['Foundation Science', 'Foundation Mathematics', 'English Language'],
+        'BAT-08': ['Comprehensive Science', 'General Mathematics', 'English Grammar'],
+        'BAT-11PCM': ['Higher Physics', 'Physical & Organic Chemistry', 'Higher Mathematics'],
+        'BAT-11PCB': ['Higher Physics', 'Physical & Organic Chemistry', 'Advanced Biology'],
+        'BAT-12PCM': ['Advanced Physics (Board + JEE)', 'Chemistry Comprehensive', 'Higher Mathematics Core'],
+        'BAT-12PCB': ['Advanced Physics (Board + NEET)', 'Chemistry Comprehensive', 'Botany & Zoology (NEET)'],
+        'BAT-ENG': ['Spoken English & Public Speaking', 'Functional Grammar & Writing', 'Vocabulary & Comprehension'],
+        'BAT-06': ['Junior Science & Discovery', 'Junior Mathematics', 'Communicative English'],
+        'BAT-07': ['Middle Science', 'Middle Mathematics', 'English Composition'],
+        'BAT-1TO5': ['Fundamental Mathematics', 'Environmental Studies (EVS)', 'English Reading & Writing']
+      };
+
+      const batchIds = Object.keys(batchMap);
+      const slotMap = (typeof BATCH_SLOTS !== 'undefined' && BATCH_SLOTS) ? BATCH_SLOTS : {};
+      const cfg = academicConfig();
 
       batchIds.forEach(batchId => {
-        const subjects = BATCH_SUBJECTS[batchId] || [];
-        const slots = BATCH_SLOTS[batchId] || [];
-        const cfg = (typeof window !== 'undefined' && window.PRAGYAN_ACADEMIC) ? window.PRAGYAN_ACADEMIC.resolveBatch(batchId) : null;
-        const teachers = cfg?.teachers?.map(titleCaseName) || ['Prof. Ravi Ranjan', 'Chandan Kumar'];
+        const subjects = batchMap[batchId] || ['Science', 'Mathematics', 'English'];
+        const slots = slotMap[batchId] || ['04:00 PM – 05:00 PM', '05:00 PM – 06:00 PM', '06:00 PM – 07:00 PM'];
+        const batchObj = cfg?.resolveBatch ? cfg.resolveBatch(batchId) : null;
+        const teachers = batchObj?.teachers ? batchObj.teachers.map(titleCaseName) : ['Prof. Ravi Ranjan', 'Chandan Kumar'];
 
         days.forEach(day => {
           subjects.forEach((subj, idx) => {
@@ -2304,7 +2335,7 @@
             const parts = timeStr.split(/[–-]/).map(t => t.trim());
             const startTime = parts[0] || '04:00 PM';
             const endTime = parts[1] || '05:00 PM';
-            const teacher = teachers[idx % teachers.length] || 'Faculty';
+            const teacher = teachers[idx % teachers.length] || 'Faculty Mentors';
 
             initialSchedules.push({
               id: `SCHED-${batchId}-${day.slice(0,3).toUpperCase()}-${idx+1}`,
@@ -2324,16 +2355,17 @@
 
       this._classSchedulesCache = initialSchedules;
       this.safeSetItem(STORAGE_KEY_SCHEDULES, initialSchedules);
-      return this._classSchedulesCache;
+      return Array.isArray(this._classSchedulesCache) ? this._classSchedulesCache : [];
     },
 
     async saveClassSchedules(schedules) {
-      this._classSchedulesCache = schedules;
-      this.safeSetItem(STORAGE_KEY_SCHEDULES, schedules);
+      const safeSchedules = Array.isArray(schedules) ? schedules : [];
+      this._classSchedulesCache = safeSchedules;
+      this.safeSetItem(STORAGE_KEY_SCHEDULES, safeSchedules);
       this.markMutation();
       try {
-        if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate && Array.isArray(schedules) && schedules.length > 0) {
-          const payload = schedules.map(s => ({
+        if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate && safeSchedules.length > 0) {
+          const payload = safeSchedules.map(s => ({
             id: String(s.id || `SCHED-${s.batch_id || s.batchId || 'BAT-10'}-${(s.day_of_week || s.dayOfWeek || 'MON').slice(0,3).toUpperCase()}-${s.sort_order || s.sortOrder || 1}`),
             batch_id: s.batch_id || s.batchId || 'BAT-10',
             day_of_week: s.day_of_week || s.dayOfWeek || 'Monday',
@@ -2354,21 +2386,25 @@
     },
 
     getInstituteHolidays() {
-      if (this._instituteHolidaysCache) return this._instituteHolidaysCache;
+      if (Array.isArray(this._instituteHolidaysCache)) return this._instituteHolidaysCache;
       try {
         const raw = localStorage.getItem(STORAGE_KEY_HOLIDAYS);
-        this._instituteHolidaysCache = raw ? JSON.parse(raw) : [];
-      } catch (e) { this._instituteHolidaysCache = []; }
-      return this._instituteHolidaysCache || [];
+        const parsed = raw ? JSON.parse(raw) : [];
+        this._instituteHolidaysCache = Array.isArray(parsed) ? parsed : [];
+      } catch (e) {
+        this._instituteHolidaysCache = [];
+      }
+      return Array.isArray(this._instituteHolidaysCache) ? this._instituteHolidaysCache : [];
     },
 
     async saveInstituteHolidays(holidays) {
-      this._instituteHolidaysCache = holidays;
-      this.safeSetItem(STORAGE_KEY_HOLIDAYS, holidays);
+      const safeHolidays = Array.isArray(holidays) ? holidays : [];
+      this._instituteHolidaysCache = safeHolidays;
+      this.safeSetItem(STORAGE_KEY_HOLIDAYS, safeHolidays);
       this.markMutation();
       try {
-        if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate && Array.isArray(holidays) && holidays.length > 0) {
-          const payload = holidays.map(h => ({
+        if (typeof SupabaseSync !== 'undefined' && SupabaseSync.mutate && safeHolidays.length > 0) {
+          const payload = safeHolidays.map(h => ({
             id: String(h.id || `HOL-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`),
             title: h.title || 'Holiday',
             start_date: h.start_date || h.startDate || new Date().toISOString().split('T')[0],
@@ -4464,9 +4500,11 @@ function renderStudentDashboard() {
     const currentSelectedDay = AppState._activeStudentScheduleDay;
 
     // Check for active holidays affecting any of this student's enrolled batches
-    const allHolidays = AppState.getInstituteHolidays ? AppState.getInstituteHolidays() : [];
+    const rawHolidays = AppState.getInstituteHolidays ? AppState.getInstituteHolidays() : [];
+    const allHolidays = Array.isArray(rawHolidays) ? rawHolidays : [];
     const todayDateStr = new Date().toISOString().split('T')[0];
     const activeHolidays = allHolidays.filter(h => {
+      if (!h || typeof h !== 'object') return false;
       const target = (h.target_batch || h.targetBatch || 'ALL').trim().toUpperCase();
       const matchBatch = target === 'ALL' || enrolledBatchesList.some(b => {
         const bKey = b.batchId || b.id || '';
@@ -4478,7 +4516,8 @@ function renderStudentDashboard() {
     });
 
     // Fetch dynamic schedules from database / AppState for ALL enrolled batches
-    const allSchedules = AppState.getClassSchedules ? AppState.getClassSchedules() : [];
+    const rawSchedules = AppState.getClassSchedules ? AppState.getClassSchedules() : [];
+    const allSchedules = Array.isArray(rawSchedules) ? rawSchedules : [];
     let renderedScheduleItems = [];
     const allTeachersSet = new Set();
     const allSubjectsList = [];
@@ -4493,16 +4532,18 @@ function renderStudentDashboard() {
       const teacherList = bTeacher.split(/[&,]/).map(t => t.trim()).filter(Boolean);
       teacherList.forEach(t => allTeachersSet.add(t));
 
+      const batchMap = (typeof BATCH_SUBJECTS !== 'undefined' && BATCH_SUBJECTS) ? BATCH_SUBJECTS : {};
       const batchSubjects = (Array.isArray(bDb.subjects) && bDb.subjects.length > 0)
         ? bDb.subjects.map(sub => typeof sub === 'string' ? sub : (sub.name || ''))
         : (Array.isArray(myBatch.subjects) && myBatch.subjects.length > 0)
           ? myBatch.subjects.map(sub => typeof sub === 'string' ? sub : (sub.name || ''))
-          : (BATCH_SUBJECTS[bKey] || BATCH_SUBJECTS[bId] || []);
+          : (batchMap[bKey] || batchMap[bId] || []);
       batchSubjects.forEach(sub => {
         if (!allSubjectsList.includes(sub)) allSubjectsList.push(sub);
       });
 
       let daySchedules = allSchedules.filter(sch => {
+        if (!sch || typeof sch !== 'object') return false;
         const schB = (sch.batch_id || sch.batchId || '').trim();
         const matchB = (schB === bId) ||
                        (schB === bKey) ||
@@ -14598,10 +14639,13 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
   } catch (e) {}
 
   async function seedDefaultScheduleForBatchAndDay(batchId, day) {
-    const allSchedules = AppState.getClassSchedules ? AppState.getClassSchedules() : [];
+    const rawSchedules = AppState.getClassSchedules ? AppState.getClassSchedules() : [];
+    const allSchedules = Array.isArray(rawSchedules) ? rawSchedules : [];
     const bKey = getBatchCategoryKey(batchId);
-    const subjects = BATCH_SUBJECTS[bKey] || ['Mathematics', 'Science', 'English'];
-    const slots = BATCH_SLOTS[bKey] || ['04:00 PM – 05:00 PM', '05:00 PM – 06:00 PM', '06:00 PM – 07:00 PM'];
+    const batchMap = (typeof BATCH_SUBJECTS !== 'undefined' && BATCH_SUBJECTS) ? BATCH_SUBJECTS : {};
+    const slotMap = (typeof BATCH_SLOTS !== 'undefined' && BATCH_SLOTS) ? BATCH_SLOTS : {};
+    const subjects = batchMap[bKey] || ['Mathematics', 'Science', 'English'];
+    const slots = slotMap[bKey] || ['04:00 PM – 05:00 PM', '05:00 PM – 06:00 PM', '06:00 PM – 07:00 PM'];
     const cfg = academicConfig();
     const batchObj = cfg?.resolveBatch ? cfg.resolveBatch(batchId) : null;
     const teachers = batchObj?.teachers ? batchObj.teachers.map(titleCaseName) : ['Prof. Ravi Ranjan', 'Chandan Kumar'];
@@ -14609,6 +14653,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
 
     // Remove existing for this batch & day
     const filtered = allSchedules.filter(s => {
+      if (!s || typeof s !== 'object') return false;
       const sBatch = s.batch_id || s.batchId || '';
       const sDay = String(s.day_of_week || s.dayOfWeek || '').toLowerCase();
       const isSameBatch = (sBatch === batchId) || (getBatchCategoryKey(sBatch) === bKey) || (String(sBatch).toUpperCase() === String(batchId).toUpperCase());
@@ -14649,9 +14694,11 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
   }
 
   async function replicateDayScheduleAcrossWeek(batchId, sourceDay) {
-    const allSchedules = AppState.getClassSchedules ? AppState.getClassSchedules() : [];
+    const rawSchedules = AppState.getClassSchedules ? AppState.getClassSchedules() : [];
+    const allSchedules = Array.isArray(rawSchedules) ? rawSchedules : [];
     const bKey = getBatchCategoryKey(batchId);
     const sourcePeriods = allSchedules.filter(s => {
+      if (!s || typeof s !== 'object') return false;
       const sBatch = s.batch_id || s.batchId || '';
       const isSameBatch = (sBatch === batchId) || (getBatchCategoryKey(sBatch) === bKey) || (String(sBatch).toUpperCase() === String(batchId).toUpperCase());
       const isSameDay = String(s.day_of_week || s.dayOfWeek || '').toLowerCase() === String(sourceDay).toLowerCase();
@@ -14670,6 +14717,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
     const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     // Remove old periods for these weekdays for this batch
     let updated = allSchedules.filter(s => {
+      if (!s || typeof s !== 'object') return false;
       const sBatch = s.batch_id || s.batchId || '';
       const isSameBatch = (sBatch === batchId) || (getBatchCategoryKey(sBatch) === bKey) || (String(sBatch).toUpperCase() === String(batchId).toUpperCase());
       const isWeekDay = weekdays.map(w => w.toLowerCase()).includes(String(s.day_of_week || s.dayOfWeek || '').toLowerCase());
@@ -14706,10 +14754,12 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
   }
 
   async function toggleEntireDayOff(batchId, day, shouldCancel) {
-    const allSchedules = AppState.getClassSchedules ? AppState.getClassSchedules() : [];
+    const rawSchedules = AppState.getClassSchedules ? AppState.getClassSchedules() : [];
+    const allSchedules = Array.isArray(rawSchedules) ? rawSchedules : [];
     const bKey = getBatchCategoryKey(batchId);
     let affected = 0;
     allSchedules.forEach(s => {
+      if (!s || typeof s !== 'object') return;
       const sBatch = s.batch_id || s.batchId || '';
       const isSameBatch = (sBatch === batchId) || (getBatchCategoryKey(sBatch) === bKey) || (String(sBatch).toUpperCase() === String(batchId).toUpperCase());
       const isSameDay = String(s.day_of_week || s.dayOfWeek || '').toLowerCase() === String(day).toLowerCase();
@@ -15065,22 +15115,26 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
 
     try {
       const cfg = academicConfig();
-      const batches = AppState.getBatches ? AppState.getBatches() : (cfg?.BATCHES || []);
+      const rawBatches = AppState.getBatches ? AppState.getBatches() : (cfg?.BATCHES || []);
+      const batches = Array.isArray(rawBatches) ? rawBatches : (cfg?.BATCHES || []);
       const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-      const allSchedules = AppState.getClassSchedules ? AppState.getClassSchedules() : [];
-      const allHolidays = AppState.getInstituteHolidays ? AppState.getInstituteHolidays() : [];
+      const rawSchedules = AppState.getClassSchedules ? AppState.getClassSchedules() : [];
+      const allSchedules = Array.isArray(rawSchedules) ? rawSchedules : [];
+      const rawHolidays = AppState.getInstituteHolidays ? AppState.getInstituteHolidays() : [];
+      const allHolidays = Array.isArray(rawHolidays) ? rawHolidays : [];
 
       const activeKey = getBatchCategoryKey(activeAdminScheduleBatchId);
 
       // Filter periods for selected batch & day
       const currentPeriods = allSchedules.filter(sch => {
+        if (!sch || typeof sch !== 'object') return false;
         const schB = sch.batch_id || sch.batchId || '';
         const matchB = (schB === activeAdminScheduleBatchId) ||
                        (getBatchCategoryKey(schB) === activeKey) ||
                        (String(schB).toUpperCase() === String(activeAdminScheduleBatchId).toUpperCase());
         const schD = String(sch.day_of_week || sch.dayOfWeek || '').toLowerCase();
-        const matchD = schD === activeAdminScheduleDay.toLowerCase();
+        const matchD = schD === String(activeAdminScheduleDay || '').toLowerCase();
         return matchB && matchD;
       });
 
@@ -15158,9 +15212,10 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
           ${daysOfWeek.map(d => {
             const isActive = d.toLowerCase() === activeAdminScheduleDay.toLowerCase();
             const periodsForD = allSchedules.filter(s => {
+              if (!s || typeof s !== 'object') return false;
               const sB = s.batch_id || s.batchId || '';
               const matchB = (sB === activeAdminScheduleBatchId) || (getBatchCategoryKey(sB) === activeKey);
-              const matchD = (s.day_of_week || s.dayOfWeek || '').toLowerCase() === d.toLowerCase();
+              const matchD = String(s.day_of_week || s.dayOfWeek || '').toLowerCase() === d.toLowerCase();
               return matchB && matchD;
             });
             const hasOff = periodsForD.length > 0 && periodsForD.every(p => !!p.is_cancelled);
