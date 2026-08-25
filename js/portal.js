@@ -15452,10 +15452,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
             </div>
           </div>
           <div class="admin-batches-header-actions">
-            <button type="button" id="btnAdminAddNewBatch" class="btn" style="background:#FFFFFF; color:var(--primary-emerald); font-weight:800; border-radius:8px; padding:0.6rem 1.25rem; display:inline-flex; align-items:center; gap:0.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.12); cursor:pointer;">
-              <i aria-hidden="true" class="fa-solid fa-plus"></i> Add New Batch
-            </button>
-            <button type="button" id="btnAdminSyncBatches" class="btn" style="background:rgba(255,255,255,0.15); color:#FFFFFF; border:1px solid rgba(255,255,255,0.4); font-weight:700; border-radius:8px; padding:0.6rem 1rem; display:inline-flex; align-items:center; gap:0.5rem; cursor:pointer;">
+            <button type="button" id="btnAdminSyncBatches" class="btn" style="background:#FFFFFF; color:var(--primary-emerald); border:1px solid rgba(255,255,255,0.4); font-weight:800; border-radius:8px; padding:0.6rem 1.25rem; display:inline-flex; align-items:center; gap:0.5rem; cursor:pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.12);">
               <i aria-hidden="true" class="fa-solid fa-arrows-rotate"></i> Sync Cloud
             </button>
           </div>
@@ -15687,11 +15684,6 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
       renderAdminBatchesTab();
     });
 
-    // Add New Batch Button
-    pane.querySelector('#btnAdminAddNewBatch')?.addEventListener('click', () => {
-      openAddEditBatchModal(null);
-    });
-
     // Cloud Sync Button
     pane.querySelector('#btnAdminSyncBatches')?.addEventListener('click', async () => {
       const syncBtn = pane.querySelector('#btnAdminSyncBatches');
@@ -15769,27 +15761,24 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
       return Boolean(k1 && kt && k1 === kt);
     }) : null;
 
-    const isEdit = !!existing;
+    if (!batchId || !existing) return;
 
-    // Generate next batch ID suggestion if new
-    let suggestedId = `BAT-${String(batches.length + 1).padStart(2, '0')}`;
-    if (isEdit) {
-      suggestedId = existing.batchId || existing.id || existing.batch_id || batchId || '';
-    }
+    const isEdit = true;
+    const suggestedId = existing.batchId || existing.id || existing.batch_id || batchId || '';
 
-    const currentFee = isEdit ? (Number(existing.monthlyFee ?? existing.monthly_fee) || 0) : 2500;
-    const currentAnnual = isEdit ? (Number(existing.annualFee ?? existing.annual_fee) || (currentFee * 12)) : (currentFee * 12);
-    const currentTeachers = isEdit ? (Array.isArray(existing.teachers) ? existing.teachers.join(', ') : (existing.teacher || 'Chandan Kumar')) : 'Chandan Kumar';
-    const currentSubjects = isEdit ? (Array.isArray(existing.subjects) ? existing.subjects.map(s => typeof s === 'string' ? s : (s.name || '')).join(', ') : '') : 'Physics, Chemistry, Mathematics';
-    const currentRoom = isEdit ? (existing.room || existing.room_no || 'Room 1') : 'Room 1';
-    const currentTiming = isEdit ? (existing.timing || existing.timings || '04:00 PM – 06:00 PM') : '04:00 PM – 06:00 PM';
-    const currentBillingDay = isEdit ? (Number(existing.billingDay ?? existing.billing_day ?? 1)) : 1;
-    const currentCapacity = isEdit ? (Number(existing.capacity) || 40) : 40;
-    const currentStatus = isEdit ? (existing.status || 'Active') : 'Active';
-    const currentStream = isEdit ? (existing.stream || 'Science') : 'Science';
-    const currentTagline = isEdit ? (existing.tagline || '') : '';
-    const currentName = isEdit ? (existing.name || existing.batch_name || existing.batchName || existing.className || '') : '';
-    const currentClass = isEdit ? (existing.className || existing.class_name || existing.name || '') : '';
+    const currentFee = Number(existing.monthlyFee ?? existing.monthly_fee) || 0;
+    const currentAnnual = Number(existing.annualFee ?? existing.annual_fee) || (currentFee * 12);
+    const currentTeachers = Array.isArray(existing.teachers) ? existing.teachers.join(', ') : (existing.teacher || 'Chandan Kumar');
+    const currentSubjects = Array.isArray(existing.subjects) ? existing.subjects.map(s => typeof s === 'string' ? s : (s.name || '')).join(', ') : 'Physics, Chemistry, Mathematics';
+    const currentRoom = existing.room || existing.room_no || 'Room 1';
+    const currentTiming = existing.timing || existing.timings || '04:00 PM – 06:00 PM';
+    const currentBillingDay = Number(existing.billingDay ?? existing.billing_day ?? 1);
+    const currentCapacity = Number(existing.capacity) || 40;
+    const currentStatus = existing.status || 'Active';
+    const currentStream = existing.stream || 'Science';
+    const currentTagline = existing.tagline || '';
+    const currentName = existing.name || existing.batch_name || existing.batchName || existing.className || '';
+    const currentClass = existing.className || existing.class_name || existing.name || '';
 
     const modalHtml = `
       <div class="inner-modal-backdrop active portal-modal-backdrop" id="${modalId}" role="dialog" aria-modal="true" aria-labelledby="batchModalTitle">
@@ -15797,10 +15786,10 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
           <div class="modal-header batch-modal-header-top">
             <div>
               <h3 class="modal-title" id="batchModalTitle" style="color: #fff; font-size: 1.25rem; font-weight: 800; display: flex; align-items: center; gap: 0.5rem; margin:0;">
-                <i aria-hidden="true" class="fa-solid fa-layer-group"></i> ${isEdit ? 'Edit Batch &amp; Tariff Master' : 'Create New Class Batch'}
+                <i aria-hidden="true" class="fa-solid fa-layer-group"></i> Edit Batch &amp; Tariff Master
               </h3>
               <p style="font-size: 0.84rem; color: #D1FAE5; margin: 0.3rem 0 0 0;">
-                ${isEdit ? `Updating class parameters for ${escapeHtml(suggestedId)}. Changes sync to Supabase database.` : 'Add a new standard, course, or competitive batch.'}
+                Updating class parameters for ${escapeHtml(suggestedId)}. Changes sync to Supabase database in real time.
               </p>
             </div>
             <button type="button" class="btn-close-modal" id="btnCloseBatchModal" aria-label="Close modal" style="color: #fff; background: rgba(255,255,255,0.2); border: none; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size:1.1rem;">
