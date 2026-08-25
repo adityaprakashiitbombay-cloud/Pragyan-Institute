@@ -1,11 +1,11 @@
 /* ==========================================================================
- * PRAGYAN INSTITUTE — STREAM CHAT REALTIME COMMUNITY FORUM & CLASS GROUPS
+ * PRAGYAN INSTITUTE — STREAM CHAT REALTIME CLASS-WISE FORUMS
  * ----------------------------------------------------------------------------
- * GetStream.io realtime multi-group messaging engine with dedicated class
- * channels for every batch (Class 1st to 12th + Special English + All-Institute).
- * Uses GetStream open livestream channel architecture for universal multi-device
- * synchronization, persistent cloud message history across page reloads and logins,
- * verified faculty credentials, student roll identities, and live WebSockets.
+ * Dedicated GetStream.io realtime chat channel for EVERY individual class
+ * (Class 1st to 12th + Special English courses).
+ * - Students automatically enter their specific class forum.
+ * - Administrators have full multi-class access and moderation across all classes.
+ * - Persistent message history, real-time WebSockets, verified badges.
  * ========================================================================== */
 (function () {
   'use strict';
@@ -16,25 +16,12 @@
   let activeChannel = null;
   let currentUser = null;
   let channelsMap = new Map();
-  let activeChannelId = 'institute-all';
+  let activeChannelId = 'batch-BAT-10';
   let selectedCategory = 'ALL';
   let searchQuery = '';
   let isListening = false;
 
   const CHANNEL_IDENTITIES = {
-    'institute-all': {
-      id: 'institute-all',
-      batchId: 'ALL',
-      name: 'Pragyan Institute Community Forum',
-      shortName: 'Institute-Wide Lounge',
-      icon: '🏫',
-      category: 'General',
-      badgeColor: '#059669',
-      tagline: 'Open Forum for All Pragyan Institute Students, Faculty & Management',
-      mentors: 'Chandan Kumar & Faculty Team',
-      bannerBg: 'linear-gradient(135deg, #064E3B 0%, #047857 100%)',
-      accentBorder: '#10B981'
-    },
     'batch-BAT-12PCM': {
       id: 'batch-BAT-12PCM',
       batchId: 'BAT-12PCM',
@@ -238,7 +225,6 @@
     try {
       if (typeof AppState === 'undefined' || !AppState.getStudents) return 0;
       const students = AppState.getStudents() || [];
-      if (batchId === 'ALL' || batchId === 'institute-all') return students.length;
       if (!window.PRAGYAN_ACADEMIC || !window.PRAGYAN_ACADEMIC.resolveBatch) return 0;
       return students.filter(s => {
         const b = window.PRAGYAN_ACADEMIC.resolveBatch(s.className || s.class_name || '');
@@ -255,14 +241,7 @@
     const myBatch = resolveBatchId();
     const batches = (window.PRAGYAN_ACADEMIC && window.PRAGYAN_ACADEMIC.BATCHES) || [];
 
-    // 1. Institute-wide main channel
-    const allMeta = CHANNEL_IDENTITIES['institute-all'];
-    const allCh = client.channel(CHANNEL_TYPE, 'institute-all', {
-      name: allMeta.name
-    });
-    channelsMap.set('institute-all', allCh);
-
-    // 2. Register all batch channels
+    // Register all class-specific batch channels
     for (const b of batches) {
       if (!isAdmin && b.batchId !== myBatch) continue;
       const chId = `batch-${b.batchId}`;
@@ -273,20 +252,34 @@
       channelsMap.set(chId, ch);
     }
 
-    // Default active channel: student's own batch group if present, otherwise institute-all
-    if (!isAdmin && myBatch && channelsMap.has(`batch-${myBatch}`)) {
-      activeChannelId = `batch-${myBatch}`;
+    // Set default active channel:
+    // - For students: their enrolled class batch channel
+    // - For admin: Class 10th (or the first available batch)
+    if (!isAdmin) {
+      if (myBatch && channelsMap.has(`batch-${myBatch}`)) {
+        activeChannelId = `batch-${myBatch}`;
+      } else if (channelsMap.size > 0) {
+        activeChannelId = Array.from(channelsMap.keys())[0];
+      }
+    } else {
+      if (!channelsMap.has(activeChannelId)) {
+        activeChannelId = channelsMap.has('batch-BAT-10') ? 'batch-BAT-10' : Array.from(channelsMap.keys())[0];
+      }
     }
 
-    activeChannel = channelsMap.get(activeChannelId) || allCh;
+    activeChannel = channelsMap.get(activeChannelId);
+    if (!activeChannel && channelsMap.size > 0) {
+      activeChannel = Array.from(channelsMap.values())[0];
+      activeChannelId = activeChannel.id;
+    }
 
-    // Watch active channel and load historical messages from Stream's database
-    try {
-      await activeChannel.watch({ state: true, presence: true });
-    } catch (watchErr) {
-      console.warn('[StreamChat] Initial watch note:', watchErr.message);
-      // Fallback watch without params
-      try { await activeChannel.watch(); } catch (_) {}
+    if (activeChannel) {
+      try {
+        await activeChannel.watch({ state: true, presence: true });
+      } catch (watchErr) {
+        console.warn('[StreamChat] Initial watch note:', watchErr.message);
+        try { await activeChannel.watch(); } catch (_) {}
+      }
     }
   }
 
@@ -301,7 +294,7 @@
       list.innerHTML = `
         <div style="text-align: center; color: #64748B; margin: auto; padding: 2rem 1rem;">
           <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 1.8rem; color: #064E3B;" aria-hidden="true"></i>
-          <p style="margin-top: 0.75rem; font-size: 0.88rem; font-weight: 700;">Loading channel messages...</p>
+          <p style="margin-top: 0.75rem; font-size: 0.88rem; font-weight: 700;">Loading class messages...</p>
         </div>
       `;
     }
@@ -357,7 +350,7 @@
 
   function renderMsgList(messages) {
     const channelMeta = CHANNEL_IDENTITIES[activeChannelId] || {
-      name: activeChannel?.data?.name || 'Class Group',
+      name: activeChannel?.data?.name || 'Class Forum',
       icon: '💬',
       badgeColor: '#059669',
       tagline: 'Class discussion and doubts'
@@ -376,7 +369,7 @@
             ${escapeHtml(channelMeta.tagline)}
           </p>
           <div style="display: inline-flex; align-items: center; gap: 0.4rem; background: #FFFFFF; border: 1px dashed ${channelMeta.badgeColor}; padding: 0.45rem 0.85rem; border-radius: 8px; font-size: 0.8rem; font-weight: 700; color: #334155;">
-            ✨ Start the discussion, ask doubts, or share classroom notes below!
+            ✨ Start the class discussion, ask doubts, or share lecture notes below!
           </div>
         </div>
       `;
@@ -454,12 +447,12 @@
 
     const activeMeta = CHANNEL_IDENTITIES[activeChannelId] || {
       id: activeChannelId,
-      name: activeChannel?.data?.name || 'Class Group',
-      shortName: 'Class Group',
+      name: activeChannel?.data?.name || 'Class Forum',
+      shortName: 'Class Forum',
       icon: '💬',
       category: 'General',
       badgeColor: '#059669',
-      tagline: 'Active classroom discussion',
+      tagline: 'Active class forum discussion',
       mentors: 'Faculty Team',
       bannerBg: 'linear-gradient(135deg, #064E3B 0%, #047857 100%)',
       accentBorder: '#10B981'
@@ -480,10 +473,10 @@
             </div>
             <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
               <span style="font-weight: 800; font-size: 0.92rem; color: #FFFFFF; letter-spacing: -0.01em;">
-                Pragyan Community Forum
+                Pragyan Class Forum
               </span>
               <span style="font-size: 0.75rem; color: #A7F3D0; margin-left: 0.4rem; opacity: 0.85;">
-                • ${isAdmin ? '🛡️ Admin Multi-Class Hub' : '🎓 Student Classroom'}
+                • ${isAdmin ? '🛡️ Admin Multi-Class Hub' : `🎓 ${escapeHtml(activeMeta.shortName)}`}
               </span>
             </div>
           </div>
@@ -499,31 +492,33 @@
           <div class="stream-cat-bar" style="background: #F8FAFC; padding: 0.5rem 0.85rem; border-bottom: 1px solid #E2E8F0; display: flex; gap: 0.4rem; align-items: center; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex-shrink: 0;">
             ${categories.map(cat => `
               <button type="button" class="stream-cat-pill ${selectedCategory === cat ? 'active' : ''}" data-cat-name="${escapeHtml(cat)}" style="padding: 0.28rem 0.7rem; border-radius: 99px; font-size: 0.76rem; font-weight: 700; cursor: pointer; border: 1px solid ${selectedCategory === cat ? '#064E3B' : '#CBD5E1'}; background: ${selectedCategory === cat ? '#064E3B' : '#FFFFFF'}; color: ${selectedCategory === cat ? '#FFFFFF' : '#475569'}; white-space: nowrap; transition: all 0.15s ease;">
-                ${cat === 'ALL' ? '🌐 All Groups (13)' : escapeHtml(cat)}
+                ${cat === 'ALL' ? '🌐 All Classes (12)' : escapeHtml(cat)}
               </button>
             `).join('')}
           </div>
         ` : ''}
 
-        <!-- CLASS GROUPS HORIZONTAL TABS BAR -->
-        <div class="stream-channels-scroll-wrap" style="background: #FFFFFF; padding: 0.55rem 0.85rem; border-bottom: 1.5px solid var(--border-sand, #E2E8F0); display: flex; gap: 0.5rem; align-items: center; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex-shrink: 0;">
-          ${filteredChannels.map(([id]) => {
-            const meta = CHANNEL_IDENTITIES[id] || { shortName: id, icon: '💬', badgeColor: '#059669' };
-            const isActive = id === activeChannelId;
-            const count = getStudentCountForBatch(meta.batchId);
-            return `
-              <button type="button" class="stream-ch-pill ${isActive ? 'active' : ''}" data-ch-id="${escapeHtml(id)}" style="display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.4rem 0.85rem; border-radius: 99px; font-size: 0.82rem; font-weight: 700; cursor: pointer; border: 1.5px solid ${isActive ? meta.badgeColor : '#E2E8F0'}; background: ${isActive ? meta.badgeColor : '#F8FAFC'}; color: ${isActive ? '#FFFFFF' : '#334155'}; white-space: nowrap; transition: all 0.2s ease; box-shadow: ${isActive ? '0 3px 10px rgba(0,0,0,0.12)' : 'none'}; min-height: 38px;">
-                <span style="font-size: 1rem;">${meta.icon}</span>
-                <span>${escapeHtml(meta.shortName)}</span>
-                ${count > 0 ? `
-                  <span style="background: ${isActive ? 'rgba(255,255,255,0.25)' : '#E2E8F0'}; color: ${isActive ? '#FFFFFF' : '#475569'}; font-size: 0.72rem; padding: 0.05rem 0.45rem; border-radius: 99px; font-weight: 800;">
-                    ${count}
-                  </span>
-                ` : ''}
-              </button>
-            `;
-          }).join('')}
-        </div>
+        <!-- CLASS GROUPS HORIZONTAL TABS BAR (Shown if more than 1 class available to user) -->
+        ${filteredChannels.length > 1 ? `
+          <div class="stream-channels-scroll-wrap" style="background: #FFFFFF; padding: 0.55rem 0.85rem; border-bottom: 1.5px solid var(--border-sand, #E2E8F0); display: flex; gap: 0.5rem; align-items: center; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex-shrink: 0;">
+            ${filteredChannels.map(([id]) => {
+              const meta = CHANNEL_IDENTITIES[id] || { shortName: id, icon: '💬', badgeColor: '#059669' };
+              const isActive = id === activeChannelId;
+              const count = getStudentCountForBatch(meta.batchId);
+              return `
+                <button type="button" class="stream-ch-pill ${isActive ? 'active' : ''}" data-ch-id="${escapeHtml(id)}" style="display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.4rem 0.85rem; border-radius: 99px; font-size: 0.82rem; font-weight: 700; cursor: pointer; border: 1.5px solid ${isActive ? meta.badgeColor : '#E2E8F0'}; background: ${isActive ? meta.badgeColor : '#F8FAFC'}; color: ${isActive ? '#FFFFFF' : '#334155'}; white-space: nowrap; transition: all 0.2s ease; box-shadow: ${isActive ? '0 3px 10px rgba(0,0,0,0.12)' : 'none'}; min-height: 38px;">
+                  <span style="font-size: 1rem;">${meta.icon}</span>
+                  <span>${escapeHtml(meta.shortName)}</span>
+                  ${count > 0 ? `
+                    <span style="background: ${isActive ? 'rgba(255,255,255,0.25)' : '#E2E8F0'}; color: ${isActive ? '#FFFFFF' : '#475569'}; font-size: 0.72rem; padding: 0.05rem 0.45rem; border-radius: 99px; font-weight: 800;">
+                      ${count}
+                    </span>
+                  ` : ''}
+                </button>
+              `;
+            }).join('')}
+          </div>
+        ` : ''}
 
         <!-- ACTIVE CLASS IDENTITY BANNER -->
         <div class="stream-active-banner" style="background: ${activeMeta.bannerBg}; color: #FFFFFF; padding: 0.75rem 1rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-bottom: 2px solid rgba(0,0,0,0.1); flex-shrink: 0;">
@@ -750,7 +745,7 @@
           <div style="width: 56px; height: 56px; border-radius: 50%; background: #FEF3C7; color: #D97706; display: inline-flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 0.75rem;">
             <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
           </div>
-          <h3 style="color: #1E293B; margin-bottom: 0.35rem; font-weight: 800;">Unable to Connect to Community Forum</h3>
+          <h3 style="color: #1E293B; margin-bottom: 0.35rem; font-weight: 800;">Unable to Connect to Class Forum</h3>
           <p style="color: #64748B; font-size: 0.88rem; line-height: 1.5; margin-bottom: 1.25rem;">${escapeHtml(err.message)}</p>
           <button type="button" class="btn btn-emerald" onclick="PragyanStreamChat.reconnect()" style="padding: 0.65rem 1.5rem; font-weight: 800; border-radius: 8px;">
             <i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i> Retry Connection
