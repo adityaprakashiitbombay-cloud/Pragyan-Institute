@@ -3473,7 +3473,6 @@ function renderStudentDashboard() {
   }
 
   function switchStudentTab(tabName) {
-    if (tabName === 'community') tabName = 'details';
     AppState.activeStudentTab = tabName;
     AppState.activeTab = tabName;
 
@@ -3506,6 +3505,8 @@ function renderStudentDashboard() {
       renderStudentNotifications();
     } else if (tabName === 'fees') {
       renderStudentFeeTab();
+    } else if (tabName === 'community') {
+      renderCommunityChatTab();
     }
   }
 
@@ -6333,6 +6334,8 @@ function renderStudentDashboard() {
       renderAdminBatchesTab();
     } else if (tabName === 'push') {
       renderAdminPushTab();
+    } else if (tabName === 'community') {
+      renderCommunityChatTab();
     }
   }
 
@@ -9267,13 +9270,14 @@ const inputRoll = modalEl.querySelector('#deleteConfirmRollInput')?.value.trim()
     if (adminBtn) adminBtn.style.display = ENABLE_COMMUNITY_CHAT ? '' : 'none';
     if (studentBtn) studentBtn.style.display = ENABLE_COMMUNITY_CHAT ? '' : 'none';
 
-    const adminPane = document.getElementById('adminTabPane-community');
-    const studentPane = document.getElementById('studentTabPane-community');
-    const panes = [adminPane, studentPane].filter(Boolean);
-    if (panes.length === 0) return;
+    const activePane = (AppState.currentRole === 'admin')
+      ? document.getElementById('adminTabPane-community')
+      : document.getElementById('studentTabPane-community');
+
+    if (!activePane) return;
 
     if (!ENABLE_COMMUNITY_CHAT) {
-      const disabledHtml = `
+      activePane.innerHTML = `
         <div class="dash-card" style="text-align: center; padding: 3.5rem 1.5rem; background: #fff; border-radius: 12px; border: 1px solid var(--border-sand); max-width: 540px; margin: 2rem auto; box-shadow: 0 4px 16px rgba(0,0,0,0.06);">
           <div style="font-size: 3rem; margin-bottom: 0.75rem;">🔒</div>
           <h3 style="font-size: 1.25rem; font-weight: 800; color: var(--text-mahogany); margin-bottom: 0.5rem;">
@@ -9287,238 +9291,17 @@ const inputRoll = modalEl.querySelector('#deleteConfirmRollInput')?.value.trim()
           </div>
         </div>
       `;
-      panes.forEach(pane => pane.innerHTML = disabledHtml);
       return;
     }
 
-    try {
-      if (typeof initGetStreamChat === 'function') {
-        initGetStreamChat().catch(e => console.warn('Stream Chat async init warning:', e));
-      }
+    if (window.PragyanStreamChat && typeof window.PragyanStreamChat.init === 'function') {
+      window.PragyanStreamChat.init(activePane);
+      return;
+    }
 
-      const messages = (AppState.getCommunityMessages() || []).filter(m => m && typeof m === 'object');
-      const currentUser = AppState.currentUser || {};
-      const isAdmin = AppState.currentRole === 'admin';
-
-      const pinnedMsgs = messages.filter(m => m.isPinned);
-      const topPinned = pinnedMsgs.length > 0 ? pinnedMsgs[pinnedMsgs.length - 1] : null;
-
-      let displayMsgs = messages;
-      if (communityActiveFilter === 'pinned') {
-        displayMsgs = messages.filter(m => m.isPinned);
-      } else if (communityActiveFilter === 'files') {
-        displayMsgs = messages.filter(m => m.attachment != null);
-      }
-
-      const chatHtml = `
-        <div class="dash-card" style="padding: 0; overflow: hidden; border: 1px solid var(--border-sand); border-radius: 12px; background: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.06); height: calc(100vh - 210px); min-height: 580px; display: flex; flex-direction: column;">
-          
-          <!-- Chat Header Bar -->
-          <div style="background: linear-gradient(135deg, #064E3B 0%, #032e23 100%); color: #fff; padding: 0.75rem 1.1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; flex-shrink: 0;">
-            <div style="display: flex; align-items: center; gap: 0.65rem;">
-              <div style="width: 36px; height: 36px; background: rgba(255,255,255,0.15); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.15rem;">
-                💬
-              </div>
-              <div>
-                <h3 style="font-size: 1.05rem; font-weight: 800; color: #fff; margin: 0; display: flex; align-items: center; gap: 0.4rem;">
-                  Pragyan Institute Community Forum
-                  <span style="font-size: 0.8rem; background: #34D399; color: #064E3B; padding: 0.12rem 0.45rem; border-radius: 99px; font-weight: 800;">GetStream Live</span>
-                </h3>
-                <div style="font-size: 0.8rem; opacity: 0.85; margin-top: 0.1rem;">
-                  Full Page Lounge • ${messages.length} Messages
-                </div>
-              </div>
-            </div>
-
-            <!-- Filter Pills -->
-            <div style="display: flex; gap: 0.35rem; background: rgba(0,0,0,0.25); padding: 0.2rem; border-radius: 8px;">
-              <button class="btn btn-community-filter ${communityActiveFilter === 'all' ? 'active' : ''}" data-filter="all" style="padding: 0.25rem 0.55rem; font-size: 0.8rem; border-radius: 6px; border: none; cursor: pointer; background: ${communityActiveFilter === 'all' ? '#ffffff' : 'transparent'}; color: ${communityActiveFilter === 'all' ? '#064E3B' : '#fff'}; font-weight: 700;">
-                All Chat
-              </button>
-              <button class="btn btn-community-filter ${communityActiveFilter === 'pinned' ? 'active' : ''}" data-filter="pinned" style="padding: 0.25rem 0.55rem; font-size: 0.8rem; border-radius: 6px; border: none; cursor: pointer; background: ${communityActiveFilter === 'pinned' ? '#ffffff' : 'transparent'}; color: ${communityActiveFilter === 'pinned' ? '#064E3B' : '#fff'}; font-weight: 700;">
-                ✨ Pinned (${pinnedMsgs.length})
-              </button>
-              <button class="btn btn-community-filter ${communityActiveFilter === 'files' ? 'active' : ''}" data-filter="files" style="padding: 0.25rem 0.55rem; font-size: 0.8rem; border-radius: 6px; border: none; cursor: pointer; background: ${communityActiveFilter === 'files' ? '#ffffff' : 'transparent'}; color: ${communityActiveFilter === 'files' ? '#064E3B' : '#fff'}; font-weight: 700;">
-                📄 Files
-              </button>
-            </div>
-          </div>
-
-          <!-- Pinned Announcement Header Card -->
-          ${!topPinned ? '' : `
-            <div style="background: #FEF3C7; border-bottom: 2px solid #F59E0B; padding: 0.65rem 1rem; display: flex; align-items: flex-start; gap: 0.65rem; flex-shrink: 0;">
-              <div style="font-size: 1.1rem; color: #D97706; margin-top: 0.1rem;" class="hg-sparkle-icon">✨</div>
-              <div style="flex: 1;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.15rem;">
-                  <span style="font-size: 0.8rem; font-weight: 800; color: #92400E; text-transform: uppercase; letter-spacing: 0.5px;">✨ HIGHLIGHTED ANNOUNCEMENT (${pinnedMsgs.length})</span>
-                  <span style="font-size: 0.8rem; color: #B45309;">By ${topPinned.senderName || 'Admin'} • ${topPinned.timestamp || ''}</span>
-                </div>
-                <div style="font-size: 0.84rem; color: #78350F; font-weight: 600; line-height: 1.35;">
-                  "${topPinned.text || ''}"
-                </div>
-                ${topPinned.linkUrl ? `
-                  <div style="margin-top: 0.35rem;">
-                    <a href="${topPinned.linkUrl}" target="_blank" class="btn" style="background: linear-gradient(135deg, #D97706 0%, #B45309 100%); color: #fff; font-size: 0.8rem; padding: 0.2rem 0.55rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 0.3rem; text-decoration: none; font-weight: 800;">
-                      <i aria-hidden="true" class="fa-solid fa-arrow-up-right-from-square"></i> Open Announcement Link
-                    </a>
-                  </div>
-                ` : ''}
-              </div>
-              ${isAdmin ? `
-                <button class="btn btn-unpin-top" data-id="${topPinned.id}" style="background: transparent; border: none; color: #B45309; cursor: pointer; font-size: 0.8rem;" title="Unpin Announcement">
-                  <i aria-hidden="true" class="fa-solid fa-xmark"></i> Unpin
-                </button>
-              ` : ''}
-            </div>
-          `}
-
-          <!-- Messages Stream Container (Full Page Responsive Height, Ultra-Thin WhatsApp Bubbles) -->
-          <div id="communityChatMessagesContainer" style="flex: 1; overflow-y: auto; padding: 0.75rem 0.9rem; background: #E5DDD5; display: flex; flex-direction: column; gap: 0.25rem; -webkit-overflow-scrolling: touch;">
-            ${displayMsgs.length === 0 ? `
-              <div style="text-align: center; padding: 3rem 1rem; color: var(--text-muted); background: #ffffff; border-radius: 12px; margin: 1rem auto; max-width: 320px;">
-                <div style="font-size: 2.2rem; margin-bottom: 0.35rem;">💬</div>
-                <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-mahogany);">No community messages yet</div>
-                <div style="font-size: 0.8rem; margin-top: 0.25rem;">Type a message or use <strong>/ad</strong> for Admin Alert</div>
-              </div>
-            ` : displayMsgs.map(msg => {
-              if (!msg) return '';
-              const isMsgAdmin = msg.isAdmin || (msg.senderRole && (msg.senderRole.toLowerCase().includes('admin') || msg.senderRole.toLowerCase().includes('director') || msg.senderRole.toLowerCase().includes('faculty')));
-              const isSelf = currentUser && (msg.senderId === currentUser.id || msg.senderName === currentUser.name);
-              const safeText = (msg.text || '').toString();
-
-              let urlMatch = msg.linkUrl;
-              if (!urlMatch && safeText) {
-                const match = safeText.match(/(https?:\/\/[^\s]+|www\.[^\s]+)/i);
-                if (match) urlMatch = match[0].startsWith('http') ? match[0] : `https://${match[0]}`;
-              }
-
-              return `
-                <div class="whatsapp-msg-row" style="display: flex; gap: 0.35rem; max-width: 90%; margin-bottom: 0.1rem; align-self: ${isSelf ? 'flex-end' : 'flex-start'}; flex-direction: ${isSelf ? 'row-reverse' : 'row'};">
-                  
-                  <div style="width: 24px; height: 24px; border-radius: 50%; background: ${isMsgAdmin ? '#ECFDF5' : '#EFF6FF'}; border: 1.5px solid ${isMsgAdmin ? '#059669' : '#3B82F6'}; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; flex-shrink: 0; margin-top: 1px;">
-                    ${msg.avatar || (isMsgAdmin ? '👨‍🏫' : '🎓')}
-                  </div>
-
-                  <div class="whatsapp-bubble ${msg.isHighlighted ? 'hg-sparkle-card' : ''}" style="background: ${msg.isHighlighted ? '#FEF3C7' : msg.isAdminAlert ? '#FEE2E2' : (isSelf ? '#DCF8C6' : '#ffffff')}; border: 1px solid ${msg.isHighlighted ? '#F59E0B' : msg.isAdminAlert ? '#EF4444' : (isSelf ? '#B7E493' : '#E5E7EB')}; border-radius: ${isSelf ? '10px 0px 10px 10px' : '0px 10px 10px 10px'}; padding: 0.25rem 0.55rem; box-shadow: 0 1px 2px rgba(0,0,0,0.04); min-width: 110px; max-width: 100%; position: relative;">
-                    
-                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.35rem; margin-bottom: 0.1rem; font-size: 0.8rem;">
-                      <span style="font-weight: 800; color: ${isMsgAdmin ? '#065F46' : '#1D4ED8'}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                        ${msg.senderName}
-                      </span>
-                      
-                      <div style="display: flex; gap: 0.2rem; align-items: center;">
-                        ${msg.isHighlighted ? '<span style="background: #F59E0B; color: #fff; font-size: 0.8rem; padding: 0.01rem 0.3rem; border-radius: 3px; font-weight: 800;" class="hg-sparkle-icon">✨ HIGHLIGHTED</span>' : ''}
-                        ${msg.isAdminAlert ? '<span style="background: #DC2626; color: #fff; font-size: 0.8rem; padding: 0.01rem 0.3rem; border-radius: 3px; font-weight: 800;"><i aria-hidden="true" class="fa-solid fa-bell"></i> ADMIN ALERT</span>' : ''}
-                        ${!msg.isHighlighted && !msg.isAdminAlert && isMsgAdmin ? '<span style="background: #D1FAE5; color: #065F46; font-size: 0.8rem; padding: 0.01rem 0.25rem; border-radius: 3px; font-weight: 700;">FACULTY</span>' : ''}
-                      </div>
-                    </div>
-
-                    <div style="font-size: 0.84rem; color: #1F2937; line-height: 1.3; word-break: break-word; white-space: pre-wrap;">${safeText}</div>
-
-                    ${urlMatch ? `
-                      <div style="margin-top: 0.25rem;">
-                        <a href="${urlMatch}" target="_blank" class="btn" style="background: linear-gradient(135deg, #059669 0%, #047857 100%); color: #ffffff !important; text-decoration: none; padding: 0.2rem 0.55rem; border-radius: 4px; font-weight: 800; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.3rem; box-shadow: 0 2px 6px rgba(5, 150, 105, 0.3);">
-                          <i aria-hidden="true" class="fa-solid fa-arrow-up-right-from-square"></i> Open Link
-                        </a>
-                      </div>
-                    ` : ''}
-
-                    ${msg.attachment ? `
-                      <div style="margin-top: 0.25rem; background: rgba(0,0,0,0.04); border-radius: 4px; padding: 0.25rem 0.45rem; display: flex; align-items: center; justify-content: space-between; gap: 0.4rem;">
-                        <div style="font-size: 0.8rem; font-weight: 700; color: #1F2937; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                          📄 ${msg.attachment.name}
-                        </div>
-                        <a href="${msg.attachment.data}" download="${msg.attachment.name}" style="color: #059669; font-weight: 700; font-size: 0.8rem; text-decoration: none; white-space: nowrap;">
-                          📥 Download
-                        </a>
-                      </div>
-                    ` : ''}
-
-                    ${(msg.replies && msg.replies.length > 0) ? `
-                      <div style="margin-top: 0.25rem; padding-left: 0.4rem; border-left: 2px solid var(--primary-emerald); display: flex; flex-direction: column; gap: 0.15rem;">
-                        ${msg.replies.map(r => `
-                          <div style="font-size: 0.8rem; background: rgba(0,0,0,0.03); padding: 0.15rem 0.35rem; border-radius: 3px;">
-                            <strong style="font-size: 0.8rem; color: #374151;">${r.senderName}:</strong> ${r.text}
-                          </div>
-                        `).join('')}
-                      </div>
-                    ` : ''}
-
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.15rem; font-size: 0.8rem; color: #6B7280; gap: 0.4rem;">
-                      <div style="display: flex; gap: 0.4rem; align-items: center;">
-                        <button class="btn btn-reply-msg" data-id="${msg.id}" style="background: none; border: none; padding: 0; color: #059669; font-size: 0.8rem; font-weight: 700; cursor: pointer;">
-                          <i aria-hidden="true" class="fa-solid fa-reply"></i> Reply
-                        </button>
-                        ${isAdmin ? `
-                          <button class="btn btn-toggle-pin-msg" data-id="${msg.id}" style="background: none; border: none; padding: 0; color: #D97706; font-size: 0.8rem; font-weight: 700; cursor: pointer;">
-                            <i aria-hidden="true" class="fa-solid fa-thumbtack"></i> ${msg.isPinned ? 'Unpin' : 'Pin'}
-                          </button>
-                          <button class="btn btn-delete-msg" data-id="${msg.id}" style="background: none; border: none; padding: 0; color: #DC2626; font-size: 0.8rem; font-weight: 700; cursor: pointer;" title="Delete">
-                            <i aria-hidden="true" class="fa-solid fa-trash-can"></i>
-                          </button>
-                        ` : ''}
-                      </div>
-                      <span style="font-size: 0.8rem; color: #6B7280;">${msg.timestamp}</span>
-                    </div>
-
-                    ${activeReplyMsgId === msg.id ? `
-                      <div style="margin-top: 0.35rem; background: #ffffff; padding: 0.3rem; border-radius: 4px; border: 1px solid var(--primary-emerald);">
-                        <div style="display: flex; gap: 0.3rem;">
-                          <input type="text" id="inputReplyText-${msg.id}" aria-label="Reply to ${msg.senderName}" class="portal-input" placeholder="Reply to ${msg.senderName}..." style="font-size: 0.8rem; height: 26px; padding: 0.1rem 0.4rem;">
-                          <button class="btn btn-emerald btn-submit-reply" data-id="${msg.id}" style="padding: 0.1rem 0.45rem; font-size: 0.8rem;">
-                            Post
-                          </button>
-                        </div>
-                      </div>
-                    ` : ''}
-                  </div>
-                </div>
-              `;
-            }).join('')}
-          </div>
-
-          <div style="background: #ffffff; border-top: 1.5px solid var(--border-sand); padding: 0.6rem 0.9rem; flex-shrink: 0;">
-            <div id="communityAttachmentPreview" style="display: none; margin-bottom: 0.4rem; background: #ECFDF5; border: 1px solid #059669; color: #065F46; padding: 0.35rem 0.55rem; border-radius: 6px; font-size: 0.8rem; justify-content: space-between; align-items: center;">
-              <div style="display: flex; align-items: center; gap: 0.35rem;">
-                <i aria-hidden="true" class="fa-solid fa-paperclip"></i>
-                <span id="communityAttachmentName">Attachment.pdf</span>
-              </div>
-              <button aria-label="Remove the attached file" type="button" id="btnRemoveAttachment" style="background: transparent; border: none; color: #DC2626; cursor: pointer; font-weight: 700;"><i aria-hidden="true" class="fa-solid fa-xmark"></i></button>
-            </div>
-
-            <form id="communityChatForm" style="display: flex; flex-direction: column; gap: 0.4rem;">
-              <div style="display: flex; gap: 0.45rem; align-items: center;">
-                <input type="text" id="communityMessageInput" aria-label="Type a community message" class="portal-input" placeholder="Type a message... Use /hg for sparkling link/announcement, /ad for Admin Alert" style="flex: 1; font-size: 0.86rem; padding: 0.55rem 0.8rem; border-radius: 20px; border: 1px solid #D1D5DB;">
-                
-                <button type="submit" class="btn btn-emerald" style="padding: 0.5rem 1rem; font-size: 0.84rem; font-weight: 700; border-radius: 20px; white-space: nowrap; display: flex; align-items: center; gap: 0.3rem;">
-                  Send <i aria-hidden="true" class="fa-solid fa-paper-plane"></i>
-                </button>
-              </div>
-
-              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.35rem; font-size: 0.8rem; color: var(--text-muted);">
-                <div style="display: flex; gap: 0.65rem; align-items: center;">
-                  <span>✨ <strong>/hg</strong>: Sparkling Link / Announcement (Admin)</span>
-                  <span>🚨 <strong>/ad</strong>: Admin Alert Notification</span>
-                </div>
-
-                ${isAdmin ? `
-                  <label for="communityFileInput" class="btn" style="background: #FAF9F6; border: 1px dashed var(--primary-emerald); color: var(--primary-emerald); padding: 0.2rem 0.55rem; font-size: 0.8rem; font-weight: 700; border-radius: 6px; cursor: pointer; margin: 0; display: inline-flex; align-items: center; gap: 0.25rem;">
-                    <i aria-hidden="true" class="fa-solid fa-paperclip"></i> Attach File
-                    <input type="file" id="communityFileInput" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.zip" style="display: none;">
-                  </label>
-                ` : ''}
-              </div>
-            </form>
-          </div>
-        </div>
-      `;
-
-      panes.forEach(pane => {
-        pane.innerHTML = chatHtml;
-        bindCommunityPaneEvents(pane, isAdmin, currentUser);
-      });
-    } catch (err) {
-      console.error('Error rendering Community Chat tab:', err);
+    if (typeof window.initGetStreamChat === 'function') {
+      window.initGetStreamChat().catch(e => console.warn('Stream Chat async init warning:', e));
+      return;
     }
   }
 

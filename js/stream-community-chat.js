@@ -1,13 +1,10 @@
 /* ==========================================================================
  * PRAGYAN INSTITUTE — STREAM CHAT REALTIME COMMUNITY FORUM ENGINE
  * ----------------------------------------------------------------------------
- * Replaces the localStorage-only community chat with GetStream.io's
- * free-tier realtime messaging. Loads the SDK from CDN on demand,
- * connects with a short-lived token minted by /api/stream-token, and
- * renders batch-scoped channels using the canonical academic config.
- *
- * Exposed as window.PragyanStreamChat.init(containerEl) — called by
- * renderCommunityChatTab() in portal.js via the existing initGetStreamChat hook.
+ * Replaces localStorage-only community chat with GetStream.io realtime
+ * messaging. Loads the Stream SDK from CDN, connects with JWT-minted
+ * short-lived tokens, and renders batch-scoped channels with full mobile
+ * responsive design and live WebSocket communication.
  * ========================================================================== */
 (function () {
   'use strict';
@@ -17,10 +14,9 @@
   let currentUser = null;
   let channelsMap = new Map();
   let activeChannelId = 'institute-all';
-  let escFn = null;
+  let typingTimeout = null;
 
   function escapeHtml(s) {
-    if (escFn) return escFn(s);
     if (typeof window !== 'undefined' && window.escapeHtml) return window.escapeHtml(s);
     return String(s ?? '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
   }
@@ -32,7 +28,7 @@
       const s = document.createElement('script');
       s.src = src;
       s.onload = resolve;
-      s.onerror = () => reject(new Error('Failed to load Stream Chat SDK'));
+      s.onerror = () => reject(new Error('Failed to load Stream Chat SDK from CDN.'));
       document.head.appendChild(s);
     });
   }
@@ -65,24 +61,23 @@
     channelsMap.clear();
     const isAdmin = currentUser.role === 'admin';
 
-    // Institute-wide channel: everyone sees this.
-    const allCh = client.channel('team', 'institute-all', {
-      name: '🏫 Institute-Wide Community',
-      created_by_id: currentUser.id
+    // 1. Institute-wide main channel (messaging channel type for universal access)
+    const allCh = client.channel('messaging', 'institute-all', {
+      name: '🏫 Institute-Wide Forum'
     });
     await allCh.watch();
     channelsMap.set('institute-all', allCh);
 
-    // Batch-specific channels. Students see only their own; admins see all.
+    // 2. Batch-specific channels
     const myBatch = resolveBatchId();
     const batches = (window.PRAGYAN_ACADEMIC && window.PRAGYAN_ACADEMIC.BATCHES) || [];
+
     for (const b of batches) {
       if (!isAdmin && b.batchId !== myBatch) continue;
       const chId = `batch-${b.batchId}`;
       if (channelsMap.has(chId)) continue;
-      const ch = client.channel('team', chId, {
-        name: b.name || b.batchId,
-        created_by_id: currentUser.id
+      const ch = client.channel('messaging', chId, {
+        name: `${b.name || b.batchId}`
       });
       await ch.watch();
       channelsMap.set(chId, ch);
@@ -99,111 +94,237 @@
 
   function renderMsgList(messages) {
     if (!messages || !messages.length) {
-      return '<div style="text-align:center;color:#64748B;margin:auto;padding:2rem;"><i class="fa-solid fa-comments" style="font-size:2.5rem;color:#CBD5E1;margin-bottom:.75rem;" aria-hidden="true"></i><p style="font-weight:700;margin-bottom:.25rem;">No messages in this channel yet.</p><p style="font-size:.82rem;">Start the conversation!</p></div>';
+      return `
+        <div style="text-align: center; color: var(--text-muted, #64748B); margin: auto; padding: 2.5rem 1rem;">
+          <div style="width: 56px; height: 56px; border-radius: 50%; background: rgba(6, 78, 59, 0.08); color: #064E3B; display: inline-flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 0.75rem;">
+            <i class="fa-solid fa-comments" aria-hidden="true"></i>
+          </div>
+          <p style="font-weight: 700; font-size: 1rem; color: #1E293B; margin-bottom: 0.25rem;">No messages in this channel yet.</p>
+          <p style="font-size: 0.84rem;">Be the first to start the discussion!</p>
+        </div>
+      `;
     }
+
     return messages.map(m => {
       const isMine = m.user && m.user.id === currentUser.id;
       const isAdminMsg = m.user && (m.user.role === 'admin' || String(m.user.id || '').startsWith('admin_'));
       const avatar = m.user?.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.user?.name || 'U')}&background=064E3B&color=fff`;
       const bubbleBg = isMine ? '#064E3B' : (isAdminMsg ? '#FFFBEB' : '#FFFFFF');
       const bubbleColor = isMine ? '#FFFFFF' : '#1E293B';
-      const bubbleBorder = isMine ? '#064E3B' : (isAdminMsg ? '#FCD34D' : 'var(--border-sand)');
-      return `<div style="display:flex;gap:.65rem;align-items:flex-start;${isMine ? 'flex-direction:row-reverse;' : ''}">
-        <img src="${escapeHtml(avatar)}" alt="" style="width:34px;height:34px;border-radius:50%;object-fit:cover;border:1.5px solid ${isAdminMsg ? '#F59E0B' : '#059669'};flex-shrink:0;">
-        <div style="max-width:78%;display:flex;flex-direction:column;${isMine ? 'align-items:flex-end;' : 'align-items:flex-start;'}">
-          <div style="display:flex;gap:.4rem;align-items:center;font-size:.78rem;margin-bottom:.15rem;">
-            <strong style="color:${isAdminMsg ? '#B45309' : 'var(--text-mahogany,#5A2E25)'};">${escapeHtml(m.user?.name || 'User')}</strong>
-            ${isAdminMsg ? '<span style="background:#FEF3C7;color:#92400E;border:1px solid #FCD34D;font-size:.7rem;font-weight:800;padding:0 .35rem;border-radius:4px;">Faculty</span>' : ''}
-            <span style="color:var(--text-muted,#64748B);">${fmtTime(m.created_at)}</span>
+      const bubbleBorder = isMine ? '#064E3B' : (isAdminMsg ? '#FCD34D' : 'var(--border-sand, #E2E8F0)');
+
+      return `
+        <div class="stream-msg-row ${isMine ? 'mine' : 'theirs'}" id="msg-${escapeHtml(m.id)}" style="display: flex; gap: 0.65rem; align-items: flex-start; margin-bottom: 0.85rem; ${isMine ? 'flex-direction: row-reverse;' : ''}">
+          <img src="${escapeHtml(avatar)}" alt="" style="width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 1.5px solid ${isAdminMsg ? '#F59E0B' : '#059669'}; flex-shrink: 0;">
+          <div style="max-width: 86%; display: flex; flex-direction: column; ${isMine ? 'align-items: flex-end;' : 'align-items: flex-start;'}">
+            <div style="display: flex; gap: 0.4rem; align-items: center; font-size: 0.76rem; margin-bottom: 0.2rem; flex-wrap: wrap;">
+              <strong style="color: ${isAdminMsg ? '#B45309' : 'var(--text-mahogany, #5A2E25)'};">
+                ${escapeHtml(m.user?.name || 'User')}
+              </strong>
+              ${isAdminMsg ? '<span style="background: #FEF3C7; color: #92400E; border: 1px solid #FCD34D; font-size: 0.68rem; font-weight: 800; padding: 0 0.35rem; border-radius: 4px;">Faculty / Director</span>' : ''}
+              <span style="color: var(--text-muted, #64748B); font-size: 0.72rem;">${fmtTime(m.created_at)}</span>
+            </div>
+            <div class="stream-msg-bubble" style="background: ${bubbleBg}; color: ${bubbleColor}; border: 1px solid ${bubbleBorder}; padding: 0.65rem 0.9rem; border-radius: 12px; font-size: 0.9rem; line-height: 1.45; word-break: break-word; overflow-wrap: anywhere; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+              ${escapeHtml(m.text || '')}
+            </div>
+            ${currentUser.role === 'admin' ? `
+              <div style="display: flex; gap: 0.4rem; margin-top: 0.2rem;">
+                <button type="button" class="btn-del-msg" data-del-msg="${escapeHtml(m.id)}" style="background: none; border: none; font-size: 0.72rem; color: #DC2626; cursor: pointer; padding: 0.15rem 0.3rem; border-radius: 4px;" aria-label="Delete message">
+                  <i class="fa-solid fa-trash-can" aria-hidden="true"></i> Delete
+                </button>
+              </div>
+            ` : ''}
           </div>
-          <div style="background:${bubbleBg};color:${bubbleColor};border:1px solid ${bubbleBorder};padding:.6rem .85rem;border-radius:10px;font-size:.88rem;line-height:1.45;word-break:break-word;box-shadow:0 1px 3px rgba(0,0,0,.05);">${escapeHtml(m.text || '')}</div>
-          ${currentUser.role === 'admin' ? `<button type="button" data-del-msg="${m.id}" style="background:none;border:none;font-size:.72rem;color:#DC2626;cursor:pointer;padding:0;margin-top:.2rem;" aria-label="Delete message">🗑 Delete</button>` : ''}
         </div>
-      </div>`;
+      `;
     }).join('');
   }
 
   function renderUI(container) {
     const channelList = Array.from(channelsMap.entries());
+    const onlineCount = activeChannel.state?.watcher_count || 1;
+
     container.innerHTML = `
-      <div style="display:flex;flex-direction:column;height:720px;max-height:calc(100vh - 180px);background:#FFF;border-radius:12px;border:1.5px solid var(--border-sand,#DDD5CD);overflow:hidden;">
-        <div style="background:#064E3B;color:#FFF;padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:.5rem;overflow-x:auto;border-bottom:2px solid #04382B;">
-          <div style="display:flex;gap:.5rem;align-items:center;">
-            ${channelList.map(([id, ch]) => `<button type="button" class="stream-ch-pill" data-ch-id="${escapeHtml(id)}" style="padding:.4rem .85rem;border-radius:99px;font-size:.82rem;font-weight:700;cursor:pointer;border:1px solid rgba(255,255,255,.25);background:${id === activeChannelId ? '#10B981' : 'rgba(255,255,255,.1)'};color:#FFF;white-space:nowrap;transition:all .2s ease;">${escapeHtml(ch.data?.name || id)}</button>`).join('')}
+      <div class="stream-chat-wrapper" style="display: flex; flex-direction: column; height: clamp(480px, 75vh, 760px); max-height: calc(100dvh - 140px); background: #FFFFFF; border-radius: 12px; border: 1.5px solid var(--border-sand, #DDD5CD); overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
+        
+        <!-- HEADER & CHANNEL TABS BAR -->
+        <div class="stream-header-bar" style="background: linear-gradient(135deg, #064E3B 0%, #02241b 100%); color: #FFFFFF; padding: 0.65rem 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; border-bottom: 2px solid #04382B; flex-shrink: 0;">
+          <div class="stream-pills-scroll" style="display: flex; gap: 0.45rem; align-items: center; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 2px;">
+            ${channelList.map(([id, ch]) => `
+              <button type="button" class="stream-ch-pill ${id === activeChannelId ? 'active' : ''}" data-ch-id="${escapeHtml(id)}" style="padding: 0.4rem 0.8rem; border-radius: 99px; font-size: 0.8rem; font-weight: 700; cursor: pointer; border: 1px solid rgba(255,255,255,0.25); background: ${id === activeChannelId ? '#10B981' : 'rgba(255,255,255,0.12)'}; color: #FFFFFF; white-space: nowrap; transition: all 0.2s ease; touch-action: manipulation; min-height: 36px;">
+                ${escapeHtml(ch.data?.name || id)}
+              </button>
+            `).join('')}
           </div>
-          <div style="font-size:.78rem;color:#A7F3D0;white-space:nowrap;"><span style="width:8px;height:8px;border-radius:50%;background:#34D399;display:inline-block;"></span> ${activeChannel.state?.watcher_count || 1} online</div>
+          <div style="font-size: 0.76rem; color: #A7F3D0; white-space: nowrap; display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0;">
+            <span style="width: 8px; height: 8px; border-radius: 50%; background: #34D399; display: inline-block; box-shadow: 0 0 6px #34D399;"></span>
+            <span id="stream-online-count">${onlineCount} online</span>
+          </div>
         </div>
-        <div id="stream-msg-list" style="flex:1;overflow-y:auto;padding:1.25rem;background:#FAF9F6;display:flex;flex-direction:column;gap:.85rem;">${renderMsgList(activeChannel.state?.messages)}</div>
-        <form id="stream-chat-form" style="display:flex;align-items:center;gap:.6rem;padding:.85rem 1rem;background:#FFF;border-top:1.5px solid var(--border-sand,#DDD5CD);">
-          <input type="text" id="stream-msg-input" class="portal-input" placeholder="Post in ${escapeHtml(activeChannel.data?.name || 'channel')}…" style="flex:1;border-radius:8px;font-size:16px;" autocomplete="off" aria-label="Chat message" required>
-          <button type="submit" class="btn btn-emerald" style="padding:.6rem 1.25rem;font-weight:800;border-radius:8px;display:inline-flex;align-items:center;gap:.4rem;min-height:44px;">Send <i class="fa-solid fa-paper-plane" aria-hidden="true"></i></button>
+
+        <!-- MESSAGES FEED -->
+        <div id="stream-msg-list" style="flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 1rem; background: #FAF9F6; display: flex; flex-direction: column;">
+          ${renderMsgList(activeChannel.state?.messages)}
+        </div>
+
+        <!-- TYPING INDICATOR -->
+        <div id="stream-typing-box" style="padding: 0.15rem 1rem; font-size: 0.74rem; color: #64748B; font-style: italic; min-height: 18px; background: #FAF9F6;"></div>
+
+        <!-- COMPOSER INPUT -->
+        <form id="stream-chat-form" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.65rem 0.85rem; background: #FFFFFF; border-top: 1.5px solid var(--border-sand, #DDD5CD); flex-shrink: 0;">
+          <input type="text" id="stream-msg-input" class="portal-input" placeholder="Message in ${escapeHtml(activeChannel.data?.name || 'community')}…" style="flex: 1; border-radius: 8px; font-size: 16px; min-height: 44px; padding: 0.55rem 0.85rem; border: 1.5px solid var(--border-sand, #CBD5E1);" autocomplete="off" aria-label="Chat message" required>
+          <button type="submit" class="btn btn-emerald" id="btn-stream-send" style="padding: 0.55rem 1.15rem; font-weight: 800; border-radius: 8px; display: inline-flex; align-items: center; gap: 0.4rem; min-height: 44px; font-size: 0.88rem;">
+            <span>Send</span> <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
+          </button>
         </form>
-      </div>`;
+      </div>
+    `;
+
     wireEvents(container);
     scrollBottom();
   }
 
   function wireEvents(container) {
+    // 1. Channel switcher
     container.querySelectorAll('.stream-ch-pill').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const id = btn.dataset.chId;
-        if (id && channelsMap.has(id)) { activeChannelId = id; activeChannel = channelsMap.get(id); renderUI(container); }
+        if (id && channelsMap.has(id) && id !== activeChannelId) {
+          activeChannelId = id;
+          activeChannel = channelsMap.get(id);
+          renderUI(container);
+        }
       });
     });
 
-    activeChannel.off('message.new');
-    activeChannel.on('message.new', () => {
+    // 2. Realtime WebSocket Subscriptions for live updates
+    const handleUpdate = () => {
       const list = container.querySelector('#stream-msg-list');
-      if (list) { list.innerHTML = renderMsgList(activeChannel.state?.messages); scrollBottom(); }
+      if (list && activeChannel) {
+        list.innerHTML = renderMsgList(activeChannel.state?.messages);
+        scrollBottom();
+      }
+    };
+
+    activeChannel.off('message.new');
+    activeChannel.off('message.updated');
+    activeChannel.off('message.deleted');
+    activeChannel.off('user.presence.changed');
+    activeChannel.off('typing.start');
+    activeChannel.off('typing.stop');
+
+    activeChannel.on('message.new', handleUpdate);
+    activeChannel.on('message.updated', handleUpdate);
+    activeChannel.on('message.deleted', handleUpdate);
+    activeChannel.on('user.presence.changed', () => {
+      const cntEl = container.querySelector('#stream-online-count');
+      if (cntEl && activeChannel) cntEl.textContent = `${activeChannel.state?.watcher_count || 1} online`;
     });
 
+    // 3. Typing indicator
+    activeChannel.on('typing.start', e => {
+      if (e.user?.id !== currentUser.id) {
+        const box = container.querySelector('#stream-typing-box');
+        if (box) box.textContent = `${escapeHtml(e.user?.name || 'Someone')} is typing...`;
+      }
+    });
+    activeChannel.on('typing.stop', e => {
+      if (e.user?.id !== currentUser.id) {
+        const box = container.querySelector('#stream-typing-box');
+        if (box) box.textContent = '';
+      }
+    });
+
+    // 4. Send message form
     const form = container.querySelector('#stream-chat-form');
     const input = container.querySelector('#stream-msg-input');
+    const sendBtn = container.querySelector('#btn-stream-send');
+
+    input?.addEventListener('input', () => {
+      if (activeChannel) {
+        activeChannel.keystroke().catch(() => {});
+      }
+    });
+
     form?.addEventListener('submit', async e => {
       e.preventDefault();
       const text = (input.value || '').trim();
       if (!text) return;
+
       input.value = '';
-      try { await activeChannel.sendMessage({ text }); } catch (err) { alert('Send failed: ' + err.message); }
+      if (sendBtn) sendBtn.disabled = true;
+
+      try {
+        await activeChannel.sendMessage({ text });
+        handleUpdate();
+      } catch (err) {
+        alert('Failed to send message: ' + err.message);
+      } finally {
+        if (sendBtn) sendBtn.disabled = false;
+        if (input) input.focus();
+      }
     });
 
+    // 5. Admin message delete
     container.querySelectorAll('[data-del-msg]').forEach(btn => {
       btn.addEventListener('click', async () => {
-        if (!confirm('Delete this message for everyone?')) return;
-        try { await client.deleteMessage(btn.dataset.delMsg); activeChannel.state.messages = activeChannel.state.messages.filter(m => m.id !== btn.dataset.delMsg); renderUI(container); }
-        catch (e) { alert('Delete failed: ' + e.message); }
+        const msgId = btn.dataset.delMsg;
+        if (!confirm('Are you sure you want to permanently delete this message for everyone?')) return;
+        try {
+          await client.deleteMessage(msgId);
+          if (activeChannel?.state?.messages) {
+            activeChannel.state.messages = activeChannel.state.messages.filter(m => m.id !== msgId);
+          }
+          handleUpdate();
+        } catch (e) {
+          alert('Delete failed: ' + e.message);
+        }
       });
     });
   }
 
   function scrollBottom() {
     const el = document.getElementById('stream-msg-list');
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+    }
   }
 
   async function init(containerEl) {
     if (!containerEl) return;
-    containerEl.innerHTML = '<div style="padding:3rem;text-align:center;color:#64748B;"><i class="fa-solid fa-circle-notch fa-spin" style="font-size:2rem;color:#064E3B;" aria-hidden="true"></i><p style="margin-top:1rem;font-weight:600;">Connecting to Pragyan Realtime Community Gateway…</p></div>';
+    containerEl.innerHTML = `
+      <div style="padding: 3rem 1rem; text-align: center; color: #64748B;">
+        <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 2rem; color: #064E3B;" aria-hidden="true"></i>
+        <p style="margin-top: 1rem; font-weight: 700; color: #1E293B;">Connecting to Pragyan Realtime Community Gateway…</p>
+        <p style="font-size: 0.82rem; color: #64748B;">Loading live channels and messages...</p>
+      </div>
+    `;
 
     try {
       await loadScript('https://cdn.jsdelivr.net/npm/stream-chat@8.52.0/dist/browser.full-bundle.min.js');
-      if (typeof StreamChat === 'undefined') throw new Error('Stream SDK failed to load');
+      if (typeof StreamChat === 'undefined') throw new Error('Stream Chat SDK failed to load.');
 
       const tokenData = await fetchToken();
       client = StreamChat.getInstance(tokenData.apiKey);
       currentUser = { id: tokenData.userId, name: tokenData.userName, role: tokenData.userRole };
+
       await client.connectUser(currentUser, tokenData.token);
       await setupChannels();
       renderUI(containerEl);
     } catch (err) {
-      console.error('[StreamChat]', err.message);
+      console.error('[StreamChat Error]', err);
       containerEl.innerHTML = `
-        <div class="dash-card" style="text-align:center;padding:2.5rem 1rem;">
-          <i class="fa-solid fa-triangle-exclamation" style="font-size:2.5rem;color:#D97706;margin-bottom:.75rem;" aria-hidden="true"></i>
-          <h3 style="color:#1E293B;">Unable to connect to Community Forum</h3>
-          <p style="color:#64748B;font-size:.9rem;max-width:450px;margin:.5rem auto 1.25rem;">${escapeHtml(err.message)}</p>
-          <button type="button" class="btn btn-emerald" onclick="PragyanStreamChat.reconnect()" style="padding:.6rem 1.4rem;font-weight:800;">Retry Connection</button>
-        </div>`;
+        <div class="dash-card" style="text-align: center; padding: 2.5rem 1.5rem; background: #FFF; border-radius: 12px; border: 1.5px solid var(--border-sand); margin: 1rem auto; max-width: 500px;">
+          <div style="width: 56px; height: 56px; border-radius: 50%; background: #FEF3C7; color: #D97706; display: inline-flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 0.75rem;">
+            <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+          </div>
+          <h3 style="color: #1E293B; margin-bottom: 0.35rem;">Unable to Connect to Community Forum</h3>
+          <p style="color: #64748B; font-size: 0.88rem; line-height: 1.5; margin-bottom: 1.25rem;">${escapeHtml(err.message)}</p>
+          <button type="button" class="btn btn-emerald" onclick="PragyanStreamChat.reconnect()" style="padding: 0.6rem 1.4rem; font-weight: 800; border-radius: 8px;">
+            <i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i> Retry Connection
+          </button>
+        </div>
+      `;
     }
   }
 
@@ -215,12 +336,14 @@
   // Public API
   window.PragyanStreamChat = {
     init,
-    reconnect() { const pane = document.getElementById('adminTabPane-community') || document.getElementById('studentTabPane-community'); if (pane) init(pane); },
+    reconnect() {
+      const pane = document.getElementById('adminTabPane-community') || document.getElementById('studentTabPane-community');
+      if (pane) init(pane);
+    },
     deleteMessage: async (msgId) => { if (client) { await client.deleteMessage(msgId); } },
     disconnect
   };
 
-  // Legacy hook that portal.js already calls
   window.initGetStreamChat = async function () {
     const pane = document.getElementById('adminTabPane-community') || document.getElementById('studentTabPane-community');
     if (pane) { await init(pane); }

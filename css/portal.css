@@ -9911,14 +9911,110 @@ button, a, input, select, textarea {
 
 
 
-/* ── Stream Community Chat ────────────────────────────────────────────────── */
-.stream-ch-pill:hover { background: rgba(255,255,255,.2) !important; }
-.stream-ch-pill.active { box-shadow: 0 2px 8px rgba(16,185,129,.4); }
-#stream-msg-list::-webkit-scrollbar { width: 6px; }
-#stream-msg-list::-webkit-scrollbar-thumb { background: var(--border-sand,#DDD5CD); border-radius: 3px; }
-#stream-msg-input:focus { border-color: var(--primary-emerald); outline: none; }
+/* ── Stream Community Chat Responsive Design ─────────────────────────────── */
+.stream-chat-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: clamp(480px, 75vh, 760px);
+  max-height: calc(100dvh - 140px);
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1.5px solid var(--border-sand, #DDD5CD);
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+.stream-ch-pill {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.stream-ch-pill:hover {
+  background: rgba(255, 255, 255, 0.22) !important;
+  transform: translateY(-1px);
+}
+
+.stream-ch-pill.active {
+  background: #10B981 !important;
+  box-shadow: 0 2px 10px rgba(16, 185, 129, 0.45);
+}
+
+#stream-msg-list {
+  scroll-behavior: smooth;
+}
+
+#stream-msg-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+#stream-msg-list::-webkit-scrollbar-thumb {
+  background: var(--border-sand, #DDD5CD);
+  border-radius: 3px;
+}
+
+#stream-msg-input:focus {
+  border-color: var(--primary-emerald, #064E3B) !important;
+  box-shadow: 0 0 0 3px rgba(6, 78, 59, 0.12) !important;
+  outline: none;
+}
+
+.stream-msg-row.mine .stream-msg-bubble {
+  border-bottom-right-radius: 2px !important;
+}
+
+.stream-msg-row.theirs .stream-msg-bubble {
+  border-bottom-left-radius: 2px !important;
+}
+
 @media (max-width: 768px) {
-  #stream-msg-list { padding: .85rem !important; }
-  #stream-chat-form { padding: .6rem .7rem !important; }
-  .stream-ch-pill { font-size: .76rem !important; padding: .35rem .65rem !important; }
+  .stream-chat-wrapper {
+    height: calc(100dvh - 130px) !important;
+    max-height: none !important;
+    border-radius: 8px !important;
+    margin: 0 -0.25rem;
+  }
+  
+  .stream-header-bar {
+    padding: 0.5rem 0.65rem !important;
+  }
+  
+  .stream-pills-scroll {
+    gap: 0.35rem !important;
+  }
+  
+  .stream-ch-pill {
+    font-size: 0.75rem !important;
+    padding: 0.3rem 0.65rem !important;
+    min-height: 32px !important;
+  }
+  
+  #stream-msg-list {
+    padding: 0.75rem 0.65rem !important;
+    gap: 0.5rem !important;
+  }
+  
+  .stream-msg-bubble {
+    font-size: 0.86rem !important;
+    padding: 0.55rem 0.75rem !important;
+  }
+  
+  #stream-chat-form {
+    padding: 0.5rem 0.65rem !important;
+    gap: 0.4rem !important;
+  }
+  
+  #stream-msg-input {
+    font-size: 16px !important;
+    min-height: 42px !important;
+    padding: 0.45rem 0.7rem !important;
+  }
+  
+  #btn-stream-send {
+    padding: 0.45rem 0.85rem !important;
+    min-height: 42px !important;
+    font-size: 0.84rem !important;
+  }
+  
+  #btn-stream-send span {
+    display: none;
+  }
 }
