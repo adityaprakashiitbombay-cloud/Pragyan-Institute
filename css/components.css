@@ -3080,50 +3080,6 @@
     max-width: 95%;
     margin-inline: auto;
   }
-  .blog-tabs {
-    display: flex !important;
-    flex-wrap: nowrap !important;
-    justify-content: flex-start !important;
-    align-items: center !important;
-    overflow-x: auto !important;
-    overscroll-behavior-x: contain !important;
-    -webkit-overflow-scrolling: touch !important;
-    scroll-snap-type: x mandatory !important;
-    scroll-padding-inline: 0.75rem !important;
-    gap: 0.55rem !important;
-    padding: 0.35rem 0.5rem 0.85rem !important;
-    margin-inline: -0.5rem !important;
-    margin-bottom: 1.75rem !important;
-    scrollbar-width: none !important;
-    -ms-overflow-style: none !important;
-    box-sizing: border-box !important;
-    width: calc(100% + 1rem) !important;
-  }
-  .blog-tabs::-webkit-scrollbar { display: none !important; }
-  .blog-tab {
-    flex: 0 0 auto !important;
-    scroll-snap-align: start !important;
-    white-space: nowrap !important;
-    font-size: 0.84rem !important;
-    font-weight: 700 !important;
-    padding: 0.55rem 1.05rem !important;
-    min-height: 44px !important;
-    border-radius: var(--radius-full) !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: 0.45rem !important;
-    background: #ffffff !important;
-    border: 1.5px solid #E2D9CE !important;
-    color: #374151 !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
-    touch-action: manipulation;
-    letter-spacing: 0.01em;
-  }
-  .blog-tab i {
-    font-size: 0.88rem !important;
-    color: #059669 !important;
-  }
   .blog-tab.active,
   .blog-tab[aria-selected="true"] {
     background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
@@ -3168,21 +3124,80 @@
   }
 }
 
-@media (max-width: 480px) {
+/* Organized Structured Grid for Mobile Devices (<= 680px) */
+@media (max-width: 680px) {
   .blog-tabs {
-    gap: 0.45rem !important;
-    padding-inline: 0.25rem !important;
-    margin-inline: -0.25rem !important;
-    width: calc(100% + 0.5rem) !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.55rem !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 0 1.85rem 0 !important;
+    box-sizing: border-box !important;
+  }
+  .blog-tabs .blog-tab[data-blog-cat="all"],
+  .blog-tabs .blog-tab:first-child {
+    grid-column: 1 / -1 !important;
+    font-size: 0.88rem !important;
+    min-height: 44px !important;
   }
   .blog-tab {
-    padding: 0.5rem 0.85rem !important;
+    flex: none !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    padding: 0.55rem 0.65rem !important;
     font-size: 0.8rem !important;
-    min-height: 42px !important;
-    gap: 0.38rem !important;
+    font-weight: 700 !important;
+    min-height: 44px !important;
+    border-radius: 10px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    gap: 0.4rem !important;
+    white-space: normal !important;
+    line-height: 1.25 !important;
+    background: #ffffff !important;
+    border: 1.5px solid #E2D9CE !important;
+    color: #374151 !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+    touch-action: manipulation;
   }
   .blog-tab i {
-    font-size: 0.82rem !important;
+    font-size: 0.85rem !important;
+    color: #059669 !important;
+    flex-shrink: 0 !important;
+  }
+}
+
+/* Flexible Tablet Wrapping (681px - 768px) */
+@media (min-width: 681px) and (max-width: 768px) {
+  .blog-tabs {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    align-items: center !important;
+    gap: 0.65rem !important;
+    margin: 0 0 2rem 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+  .blog-tab {
+    flex: 0 0 auto !important;
+    padding: 0.6rem 1.15rem !important;
+    border-radius: var(--radius-full) !important;
+    font-size: 0.86rem !important;
+    min-height: 44px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 0.45rem !important;
+    background: #ffffff !important;
+    border: 1.5px solid #E2D9CE !important;
+    color: #374151 !important;
+  }
+  .blog-tab i {
+    font-size: 0.88rem !important;
+    color: #059669 !important;
   }
 }
 
