@@ -181,13 +181,15 @@
     }
   };
 
-  const ADMIN_SLASH_COMMANDS = [
-    { cmd: '/hg', usage: '/hg <message>', label: 'Highlight Text', desc: 'Broadcast highlighted announcement in glowing gold callout banner', icon: '⭐' },
-    { cmd: '/highlight', usage: '/highlight <message>', label: 'Highlight Text', desc: 'Broadcast highlighted announcement in glowing gold callout banner', icon: '🌟' },
-    { cmd: '/pin', usage: '/pin <message>', label: 'Post & Pin Message', desc: 'Send message and immediately pin it to the top of group', icon: '📌' },
-    { cmd: '/notice', usage: '/notice <message>', label: 'Official Notice', desc: 'Post as an official class notice announcement', icon: '📢' },
-    { cmd: '/clear', usage: '/clear', label: 'Clear Group Chat', desc: 'Prompt to purge entire message history for this class', icon: '🧹' },
-    { cmd: '/help', usage: '/help', label: 'Show Commands', desc: 'View list of available admin slash commands and shortcuts', icon: '❓' }
+  const SLASH_COMMANDS = [
+    { cmd: '/quest', usage: '/quest <question>', label: 'Ask Question / Doubt', desc: 'Highlight academic question in vibrant indigo/cyan card for mentors and peers', icon: '❓', forStudents: true },
+    { cmd: '/question', usage: '/question <question>', label: 'Ask Question / Doubt', desc: 'Highlight academic question in vibrant indigo/cyan card for mentors and peers', icon: '💡', forStudents: true },
+    { cmd: '/hg', usage: '/hg <message>', label: 'Highlight Text', desc: 'Broadcast highlighted announcement in glowing gold callout banner', icon: '⭐', adminOnly: true },
+    { cmd: '/highlight', usage: '/highlight <message>', label: 'Highlight Text', desc: 'Broadcast highlighted announcement in glowing gold callout banner', icon: '🌟', adminOnly: true },
+    { cmd: '/pin', usage: '/pin <message>', label: 'Post & Pin Message', desc: 'Send message and immediately pin it to the top of group', icon: '📌', adminOnly: true },
+    { cmd: '/notice', usage: '/notice <message>', label: 'Official Notice', desc: 'Post as an official class notice announcement', icon: '📢', adminOnly: true },
+    { cmd: '/clear', usage: '/clear', label: 'Clear Group Chat', desc: 'Prompt to purge entire message history for this class', icon: '🧹', adminOnly: true },
+    { cmd: '/help', usage: '/help', label: 'Show Commands', desc: 'View list of available slash commands and shortcuts', icon: '📖', forStudents: true }
   ];
 
   function escapeHtml(s) {
@@ -398,6 +400,8 @@
     // Clean slash prefixes
     if (text.startsWith('/hg ')) text = text.slice(4).trim();
     else if (text.startsWith('/highlight ')) text = text.slice(11).trim();
+    else if (text.startsWith('/quest ')) text = text.slice(7).trim();
+    else if (text.startsWith('/question ')) text = text.slice(10).trim();
     else if (text.startsWith('/pin ')) text = text.slice(5).trim();
     else if (text.startsWith('/notice ')) text = text.slice(8).trim();
 
@@ -432,7 +436,7 @@
             ${escapeHtml(channelMeta.tagline)}
           </p>
           <div style="display: inline-flex; align-items: center; gap: 0.4rem; background: #FFFFFF; border: 1px dashed ${channelMeta.badgeColor}; padding: 0.45rem 0.85rem; border-radius: 8px; font-size: 0.8rem; font-weight: 700; color: #334155;">
-            ✨ Start the class discussion, ask doubts, or share lecture notes below!
+            ✨ Start the class discussion, ask doubts (/quest), or share lecture notes below!
           </div>
         </div>
       `;
@@ -443,6 +447,7 @@
       const identity = extractUserBadge(m.user, channelMeta);
       const isFaculty = identity.isFaculty;
 
+      const isQuestion = (m.text && (m.text.startsWith('/quest ') || m.text.startsWith('/question '))) || m.is_question || m.custom_type === 'question';
       const isHighlight = (m.text && (m.text.startsWith('/hg ') || m.text.startsWith('/highlight '))) || m.is_highlighted || m.custom_type === 'highlight';
       const isPinned = m.pinned || m.is_pinned || Boolean(m.pinned_at);
       const isNotice = (m.text && m.text.startsWith('/notice ')) || m.is_notice;
@@ -451,7 +456,23 @@
       const formattedBody = formatMessageBody(m.text || '', isHighlight);
 
       let bubbleContentHtml = '';
-      if (isHighlight) {
+      if (isQuestion) {
+        bubbleContentHtml = `
+          <div class="stream-msg-bubble stream-msg-question" style="background: linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%); color: #1E1B4B; border: 2px solid #6366F1; padding: 0.85rem 1.15rem; border-radius: 12px; font-size: 0.95rem; line-height: 1.55; box-shadow: 0 4px 20px rgba(99, 102, 241, 0.22); position: relative;">
+            <div style="font-size: 0.74rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; color: #4338CA; margin-bottom: 0.4rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(99, 102, 241, 0.25); padding-bottom: 0.35rem;">
+              <span style="display: inline-flex; align-items: center; gap: 0.35rem;">
+                <span style="font-size: 0.95rem;">❓</span> <strong>STUDENT QUESTION &amp; DOUBT</strong>
+              </span>
+              <span style="font-size: 0.72rem; color: #3730A3; background: #C7D2FE; padding: 1px 7px; border-radius: 4px; font-weight: 800;">
+                💡 Needs Faculty Answer
+              </span>
+            </div>
+            <div style="font-weight: 600; font-size: 0.95rem; color: #1E1B4B;">
+              ${formattedBody}
+            </div>
+          </div>
+        `;
+      } else if (isHighlight) {
         bubbleContentHtml = `
           <div class="stream-msg-bubble stream-msg-highlight" style="background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%); color: #78350F; border: 2px solid #F59E0B; padding: 0.85rem 1.15rem; border-radius: 12px; font-size: 0.95rem; line-height: 1.55; box-shadow: 0 4px 20px rgba(245, 158, 11, 0.2); position: relative;">
             <div style="font-size: 0.74rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; color: #B45309; margin-bottom: 0.4rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(217, 119, 6, 0.25); padding-bottom: 0.35rem;">
@@ -711,7 +732,10 @@
               ⭐
             </button>
           ` : ''}
-          <input type="text" id="stream-msg-input" class="portal-input" placeholder="${isAdmin ? 'Type message, @mention student, /hg to highlight, or /pin…' : `Message ${escapeHtml(activeMeta.shortName)}…`}" style="flex: 1; border-radius: 10px; font-size: 16px; min-height: 46px; padding: 0.6rem 0.95rem; border: 1.5px solid var(--border-sand, #CBD5E1); background: #FAF9F6; transition: border-color 0.2s;" autocomplete="off" aria-label="Chat message" required>
+          <button type="button" id="btn-quick-quest" title="Ask academic question / doubt (/quest)" style="background: #EEF2FF; color: #4F46E5; border: 1.5px solid #C7D2FE; width: 44px; height: 44px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; font-size: 1.15rem; cursor: pointer; flex-shrink: 0;" aria-label="Ask Question prefix">
+            ❓
+          </button>
+          <input type="text" id="stream-msg-input" class="portal-input" placeholder="${isAdmin ? 'Type message, @mention student, /hg to highlight, /quest or /pin…' : `Message ${escapeHtml(activeMeta.shortName)} (use /quest to ask doubt)…`}" style="flex: 1; border-radius: 10px; font-size: 16px; min-height: 46px; padding: 0.6rem 0.95rem; border: 1.5px solid var(--border-sand, #CBD5E1); background: #FAF9F6; transition: border-color 0.2s;" autocomplete="off" aria-label="Chat message" required>
           <button type="submit" class="btn btn-emerald" id="btn-stream-send" style="padding: 0.6rem 1.35rem; font-weight: 800; border-radius: 10px; display: inline-flex; align-items: center; gap: 0.45rem; min-height: 46px; font-size: 0.9rem; flex-shrink: 0; box-shadow: 0 4px 12px rgba(6,78,59,0.2);">
             <span>Send</span> <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
           </button>
@@ -809,6 +833,7 @@
     const input = container.querySelector('#stream-msg-input');
     const autoBox = container.querySelector('#stream-autocomplete-box');
     const quickHgBtn = container.querySelector('#btn-quick-hg');
+    const quickQuestBtn = container.querySelector('#btn-quick-quest');
     let autoSelectedIndex = 0;
     let autoMode = null; // 'slash' | 'mention' | null
 
@@ -818,6 +843,17 @@
           input.value = input.value.replace(/^\/hg\s*/, '');
         } else {
           input.value = `/hg ${input.value.trim()}`;
+        }
+        input.focus();
+      });
+    }
+
+    if (quickQuestBtn && input) {
+      quickQuestBtn.addEventListener('click', () => {
+        if (input.value.startsWith('/quest ')) {
+          input.value = input.value.replace(/^\/quest\s*/, '');
+        } else {
+          input.value = `/quest ${input.value.trim()}`;
         }
         input.focus();
       });
@@ -834,7 +870,9 @@
 
     function renderSlashCommands(filterQuery) {
       const q = filterQuery.toLowerCase().trim();
-      const filtered = ADMIN_SLASH_COMMANDS.filter(c => c.cmd.includes(q) || c.label.toLowerCase().includes(q));
+      const isAdminUser = currentUser.role === 'admin';
+      const availableCmds = SLASH_COMMANDS.filter(c => isAdminUser ? true : c.forStudents);
+      const filtered = availableCmds.filter(c => c.cmd.includes(q) || c.label.toLowerCase().includes(q));
       if (!filtered.length) { hideAutocomplete(); return; }
 
       autoMode = 'slash';
@@ -842,7 +880,7 @@
 
       autoBox.innerHTML = `
         <div style="padding: 0.4rem 0.85rem; font-size: 0.74rem; font-weight: 800; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #F1F5F9;">
-          ⚡ Admin Commands
+          ⚡ ${isAdminUser ? 'Admin & Class Commands' : 'Class Commands'}
         </div>
         ${filtered.map((c, i) => `
           <div class="auto-item ${i === autoSelectedIndex ? 'active' : ''}" data-cmd="${escapeHtml(c.usage)}" style="display: flex; align-items: center; justify-content: space-between; padding: 0.55rem 0.85rem; cursor: pointer; background: ${i === autoSelectedIndex ? '#ECFDF5' : '#FFFFFF'}; transition: background 0.1s;">
@@ -925,8 +963,8 @@
       const val = input.value;
       if (activeChannel) activeChannel.keystroke().catch(() => {});
 
-      // Slash commands trigger
-      if (currentUser.role === 'admin' && val.startsWith('/')) {
+      // Slash commands trigger (Students & Admins)
+      if (val.startsWith('/')) {
         renderSlashCommands(val.slice(1));
         return;
       }
@@ -983,10 +1021,15 @@
       }
       if (rawText === '/help') {
         input.value = '';
-        alert('✨ Available Admin Commands:\n\n• /hg <text> — Broadcast highlighted announcement in gold callout card\n• /pin <text> — Post and pin announcement\n• /notice <text> — Broadcast class notice\n• /clear — Clear group message history\n• @<name> — Mention specific student');
+        if (currentUser.role === 'admin') {
+          alert('✨ Available Admin Commands:\n\n• /quest <question> — Ask highlighted question / doubt in indigo card\n• /hg <text> — Broadcast highlighted announcement in gold callout card\n• /pin <text> — Post and pin announcement\n• /notice <text> — Broadcast class notice\n• /clear — Clear group message history\n• @<name> — Mention specific student');
+        } else {
+          alert('✨ Available Student Commands:\n\n• /quest <question> — Ask question / doubt (highlighted in indigo/cyan card for faculty & mentors)\n• @<name> — Mention a classmate or student\n• /help — Show help');
+        }
         return;
       }
 
+      const isQuestion = rawText.startsWith('/quest ') || rawText.startsWith('/question ');
       const isHighlight = rawText.startsWith('/hg ') || rawText.startsWith('/highlight ');
       const isPinCommand = rawText.startsWith('/pin ');
       const isNotice = rawText.startsWith('/notice ');
@@ -997,9 +1040,10 @@
       try {
         const msgPayload = {
           text: rawText,
+          is_question: isQuestion,
           is_highlighted: isHighlight,
           is_notice: isNotice,
-          custom_type: isHighlight ? 'highlight' : (isNotice ? 'notice' : 'text')
+          custom_type: isQuestion ? 'question' : (isHighlight ? 'highlight' : (isNotice ? 'notice' : 'text'))
         };
 
         const sent = await activeChannel.sendMessage(msgPayload);

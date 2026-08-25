@@ -10079,6 +10079,21 @@ button, a, input, select, textarea {
   background: #F59E0B;
 }
 
+.stream-msg-question {
+  position: relative;
+  overflow: hidden;
+}
+
+.stream-msg-question::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: #6366F1;
+}
+
 .stream-msg-pinned {
   animation: streamFadeIn 0.3s ease;
 }
