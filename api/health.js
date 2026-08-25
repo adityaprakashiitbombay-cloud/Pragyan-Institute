@@ -34,19 +34,30 @@ export default async function handler(req, res) {
 
     const isAdmin = session.role === 'admin';
     const prefix = isAdmin ? 'admin' : 'student';
-    const rawId = session.sub || 'unknown';
+    // For admin, prioritize username (e.g. "chandan") then id/sub; for students, student_id/roll/sub
+    const rawId = (isAdmin ? (session.username || session.sub) : (session.sub || session.roll || session.student_id)) || 'unknown';
     const userId = `${prefix}_${String(rawId).toLowerCase().replace(/[^a-zA-Z0-9_-]/g, '')}`;
-    const userName = session.name || (isAdmin ? 'Institute Admin' : 'Student');
+    const userName = session.name || (isAdmin ? 'Chandan Kumar' : 'Student');
     const userRole = isAdmin ? 'admin' : 'user';
 
     try {
       const serverClient = StreamChat.getInstance(apiKey, apiSecret);
-      await serverClient.upsertUser({
-        id: userId,
-        name: userName,
-        role: userRole,
-        image: `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=064E3B&color=fff`,
-      });
+      try {
+        await serverClient.upsertUser({
+          id: userId,
+          name: userName,
+          role: userRole,
+          image: `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=064E3B&color=fff`,
+        });
+      } catch (upsertErr) {
+        console.warn('[health/stream-token] upsertUser note:', upsertErr.message);
+        try {
+          await serverClient.partialUpdateUser({
+            id: userId,
+            set: { role: userRole }
+          });
+        } catch (_) {}
+      }
 
       const CHAT_TOKEN_TTL_SECONDS = 24 * 60 * 60;
       const exp = Math.floor(Date.now() / 1000) + CHAT_TOKEN_TTL_SECONDS;

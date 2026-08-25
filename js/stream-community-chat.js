@@ -308,7 +308,16 @@
       client = StreamChat.getInstance(tokenData.apiKey);
       currentUser = { id: tokenData.userId, name: tokenData.userName, role: tokenData.userRole };
 
-      await client.connectUser(currentUser, tokenData.token);
+      try {
+        await client.connectUser(currentUser, tokenData.token);
+      } catch (connErr) {
+        console.warn('[StreamChat] connectUser full metadata failed, attempting id-only connect:', connErr.message);
+        if (connErr.message && (connErr.message.includes('already exist') || connErr.message.includes('UpdateUsers') || connErr.message.includes('code 6'))) {
+          await client.connectUser({ id: tokenData.userId }, tokenData.token);
+        } else {
+          throw connErr;
+        }
+      }
       await setupChannels();
       renderUI(containerEl);
     } catch (err) {

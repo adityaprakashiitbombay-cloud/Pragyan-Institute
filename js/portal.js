@@ -9177,11 +9177,11 @@ const inputRoll = modalEl.querySelector('#deleteConfirmRollInput')?.value.trim()
       let userRole = 'user';
 
       if (currentRole === 'admin' && currentUser) {
-        userId = `admin_${(currentUser.username || currentUser.id || 'admin').replace(/[^a-zA-Z0-9_-]/g, '')}`;
-        userName = currentUser.name || 'Admin';
+        userId = `admin_${(currentUser.username || currentUser.id || 'admin').toLowerCase().replace(/[^a-zA-Z0-9_-]/g, '')}`;
+        userName = currentUser.name || 'Chandan Kumar';
         userRole = 'admin';
       } else if (currentUser) {
-        userId = `student_${(currentUser.rollNo || currentUser.id || 'stu').replace(/[^a-zA-Z0-9_-]/g, '')}`;
+        userId = `student_${(currentUser.student_id || currentUser.rollNo || currentUser.id || 'stu').toLowerCase().replace(/[^a-zA-Z0-9_-]/g, '')}`;
         userName = currentUser.name || 'Student';
         userRole = 'user';
       }
@@ -9192,17 +9192,25 @@ const inputRoll = modalEl.querySelector('#deleteConfirmRollInput')?.value.trim()
         if (tokenRes.ok && (tokenRes.headers.get("content-type") || "").includes("application/json")) {
           const tokenJson = await tokenRes.json().catch(() => ({}));
           streamChatClient = StreamChat.getInstance(tokenJson.apiKey);
-          userId = tokenJson.userId;
+          userId = tokenJson.userId || userId;
           token = tokenJson.token;
         }
       } catch(e) {}
 
       if (!token || !streamChatClient) throw new Error('Secure chat authentication is unavailable');
 
-      await streamChatClient.connectUser(
-        { id: userId, name: userName, role: userRole },
-        token
-      );
+      try {
+        await streamChatClient.connectUser(
+          { id: userId, name: userName, role: userRole },
+          token
+        );
+      } catch (connErr) {
+        if (connErr.message && (connErr.message.includes('already exist') || connErr.message.includes('UpdateUsers'))) {
+          await streamChatClient.connectUser({ id: userId }, token);
+        } else {
+          throw connErr;
+        }
+      }
 
       // Create/join shared public community channel accessible across ALL devices
       streamChatChannel = streamChatClient.channel('messaging', 'pragyan_community_lounge', {
