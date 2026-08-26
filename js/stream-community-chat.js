@@ -1675,7 +1675,7 @@
     const mediaList = getMediaAttachmentsFromMessages(messages);
 
     container.innerHTML = `
-      <div class="stream-chat-wrapper" style="display: flex; flex-direction: column; height: clamp(560px, calc(100dvh - 140px), 880px); background: #FFFFFF; border-radius: 14px; border: 1.5px solid var(--border-sand, #DDD5CD); overflow: hidden; box-shadow: 0 8px 30px rgba(0,0,0,0.08); position: relative;">
+      <div class="stream-chat-wrapper">
         
         <!-- TOP APP BAR & LIVE STATUS & FULLSCREEN CONTROLS -->
         <div class="stream-top-bar" style="background: #042E23; color: #FFFFFF; padding: 0.45rem 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.1); flex-shrink: 0;">

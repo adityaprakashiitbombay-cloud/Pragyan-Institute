@@ -10229,14 +10229,28 @@ body.stream-chat-is-fullscreen #stream-community-chat-app {
 
 /* ── Mobile Tablet & Phone Responsive Layout Rules (< 768px) ── */
 @media (max-width: 768px) {
+  .dashboard-content-body {
+    padding: 0.65rem 0.5rem !important;
+  }
+
+  #studentTabPane-community,
+  #adminTabPane-community {
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
   .stream-chat-wrapper {
-    height: clamp(480px, calc(100dvh - 120px), 880px) !important;
-    max-height: none !important;
+    height: clamp(360px, calc(100dvh - 210px), 720px) !important;
+    max-height: calc(100dvh - 190px) !important;
     border-radius: 10px !important;
     margin: 0 !important;
     width: 100% !important;
     box-sizing: border-box !important;
     border-width: 1px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
   }
 
   .stream-chat-wrapper.stream-fullscreen {
@@ -10259,6 +10273,7 @@ body.stream-chat-is-fullscreen #stream-community-chat-app {
     box-sizing: border-box !important;
     z-index: 999999 !important;
     z-index: 2147483647 !important;
+    border-radius: 0 !important;
   }
   
   .stream-top-bar {
@@ -10271,9 +10286,17 @@ body.stream-chat-is-fullscreen #stream-community-chat-app {
   }
 
   .stream-active-banner {
-    padding: 0.35rem 0.65rem !important;
-    gap: 0.4rem !important;
+    padding: 0.35rem 0.6rem !important;
+    gap: 0.35rem !important;
     min-height: 34px !important;
+  }
+
+  .stream-active-banner h3 {
+    font-size: 0.85rem !important;
+    max-width: 170px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
   }
 
   .stream-banner-tagline {
@@ -10336,7 +10359,11 @@ body.stream-chat-is-fullscreen #stream-community-chat-app {
   }
   
   #stream-msg-list {
-    padding: 0.5rem 0.6rem !important;
+    padding: 0.45rem 0.55rem !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
   }
 
   .stream-msg-row {
@@ -10396,13 +10423,14 @@ body.stream-chat-is-fullscreen #stream-community-chat-app {
     padding: 0.4rem 0.55rem !important;
     padding-bottom: max(0.4rem, env(safe-area-inset-bottom)) !important;
     gap: 0.35rem !important;
+    flex-shrink: 0 !important;
   }
   
   #stream-msg-input {
     font-size: 16px !important;
     min-height: 40px !important;
     padding: 0.4rem 0.75rem !important;
-    border-radius: 8px !important;
+    border-radius: 9999px !important;
   }
 
   #btn-quick-quest, #btn-quick-hg, #btn-stream-attach {
@@ -10411,7 +10439,7 @@ body.stream-chat-is-fullscreen #stream-community-chat-app {
     min-width: 38px !important;
     min-height: 38px !important;
     font-size: 0.92rem !important;
-    border-radius: 8px !important;
+    border-radius: 50% !important;
   }
   
   #btn-stream-send {
@@ -10420,7 +10448,7 @@ body.stream-chat-is-fullscreen #stream-community-chat-app {
     min-width: 40px !important;
     min-height: 40px !important;
     padding: 0 !important;
-    border-radius: 8px !important;
+    border-radius: 50% !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -10447,8 +10475,13 @@ body.stream-chat-is-fullscreen #stream-community-chat-app {
 
 /* ── Ultra-Compact Phone Layout Rules (< 480px) ── */
 @media (max-width: 480px) {
+  .dashboard-content-body {
+    padding: 0.4rem 0.35rem !important;
+  }
+
   .stream-chat-wrapper {
-    height: clamp(440px, calc(100dvh - 100px), 880px) !important;
+    height: clamp(340px, calc(100dvh - 195px), 680px) !important;
+    max-height: calc(100dvh - 180px) !important;
     border-radius: 8px !important;
     margin: 0 !important;
     width: 100% !important;
@@ -10461,6 +10494,11 @@ body.stream-chat-is-fullscreen #stream-community-chat-app {
 
   .btn-stream-fullscreen span {
     display: none !important;
+  }
+
+  .stream-active-banner h3 {
+    font-size: 0.82rem !important;
+    max-width: 135px !important;
   }
 
   .stream-msg-bubble-col {
