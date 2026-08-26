@@ -297,6 +297,10 @@ export function runCommunityChatLayoutTests(assert) {
          chatJs.includes('openMobileFullscreen(container)') &&
          chatJs.includes('btn-enter-mobile-chat'),
     'T35.90: js/stream-community-chat.js defines openMobileFullscreen and wires launch button with multi-event listeners');
+
+  assert(chatJs.includes("cmd: '/imp'") &&
+         !chatJs.includes("cmd: '/important'"),
+    'T35.91: js/stream-community-chat.js retains /imp and removes duplicate /important from SLASH_COMMANDS');
 }
 
 

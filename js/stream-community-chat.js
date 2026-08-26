@@ -192,7 +192,6 @@
 
   const SLASH_COMMANDS = [
     { cmd: '/imp', usage: '/imp <message>', label: 'Very Important Announcement', desc: 'Broadcast high-priority urgent announcement in red alert card', icon: '🚨', adminOnly: true },
-    { cmd: '/important', usage: '/important <message>', label: 'Very Important Announcement', desc: 'Broadcast high-priority urgent announcement in red alert card', icon: '⚡', adminOnly: true },
     { cmd: '/hg', usage: '/hg <message>', label: 'Highlight Announcement', desc: 'Broadcast highlighted announcement in glowing gold callout banner', icon: '⭐', adminOnly: true },
     { cmd: '/highlight', usage: '/highlight <message>', label: 'Highlight Announcement', desc: 'Broadcast highlighted announcement in glowing gold callout banner', icon: '🌟', adminOnly: true },
     { cmd: '/mute', usage: '/mute @<student> or /mute <roll>', label: 'Mute Student Messages', desc: 'Prevent student from sending messages until unmuted', icon: '🔇', adminOnly: true },
