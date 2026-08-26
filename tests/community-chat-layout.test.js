@@ -74,4 +74,10 @@ export function runCommunityChatLayoutTests(assert) {
     'T35.23: js/stream-community-chat.js strips leading slash from message text before Stream API dispatch to avoid command error');
   assert(chatJs.includes('is_highlighted: Boolean(isHighlight)') && chatJs.includes('is_question: Boolean(isQuestion)'),
     'T35.24: js/stream-community-chat.js sends explicit boolean flags for questions and highlights in custom message payload');
+
+  // --- 7. Resilient Deletion & Error Code 16 Handling ---
+  assert(chatJs.includes('errCode === 16') && chatJs.includes("doesn't exist|not found"),
+    'T35.25: js/stream-community-chat.js suppresses error code 16 / not found and removes ghost message from UI');
+  assert(healthJs.includes('isStreamDelete') && healthJs.includes('deleteMessage(messageId'),
+    'T35.26: api/health.js implements stream-delete sub-route with admin session verification');
 }

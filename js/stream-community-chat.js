@@ -1399,7 +1399,29 @@
         delBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
 
         try {
-          if (client) await client.deleteMessage(msgId);
+          if (client) {
+            try {
+              await client.deleteMessage(msgId, { hard: true });
+            } catch (delErr) {
+              const errMsg = String(delErr?.message || '');
+              const errCode = delErr?.code || delErr?.status;
+              // If message is already deleted or not found on Stream server (error 16, 404, or "doesn't exist"), proceed cleanly
+              if (errCode === 16 || errCode === 404 || /doesn't exist|not found/i.test(errMsg)) {
+                console.warn('[StreamChat Delete Note] Message already gone from server:', msgId);
+              } else {
+                // Try server-side admin delete fallback
+                const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pragyan_portal_token')) || '';
+                const srvRes = await fetch('/api/health?action=stream-delete', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                  body: JSON.stringify({ messageId: msgId })
+                }).catch(() => null);
+                if (!srvRes || !srvRes.ok) {
+                  throw delErr;
+                }
+              }
+            }
+          }
           if (activeChannel?.state?.messages) {
             activeChannel.state.messages = activeChannel.state.messages.filter(m => m.id !== msgId);
           }
@@ -1563,7 +1585,22 @@
       const pane = getActiveCommunityPane();
       if (pane) switchChannel(chId, pane);
     },
-    deleteMessage: async (msgId) => { if (client) { await client.deleteMessage(msgId); } },
+    deleteMessage: async (msgId) => {
+      if (client) {
+        try {
+          await client.deleteMessage(msgId, { hard: true });
+        } catch (delErr) {
+          const errMsg = String(delErr?.message || '');
+          const errCode = delErr?.code || delErr?.status;
+          if (errCode !== 16 && errCode !== 404 && !/doesn't exist|not found/i.test(errMsg)) {
+            console.warn('[PragyanStreamChat.deleteMessage error]', delErr);
+          }
+        }
+      }
+      if (activeChannel?.state?.messages) {
+        activeChannel.state.messages = activeChannel.state.messages.filter(m => m.id !== msgId);
+      }
+    },
     pinMessage: async (msgId) => { if (client) { await client.pinMessage({ id: msgId }); } },
     unpinMessage: async (msgId) => { if (client) { await client.unpinMessage({ id: msgId }); } },
     disconnect
