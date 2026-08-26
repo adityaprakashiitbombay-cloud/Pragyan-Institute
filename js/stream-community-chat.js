@@ -187,14 +187,18 @@
   };
 
   const SLASH_COMMANDS = [
-    { cmd: '/question', usage: '/question <question>', label: 'Ask Question / Doubt', desc: 'Post question in vibrant indigo card for mentors & classmates', icon: '❓', studentOnly: true },
-    { cmd: '/quest', usage: '/quest <question>', label: 'Ask Question / Doubt', desc: 'Post question in vibrant indigo card for mentors & classmates', icon: '💡', studentOnly: true },
-    { cmd: '/ask', usage: '/ask <question>', label: 'Ask Question / Doubt', desc: 'Post question in vibrant indigo card for mentors & classmates', icon: '❓', studentOnly: true },
+    { cmd: '/imp', usage: '/imp <message>', label: 'Very Important Announcement', desc: 'Broadcast high-priority urgent announcement in red alert card', icon: '🚨', adminOnly: true },
+    { cmd: '/important', usage: '/important <message>', label: 'Very Important Announcement', desc: 'Broadcast high-priority urgent announcement in red alert card', icon: '⚡', adminOnly: true },
     { cmd: '/hg', usage: '/hg <message>', label: 'Highlight Announcement', desc: 'Broadcast highlighted announcement in glowing gold callout banner', icon: '⭐', adminOnly: true },
     { cmd: '/highlight', usage: '/highlight <message>', label: 'Highlight Announcement', desc: 'Broadcast highlighted announcement in glowing gold callout banner', icon: '🌟', adminOnly: true },
+    { cmd: '/mute', usage: '/mute @<student> or /mute <roll>', label: 'Mute Student Messages', desc: 'Prevent student from sending messages until unmuted', icon: '🔇', adminOnly: true },
+    { cmd: '/unmute', usage: '/unmute @<student> or /unmute <roll>', label: 'Unmute Student Messages', desc: 'Restore student permission to send messages in this class', icon: '🔊', adminOnly: true },
     { cmd: '/pin', usage: '/pin <message>', label: 'Post & Pin Message', desc: 'Send message and immediately pin it to the top of group', icon: '📌', adminOnly: true },
     { cmd: '/notice', usage: '/notice <message>', label: 'Official Notice', desc: 'Post as an official class notice announcement', icon: '📢', adminOnly: true },
     { cmd: '/clear', usage: '/clear', label: 'Clear Group Chat', desc: 'Prompt to purge entire message history for this class', icon: '🧹', adminOnly: true },
+    { cmd: '/question', usage: '/question <question>', label: 'Ask Question / Doubt', desc: 'Post question in vibrant indigo card for mentors & classmates', icon: '❓', studentOnly: true },
+    { cmd: '/quest', usage: '/quest <question>', label: 'Ask Question / Doubt', desc: 'Post question in vibrant indigo card for mentors & classmates', icon: '💡', studentOnly: true },
+    { cmd: '/ask', usage: '/ask <question>', label: 'Ask Question / Doubt', desc: 'Post question in vibrant indigo card for mentors & classmates', icon: '❓', studentOnly: true },
     { cmd: '/help', usage: '/help', label: 'Show Commands', desc: 'View list of available slash commands and shortcuts', icon: '📖', forStudents: true, forAdmins: true }
   ];
 
@@ -501,12 +505,27 @@
     };
   }
 
+  function isUserMutedById(userId) {
+    if (!userId) return false;
+    const chData = activeChannel?.data || {};
+    const mutedList = chData.muted_users || chData.muted_user_ids || [];
+    if (Array.isArray(mutedList) && (mutedList.includes(userId) || mutedList.some(id => String(id).toLowerCase() === String(userId).toLowerCase()))) {
+      return true;
+    }
+    return false;
+  }
+
+  function isCurrentUserMuted() {
+    if (!currentUser || currentUser.role === 'admin') return false;
+    return isUserMutedById(currentUser.id);
+  }
+
   function formatMessageBody(rawText) {
     if (!rawText) return '';
     let text = String(rawText);
 
     // Clean slash prefixes case-insensitively
-    const cleaned = text.replace(/^\/(quest|question|doubt|ask|q|hg|highlight|star|imp|important|pin|sticky|notice|announcement|announce)\s*/i, '').trim();
+    const cleaned = text.replace(/^\/(quest|question|doubt|ask|q|hg|highlight|star|imp|important|urgent|alert|pin|sticky|notice|announcement|announce)\s*/i, '').trim();
     if (cleaned) {
       text = cleaned;
     }
@@ -1098,10 +1117,14 @@
       const identity = extractUserBadge(m.user, channelMeta);
       const isFaculty = identity.isFaculty;
 
+      const isImportant = Boolean(m.is_important) || m.custom_type === 'important' || (m.text && /^\/(imp|important|urgent|alert)\b/i.test(m.text));
       const isQuestion = Boolean(m.is_question) || m.custom_type === 'question' || (m.text && /^\/(quest|question|doubt|ask|q)\b/i.test(m.text));
-      const isHighlight = Boolean(m.is_highlighted) || m.custom_type === 'highlight' || (m.text && /^\/(hg|highlight|star|imp|important)\b/i.test(m.text));
+      const isHighlight = Boolean(m.is_highlighted) || m.custom_type === 'highlight' || (m.text && /^\/(hg|highlight|star)\b/i.test(m.text));
       const isPinned = m.pinned || m.is_pinned || Boolean(m.pinned_at);
       const isNotice = Boolean(m.is_notice) || m.custom_type === 'notice' || (m.text && /^\/(notice|announcement|announce)\b/i.test(m.text));
+
+      const isStudentSender = !isFaculty && (m.user?.role !== 'admin' && !m.user?.id?.startsWith('admin_'));
+      const isTargetMuted = isUserMutedById(m.user?.id);
 
       const avatar = m.user?.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.user?.name || 'User')}&background=${isFaculty ? 'D97706' : '064E3B'}&color=fff`;
       const formattedBody = formatMessageBody(m.text || '');
@@ -1128,13 +1151,18 @@
         `;
       }
 
-      // Message Actions (Reply for everyone, Pin/Delete for Admin)
+      // Message Actions (Reply for everyone, Mute/Pin/Delete for Admin)
       let actionsHtml = `
         <span class="stream-msg-actions" style="display: inline-flex; align-items: center; gap: 0.2rem; margin-left: 0.35rem;">
           <button type="button" class="btn-reply-msg" data-reply-msg="${escapeHtml(m.id)}" data-reply-author="${escapeHtml(m.user?.name || 'User')}" data-reply-text="${escapeHtml((m.text || '').substring(0, 100))}" style="background: rgba(0,0,0,0.06); border: none; font-size: 0.65rem; color: #475569; cursor: pointer; padding: 2px 5px; border-radius: 4px; font-weight: 700; line-height: 1; display: inline-flex; align-items: center; gap: 0.2rem;" title="Reply to this message" aria-label="Reply to message">
             <i class="fa-solid fa-reply" aria-hidden="true"></i> <span>Reply</span>
           </button>
           ${currentUser.role === 'admin' ? `
+            ${isStudentSender ? `
+              <button type="button" class="btn-toggle-mute" data-mute-student="${escapeHtml(m.user?.id || '')}" data-student-name="${escapeHtml(m.user?.name || '')}" data-is-muted="${isTargetMuted ? 'true' : 'false'}" style="background: ${isTargetMuted ? 'rgba(239, 68, 68, 0.15)' : 'rgba(0,0,0,0.06)'}; border: none; font-size: 0.65rem; color: ${isTargetMuted ? '#DC2626' : '#64748B'}; cursor: pointer; padding: 2px 5px; border-radius: 4px; font-weight: 700; line-height: 1; display: inline-flex; align-items: center; gap: 0.2rem;" title="${isTargetMuted ? 'Unmute student messages' : 'Mute student from sending messages'}">
+                <i class="fa-solid ${isTargetMuted ? 'fa-volume-high' : 'fa-volume-xmark'}"></i> <span>${isTargetMuted ? 'Unmute' : 'Mute'}</span>
+              </button>
+            ` : ''}
             <button type="button" class="${isPinned ? 'btn-unpin-msg' : 'btn-pin-msg'}" data-${isPinned ? 'unpin' : 'pin'}-msg="${escapeHtml(m.id)}" style="background: rgba(0,0,0,0.06); border: none; font-size: 0.65rem; color: ${isPinned ? '#D97706' : '#059669'}; cursor: pointer; padding: 2px 5px; border-radius: 4px; font-weight: 700; line-height: 1;" title="${isPinned ? 'Unpin message' : 'Pin to top'}">
               <i class="fa-solid fa-thumbtack" aria-hidden="true"></i> ${isPinned ? 'Unpin' : 'Pin'}
             </button>
@@ -1146,7 +1174,27 @@
       `;
 
       let bubbleContentHtml = '';
-      if (isQuestion) {
+      if (isImportant) {
+        bubbleContentHtml = `
+          <div class="stream-msg-bubble stream-msg-important" style="background: linear-gradient(135deg, #FEF2F2 0%, #FFF1F2 100%); color: #7F1D1D; border: 2px solid #EF4444; padding: 0.5rem 0.8rem; border-radius: 10px; font-size: 0.9rem; line-height: 1.45; box-shadow: 0 4px 16px rgba(239, 68, 68, 0.2); position: relative;">
+            <div style="font-size: 0.72rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; color: #DC2626; margin-bottom: 0.25rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; border-bottom: 1.5px solid rgba(239, 68, 68, 0.25); padding-bottom: 0.25rem;">
+              <span style="display: inline-flex; align-items: center; gap: 0.3rem;">
+                <span>🚨</span> <strong>VERY IMPORTANT ANNOUNCEMENT</strong>
+              </span>
+              ${isPinned ? `<span style="font-size: 0.65rem; color: #991B1B; background: #FECACA; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 800;"><i class="fa-solid fa-thumbtack"></i> Pinned</span>` : '<span style="font-size: 0.65rem; color: #FFF; background: #DC2626; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 900;">HIGH PRIORITY</span>'}
+            </div>
+            ${quoteHeaderHtml}
+            <div style="font-weight: 700; color: #7F1D1D; font-size: 0.92rem;">
+              ${formattedBody}
+            </div>
+            ${attachmentsHtml}
+            <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.35rem; margin-top: 0.25rem; font-size: 0.66rem; color: #DC2626;">
+              <span>${timeStr}</span>
+              ${actionsHtml}
+            </div>
+          </div>
+        `;
+      } else if (isQuestion) {
         bubbleContentHtml = `
           <div class="stream-msg-bubble stream-msg-question" style="background: linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%); color: #1E1B4B; border: 1.5px solid #6366F1; padding: 0.45rem 0.75rem; border-radius: 10px; font-size: 0.88rem; line-height: 1.4; box-shadow: 0 2px 8px rgba(99, 102, 241, 0.15); position: relative;">
             <div style="font-size: 0.7rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.3px; color: #4338CA; margin-bottom: 0.2rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; border-bottom: 1px solid rgba(99, 102, 241, 0.2); padding-bottom: 0.2rem;">
@@ -1266,7 +1314,7 @@
   function showHelpModal() {
     const isAdminUser = currentUser?.role === 'admin';
     if (isAdminUser) {
-      alert('✨ Available Admin & Faculty Broadcast Commands:\n\n• ↩️ Reply button — Reply to any student message with quote reference\n• 📎 Paperclip icon — Upload PDF notes & study images (up to 20 MB)\n• ⭐ Quick Highlight or /hg <text> — Broadcast highlighted announcement in gold callout card\n• /pin <text> — Post and immediately pin announcement\n• /notice <text> — Broadcast official class notice\n• /clear — Clear group message history\n• @<name> — Mention specific student\n• /help — Show this help menu');
+      alert('✨ Available Admin & Faculty Broadcast Commands:\n\n• 🚨 /imp <text> — Broadcast high-priority very important announcement in red alert banner\n• ⭐ /hg <text> — Broadcast highlighted announcement in gold callout banner\n• 🔇 /mute @<student> — Mute student from sending messages in this class\n• 🔊 /unmute @<student> — Unmute student and restore message permissions\n• 📌 /pin <text> — Post and immediately pin announcement to the top\n• 📢 /notice <text> — Broadcast official class notice\n• 📎 Paperclip icon — Upload PDF notes & study images (up to 20 MB)\n• ↩️ Reply button — Reply to any student message with quote reference\n• 🧹 /clear — Clear group message history\n• @<name> — Mention / tag specific student\n• /help — Show this help menu');
     } else {
       alert('✨ Available Student Commands:\n\n• ❓ Question button or /question <doubt> — Ask academic doubt / question (highlighted in indigo card for mentors & classmates)\n• ↩️ Reply button — Reply directly to classmate or faculty message\n• 📁 Class Media tab — Browse & download all PDFs, chapter notes & diagrams\n• @<name> — Mention a classmate or student\n• /help — Show commands');
     }
@@ -1521,8 +1569,16 @@
         <!-- FLOATING AUTOCOMPLETE DROPDOWN (@MENTIONS & /SLASH COMMANDS) -->
         <div id="stream-autocomplete-box" style="display: none; position: absolute; bottom: 58px; left: 0.75rem; right: 0.75rem; max-height: 220px; overflow-y: auto; background: #FFFFFF; border: 1.5px solid var(--border-sand, #CBD5E1); border-radius: 10px; box-shadow: 0 12px 35px rgba(0,0,0,0.16); z-index: 9999; padding: 0.3rem 0;"></div>
 
+        ${isCurrentUserMuted() ? `
+          <!-- Muted Student Warning Banner -->
+          <div id="stream-muted-banner" style="background: #FEF2F2; color: #991B1B; border-top: 1.5px solid #FCA5A5; padding: 0.45rem 0.85rem; font-size: 0.78rem; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 0.4rem; flex-shrink: 0; box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);">
+            <i class="fa-solid fa-microphone-slash" style="color: #DC2626; font-size: 0.95rem;"></i>
+            <span>You have been muted by faculty for this class. You cannot send messages until unmuted by an instructor.</span>
+          </div>
+        ` : ''}
+
         <!-- COMPOSER INPUT BAR -->
-        <form id="stream-chat-form" style="display: flex; align-items: center; gap: 0.4rem; padding: 0.55rem 0.85rem; background: #FFFFFF; border-top: 1.5px solid var(--border-sand, #DDD5CD); flex-shrink: 0; position: relative;">
+        <form id="stream-chat-form" style="display: flex; align-items: center; gap: 0.4rem; padding: 0.55rem 0.85rem; background: ${isCurrentUserMuted() ? '#F8FAFC' : '#FFFFFF'}; border-top: 1.5px solid var(--border-sand, #DDD5CD); flex-shrink: 0; position: relative;">
           ${isAdmin ? `
             <!-- Admin Attach File (PDF / Images up to 20MB) -->
             <button type="button" id="btn-stream-attach" title="Attach PDF notes or image (up to 20 MB)" style="background: #ECFDF5; color: #065F46; border: 1.5px solid #A7F3D0; width: 38px; height: 38px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 1rem; cursor: pointer; flex-shrink: 0; transition: all 0.15s ease;" aria-label="Attach PDF or Image">
@@ -1535,12 +1591,12 @@
             </button>
           ` : `
             <!-- Student Quick Question Button -->
-            <button type="button" id="btn-quick-quest" title="Ask academic question / doubt (/question)" style="background: #EEF2FF; color: #4F46E5; border: 1.5px solid #C7D2FE; width: 38px; height: 38px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 1rem; cursor: pointer; flex-shrink: 0;" aria-label="Ask Question prefix">
+            <button type="button" id="btn-quick-quest" ${isCurrentUserMuted() ? 'disabled' : ''} title="Ask academic question / doubt (/question)" style="background: ${isCurrentUserMuted() ? '#F1F5F9' : '#EEF2FF'}; color: ${isCurrentUserMuted() ? '#94A3B8' : '#4F46E5'}; border: 1.5px solid ${isCurrentUserMuted() ? '#CBD5E1' : '#C7D2FE'}; width: 38px; height: 38px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 1rem; cursor: ${isCurrentUserMuted() ? 'not-allowed' : 'pointer'}; flex-shrink: 0;" aria-label="Ask Question prefix">
               ❓
             </button>
           `}
-          <input type="text" id="stream-msg-input" class="portal-input" placeholder="${isAdmin ? 'Type announcement, @mention, /hg, /pin, /notice, or attach notes…' : `Message ${escapeHtml(activeMeta.shortName)} (use /question for doubts)…`}" style="flex: 1; border-radius: 8px; font-size: 16px; min-height: 40px; padding: 0.45rem 0.85rem; border: 1.5px solid var(--border-sand, #CBD5E1); background: #FAF9F6; transition: border-color 0.2s;" autocomplete="off" aria-label="Chat message">
-          <button type="submit" class="btn btn-emerald" id="btn-stream-send" style="padding: 0.45rem 1.15rem; font-weight: 800; border-radius: 8px; display: inline-flex; align-items: center; gap: 0.35rem; min-height: 40px; font-size: 0.85rem; flex-shrink: 0; box-shadow: 0 2px 8px rgba(6,78,59,0.2);">
+          <input type="text" id="stream-msg-input" class="portal-input" ${isCurrentUserMuted() ? 'disabled' : ''} placeholder="${isCurrentUserMuted() ? '🔒 You have been muted by faculty in this class' : (isAdmin ? 'Type announcement, @mention, /hg, /imp, /mute, /notice, or attach notes…' : `Message ${escapeHtml(activeMeta.shortName)} (use /question for doubts)…`)}" style="flex: 1; border-radius: 8px; font-size: 16px; min-height: 40px; padding: 0.45rem 0.85rem; border: 1.5px solid var(--border-sand, #CBD5E1); background: ${isCurrentUserMuted() ? '#F1F5F9' : '#FAF9F6'}; color: ${isCurrentUserMuted() ? '#94A3B8' : '#1E293B'}; cursor: ${isCurrentUserMuted() ? 'not-allowed' : 'text'}; transition: border-color 0.2s;" autocomplete="off" aria-label="Chat message">
+          <button type="submit" class="btn btn-emerald" id="btn-stream-send" ${isCurrentUserMuted() ? 'disabled' : ''} style="padding: 0.45rem 1.15rem; font-weight: 800; border-radius: 8px; display: inline-flex; align-items: center; gap: 0.35rem; min-height: 40px; font-size: 0.85rem; flex-shrink: 0; box-shadow: 0 2px 8px rgba(6,78,59,0.2); opacity: ${isCurrentUserMuted() ? '0.5' : '1'}; cursor: ${isCurrentUserMuted() ? 'not-allowed' : 'pointer'};">
             <span>Send</span> <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
           </button>
         </form>
@@ -1591,6 +1647,29 @@
         if (delId) {
           activeChannel.state.messages = activeChannel.state.messages.filter(m => m.id !== delId);
         }
+      } else if (eventType === 'channel.updated') {
+        if (event.channel?.muted_users) {
+          activeChannel.data.muted_users = event.channel.muted_users;
+          activeChannel.data.muted_user_ids = event.channel.muted_users;
+          const pane = getActiveCommunityPane();
+          if (pane) renderUI(pane);
+          return;
+        }
+      } else if (eventType === 'user.banned' || eventType === 'user.unbanned') {
+        const bannedUserId = event.user?.id;
+        if (bannedUserId && activeChannel?.data) {
+          let mutedList = Array.isArray(activeChannel.data.muted_users) ? [...activeChannel.data.muted_users] : [];
+          if (eventType === 'user.banned') {
+            if (!mutedList.includes(bannedUserId)) mutedList.push(bannedUserId);
+          } else {
+            mutedList = mutedList.filter(id => id !== bannedUserId);
+          }
+          activeChannel.data.muted_users = mutedList;
+          activeChannel.data.muted_user_ids = mutedList;
+          const pane = getActiveCommunityPane();
+          if (pane) renderUI(pane);
+          return;
+        }
       } else if (eventType === 'channel.truncated' || eventType === 'notification.channel_truncate') {
         activeChannel.state.messages = [];
       }
@@ -1604,6 +1683,8 @@
       'message.deleted',
       'channel.updated',
       'channel.truncated',
+      'user.banned',
+      'user.unbanned',
       'notification.message_new',
       'notification.channel_truncate'
     ];
@@ -1637,6 +1718,118 @@
         if (box) box.textContent = '';
       }
     });
+  }
+
+  async function handlePinAction(messageId, pin = true) {
+    if (!messageId) return;
+    const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pragyan_portal_token')) || '';
+
+    // Update in-memory message state
+    if (activeChannel?.state?.messages) {
+      const msg = activeChannel.state.messages.find(m => m.id === messageId);
+      if (msg) {
+        msg.pinned = Boolean(pin);
+        msg.is_pinned = Boolean(pin);
+        msg.pinned_at = pin ? new Date().toISOString() : null;
+      }
+    }
+
+    try {
+      if (client) {
+        if (pin) {
+          try { await client.pinMessage({ id: messageId }); } catch (_) {}
+        } else {
+          try { await client.unpinMessage({ id: messageId }); } catch (_) {}
+        }
+      }
+
+      // Server-side pin sync to broadcast real-time event to all students
+      if (token) {
+        await fetch('/api/health?action=stream-pin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ messageId, pin: Boolean(pin) })
+        }).catch(() => null);
+      }
+
+      renderPinnedBarAndList();
+    } catch (err) {
+      console.warn('[Pin action warning]', err);
+      renderPinnedBarAndList();
+    }
+  }
+
+  async function handleMuteAction(targetUserId, studentName, shouldMute, containerEl) {
+    if (!targetUserId) return;
+    const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pragyan_portal_token')) || '';
+    const targetPane = containerEl || getActiveCommunityPane();
+
+    try {
+      const res = await fetch(`/api/health?action=${shouldMute ? 'stream-mute' : 'stream-unmute'}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          studentId: targetUserId,
+          studentName: studentName || '',
+          channelId: activeChannelId,
+          channelType: 'livestream'
+        })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Server mute request failed');
+      }
+
+      // Update local channel data
+      if (activeChannel?.data) {
+        let mutedList = Array.isArray(activeChannel.data.muted_users) ? [...activeChannel.data.muted_users] : [];
+        if (shouldMute) {
+          if (!mutedList.includes(targetUserId)) mutedList.push(targetUserId);
+        } else {
+          mutedList = mutedList.filter(id => id !== targetUserId);
+        }
+        activeChannel.data.muted_users = mutedList;
+        activeChannel.data.muted_user_ids = mutedList;
+      }
+
+      if (targetPane) {
+        renderUI(targetPane);
+      }
+
+      alert(`✅ Student ${studentName ? `@${studentName}` : targetUserId} has been ${shouldMute ? 'muted' : 'unmuted'} for this class.`);
+    } catch (err) {
+      console.error('[StreamChat Mute Error]', err);
+      alert(`❌ Failed to ${shouldMute ? 'mute' : 'unmute'} student: ${err.message}`);
+    }
+  }
+
+  async function handleMuteStudentCommand(targetArg, shouldMute, containerEl) {
+    const cleanQuery = targetArg.replace(/^@/, '').trim().toLowerCase();
+    const students = getStudentsListForMention('');
+    let matchedStudent = students.find(s => {
+      const sName = (s.name || s.studentName || '').toLowerCase();
+      const sRoll = String(s.rollNo || s.roll_no || s.student_id || '').toLowerCase();
+      const sId = String(s.id || '').toLowerCase();
+      return sName === cleanQuery || sRoll === cleanQuery || sId === cleanQuery || sName.includes(cleanQuery);
+    });
+
+    let targetUserId = '';
+    let studentDisplayName = '';
+
+    if (matchedStudent) {
+      const rollOrId = matchedStudent.rollNo || matchedStudent.roll_no || matchedStudent.student_id || matchedStudent.id;
+      targetUserId = `student_${String(rollOrId).toLowerCase().replace(/[^a-zA-Z0-9_-]/g, '')}`;
+      studentDisplayName = matchedStudent.name || matchedStudent.studentName || rollOrId;
+    } else {
+      targetUserId = cleanQuery.startsWith('student_') ? cleanQuery : `student_${cleanQuery.replace(/[^a-zA-Z0-9_-]/g, '')}`;
+      studentDisplayName = targetArg;
+    }
+
+    await handleMuteAction(targetUserId, studentDisplayName, shouldMute, containerEl);
   }
 
   function wireEvents(container) {
@@ -2190,6 +2383,24 @@
         }
         return;
       }
+
+      // 20. Admin Mute / Unmute Student Message Action
+      const muteBtn = e.target.closest('.btn-toggle-mute');
+      if (muteBtn) {
+        e.preventDefault();
+        const studentId = muteBtn.dataset.muteStudent;
+        const studentName = muteBtn.dataset.studentName || 'Student';
+        const isMutedNow = muteBtn.dataset.isMuted === 'true';
+        if (!studentId) return;
+
+        const confirmMsg = isMutedNow
+          ? `🔊 Unmute @${studentName}?\n\nThis will restore their permission to send messages in this class.`
+          : `🔇 Mute @${studentName}?\n\nThis will prevent this student from sending any messages in this class until you unmute them.`;
+        if (!confirm(confirmMsg)) return;
+
+        await handleMuteAction(studentId, studentName, !isMutedNow, container);
+        return;
+      }
     });
 
     // Close autocomplete on click outside
@@ -2216,6 +2427,13 @@
 
       hideAutocomplete();
 
+      // Guard: Block muted students from submitting messages
+      if (isCurrentUserMuted()) {
+        alert('🚫 You have been muted by faculty for this class. You cannot send messages until you are unmuted.');
+        input.value = '';
+        return;
+      }
+
       // Handle Slash Commands
       if (rawText === '/clear') {
         input.value = '';
@@ -2228,17 +2446,37 @@
         return;
       }
 
+      const isMuteCommand = /^\/mute\b/i.test(rawText);
+      const isUnmuteCommand = /^\/unmute\b/i.test(rawText);
+      if (isMuteCommand || isUnmuteCommand) {
+        input.value = '';
+        if (currentUser?.role !== 'admin') {
+          alert('⚠️ Only faculty and administrators can mute or unmute students.');
+          return;
+        }
+        const shouldMute = isMuteCommand;
+        const targetArg = rawText.replace(/^\/(unmute|mute)\s*/i, '').trim();
+        if (!targetArg) {
+          alert(`⚠️ Please specify the student to ${shouldMute ? 'mute' : 'unmute'}.\n\nUsage:\n• /${shouldMute ? 'mute' : 'unmute'} @StudentName\n• /${shouldMute ? 'mute' : 'unmute'} <RollNumber>\n\nExample: /${shouldMute ? 'mute' : 'unmute'} @Aarav Kumar`);
+          input.focus();
+          return;
+        }
+        await handleMuteStudentCommand(targetArg, shouldMute, container);
+        return;
+      }
+
+      const isImportant = /^\/(imp|important|urgent|alert)\b/i.test(rawText);
       const isQuestion = /^\/(quest|question|doubt|ask|q)\b/i.test(rawText);
-      const isHighlight = /^\/(hg|highlight|star|imp|important)\b/i.test(rawText);
+      const isHighlight = /^\/(hg|highlight|star)\b/i.test(rawText);
       const isPinCommand = /^\/(pin|sticky)\b/i.test(rawText);
       const isNotice = /^\/(notice|announcement|announce)\b/i.test(rawText);
 
       // Validate that user entered actual message text after command
-      const cleanBody = rawText.replace(/^\/(quest|question|doubt|ask|q|hg|highlight|star|imp|important|pin|sticky|notice|announcement|announce)\s*/i, '').trim();
-      const hasCustomFormatting = isQuestion || isHighlight || isPinCommand || isNotice;
+      const cleanBody = rawText.replace(/^\/(imp|important|urgent|alert|quest|question|doubt|ask|q|hg|highlight|star|pin|sticky|notice|announcement|announce)\s*/i, '').trim();
+      const hasCustomFormatting = isImportant || isQuestion || isHighlight || isPinCommand || isNotice;
 
       if (hasCustomFormatting && !cleanBody) {
-        alert('⚠️ Please type your message text after the slash command (e.g. /hg Exam schedule or /quest What is thermodynamics?)');
+        alert(`⚠️ Please type your message text after the slash command (e.g. ${isImportant ? '/imp Exam postponed to Monday' : (isHighlight ? '/hg Live lecture at 5 PM' : '/question What is thermodynamics?')})`);
         input.focus();
         return;
       }
@@ -2256,10 +2494,11 @@
       try {
         const msgPayload = {
           text: textToSend,
+          is_important: Boolean(isImportant),
           is_question: Boolean(isQuestion),
           is_highlighted: Boolean(isHighlight),
           is_notice: Boolean(isNotice),
-          custom_type: isQuestion ? 'question' : (isHighlight ? 'highlight' : (isNotice ? 'notice' : 'text'))
+          custom_type: isImportant ? 'important' : (isQuestion ? 'question' : (isHighlight ? 'highlight' : (isNotice ? 'notice' : 'text')))
         };
 
         if (replyingToMessage) {

@@ -294,6 +294,107 @@ export default async function handler(req, res) {
     }
   }
 
+  // Stream mute/unmute student sub-route (Admin Only)
+  const isStreamMute = (req.url && (req.url.includes('stream-mute') || req.url.includes('action=stream-mute') || req.url.includes('route=stream-mute'))) ||
+    req.query?.action === 'stream-mute' ||
+    req.query?.route === 'stream-mute' ||
+    (req.headers['x-matched-path'] && req.headers['x-matched-path'].includes('stream-mute')) ||
+    (req.headers['x-vercel-matched-path'] && req.headers['x-vercel-matched-path'].includes('stream-mute'));
+
+  const isStreamUnmute = (req.url && (req.url.includes('stream-unmute') || req.url.includes('action=stream-unmute') || req.url.includes('route=stream-unmute'))) ||
+    req.query?.action === 'stream-unmute' ||
+    req.query?.route === 'stream-unmute' ||
+    (req.headers['x-matched-path'] && req.headers['x-matched-path'].includes('stream-unmute')) ||
+    (req.headers['x-vercel-matched-path'] && req.headers['x-vercel-matched-path'].includes('stream-unmute'));
+
+  if (isStreamMute || isStreamUnmute) {
+    if (req.method !== 'POST') {
+      return res.status(405).json({ success: false, error: 'Method not allowed' });
+    }
+    const session = requireSession(req, res, ['admin']);
+    if (!session) return;
+
+    const apiKey = process.env.STREAM_API_KEY || 'w9gs6k2jh9wg';
+    const apiSecret = process.env.STREAM_API_SECRET || '76mehp9ua5k2dr65g2na5p52gr34a3thzgkjncbd56u7arvggdhgpnnpc4df4c7s';
+    if (!apiKey || !apiSecret) {
+      return res.status(503).json({ success: false, error: 'Stream Chat service is not configured on server' });
+    }
+
+    const { studentId, channelId = 'batch-BAT-10', channelType = 'livestream', studentName = '' } = req.body || {};
+    if (!studentId) {
+      return res.status(400).json({ success: false, error: 'studentId is required' });
+    }
+
+    const shouldMute = isStreamMute;
+
+    try {
+      const serverClient = StreamChat.getInstance(apiKey, apiSecret);
+      const ch = serverClient.channel(channelType, channelId);
+
+      // Normalize target user ID
+      const targetUserId = studentId.startsWith('student_') ? studentId : `student_${String(studentId).toLowerCase().replace(/[^a-zA-Z0-9_-]/g, '')}`;
+
+      const adminName = session.name || 'Chandan Kumar';
+      const adminId = `admin_${String(session.username || 'chandan').toLowerCase()}`;
+
+      // 1. Channel-level ban/unban on Stream Chat
+      if (shouldMute) {
+        try {
+          await ch.banUser(targetUserId, { reason: 'Muted by teacher', user_id: adminId });
+        } catch (_) {
+          try { await serverClient.banUser(targetUserId, { reason: 'Muted by teacher', banned_by_id: adminId }); } catch (_) {}
+        }
+      } else {
+        try {
+          await ch.unbanUser(targetUserId);
+        } catch (_) {
+          try { await serverClient.unbanUser(targetUserId); } catch (_) {}
+        }
+      }
+
+      // 2. Fetch current channel state and update muted_users array
+      try {
+        const queryRes = await ch.query().catch(() => null);
+        let currentMuted = Array.isArray(queryRes?.channel?.muted_users) ? queryRes.channel.muted_users : [];
+        if (shouldMute) {
+          if (!currentMuted.includes(targetUserId)) currentMuted.push(targetUserId);
+        } else {
+          currentMuted = currentMuted.filter(id => id !== targetUserId);
+        }
+
+        await ch.updatePartial({
+          set: {
+            muted_users: currentMuted,
+            muted_user_ids: currentMuted
+          }
+        }).catch(() => {});
+      } catch (_) {}
+
+      // 3. Post system notice in the channel
+      try {
+        const displayName = studentName ? `@${studentName}` : targetUserId;
+        await ch.sendMessage({
+          text: shouldMute
+            ? `🔇 ${displayName} has been muted by ${adminName}. They cannot send messages until unmuted.`
+            : `🔊 ${displayName} has been unmuted by ${adminName}. They can now send messages.`,
+          user: { id: adminId, name: adminName, role: 'admin' },
+          is_system_notice: true
+        }).catch(() => {});
+      } catch (_) {}
+
+      return res.status(200).json({
+        success: true,
+        muted: Boolean(shouldMute),
+        studentId: targetUserId,
+        channelId,
+        message: `Student ${targetUserId} has been successfully ${shouldMute ? 'muted' : 'unmuted'}.`
+      });
+    } catch (err) {
+      console.error('[health/stream-mute] error:', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
   // Stream file/image upload sub-route (Admin Only, Up to 20MB)
   const isStreamUpload = (req.url && (req.url.includes('stream-upload') || req.url.includes('action=stream-upload') || req.url.includes('route=stream-upload'))) ||
     req.query?.action === 'stream-upload' ||

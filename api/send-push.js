@@ -40,6 +40,8 @@ function interpolate(template, student = {}) {
   const receiptNo = student.receipt_no || student.receiptNo || '';
   const instituteName = 'Pragyan Institute';
 
+  const payUrl = studentId ? `/pay.html?id=${encodeURIComponent(studentId)}&name=${encodeURIComponent(studentName)}&amount=${encodeURIComponent(duesAmount || 0)}` : '/pay.html';
+
   let todayFormatted = '';
   let monthFormatted = '';
   try {
@@ -62,6 +64,8 @@ function interpolate(template, student = {}) {
     .replace(/\{{1,2}\s*(?:roll_no|rollNo|roll_number|rollNumber|roll)\s*\}{1,2}/gi, rollNo)
     // Student ID tags
     .replace(/\{{1,2}\s*(?:student_id|studentId|id|admission_no|reg_no)\s*\}{1,2}/gi, studentId)
+    // Personalized Payment URL tags
+    .replace(/\{{1,2}\s*(?:pay_url|payment_url|pay_link|payment_link)\s*\}{1,2}/gi, payUrl)
     // Guardian / Parent tags
     .replace(/\{{1,2}\s*(?:guardian_name|guardianName|parent_name|parentName|father_name|fatherName)\s*\}{1,2}/gi, guardianName || 'Parent/Guardian')
     // Mobile / Contact tags
@@ -73,6 +77,28 @@ function interpolate(template, student = {}) {
     // Institute & Receipt tags
     .replace(/\{{1,2}\s*(?:institute_name|instituteName|institute)\s*\}{1,2}/gi, instituteName)
     .replace(/\{{1,2}\s*(?:receipt_no|receiptNo)\s*\}{1,2}/gi, receiptNo);
+}
+
+function resolveActionUrl(url, actionTitle, student = {}) {
+  const sid = student.student_id || student.roll_no || student.id || '';
+  const sName = student.name || student.student_name || student.studentName || '';
+  const duesAmount = student.pending_balance ?? student.pending_fee ?? student.pendingFee ?? (Number(student.total_fee || 0) - Number(student.paid_fee || 0)) ?? 0;
+
+  let cleanUrl = interpolate(url || '/', student);
+
+  // If this action is to Pay Fees (via title or pay.html url), append personalized payment query params
+  const isPayAction = cleanUrl.includes('pay.html') || /pay\s*fee|clear\s*due|pay\s*dues/i.test(actionTitle || '') || /pay/i.test(cleanUrl);
+  if (isPayAction && sid) {
+    const params = new URLSearchParams();
+    params.set('id', sid);
+    if (sName) params.set('name', sName);
+    if (duesAmount > 0) params.set('amount', duesAmount);
+    const qs = params.toString();
+    const basePath = cleanUrl.includes('pay.html') ? cleanUrl.split('?')[0] : '/pay.html';
+    cleanUrl = `${basePath}?${qs}`;
+  }
+
+  return cleanUrl;
 }
 
 export default async function handler(req, res) {
@@ -313,9 +339,30 @@ export default async function handler(req, res) {
       }
     }
 
-    let targetSubs = subscriptions;
+    // Single Active Device per Student Policy:
+    // If a student is subscribed on multiple devices, overwrite/filter so we only send to their latest active device.
+    const studentLatestDeviceMap = new Map();
+    for (const sub of (subscriptions || [])) {
+      const sKey = (sub.student_id || '').trim().toLowerCase();
+      if (!sKey) {
+        // Skip unbound/anonymous endpoints (only students devices receive notifications)
+        continue;
+      }
+      const existing = studentLatestDeviceMap.get(sKey);
+      if (!existing) {
+        studentLatestDeviceMap.set(sKey, sub);
+      } else {
+        const existingTime = new Date(existing.updated_at || existing.created_at || 0).getTime();
+        const subTime = new Date(sub.updated_at || sub.created_at || 0).getTime();
+        if (subTime >= existingTime) {
+          studentLatestDeviceMap.set(sKey, sub);
+        }
+      }
+    }
+
+    let targetSubs = Array.from(studentLatestDeviceMap.values());
     if (targetType === 'DUES') {
-      targetSubs = subscriptions.filter(s => {
+      targetSubs = targetSubs.filter(s => {
         const stud = studentMap.get(s.student_id) || (s.student_id ? studentMap.get(String(s.student_id).toLowerCase()) : null);
         return stud && Number(stud.pending_balance || stud.pending_fee || 0) > 0;
       });
@@ -338,8 +385,10 @@ export default async function handler(req, res) {
         const messageBody = interpolate(rawBody, studentInfo);
         const resolvedActions = actions.map(act => ({
           ...act,
-          url: interpolate(act.url, studentInfo)
+          url: resolveActionUrl(act.url, act.title, studentInfo)
         }));
+
+        const primaryUrl = resolvedActions[0]?.url || (studentInfo.student_id ? `/pay.html?id=${encodeURIComponent(studentInfo.student_id)}&name=${encodeURIComponent(studentInfo.name || '')}` : '/portal.html');
 
         const payloadObj = {
           title,
@@ -347,7 +396,7 @@ export default async function handler(req, res) {
           icon: '/assets/images/logo.png',
           badge: '/assets/images/logo.png',
           image: image || undefined,
-          url: resolvedActions[0]?.url || (sub.student_id ? '/portal.html' : '/'),
+          url: primaryUrl,
           actions: resolvedActions,
           priority,
           timestamp: Date.now()

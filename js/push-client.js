@@ -205,9 +205,19 @@
         }
 
         const targetStudent = student || (typeof AppState !== 'undefined' && AppState.currentUser) || null;
+        if (targetStudent?.role === 'admin' || (typeof AppState !== 'undefined' && AppState.currentUser?.role === 'admin')) {
+          console.log('[PushClient] Admin devices are not registered for student push notifications.');
+          return true;
+        }
+
         let studentId = targetStudent?.student_id || targetStudent?.roll_no || targetStudent?.rollNo || null;
         if (!studentId && targetStudent?.id && !String(targetStudent.id).includes('-')) {
           studentId = targetStudent.id;
+        }
+
+        if (!studentId) {
+          console.log('[PushClient] No student session found; skipping push device registration.');
+          return false;
         }
 
         let batchId = targetStudent?.batch_id || targetStudent?.batchId || null;

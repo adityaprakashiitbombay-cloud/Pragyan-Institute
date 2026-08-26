@@ -482,6 +482,15 @@ export default async function handler(req, res) {
         .range(offset, offset + limit - 1);
       result = await addWhere(query, filters.where);
     } else if (operation === 'insert') {
+      if (table === 'push_subscriptions') {
+        const studentId = session?.sub || (data && typeof data === 'object' && (data.student_id || data[0]?.student_id));
+        if (studentId) {
+          const newEndpoint = (data && typeof data === 'object' && (data.endpoint || data[0]?.endpoint)) || '';
+          if (newEndpoint) {
+            await supabase.from('push_subscriptions').delete().eq('student_id', studentId).neq('endpoint', newEndpoint).catch(() => {});
+          }
+        }
+      }
       result = await supabase.from(table).insert(rows(data)).select(readColumns(table));
     } else if (operation === 'upsert') {
       if (!filters.conflict) {
@@ -491,6 +500,15 @@ export default async function handler(req, res) {
         else if (table === 'batches') filters.conflict = 'batch_id';
         else if (table === 'students') filters.conflict = 'student_id';
         else return res.status(400).json({ success: false, error: 'Missing conflict column for upsert' });
+      }
+      if (table === 'push_subscriptions') {
+        const studentId = session?.sub || (data && typeof data === 'object' && (data.student_id || data[0]?.student_id));
+        if (studentId) {
+          const newEndpoint = (data && typeof data === 'object' && (data.endpoint || data[0]?.endpoint)) || '';
+          if (newEndpoint) {
+            await supabase.from('push_subscriptions').delete().eq('student_id', studentId).neq('endpoint', newEndpoint).catch(() => {});
+          }
+        }
       }
       let upsertRows = rows(data);
       if (table === 'blog_posts' || table === 'batches' || table === 'students') {

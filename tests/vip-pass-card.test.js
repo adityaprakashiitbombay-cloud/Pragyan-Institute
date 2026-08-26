@@ -48,4 +48,10 @@ export function runVipPassCardTests(assert) {
     'T30.15: js/portal.js displays complete institutional campus address and PIN code');
   assert(portalCss.includes('.back-contact-help'),
     'T30.16: portal.css formats campus address with location pin icon and proper line height');
+
+  // --- 5. Front Card Inspiring Academic Quote Badge Suite ---
+  assert(portalJs.includes('metallic-front-quote-badge') && portalJs.includes('Knowledge is the supreme beacon of empowerment &amp; wisdom'),
+    'T30.17: js/portal.js renders front face inspiring academic quote badge between session row and barcode');
+  assert(portalCss.includes('.metallic-id-front-quote-wrap') && portalCss.includes('.metallic-front-quote-badge') && portalCss.includes('.metallic-quote-text'),
+    'T30.18: portal.css defines responsive typography and styling for front face quote badge across all screen sizes');
 }

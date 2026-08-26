@@ -140,4 +140,8 @@ export async function runPushNotificationTests(assert) {
     'T28.54: api/send-push.js resolves student profiles across student_id, UUID id, and roll_no');
   assert(portalJs.includes("insertTextAtCursor") && portalJs.includes("btn-var-tag"),
     'T28.55: js/portal.js provides smart cursor tag insertion for push composer');
+  assert(sendPushJsH.includes("pay.html?id=") && sendPushJsH.includes("amount="),
+    'T28.56: api/send-push.js builds personalized payment links with student id and pending dues in action buttons');
+  assert(dbJs.includes("delete().eq('student_id', studentId).neq('endpoint', newEndpoint)") && dbJs.includes("push_subscriptions"),
+    'T28.57: api/db.js implements single active device per student policy by purging previous subscriptions on new device login');
 }

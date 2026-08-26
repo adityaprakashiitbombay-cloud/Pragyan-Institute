@@ -43,15 +43,16 @@
   <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
   <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
 
-  <!-- Font Awesome Icons -->
+  <!-- Font Awesome Icons & Map Leaflet -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 
   <!-- CSS Design System -->
-  <link rel="stylesheet" href="./css/variables.css?v=90.0.a48e679d">
-  <link rel="stylesheet" href="./css/main.css?v=90.0.a48e679d">
-  <link rel="stylesheet" href="./css/components.css?v=90.0.a48e679d">
-  <link rel="stylesheet" href="./css/animations.css?v=90.0.a48e679d">
-  <link rel="stylesheet" href="./css/portal.css?v=90.0.a48e679d">
+  <link rel="stylesheet" href="./css/variables.css?v=90.0.ecc319f0">
+  <link rel="stylesheet" href="./css/main.css?v=90.0.ecc319f0">
+  <link rel="stylesheet" href="./css/components.css?v=90.0.ecc319f0">
+  <link rel="stylesheet" href="./css/animations.css?v=90.0.ecc319f0">
+  <link rel="stylesheet" href="./css/portal.css?v=90.0.ecc319f0">
 
   <!-- Schema.org JSON-LD Structured Data for Google Top Ranking & Knowledge Graph -->
   <script type="application/ld+json">
@@ -1094,9 +1095,9 @@
 
         <!-- Location Info & Map -->
         <div>
-          <div class="map-card">
-            <!-- High Reliability Map Embed for Pragyan Institute Lalganj, Vaishali, Bihar -->
-            <iframe src="https://www.openstreetmap.org/export/embed.html?bbox=85.1664%2C25.8613%2C85.1864%2C25.8773&amp;layer=mapnik&amp;marker=25.8693%2C85.1764" width="100%" height="280" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Pragyan Institute Lalganj Vaishali Bihar Map Location"></iframe>
+          <div class="map-card" style="position: relative; width: 100%; height: 320px; border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--border-sand); box-shadow: var(--shadow-sm); margin-bottom: 1.5rem; background: #e5e7eb;">
+            <!-- Interactive Full-Width Leaflet Map for Pragyan Institute Lalganj -->
+            <div id="contact-map" style="width: 100%; height: 100%; min-height: 320px;" aria-label="Pragyan Institute Lalganj Location Map"></div>
           </div>
           <a href="https://maps.app.goo.gl/jhpW5ynQntfTMa2aA" target="_blank" rel="noopener" class="btn btn-outline-terracotta" style="width: 100%; margin-bottom: 1.5rem;">
             <i aria-hidden="true" class="fa-solid fa-map-location-dot"></i> Open Directions in Google Maps
@@ -1538,24 +1539,25 @@
   <!-- Application Scripts -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
-  <script defer src="./js/config.js?v=90.0.a48e679d"></script>
+  <script defer src="./js/config.js?v=90.0.ecc319f0"></script>
   <!-- Canonical batch/fee/faculty table. Must load before app.js and portal.js,
        which read window.PRAGYAN_ACADEMIC instead of keeping their own copies. -->
-  <script defer src="./js/academic-config.js?v=90.0.a48e679d"></script>
-  <script defer src="./js/supabase-sync.js?v=90.0.a48e679d"></script>
-  <script type="module" src="./js/blog-markdown.js?v=90.0.a48e679d"></script>
+  <script defer src="./js/academic-config.js?v=90.0.ecc319f0"></script>
+  <script defer src="./js/supabase-sync.js?v=90.0.ecc319f0"></script>
+  <script type="module" src="./js/blog-markdown.js?v=90.0.ecc319f0"></script>
         <script src="https://cdn.jsdelivr.net/npm/stream-chat@8.52.0/dist/browser.full-bundle.min.js"></script>
-        <script defer src="./js/stream-community-chat.js?v=90.0.a48e679d"></script>
-  <script defer src="./js/push-client.js?v=90.0.a48e679d"></script>
-  <script defer src="./js/chat.js?v=90.0.a48e679d"></script>
-  <script defer src="./js/app.js?v=90.0.a48e679d"></script>
-  <script defer src="./js/portal.js?v=90.0.a48e679d"></script>
+        <script defer src="./js/stream-community-chat.js?v=90.0.ecc319f0"></script>
+  <script defer src="./js/push-client.js?v=90.0.ecc319f0"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script defer src="./js/chat.js?v=90.0.ecc319f0"></script>
+  <script defer src="./js/app.js?v=90.0.ecc319f0"></script>
+  <script defer src="./js/portal.js?v=90.0.ecc319f0"></script>
 
   <!-- PWA Service Worker Registration for Instant Offline Caching -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=90.0.a48e679d').then(reg => {
+        navigator.serviceWorker.register('./sw.js?v=90.0.ecc319f0').then(reg => {
           reg.update().catch(() => {});
         }).catch(err => console.log('SW reg error:', err));
       });

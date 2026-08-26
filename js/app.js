@@ -1925,10 +1925,98 @@ function initStreamToggles() {
   });
 }
 
+function initContactMap() {
+  const mapContainer = document.getElementById('contact-map');
+  if (!mapContainer) return;
+
+  function renderMapInstance() {
+    if (typeof L === 'undefined') return false;
+    if (mapContainer._leaflet_id) return true;
+
+    try {
+      const lat = 25.8672;
+      const lng = 85.1764;
+      const map = L.map('contact-map', {
+        center: [lat, lng],
+        zoom: 16,
+        scrollWheelZoom: false
+      });
+
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'
+      }).addTo(map);
+
+      const customIcon = L.divIcon({
+        className: 'map-custom-marker',
+        html: '<div style="background:#064E3B; color:#FCD34D; width:34px; height:34px; border-radius:50% 50% 50% 0; transform:rotate(-45deg); display:flex; align-items:center; justify-content:center; box-shadow:0 3px 10px rgba(0,0,0,0.35); border:2px solid #ffffff;"><i class="fa-solid fa-graduation-cap" aria-hidden="true" style="transform:rotate(45deg); font-size:15px;"></i></div>',
+        iconSize: [34, 34],
+        iconAnchor: [17, 34],
+        popupAnchor: [0, -34]
+      });
+
+      const marker = L.marker([lat, lng], { icon: customIcon }).addTo(map);
+      marker.bindPopup(
+        '<div style="font-family:inherit; padding:2px; min-width:170px;">' +
+          '<strong style="color:#064E3B; font-size:13.5px; display:block; margin-bottom:2px;">Pragyan Institute</strong>' +
+          '<span style="color:#4B5563; font-size:11.5px; line-height:1.3; display:block;">At Moti Market, Near Jagdamba Sthan, Lalganj</span>' +
+          '<a href="https://maps.app.goo.gl/jhpW5ynQntfTMa2aA" target="_blank" rel="noopener" style="display:inline-block; margin-top:5px; color:#B4543A; font-weight:700; font-size:11.5px; text-decoration:none;">Get Directions &rarr;</a>' +
+        '</div>'
+      );
+
+      function fixMapSize() {
+        if (map) map.invalidateSize();
+      }
+
+      setTimeout(fixMapSize, 100);
+      setTimeout(fixMapSize, 400);
+      setTimeout(fixMapSize, 1000);
+      window.addEventListener('resize', fixMapSize);
+
+      if ('IntersectionObserver' in window) {
+        const obs = new IntersectionObserver((entries) => {
+          if (entries[0] && entries[0].isIntersecting) {
+            fixMapSize();
+            obs.disconnect();
+          }
+        }, { threshold: 0.1 });
+        obs.observe(mapContainer);
+      }
+      return true;
+    } catch (err) {
+      console.warn('[Map Init Warning]', err);
+      return false;
+    }
+  }
+
+  if (!renderMapInstance()) {
+    if (!document.getElementById('leaflet-css')) {
+      const link = document.createElement('link');
+      link.id = 'leaflet-css';
+      link.rel = 'stylesheet';
+      link.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+      document.head.appendChild(link);
+    }
+    if (!document.getElementById('leaflet-js')) {
+      const script = document.createElement('script');
+      script.id = 'leaflet-js';
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+      script.onload = () => renderMapInstance();
+      script.onerror = () => {
+        mapContainer.innerHTML = '<iframe src="https://maps.google.com/maps?q=25.8672,85.1764&hl=en&z=16&output=embed" width="100%" height="100%" style="border:0;" allowfullscreen="" loading="lazy"></iframe>';
+      };
+      document.head.appendChild(script);
+    } else {
+      setTimeout(renderMapInstance, 250);
+    }
+  }
+}
+
 function initPublicFeatures() {
   initBlog();
   initMentorRatings();
   initStreamToggles();
+  initContactMap();
 }
 
 if (document.readyState === 'loading') {

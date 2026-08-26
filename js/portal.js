@@ -3726,6 +3726,15 @@ function renderStudentDashboard() {
               </div>
             </div>
 
+            <!-- Front Face Inspiring Academic Motto & Quote Pill -->
+            <div class="metallic-id-front-quote-wrap">
+              <div class="metallic-front-quote-badge">
+                <i aria-hidden="true" class="fa-solid fa-quote-left metallic-quote-icon"></i>
+                <span class="metallic-quote-text">Knowledge is the supreme beacon of empowerment &amp; wisdom</span>
+                <i aria-hidden="true" class="fa-solid fa-wand-magic-sparkles metallic-quote-sparkle"></i>
+              </div>
+            </div>
+
             <div class="metallic-id-barcode-wrap">
               ${generateStudentLogicalBarcodeSVG(s)}
               <div class="metallic-qr-placeholder">

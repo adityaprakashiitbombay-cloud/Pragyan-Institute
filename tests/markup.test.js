@@ -192,4 +192,15 @@ export function runMarkupTests(assert) {
     facultyGaps.length === 0,
     `T19.16: index.html names every canonical faculty member${facultyGaps.length ? ` (absent: ${facultyGaps.join(', ')})` : ''}`
   );
+
+  // --- Interactive Responsive Map ------------------------------------------
+  assert(
+    index.includes('id="contact-map"') && index.includes('leaflet'),
+    'T19.17: index.html includes responsive #contact-map container and Leaflet map assets'
+  );
+  const appJsSource = read('js/app.js');
+  assert(
+    appJsSource.includes('function initContactMap') && appJsSource.includes('invalidateSize'),
+    'T19.18: js/app.js initializes responsive Leaflet contact map with tile invalidation for all screen resolutions'
+  );
 }

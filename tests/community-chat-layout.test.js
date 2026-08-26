@@ -138,7 +138,18 @@ export function runCommunityChatLayoutTests(assert) {
     'T35.49: js/stream-community-chat.js scopes /question and /quest commands strictly for students and hides question shortcuts from teachers/admins');
   assert(chatJs.includes('btn-quick-quest') && chatJs.includes('<!-- Student Quick Question Button -->') && chatJs.includes('!isAdmin'),
     'T35.50: js/stream-community-chat.js renders #btn-quick-quest button strictly for students while reserving moderation and highlight tools for teachers');
+
+  // --- 13. Admin Highlight /hg, @mentions, /mute, /unmute, & /imp Urgent Announcements Suite ---
+  assert(chatJs.includes("cmd: '/hg'") && (chatJs.includes("is_highlighted") || chatJs.includes("stream-msg-highlight")) && portalCss.includes(".stream-msg-highlight"),
+    'T35.51: js/stream-community-chat.js implements /hg highlight command and golden highlight card rendering');
+  assert(chatJs.includes("cmd: '/mute'") && chatJs.includes("cmd: '/unmute'") && chatJs.includes("isCurrentUserMuted") && chatJs.includes("stream-muted-banner"),
+    'T35.52: js/stream-community-chat.js implements /mute and /unmute commands, muted banner, and disables message composer for muted students');
+  assert(chatJs.includes("cmd: '/imp'") && (chatJs.includes("is_important") || chatJs.includes("stream-msg-important")) && portalCss.includes(".stream-msg-important"),
+    'T35.53: js/stream-community-chat.js and css/portal.css implement /imp urgent announcement badge with glowing crimson-gold styling');
+  assert(healthJs.includes("isStreamMute") && healthJs.includes("isStreamUnmute") && healthJs.includes("banUser") && healthJs.includes("unbanUser"),
+    'T35.54: api/health.js implements stream-mute and stream-unmute subroutes with Stream API user ban/unban and channel state synchronization');
 }
+
 
 
 
