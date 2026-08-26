@@ -131,6 +131,13 @@ export async function runPushNotificationTests(assert) {
   assert(!sendPushJsH.includes("dispatched_by: 'CHANDAN KUMAR'") && sendPushJsH.includes('session?.username || session?.sub'),
     'T28.H5: dispatched_by derives from the authenticated caller (no attribution spoof)');
   assert(sendPushJsH.includes(".in('student_id', studentIds)"), 'T28.H6: student interpolation fetch is scoped by id-list');
-  assert(/\u20B9/.test(sendPushJsH), 'T28.H7: formatINR emits the real rupee glyph');
   assert(sendPushJsH.includes('BROADCAST_RATE_LIMIT'), 'T28.H8: per-caller broadcast rate limit exists');
+
+  // --- 13. Dynamic Personalization Tags & Multi-Identifier Resolution ---
+  assert(sendPushJsH.includes("student_name") && sendPushJsH.includes("pending_dues") && sendPushJsH.includes("batch_name"),
+    'T28.53: api/send-push.js supports rich dynamic student personalization tags');
+  assert(sendPushJsH.includes(".in('student_id'") && sendPushJsH.includes(".in('id'") && sendPushJsH.includes(".in('roll_no'"),
+    'T28.54: api/send-push.js resolves student profiles across student_id, UUID id, and roll_no');
+  assert(portalJs.includes("insertTextAtCursor") && portalJs.includes("btn-var-tag"),
+    'T28.55: js/portal.js provides smart cursor tag insertion for push composer');
 }

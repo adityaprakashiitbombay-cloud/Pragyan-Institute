@@ -4818,15 +4818,32 @@ function renderStudentDashboard() {
     const feeAcc = (typeof AppState !== 'undefined' && AppState.getStudentFeeAccount)
       ? AppState.getStudentFeeAccount(s.id || s.student_id || s.rollNo, s)
       : { totalDue: 0 };
-    const pendingFormatted = '₹' + Number(feeAcc.totalDue ?? s.pendingFee ?? s.pending_fee ?? 0).toLocaleString('en-IN');
+    const rawDue = Number(feeAcc.totalDue ?? s.pendingFee ?? s.pending_fee ?? 0);
+    const pendingFormatted = '₹' + rawDue.toLocaleString('en-IN');
+    const studentName = s.name || s.student_name || s.studentName || 'Student';
+    const className = s.className || s.class_name || s.batchName || s.batch || 'Academic Batch';
+    const rollNo = s.rollNo || s.roll_no || s.student_id || s.id || '';
+    const studentId = s.student_id || s.id || s.rollNo || s.roll_no || '';
+    const guardianName = s.guardianName || s.guardian_name || s.fatherName || s.father_name || 'Guardian';
+    const mobile = s.phone || s.mobile || s.contact || s.guardianMobile || s.guardian_mobile || '';
+    const dueDate = s.dueDate || s.due_date || '5th of this month';
+    const receiptNo = s.receiptNo || s.receipt_no || '';
+    const todayStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    const monthStr = new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+
     return text
-      .replace(/\{\{\s*(?:student_name|name)\s*\}\}/gi, s.name || 'Student')
-      .replace(/\{\{\s*(?:batch_name|batch|class_name)\s*\}\}/gi, s.className || s.class_name || s.batchName || 'Academic Batch')
-      .replace(/\{\{\s*(?:pending_dues|dues|amount)\s*\}\}/gi, pendingFormatted)
-      .replace(/\{\{\s*(?:roll_no|roll|student_id|id)\s*\}\}/gi, s.rollNo || s.roll_no || s.student_id || s.id || '')
-      .replace(/\{\{\s*due_date\s*\}\}/gi, '5th of this month')
-      .replace(/\{\{\s*(?:guardian_name|father_name|guardian)\s*\}\}/gi, s.guardianName || s.fatherName || 'Guardian')
-      .replace(/\{\{\s*(?:phone|contact|mobile)\s*\}\}/gi, s.phone || s.contact || '');
+      .replace(/\{{1,2}\s*(?:student_name|studentName|name|student)\s*\}{1,2}/gi, studentName)
+      .replace(/\{{1,2}\s*(?:batch_name|batchName|class_name|className|batch|class|course)\s*\}{1,2}/gi, className)
+      .replace(/\{{1,2}\s*(?:pending_dues|pendingDues|dues|pending_fee|pendingFee|amount|fee|balance)\s*\}{1,2}/gi, pendingFormatted)
+      .replace(/\{{1,2}\s*(?:roll_no|rollNo|roll_number|roll)\s*\}{1,2}/gi, rollNo)
+      .replace(/\{{1,2}\s*(?:student_id|studentId|id|admission_no)\s*\}{1,2}/gi, studentId)
+      .replace(/\{{1,2}\s*(?:guardian_name|guardianName|parent_name|father_name|guardian)\s*\}{1,2}/gi, guardianName)
+      .replace(/\{{1,2}\s*(?:phone|contact|mobile)\s*\}{1,2}/gi, mobile)
+      .replace(/\{{1,2}\s*due_date\s*\}{1,2}/gi, dueDate)
+      .replace(/\{{1,2}\s*(?:date|today)\s*\}{1,2}/gi, todayStr)
+      .replace(/\{{1,2}\s*month\s*\}{1,2}/gi, monthStr)
+      .replace(/\{{1,2}\s*(?:institute_name|instituteName|institute)\s*\}{1,2}/gi, 'Pragyan Institute')
+      .replace(/\{{1,2}\s*(?:receipt_no|receiptNo)\s*\}{1,2}/gi, receiptNo);
   }
 
   // 3. Student Tab: Notification Tab
@@ -13723,10 +13740,13 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
               <!-- Dynamic Variable Chips -->
               <div class="push-vars-bar">
                 <span class="vars-label">Insert Dynamic Tag:</span>
-                <button type="button" class="btn-var-tag" data-tag="{{student_name}}">👤 {{student_name}}</button>
-                <button type="button" class="btn-var-tag" data-tag="{{batch_name}}">🎓 {{batch_name}}</button>
-                <button type="button" class="btn-var-tag" data-tag="{{pending_dues}}">💵 {{pending_dues}}</button>
-                <button type="button" class="btn-var-tag" data-tag="{{due_date}}">📅 {{due_date}}</button>
+                <button type="button" class="btn-var-tag" data-tag="{{student_name}}" title="Insert Student Full Name">👤 {{student_name}}</button>
+                <button type="button" class="btn-var-tag" data-tag="{{batch_name}}" title="Insert Enrolled Batch Name">🎓 {{batch_name}}</button>
+                <button type="button" class="btn-var-tag" data-tag="{{pending_dues}}" title="Insert Pending Dues Amount">💵 {{pending_dues}}</button>
+                <button type="button" class="btn-var-tag" data-tag="{{roll_no}}" title="Insert 6-Digit Roll Number">🆔 {{roll_no}}</button>
+                <button type="button" class="btn-var-tag" data-tag="{{due_date}}" title="Insert Due Date">📅 {{due_date}}</button>
+                <button type="button" class="btn-var-tag" data-tag="{{guardian_name}}" title="Insert Parent/Guardian Name">👨‍👩‍👦 {{guardian_name}}</button>
+                <button type="button" class="btn-var-tag" data-tag="{{institute_name}}" title="Insert Institute Name">🏛️ {{institute_name}}</button>
               </div>
 
               <!-- Action Buttons Grid -->
@@ -13912,22 +13932,64 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
     const titleCount = pane.querySelector('#pushTitleCount');
     const bodyCount = pane.querySelector('#pushBodyCount');
 
+    let lastActivePushInput = bodyInput;
+    [titleInput, bodyInput, action1Title, action2Title].forEach(inp => {
+      inp?.addEventListener('focus', () => { lastActivePushInput = inp; });
+      inp?.addEventListener('click', () => { lastActivePushInput = inp; });
+    });
+
+    let selectedPushStudentObject = null;
+
+    function formatINRLocal(num) {
+      return '₹' + Number(num || 0).toLocaleString('en-IN');
+    }
+
+    function interpolateSample(template) {
+      if (!template || typeof template !== 'string') return '';
+      const sampleStudent = selectedPushStudentObject || {
+        name: 'Rahul Sharma',
+        class_name: 'Class 10th (ACHIEVER)',
+        pending_fee: 1200,
+        roll_no: '261001',
+        guardian_name: 'Shri Mohan Sharma',
+        mobile: '9876543210'
+      };
+
+      const sName = sampleStudent.name || 'Rahul Sharma';
+      const bName = sampleStudent.class_name || sampleStudent.className || 'Class 10th (ACHIEVER)';
+      let sampleDuesNum = 1200;
+      if (sampleStudent.pending_fee != null) {
+        sampleDuesNum = Number(sampleStudent.pending_fee);
+      } else if (sampleStudent.pendingFee != null) {
+        sampleDuesNum = Number(sampleStudent.pendingFee);
+      }
+      const sDues = formatINRLocal(sampleDuesNum);
+      const sRoll = sampleStudent.roll_no || sampleStudent.rollNo || sampleStudent.student_id || '261001';
+      const sGuardian = sampleStudent.guardian_name || sampleStudent.guardianName || 'Shri Mohan Sharma';
+      const sMob = sampleStudent.mobile || '9876543210';
+      const todayStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+      const monthStr = new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+
+      return template
+        .replace(/\{{1,2}\s*(?:student_name|studentName|name|student)\s*\}{1,2}/gi, sName)
+        .replace(/\{{1,2}\s*(?:batch_name|batchName|class_name|className|batch|class|course)\s*\}{1,2}/gi, bName)
+        .replace(/\{{1,2}\s*(?:pending_dues|pendingDues|dues|pending_fee|pendingFee|amount|fee|balance)\s*\}{1,2}/gi, sDues)
+        .replace(/\{{1,2}\s*(?:roll_no|rollNo|roll_number|roll)\s*\}{1,2}/gi, sRoll)
+        .replace(/\{{1,2}\s*(?:student_id|studentId|id)\s*\}{1,2}/gi, sRoll)
+        .replace(/\{{1,2}\s*(?:guardian_name|guardianName|parent_name|father_name)\s*\}{1,2}/gi, sGuardian)
+        .replace(/\{{1,2}\s*(?:mobile|phone|contact)\s*\}{1,2}/gi, sMob)
+        .replace(/\{{1,2}\s*due_date\s*\}{1,2}/gi, '5th of this month')
+        .replace(/\{{1,2}\s*(?:date|today)\s*\}{1,2}/gi, todayStr)
+        .replace(/\{{1,2}\s*month\s*\}{1,2}/gi, monthStr)
+        .replace(/\{{1,2}\s*(?:institute_name|instituteName|institute)\s*\}{1,2}/gi, 'Pragyan Institute');
+    }
+
     function updateSim() {
       const rawT = titleInput?.value || '📢 Pragyan Institute Alert';
       const rawB = bodyInput?.value || 'You have a new update from Pragyan Institute.';
 
-      // Sample preview replacements
-      const sampleT = rawT
-        .replace(/\{\{\s*(?:student_name|name)\s*\}\}/gi, 'Rahul Sharma')
-        .replace(/\{\{\s*(?:batch_name|batch)\s*\}\}/gi, 'Class 10th (ACHIEVER)')
-        .replace(/\{\{\s*(?:pending_dues|dues)\s*\}\}/gi, '₹1,000')
-        .replace(/\{\{\s*due_date\s*\}\}/gi, '5th August');
-
-      const sampleB = rawB
-        .replace(/\{\{\s*(?:student_name|name)\s*\}\}/gi, 'Rahul Sharma')
-        .replace(/\{\{\s*(?:batch_name|batch)\s*\}\}/gi, 'Class 10th (ACHIEVER)')
-        .replace(/\{\{\s*(?:pending_dues|dues)\s*\}\}/gi, '₹1,000')
-        .replace(/\{\{\s*due_date\s*\}\}/gi, '5th August');
+      const sampleT = interpolateSample(rawT);
+      const sampleB = interpolateSample(rawB);
 
       if (simTitle) simTitle.textContent = sampleT;
       if (simBody) simBody.textContent = sampleB;
@@ -13949,23 +14011,37 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
     });
     updateSim();
 
+    function insertTextAtCursor(targetInput, text) {
+      if (!targetInput) targetInput = bodyInput;
+      if (!targetInput) return;
+      const start = targetInput.selectionStart ?? targetInput.value.length;
+      const end = targetInput.selectionEnd ?? targetInput.value.length;
+      const val = targetInput.value;
+      targetInput.value = val.substring(0, start) + text + val.substring(end);
+      const newPos = start + text.length;
+      if (typeof targetInput.setSelectionRange === 'function') {
+        targetInput.setSelectionRange(newPos, newPos);
+      }
+      targetInput.focus();
+      updateSim();
+    }
+
     // Emoji clicks
     pane.querySelectorAll('.emoji-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        if (bodyInput) {
-          bodyInput.value += ' ' + btn.textContent.trim();
-          updateSim();
+        const em = btn.textContent.trim();
+        if (em) {
+          insertTextAtCursor(lastActivePushInput || bodyInput, em + ' ');
         }
       });
     });
 
-    // Dynamic variable tag clicks
+    // Dynamic variable tag clicks with smart cursor insertion
     pane.querySelectorAll('.btn-var-tag').forEach(btn => {
       btn.addEventListener('click', () => {
         const tag = btn.dataset.tag;
-        if (bodyInput && tag) {
-          bodyInput.value += ' ' + tag;
-          updateSim();
+        if (tag) {
+          insertTextAtCursor(lastActivePushInput || bodyInput, tag + ' ');
         }
       });
     });
@@ -14024,7 +14100,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
       });
     });
 
-    // Student Search Autocomplete
+    // Student Search Autocomplete with Multi-Identifier Capture
     const studentSearch = pane.querySelector('#pushStudentSearchInput');
     const studentDropdown = pane.querySelector('#pushStudentDropdown');
     const selectedStudentBadge = pane.querySelector('#pushSelectedStudentBadge');
@@ -14041,7 +14117,7 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
         const roll = (s.roll_no || s.student_id || '').toLowerCase();
         const mob = (s.mobile || '').toLowerCase();
         return name.includes(q) || roll.includes(q) || mob.includes(q);
-      }).slice(0, 5);
+      }).slice(0, 8);
 
       if (matches.length === 0) {
         if (studentDropdown) {
@@ -14053,8 +14129,8 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
 
       if (studentDropdown) {
         studentDropdown.innerHTML = matches.map(m => `
-          <div class="student-search-item" data-sid="${escapeHtml(m.student_id || m.id)}" style="padding:8px 12px; cursor:pointer; font-size:0.84rem; border-bottom:1px solid #F1F5F9;">
-            <strong>${escapeHtml(m.name)}</strong> (${escapeHtml(m.class_name || 'Batch')}) · Roll: ${escapeHtml(m.roll_no || m.student_id)}
+          <div class="student-search-item" data-sid="${escapeHtml(m.student_id || m.id || m.roll_no)}" style="padding:8px 12px; cursor:pointer; font-size:0.84rem; border-bottom:1px solid #F1F5F9;">
+            <strong>${escapeHtml(m.name)}</strong> (${escapeHtml(m.class_name || 'Batch')}) · Roll: ${escapeHtml(m.roll_no || m.student_id || '')}
           </div>
         `).join('');
         studentDropdown.style.display = 'block';
@@ -14062,13 +14138,15 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
         studentDropdown.querySelectorAll('.student-search-item').forEach(item => {
           item.addEventListener('click', () => {
             selectedPushStudentId = item.dataset.sid;
-            const chosen = matches.find(m => (m.student_id || m.id) === selectedPushStudentId);
+            const chosen = matches.find(m => (m.student_id || m.id || m.roll_no) === selectedPushStudentId);
+            selectedPushStudentObject = chosen || null;
             if (chosen && selectedStudentBadge) {
-              selectedStudentBadge.innerHTML = `<i aria-hidden="true" class="fa-solid fa-user-check"></i> Selected: <strong>${escapeHtml(chosen.name)}</strong> (${escapeHtml(chosen.class_name || '')})`;
+              selectedStudentBadge.innerHTML = `<i aria-hidden="true" class="fa-solid fa-user-check"></i> Selected: <strong>${escapeHtml(chosen.name)}</strong> (${escapeHtml(chosen.class_name || '')}) · Roll: ${escapeHtml(chosen.roll_no || chosen.student_id || '')}`;
               selectedStudentBadge.style.display = 'block';
             }
             studentDropdown.style.display = 'none';
             if (studentSearch) studentSearch.value = chosen ? chosen.name : '';
+            updateSim();
           });
         });
       }
@@ -14096,7 +14174,14 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
           alert('Please search and select a target student.');
           return;
         }
-        target.students = [selectedPushStudentId];
+        const sObj = selectedPushStudentObject || {};
+        target.students = [
+          selectedPushStudentId,
+          sObj.student_id,
+          sObj.id,
+          sObj.roll_no,
+          sObj.rollNo
+        ].filter(Boolean);
       }
 
       const actions = [];

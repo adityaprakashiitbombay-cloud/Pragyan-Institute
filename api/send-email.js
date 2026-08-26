@@ -48,17 +48,59 @@ function formatINR(num) {
   return '₹' + Number(num || 0).toLocaleString('en-IN');
 }
 
-/** Interpolate {{student_name}}, {{batch_name}}, {{pending_dues}}, etc. */
+/** 
+ * Enhanced dynamic variable interpolation engine.
+ * Supports both single {tag} and double {{tag}} braces across all student fields:
+ * - {student_name}, {name}, {student}
+ * - {batch_name}, {batch}, {class_name}, {class}, {course}
+ * - {pending_dues}, {dues}, {pending_fee}, {amount}, {fee}, {balance}
+ * - {roll_no}, {roll}, {roll_number}
+ * - {student_id}, {id}, {admission_no}
+ * - {guardian_name}, {parent_name}, {father_name}
+ * - {mobile}, {phone}, {contact}
+ * - {due_date}, {date}, {today}, {month}
+ * - {institute_name}, {institute}
+ * - {receipt_no}
+ */
 function interpolate(template, student = {}) {
   if (!template || typeof template !== 'string') return '';
+
+  const studentName = student.name || student.student_name || student.studentName || 'Student';
+  const className = student.class_name || student.className || student.batch_name || student.batch || student.batchId || 'Academic Batch';
+  const duesAmount = student.pending_balance ?? student.pending_fee ?? student.pendingFee ?? (Number(student.total_fee || 0) - Number(student.paid_fee || 0)) ?? 0;
+  const dues = formatINR(duesAmount);
+  const rollNo = student.roll_no || student.rollNo || student.student_id || student.id || '';
+  const studentId = student.student_id || student.id || student.roll_no || '';
+  const guardianName = student.guardian_name || student.guardianName || student.father_name || '';
+  const mobile = student.mobile || student.guardian_mobile || student.guardianMobile || '';
+  const dueDate = student.due_date || '5th of this month';
+  const receiptNo = student.receipt_no || student.receiptNo || '';
+  const instituteName = 'Pragyan Institute';
+
+  let todayFormatted = '';
+  let monthFormatted = '';
+  try {
+    const now = new Date();
+    todayFormatted = now.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
+    monthFormatted = now.toLocaleDateString('en-IN', { month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' });
+  } catch (_) {
+    todayFormatted = 'Today';
+    monthFormatted = 'This Month';
+  }
+
   return template
-    .replace(/\{\{\s*(?:student_name|name)\s*\}\}/gi, student.name || 'Student')
-    .replace(/\{\{\s*(?:batch_name|batch|class_name)\s*\}\}/gi, student.class_name || 'Academic Batch')
-    .replace(/\{\{\s*(?:pending_dues|dues|amount)\s*\}\}/gi, formatINR(student.pending_balance))
-    .replace(/\{\{\s*(?:roll_no|roll)\s*\}\}/gi, student.roll_no || student.student_id || '')
-    .replace(/\{\{\s*(?:student_id|id)\s*\}\}/gi, student.student_id || '')
-    .replace(/\{\{\s*due_date\s*\}\}/gi, '5th of this month')
-    .replace(/\{\{\s*receipt_no\s*\}\}/gi, student.receipt_no || '');
+    .replace(/\{{1,2}\s*(?:student_name|studentName|name|student)\s*\}{1,2}/gi, studentName)
+    .replace(/\{{1,2}\s*(?:batch_name|batchName|class_name|className|batch|class|course)\s*\}{1,2}/gi, className)
+    .replace(/\{{1,2}\s*(?:pending_dues|pendingDues|dues|pending_fee|pendingFee|pending_fees|amount|fee|fees|balance)\s*\}{1,2}/gi, dues)
+    .replace(/\{{1,2}\s*(?:roll_no|rollNo|roll_number|rollNumber|roll)\s*\}{1,2}/gi, rollNo)
+    .replace(/\{{1,2}\s*(?:student_id|studentId|id|admission_no|reg_no)\s*\}{1,2}/gi, studentId)
+    .replace(/\{{1,2}\s*(?:guardian_name|guardianName|parent_name|parentName|father_name|fatherName)\s*\}{1,2}/gi, guardianName || 'Parent/Guardian')
+    .replace(/\{{1,2}\s*(?:mobile|phone|contact)\s*\}{1,2}/gi, mobile)
+    .replace(/\{{1,2}\s*due_date\s*\}{1,2}/gi, dueDate)
+    .replace(/\{{1,2}\s*(?:date|today)\s*\}{1,2}/gi, todayFormatted)
+    .replace(/\{{1,2}\s*month\s*\}{1,2}/gi, monthFormatted)
+    .replace(/\{{1,2}\s*(?:institute_name|instituteName|institute)\s*\}{1,2}/gi, instituteName)
+    .replace(/\{{1,2}\s*(?:receipt_no|receiptNo)\s*\}{1,2}/gi, receiptNo);
 }
 
 /**
@@ -138,9 +180,48 @@ async function handlePushBroadcast(req, res) {
       .select('endpoint, p256dh_key, auth_key, student_id, batch_id');
 
     if (targetType === 'STUDENT' && Array.isArray(target.students) && target.students.length > 0) {
-      subsQuery = subsQuery.in('student_id', target.students);
+      const rawTargetIds = target.students.map(s => String(s || '').trim()).filter(Boolean);
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const targetUuids = rawTargetIds.filter(id => uuidRegex.test(id));
+      const targetTextIds = rawTargetIds.filter(id => !uuidRegex.test(id));
+
+      const orClauses = [];
+      if (targetTextIds.length > 0) {
+        orClauses.push(`student_id.in.(${targetTextIds.map(id => `"${id}"`).join(',')})`);
+        orClauses.push(`roll_no.in.(${targetTextIds.map(id => `"${id}"`).join(',')})`);
+      }
+      if (targetUuids.length > 0) {
+        orClauses.push(`id.in.(${targetUuids.map(id => `"${id}"`).join(',')})`);
+      }
+
+      let allStudentKeys = new Set(rawTargetIds);
+      if (orClauses.length > 0) {
+        const { data: matchedStudents } = await supabase
+          .from('students')
+          .select('id, student_id, roll_no, name')
+          .or(orClauses.join(','));
+
+        if (matchedStudents && matchedStudents.length > 0) {
+          for (const s of matchedStudents) {
+            if (s.id) allStudentKeys.add(s.id);
+            if (s.student_id) allStudentKeys.add(s.student_id);
+            if (s.roll_no) allStudentKeys.add(s.roll_no);
+          }
+        }
+      }
+
+      subsQuery = subsQuery.in('student_id', Array.from(allStudentKeys));
     } else if (targetType === 'BATCHES' && Array.isArray(target.batches) && target.batches.length > 0) {
-      subsQuery = subsQuery.in('batch_id', target.batches);
+      const allBatchKeys = new Set();
+      target.batches.forEach(b => {
+        const str = String(b || '').trim();
+        if (str) {
+          allBatchKeys.add(str);
+          if (str.startsWith('batch-')) allBatchKeys.add(str.replace('batch-', ''));
+          else allBatchKeys.add(`batch-${str}`);
+        }
+      });
+      subsQuery = subsQuery.in('batch_id', Array.from(allBatchKeys));
     }
 
     const { data: subscriptions, error: subErr } = await subsQuery;
@@ -161,20 +242,52 @@ async function handlePushBroadcast(req, res) {
     const studentIds = [...new Set(subscriptions.map(s => s.student_id).filter(Boolean))];
     const studentMap = new Map();
     if (studentIds.length > 0) {
-      const { data: students } = await supabase
-        .from('students')
-        .select('student_id, name, class_name, pending_balance, roll_no')
-        .in('student_id', studentIds);
-      if (students) {
-        for (const s of students) studentMap.set(s.student_id, s);
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const uuidIds = studentIds.filter(id => uuidRegex.test(id));
+      const nonUuidIds = studentIds.filter(id => !uuidRegex.test(id));
+
+      const queries = [];
+      queries.push(supabase.from('students').select('id, student_id, roll_no, name, class_name, pending_fee, total_fee, paid_fee, guardian_name, mobile').in('student_id', studentIds));
+      if (uuidIds.length > 0) {
+        queries.push(supabase.from('students').select('id, student_id, roll_no, name, class_name, pending_fee, total_fee, paid_fee, guardian_name, mobile').in('id', uuidIds));
+      }
+      if (nonUuidIds.length > 0) {
+        queries.push(supabase.from('students').select('id, student_id, roll_no, name, class_name, pending_fee, total_fee, paid_fee, guardian_name, mobile').in('roll_no', nonUuidIds));
+      }
+
+      const results = await Promise.allSettled(queries);
+      const allFound = [];
+      results.forEach(r => {
+        if (r.status === 'fulfilled' && Array.isArray(r.value?.data)) {
+          allFound.push(...r.value.data);
+        }
+      });
+
+      for (const s of allFound) {
+        s.pending_balance = Number(s.pending_fee ?? s.pending_fees ?? (Number(s.total_fee || 0) - Number(s.paid_fee || 0)) ?? 0);
+        if (s.student_id) {
+          studentMap.set(s.student_id, s);
+          studentMap.set(String(s.student_id).toLowerCase(), s);
+        }
+        if (s.id) {
+          studentMap.set(s.id, s);
+          studentMap.set(String(s.id).toLowerCase(), s);
+        }
+        if (s.roll_no) {
+          studentMap.set(s.roll_no, s);
+          studentMap.set(String(s.roll_no).toLowerCase(), s);
+        }
+        if (s.name) {
+          studentMap.set(s.name.toLowerCase(), s);
+        }
       }
     }
 
     let targetSubs = subscriptions;
     if (targetType === 'DUES') {
       targetSubs = subscriptions.filter(s => {
-        const stud = studentMap.get(s.student_id);
-        return stud && Number(stud.pending_balance || 0) > 0;
+        const stud = studentMap.get(s.student_id) || (s.student_id ? studentMap.get(String(s.student_id).toLowerCase()) : null);
+        return stud && Number(stud.pending_balance || stud.pending_fee || 0) > 0;
       });
     }
 
