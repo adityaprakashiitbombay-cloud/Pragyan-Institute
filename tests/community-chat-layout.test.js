@@ -16,6 +16,7 @@ export function runCommunityChatLayoutTests(assert) {
   const healthJs = read('api/health.js');
   const portalJs = read('js/portal.js');
   const vercelJson = read('vercel.json');
+  const authJs = read('api/_lib/auth.js');
 
   // --- 1. Compact Message Architecture & Reduced Bloat ---
   assert(chatJs.includes('renderMsgList'), 'T35.1: js/stream-community-chat.js defines renderMsgList');
@@ -169,7 +170,14 @@ export function runCommunityChatLayoutTests(assert) {
     'T35.61: js/stream-community-chat.js implements background polling sync (startPeriodicSync/stopPeriodicSync) for reliable real-time updates');
   assert(chatJs.includes('getAllCommunityPanes') && chatJs.includes('panes.forEach(pane =>'),
     'T35.62: js/stream-community-chat.js renders updates across all active community panes simultaneously');
+
+  // --- 16. 7-Day Session & Stream Chat Token Expiry Suite ---
+  assert(/SESSION_TTL_SECONDS\s*=\s*60\s*\*\s*60\s*\*\s*24\s*\*\s*7/.test(authJs),
+    'T35.63: api/_lib/auth.js sets SESSION_TTL_SECONDS to 7 days (604,800 seconds) so users stay logged in for at least a week');
+  assert(/CHAT_TOKEN_TTL_SECONDS\s*=\s*7\s*\*\s*24\s*\*\s*60\s*\*\s*60/.test(healthJs),
+    'T35.64: api/health.js sets CHAT_TOKEN_TTL_SECONDS to 7 days (604,800 seconds) matching the portal session lifetime');
 }
+
 
 
 

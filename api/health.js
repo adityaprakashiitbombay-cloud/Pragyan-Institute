@@ -106,7 +106,7 @@ export default async function handler(req, res) {
         } catch (_) {}
       })();
 
-      const CHAT_TOKEN_TTL_SECONDS = 24 * 60 * 60;
+      const CHAT_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days (604,800 seconds)
       const exp = Math.floor(Date.now() / 1000) + CHAT_TOKEN_TTL_SECONDS;
       const token = serverClient.createToken(userId, exp);
 

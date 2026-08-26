@@ -25,7 +25,7 @@ import jwt from 'jsonwebtoken';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 
-export const SESSION_TTL_SECONDS = 60 * 60 * 8;
+export const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days (604,800 seconds)
 let _ephemeralSecret = null;
 let _cachedClient = null;
 
