@@ -29,7 +29,7 @@
   let streamBroadcastChannel = null;
   let syncIntervalId = null;
   let isSyncingActiveChannel = false;
-  let isMobileChatOpen = false;
+  let isMobileChatOpen = true;
 
   const CHANNEL_IDENTITIES = {
     'batch-BAT-12PCM': {
@@ -643,7 +643,7 @@
       if (typeof document !== 'undefined' && document.visibilityState === 'visible' && client?.userID && activeChannel) {
         syncActiveChannelMessages();
       }
-    }, 2500);
+    }, 1500);
   }
 
   function resolveStudentBatches() {
@@ -862,13 +862,13 @@
       activeChannelId = activeChannel.id;
     }
 
-    if (isAdmin && channelsMap.size > 0) {
+    if (channelsMap.size > 0) {
       try {
         await Promise.allSettled(
           Array.from(channelsMap.values()).map(ch => ch.watch({ state: true, presence: true }))
         );
-      } catch (adminWatchErr) {
-        console.warn('[StreamChat] Admin bulk watch note:', adminWatchErr.message);
+      } catch (watchErr) {
+        console.warn('[StreamChat] Bulk watch note:', watchErr.message);
       }
     }
 
@@ -3015,36 +3015,69 @@
       input.value = '';
       if (sendBtn) sendBtn.disabled = true;
 
+      const msgPayload = {
+        text: textToSend,
+        is_important: Boolean(isImportant),
+        is_question: Boolean(isQuestion),
+        is_highlighted: Boolean(isHighlight),
+        is_notice: Boolean(isNotice),
+        custom_type: isImportant ? 'important' : (isQuestion ? 'question' : (isHighlight ? 'highlight' : (isNotice ? 'notice' : 'text')))
+      };
+
+      if (replyingToMessage) {
+        msgPayload.quoted_message_id = replyingToMessage.id;
+        msgPayload.quoted_message_author = replyingToMessage.author;
+        msgPayload.quoted_message_text = (replyingToMessage.text || '').substring(0, 150);
+      }
+
+      // Optimistic Instant Local Render (0ms latency on sender interface)
+      const optimisticId = `opt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const optimisticMessage = {
+        id: optimisticId,
+        text: textToSend,
+        is_important: Boolean(isImportant),
+        is_question: Boolean(isQuestion),
+        is_highlighted: Boolean(isHighlight),
+        is_notice: Boolean(isNotice),
+        custom_type: isImportant ? 'important' : (isQuestion ? 'question' : (isHighlight ? 'highlight' : (isNotice ? 'notice' : 'text'))),
+        user: {
+          id: currentUser?.id || 'unknown',
+          name: currentUser?.name || 'User',
+          role: currentUser?.role || 'user'
+        },
+        created_at: new Date().toISOString(),
+        attachments: [],
+        quoted_message_id: msgPayload.quoted_message_id || null,
+        quoted_message_author: msgPayload.quoted_message_author || null,
+        quoted_message_text: msgPayload.quoted_message_text || null
+      };
+
+      if (!activeChannel.state) activeChannel.state = { messages: [] };
+      if (!Array.isArray(activeChannel.state.messages)) activeChannel.state.messages = [];
+      activeChannel.state.messages.push(optimisticMessage);
+      renderPinnedBarAndList();
+
+      replyingToMessage = null;
+      updateReplyBar(container);
+
+      // Broadcast optimistic event to other open tabs/windows
+      broadcastMessageSync(optimisticMessage, activeChannelId);
+
       try {
-        const msgPayload = {
-          text: textToSend,
-          is_important: Boolean(isImportant),
-          is_question: Boolean(isQuestion),
-          is_highlighted: Boolean(isHighlight),
-          is_notice: Boolean(isNotice),
-          custom_type: isImportant ? 'important' : (isQuestion ? 'question' : (isHighlight ? 'highlight' : (isNotice ? 'notice' : 'text')))
-        };
-
-        if (replyingToMessage) {
-          msgPayload.quoted_message_id = replyingToMessage.id;
-          msgPayload.quoted_message_author = replyingToMessage.author;
-          msgPayload.quoted_message_text = (replyingToMessage.text || '').substring(0, 150);
-        }
-
         const sent = await activeChannel.sendMessage(msgPayload);
 
-        // Clear reply state after sending
-        replyingToMessage = null;
-        updateReplyBar(container);
-
-        // Ensure local activeChannel state has the message immediately
+        // Replace optimistic placeholder with real confirmed message from server
         if (sent?.message && activeChannel?.state?.messages) {
-          if (!activeChannel.state.messages.some(m => m.id === sent.message.id)) {
+          const optIdx = activeChannel.state.messages.findIndex(m => m.id === optimisticId);
+          if (optIdx >= 0) {
+            activeChannel.state.messages[optIdx] = sent.message;
+          } else if (!activeChannel.state.messages.some(m => m.id === sent.message.id)) {
             activeChannel.state.messages.push(sent.message);
           }
+          activeChannel.state.messages.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
         }
 
-        // Broadcast to other tabs/windows via BroadcastChannel/localStorage
+        // Broadcast confirmed message to other tabs/windows
         if (sent?.message) {
           broadcastMessageSync(sent.message, activeChannelId);
         }
@@ -3059,7 +3092,12 @@
         renderPinnedBarAndList();
       } catch (err) {
         console.error('[StreamChat Send Error]', err);
-        alert('Failed to send message: ' + err.message);
+        // Remove optimistic message if send failed
+        if (activeChannel?.state?.messages) {
+          activeChannel.state.messages = activeChannel.state.messages.filter(m => m.id !== optimisticId);
+          renderPinnedBarAndList();
+        }
+        alert('Failed to send message: ' + (err.message || 'Network error'));
       } finally {
         if (sendBtn) sendBtn.disabled = false;
         if (input) input.focus();
