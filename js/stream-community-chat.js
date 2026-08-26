@@ -29,6 +29,7 @@
   let streamBroadcastChannel = null;
   let syncIntervalId = null;
   let isSyncingActiveChannel = false;
+  let isMobileChatOpen = false;
 
   const CHANNEL_IDENTITIES = {
     'batch-BAT-12PCM': {
@@ -1632,6 +1633,66 @@
     });
   }
 
+  function renderMobileLaunchCardHtml(activeMeta, onlineCount, isAdmin) {
+    return `
+      <div class="stream-mobile-launch-wrap">
+        <div class="stream-mobile-launch-card">
+          <div class="stream-mobile-card-top-stripe"></div>
+
+          <div class="stream-mobile-card-avatar">
+            ${activeMeta.icon || '💬'}
+          </div>
+
+          <div class="stream-mobile-live-badge">
+            <span class="stream-live-pulse-dot"></span>
+            <span>${onlineCount} Active Online</span>
+          </div>
+
+          <h3 class="stream-mobile-card-title">
+            ${escapeHtml(activeMeta.name || 'Pragyan Class Forum')}
+          </h3>
+          
+          <div class="stream-mobile-card-subtitle">
+            👨‍🏫 <strong>${escapeHtml(activeMeta.mentors || 'Faculty Team')}</strong>
+            <p style="margin: 0.25rem 0 0 0; color: #64748B; font-size: 0.8rem; line-height: 1.4;">
+              ${escapeHtml(activeMeta.tagline || 'Live doubts, discussions, and study materials')}
+            </p>
+          </div>
+
+          <div class="stream-mobile-features-list">
+            <div class="stream-mobile-feature-row">
+              <span>❓</span>
+              <div>
+                <strong>Ask Academic Doubts</strong>
+                <p>Send doubts to mentors using /quest</p>
+              </div>
+            </div>
+            <div class="stream-mobile-feature-row">
+              <span>📁</span>
+              <div>
+                <strong>Class Notes & PDFs</strong>
+                <p>Access diagrams, PDFs & formula sheets</p>
+              </div>
+            </div>
+            <div class="stream-mobile-feature-row">
+              <span>⭐</span>
+              <div>
+                <strong>Verified Announcements</strong>
+                <p>Official faculty updates & urgent alerts</p>
+              </div>
+            </div>
+          </div>
+
+          <button type="button" id="btn-enter-mobile-chat" class="btn btn-emerald stream-launch-chat-btn" title="Open Fullscreen Class Chat">
+            <i class="fa-solid fa-comments" aria-hidden="true"></i>
+            <span>Enter Class Chat</span>
+            <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
   function renderUI(container) {
     const isAdmin = currentUser.role === 'admin';
     const rawEnrolled = resolveStudentBatches();
@@ -1672,9 +1733,30 @@
     const showChBar = isAdmin || filteredChannels.length > 1;
     const messages = (activeChannel?.state?.messages || []).filter(m => !m.deleted_at);
     const pinnedMessages = messages.filter(m => m.pinned || m.is_pinned || Boolean(m.pinned_at));
-    const isMobileView = (typeof window !== 'undefined' && window.innerWidth <= 768);
+    const isMobileView = (typeof window !== 'undefined' && (window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)));
+
+    // On mobile devices, show the Entry Gateway card first unless the user explicitly entered chat
+    if (isMobileView && !isMobileChatOpen) {
+      document.body.classList.remove('stream-body-fullscreen-lock');
+      container.innerHTML = renderMobileLaunchCardHtml(activeMeta, onlineCount, isAdmin);
+      const launchBtn = container.querySelector('#btn-enter-mobile-chat');
+      if (launchBtn) {
+        launchBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          isMobileChatOpen = true;
+          document.body.classList.add('stream-body-fullscreen-lock');
+          renderUI(container);
+        });
+      }
+      return;
+    }
+
+    if (isMobileView && isMobileChatOpen) {
+      document.body.classList.add('stream-body-fullscreen-lock');
+    }
+
     const fullscreenBtnHtml = isMobileView
-      ? `<button type="button" id="btn-stream-fullscreen" class="btn-stream-fullscreen btn-mobile-exit" title="Exit Community Chat and return to dashboard" aria-label="Exit Community Chat" style="background: rgba(255,255,255,0.18); color: #FFFFFF; border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; padding: 0.22rem 0.55rem; font-size: 0.76rem; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem; transition: all 0.15s ease;">
+      ? `<button type="button" id="btn-stream-fullscreen" class="btn-stream-fullscreen btn-mobile-exit" title="Exit Community Chat and return to tab" aria-label="Exit Community Chat" style="background: rgba(255,255,255,0.18); color: #FFFFFF; border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; padding: 0.22rem 0.55rem; font-size: 0.76rem; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem; transition: all 0.15s ease;">
           <i class="fa-solid fa-arrow-left" aria-hidden="true"></i> <span>Back</span>
         </button>`
       : `<button type="button" id="btn-stream-fullscreen" class="btn-stream-fullscreen" title="Toggle Fullscreen View" aria-label="Toggle Fullscreen View" style="background: rgba(255,255,255,0.18); color: #FFFFFF; border: 1px solid rgba(255,255,255,0.28); border-radius: 6px; padding: 0.22rem 0.6rem; font-size: 0.74rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem; transition: all 0.15s ease;">
@@ -2112,6 +2194,13 @@
             replyingToMessage = null;
             updateReplyBar();
           }
+          const isMobileScreen = (typeof window !== 'undefined' && (window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)));
+          if (isMobileScreen && isMobileChatOpen) {
+            isMobileChatOpen = false;
+            document.body.classList.remove('stream-body-fullscreen-lock');
+            getAllCommunityPanes().forEach(pane => renderUI(pane));
+            return;
+          }
           const activeFullWrapper = document.querySelector('.stream-chat-wrapper.stream-fullscreen');
           if (activeFullWrapper) {
             activeFullWrapper.classList.remove('stream-fullscreen');
@@ -2319,24 +2408,11 @@
       const fullscreenBtn = e.target.closest('#btn-stream-fullscreen');
       if (fullscreenBtn) {
         e.preventDefault();
-        const isMobileScreen = (typeof window !== 'undefined' && window.innerWidth <= 768);
+        const isMobileScreen = (typeof window !== 'undefined' && (window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)));
         if (isMobileScreen) {
+          isMobileChatOpen = false;
           document.body.classList.remove('stream-body-fullscreen-lock');
-          const chatWrapper = container.querySelector('.stream-chat-wrapper');
-          chatWrapper?.classList.remove('stream-fullscreen');
-          if (isAdmin) {
-            if (typeof window.switchAdminTab === 'function') {
-              window.switchAdminTab('students');
-            } else {
-              document.querySelector('.admin-tab-btn[data-tab="students"]')?.click();
-            }
-          } else {
-            if (typeof window.switchStudentTab === 'function') {
-              window.switchStudentTab('details');
-            } else {
-              document.querySelector('.student-tab-btn[data-tab="details"]')?.click();
-            }
-          }
+          renderUI(container);
           return;
         }
 
@@ -3207,6 +3283,10 @@
       client = null; 
     }
     channelsMap.clear(); activeChannel = null; currentUser = null; isListening = false;
+    isMobileChatOpen = false;
+    if (typeof document !== 'undefined') {
+      document.body.classList.remove('stream-body-fullscreen-lock');
+    }
   }
 
   // Public API
@@ -3241,6 +3321,13 @@
     syncActiveChannelMessages,
     broadcastMessageSync,
     renderPinnedBarAndList,
+    exitMobileFullscreen() {
+      isMobileChatOpen = false;
+      if (typeof document !== 'undefined') {
+        document.body.classList.remove('stream-body-fullscreen-lock');
+      }
+      getAllCommunityPanes().forEach(pane => renderUI(pane));
+    },
     disconnect
   };
 

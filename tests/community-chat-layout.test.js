@@ -246,11 +246,11 @@ export function runCommunityChatLayoutTests(assert) {
          portalCss.includes('z-index: 2147483647 !important'),
     'T35.79: css/portal.css defines mobile fullscreen-only layout for .stream-chat-wrapper and .stream-loading-card');
 
-  assert(portalJs.includes("document.body.classList.add('stream-body-fullscreen-lock')") &&
-         portalJs.includes("document.body.classList.remove('stream-body-fullscreen-lock')") &&
+  assert(portalJs.includes("document.body.classList.remove('stream-body-fullscreen-lock')") &&
+         portalJs.includes('exitMobileFullscreen') &&
          chatJs.includes('isMobileScreen') &&
-         chatJs.includes("switchAdminTab('students')"),
-    'T35.80: js/portal.js and stream-community-chat.js manage body fullscreen lock and mobile exit transition to default tabs');
+         chatJs.includes('exitMobileFullscreen'),
+    'T35.80: js/portal.js and stream-community-chat.js manage body fullscreen lock and exitMobileFullscreen cleanup');
 
   assert(portalCss.includes('#btn-stream-send span') &&
          portalCss.includes('display: none !important;') &&
@@ -261,6 +261,21 @@ export function runCommunityChatLayoutTests(assert) {
          chatJs.includes('fa-arrow-left') &&
          portalCss.includes('.btn-stream-fullscreen span'),
     'T35.82: js/stream-community-chat.js and css/portal.css render dedicated mobile back button with clean arrow icon');
+
+  assert(chatJs.includes('renderMobileLaunchCardHtml') &&
+         chatJs.includes('btn-enter-mobile-chat') &&
+         chatJs.includes('isMobileChatOpen'),
+    'T35.83: js/stream-community-chat.js defines renderMobileLaunchCardHtml and #btn-enter-mobile-chat for mobile entry gateway card');
+
+  assert(portalCss.includes('.stream-mobile-launch-wrap') &&
+         portalCss.includes('.stream-mobile-launch-card') &&
+         portalCss.includes('.stream-launch-chat-btn'),
+    'T35.84: css/portal.css defines responsive styles for mobile entry launch card and launch button');
+
+  assert(chatJs.includes("e.key === 'Escape'") &&
+         chatJs.includes('isMobileChatOpen = false') &&
+         chatJs.includes('getAllCommunityPanes().forEach(pane => renderUI(pane))'),
+    'T35.85: js/stream-community-chat.js wires Escape key to return mobile user cleanly to entry card in Community tab');
 }
 
 
