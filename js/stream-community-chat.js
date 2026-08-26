@@ -294,10 +294,22 @@
       if (channelsMap.has(incomingChId) && data.message) {
         const targetCh = channelsMap.get(incomingChId);
         if (targetCh && targetCh.state && Array.isArray(targetCh.state.messages)) {
-          if (!targetCh.state.messages.some(m => m.id === data.message.id)) {
-            targetCh.state.messages.push(data.message);
-            targetCh.state.messages.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+          const inc = data.message;
+          let idx = targetCh.state.messages.findIndex(m => m.id === inc.id);
+          if (idx < 0) {
+            idx = targetCh.state.messages.findIndex(m => 
+              String(m.id).startsWith('opt_') && 
+              m.user?.id === inc.user?.id && 
+              m.text === inc.text &&
+              Math.abs(new Date(m.created_at || 0).getTime() - new Date(inc.created_at || 0).getTime()) < 15000
+            );
           }
+          if (idx >= 0) {
+            targetCh.state.messages[idx] = inc;
+          } else {
+            targetCh.state.messages.push(inc);
+          }
+          targetCh.state.messages.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
         }
       }
       return;
@@ -307,11 +319,22 @@
       if (!activeChannel.state) activeChannel.state = { messages: [] };
       if (!Array.isArray(activeChannel.state.messages)) activeChannel.state.messages = [];
       const incoming = data.message;
-      if (!activeChannel.state.messages.some(m => m.id === incoming.id)) {
-        activeChannel.state.messages.push(incoming);
-        activeChannel.state.messages.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
-        renderPinnedBarAndList();
+      let idx = activeChannel.state.messages.findIndex(m => m.id === incoming.id);
+      if (idx < 0) {
+        idx = activeChannel.state.messages.findIndex(m => 
+          String(m.id).startsWith('opt_') && 
+          m.user?.id === incoming.user?.id && 
+          m.text === incoming.text &&
+          Math.abs(new Date(m.created_at || 0).getTime() - new Date(incoming.created_at || 0).getTime()) < 15000
+        );
       }
+      if (idx >= 0) {
+        activeChannel.state.messages[idx] = incoming;
+      } else {
+        activeChannel.state.messages.push(incoming);
+      }
+      activeChannel.state.messages.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+      renderPinnedBarAndList();
     } else {
       syncActiveChannelMessages();
     }
@@ -422,8 +445,19 @@
       if (targetCh && targetCh !== activeChannel && targetCh.state) {
         if (!Array.isArray(targetCh.state.messages)) targetCh.state.messages = [];
         if (eventType === 'message.new' || eventType === 'notification.message_new') {
-          if (event.message && !targetCh.state.messages.some(m => m.id === event.message.id)) {
-            targetCh.state.messages.push(event.message);
+          if (event.message) {
+            const inc = event.message;
+            let idx = targetCh.state.messages.findIndex(m => m.id === inc.id);
+            if (idx < 0) {
+              idx = targetCh.state.messages.findIndex(m => 
+                String(m.id).startsWith('opt_') && 
+                m.user?.id === inc.user?.id && 
+                m.text === inc.text &&
+                Math.abs(new Date(m.created_at || 0).getTime() - new Date(inc.created_at || 0).getTime()) < 15000
+              );
+            }
+            if (idx >= 0) targetCh.state.messages[idx] = inc;
+            else targetCh.state.messages.push(inc);
             targetCh.state.messages.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
           }
         } else if (eventType === 'message.updated') {
@@ -455,11 +489,20 @@
 
     if (eventType === 'message.new' || eventType === 'notification.message_new') {
       if (event.message) {
-        const idx = activeChannel.state.messages.findIndex(m => m.id === event.message.id);
+        const incoming = event.message;
+        let idx = activeChannel.state.messages.findIndex(m => m.id === incoming.id);
+        if (idx < 0) {
+          idx = activeChannel.state.messages.findIndex(m => 
+            String(m.id).startsWith('opt_') && 
+            m.user?.id === incoming.user?.id && 
+            m.text === incoming.text &&
+            Math.abs(new Date(m.created_at || 0).getTime() - new Date(incoming.created_at || 0).getTime()) < 15000
+          );
+        }
         if (idx >= 0) {
-          activeChannel.state.messages[idx] = { ...activeChannel.state.messages[idx], ...event.message };
+          activeChannel.state.messages[idx] = incoming;
         } else {
-          activeChannel.state.messages.push(event.message);
+          activeChannel.state.messages.push(incoming);
         }
         activeChannel.state.messages.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
       }
@@ -1584,7 +1627,7 @@
     `;
   }
 
-  function renderMsgList(messages) {
+  function renderMsgList(rawMessages) {
     const channelMeta = CHANNEL_IDENTITIES[activeChannelId] || {
       name: activeChannel?.data?.name || 'Class Forum',
       icon: '💬',
@@ -1592,7 +1635,7 @@
       tagline: 'Class discussion and doubts'
     };
 
-    if (!messages || !messages.length) {
+    if (!rawMessages || !rawMessages.length) {
       return `
         <div style="text-align: center; color: var(--text-muted, #64748B); margin: auto; padding: 2.5rem 1rem; max-width: 420px;">
           <div style="width: 48px; height: 48px; border-radius: 50%; background: ${channelMeta.badgeColor}18; color: ${channelMeta.badgeColor}; display: inline-flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 0.6rem; border: 1.5px solid ${channelMeta.badgeColor}33;">
@@ -1609,6 +1652,24 @@
           </div>
         </div>
       `;
+    }
+
+    // Deduplicate messages across ID and optimistic signature
+    const seenIds = new Set();
+    const seenSigs = new Set();
+    const messages = [];
+
+    for (const m of rawMessages) {
+      if (!m || !m.id || m.deleted_at) continue;
+      if (seenIds.has(m.id)) continue;
+      seenIds.add(m.id);
+
+      const timeSlot = Math.floor(new Date(m.created_at || 0).getTime() / 15000);
+      const sig = `${m.user?.id || 'usr'}_${m.text || ''}_${timeSlot}`;
+      if (seenSigs.has(sig)) continue;
+      seenSigs.add(sig);
+
+      messages.push(m);
     }
 
     const myId = currentUser?.id || '';
@@ -1893,7 +1954,26 @@
   function renderPinnedBarAndList(targetPane, force = false) {
     try {
       const panes = targetPane ? [targetPane] : getAllCommunityPanes();
-      const messages = (activeChannel?.state?.messages || []).filter(m => !m.deleted_at);
+      const rawMessages = (activeChannel?.state?.messages || []).filter(m => m && !m.deleted_at);
+      
+      // Deduplicate messages across ID, client_msg_id, and optimistic signature
+      const seenMsgIds = new Set();
+      const seenMsgSigs = new Set();
+      const messages = [];
+
+      for (const m of rawMessages) {
+        if (!m || !m.id) continue;
+        if (seenMsgIds.has(m.id)) continue;
+        seenMsgIds.add(m.id);
+
+        const timeSlot = Math.floor(new Date(m.created_at || 0).getTime() / 15000);
+        const sig = `${m.user?.id || 'usr'}_${m.text || ''}_${timeSlot}`;
+        if (seenMsgSigs.has(sig)) continue;
+        seenMsgSigs.add(sig);
+
+        messages.push(m);
+      }
+
       const pinnedMessages = messages.filter(m => m.pinned || m.is_pinned || Boolean(m.pinned_at));
       const isAdmin = Boolean(currentUser?.role === 'admin' || (typeof AppState !== 'undefined' && AppState.adminLoggedIn));
 
@@ -3107,6 +3187,7 @@
         quoted_message_text: msgPayload.quoted_message_text || null
       };
 
+      // Render optimistic message locally
       if (!activeChannel.state) activeChannel.state = { messages: [] };
       if (!Array.isArray(activeChannel.state.messages)) activeChannel.state.messages = [];
       activeChannel.state.messages.push(optimisticMessage);
@@ -3115,15 +3196,18 @@
       replyingToMessage = null;
       updateReplyBar(container);
 
-      // Broadcast optimistic event to other open tabs/windows
-      broadcastMessageSync(optimisticMessage, activeChannelId);
-
       try {
         const sent = await activeChannel.sendMessage(msgPayload);
 
         // Replace optimistic placeholder with real confirmed message from server
         if (sent?.message && activeChannel?.state?.messages) {
-          const optIdx = activeChannel.state.messages.findIndex(m => m.id === optimisticId);
+          const optIdx = activeChannel.state.messages.findIndex(m => 
+            m.id === optimisticId || (
+              String(m.id).startsWith('opt_') && 
+              m.user?.id === sent.message.user?.id && 
+              m.text === sent.message.text
+            )
+          );
           if (optIdx >= 0) {
             activeChannel.state.messages[optIdx] = sent.message;
           } else if (!activeChannel.state.messages.some(m => m.id === sent.message.id)) {

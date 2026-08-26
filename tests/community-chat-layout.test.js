@@ -359,6 +359,11 @@ export function runCommunityChatLayoutTests(assert) {
          chatJs.includes('lastRenderedMessagesHash') &&
          chatJs.includes('wasNearBottom'),
     'T35.102: js/stream-community-chat.js implements getMessagesHash and smart DOM reconciliation with scroll retention');
+
+  assert(chatJs.includes('seenMsgSigs') &&
+         chatJs.includes("startsWith('opt_')") &&
+         chatJs.includes('seenIds'),
+    'T35.103: js/stream-community-chat.js implements multi-tier message deduplication and optimistic copy replacement to prevent double message rendering');
 }
 
 
