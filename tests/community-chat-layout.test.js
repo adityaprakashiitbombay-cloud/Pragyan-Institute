@@ -305,6 +305,16 @@ export function runCommunityChatLayoutTests(assert) {
   assert(chatJs.includes('msgPayload.quoted_message_id = replyingToMessage.id;') &&
          !chatJs.includes('msgPayload.parent_id = replyingToMessage.id;'),
     'T35.92: js/stream-community-chat.js avoids parent_id thread nesting error while preserving rich in-channel quotes');
+
+  assert(chatJs.includes('function handleMsgEvent(eventType, event)') &&
+         chatJs.includes('bindChannelRealtime') &&
+         chatJs.includes('Array.from(channelsMap.values()).map(ch => ch.watch({ state: true, presence: true }))'),
+    'T35.93: js/stream-community-chat.js implements module-level handleMsgEvent and admin bulk channel watching for live real-time sync');
+
+  assert(portalJs.includes('window.PragyanStreamChat.syncActiveChannelMessages()') &&
+         chatJs.includes('panes.add(adminPane)') &&
+         chatJs.includes('panes.add(studentPane)'),
+    'T35.94: js/portal.js and stream-community-chat.js ensure seamless re-activation sync across both student and admin community panes');
 }
 
 

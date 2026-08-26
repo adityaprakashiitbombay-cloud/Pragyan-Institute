@@ -274,22 +274,32 @@
   }
 
   function getAllCommunityPanes() {
-    const panes = [];
+    const panes = new Set();
     const adminPane = document.getElementById('adminTabPane-community');
     const studentPane = document.getElementById('studentTabPane-community');
-    if (adminPane && adminPane.querySelector('.stream-chat-wrapper')) panes.push(adminPane);
-    if (studentPane && studentPane.querySelector('.stream-chat-wrapper')) panes.push(studentPane);
-    if (!panes.length) {
-      const fallback = getActiveCommunityPane();
-      if (fallback) panes.push(fallback);
-    }
-    return panes;
+    if (adminPane) panes.add(adminPane);
+    if (studentPane) panes.add(studentPane);
+    const appEl = document.getElementById('stream-community-chat-app');
+    if (appEl) panes.add(appEl);
+    return Array.from(panes);
   }
   const getAllMountedPanes = getAllCommunityPanes;
 
   function handleIncomingSync(data) {
     if (!data || data.type !== 'sync_channel') return;
-    if (data.channelId && data.channelId !== activeChannelId) return;
+
+    if (data.channelId && data.channelId !== activeChannelId) {
+      if (channelsMap.has(data.channelId) && data.message) {
+        const targetCh = channelsMap.get(data.channelId);
+        if (targetCh && targetCh.state && Array.isArray(targetCh.state.messages)) {
+          if (!targetCh.state.messages.some(m => m.id === data.message.id)) {
+            targetCh.state.messages.push(data.message);
+            targetCh.state.messages.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+          }
+        }
+      }
+      return;
+    }
 
     if (data.message && activeChannel?.state?.messages) {
       const incoming = data.message;
@@ -351,6 +361,99 @@
     return '';
   }
 
+  function handleMsgEvent(eventType, event) {
+    if (!event) return;
+    const evtChId = getEventChannelId(event);
+
+    // 1. Update channelsMap if the event belongs to another known channel
+    if (evtChId && channelsMap.has(evtChId)) {
+      const targetCh = channelsMap.get(evtChId);
+      if (targetCh && targetCh !== activeChannel && targetCh.state) {
+        if (!Array.isArray(targetCh.state.messages)) targetCh.state.messages = [];
+        if (eventType === 'message.new' || eventType === 'notification.message_new') {
+          if (event.message && !targetCh.state.messages.some(m => m.id === event.message.id)) {
+            targetCh.state.messages.push(event.message);
+            targetCh.state.messages.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+          }
+        } else if (eventType === 'message.updated') {
+          if (event.message) {
+            const idx = targetCh.state.messages.findIndex(m => m.id === event.message.id);
+            if (idx >= 0) targetCh.state.messages[idx] = { ...targetCh.state.messages[idx], ...event.message };
+            else targetCh.state.messages.push(event.message);
+            targetCh.state.messages.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+          }
+        } else if (eventType === 'message.deleted') {
+          const delId = event.message?.id || event.id;
+          if (delId) targetCh.state.messages = targetCh.state.messages.filter(m => m.id !== delId);
+        }
+      }
+    }
+
+    // 2. If it matches our active channel (or no channel specified), process for active UI
+    if (!activeChannel) return;
+    const isMatch = !evtChId || evtChId === activeChannel.id || 
+                    (event.cid && activeChannel.cid && event.cid === activeChannel.cid) ||
+                    (event.channel?.id === activeChannel.id);
+    if (!isMatch) return;
+
+    if (!activeChannel.state) activeChannel.state = { messages: [] };
+    if (!Array.isArray(activeChannel.state.messages)) activeChannel.state.messages = [];
+
+    if (eventType === 'message.new' || eventType === 'notification.message_new') {
+      if (event.message) {
+        const idx = activeChannel.state.messages.findIndex(m => m.id === event.message.id);
+        if (idx >= 0) {
+          activeChannel.state.messages[idx] = { ...activeChannel.state.messages[idx], ...event.message };
+        } else {
+          activeChannel.state.messages.push(event.message);
+        }
+        activeChannel.state.messages.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+      }
+    } else if (eventType === 'message.updated') {
+      if (event.message) {
+        const idx = activeChannel.state.messages.findIndex(m => m.id === event.message.id);
+        if (idx >= 0) {
+          activeChannel.state.messages[idx] = { ...activeChannel.state.messages[idx], ...event.message };
+        } else {
+          activeChannel.state.messages.push(event.message);
+        }
+        activeChannel.state.messages.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+      }
+    } else if (eventType === 'message.deleted') {
+      const delId = event.message?.id || event.id;
+      if (delId) {
+        activeChannel.state.messages = activeChannel.state.messages.filter(m => m.id !== delId);
+      }
+    } else if (eventType === 'channel.updated') {
+      if (event.channel?.muted_users) {
+        activeChannel.data = activeChannel.data || {};
+        activeChannel.data.muted_users = event.channel.muted_users;
+        activeChannel.data.muted_user_ids = event.channel.muted_users;
+        getAllMountedPanes().forEach(pane => renderUI(pane));
+        return;
+      }
+    } else if (eventType === 'user.banned' || eventType === 'user.unbanned') {
+      const bannedUserId = event.user?.id;
+      if (bannedUserId && activeChannel) {
+        activeChannel.data = activeChannel.data || {};
+        let mutedList = Array.isArray(activeChannel.data.muted_users) ? [...activeChannel.data.muted_users] : [];
+        if (eventType === 'user.banned') {
+          if (!mutedList.includes(bannedUserId)) mutedList.push(bannedUserId);
+        } else {
+          mutedList = mutedList.filter(id => id !== bannedUserId);
+        }
+        activeChannel.data.muted_users = mutedList;
+        activeChannel.data.muted_user_ids = mutedList;
+        getAllMountedPanes().forEach(pane => renderUI(pane));
+        return;
+      }
+    } else if (eventType === 'channel.truncated' || eventType === 'notification.channel_truncate') {
+      activeChannel.state.messages = [];
+    }
+
+    renderPinnedBarAndList();
+  }
+
   function bindChannelRealtime(ch) {
     if (!ch || ch._realtimeBound) return;
     ch._realtimeBound = true;
@@ -396,7 +499,7 @@
       if (typeof document !== 'undefined' && document.visibilityState === 'visible' && client?.userID && activeChannel) {
         syncActiveChannelMessages();
       }
-    }, 5000);
+    }, 3000);
   }
 
   function resolveStudentBatches() {
@@ -613,6 +716,16 @@
     if (!activeChannel && channelsMap.size > 0) {
       activeChannel = Array.from(channelsMap.values())[0];
       activeChannelId = activeChannel.id;
+    }
+
+    if (isAdmin && channelsMap.size > 0) {
+      try {
+        await Promise.allSettled(
+          Array.from(channelsMap.values()).map(ch => ch.watch({ state: true, presence: true }))
+        );
+      } catch (adminWatchErr) {
+        console.warn('[StreamChat] Admin bulk watch note:', adminWatchErr.message);
+      }
     }
 
     if (activeChannel) {
@@ -1949,90 +2062,6 @@
   function setupRealtimeListeners() {
     if (!client || isListening) return;
     isListening = true;
-
-    const handleMsgEvent = (eventType, event) => {
-      const evtChId = getEventChannelId(event);
-
-      // 1. Update channelsMap if the event belongs to another known channel
-      if (evtChId && channelsMap.has(evtChId)) {
-        const targetCh = channelsMap.get(evtChId);
-        if (targetCh && targetCh !== activeChannel && targetCh.state) {
-          if (!Array.isArray(targetCh.state.messages)) targetCh.state.messages = [];
-          if (eventType === 'message.new' || eventType === 'notification.message_new') {
-            if (event.message && !targetCh.state.messages.some(m => m.id === event.message.id)) {
-              targetCh.state.messages.push(event.message);
-            }
-          } else if (eventType === 'message.deleted') {
-            const delId = event.message?.id || event.id;
-            if (delId) targetCh.state.messages = targetCh.state.messages.filter(m => m.id !== delId);
-          }
-        }
-      }
-
-      // 2. If it matches our active channel (or no channel specified), process for active UI
-      if (!activeChannel) return;
-      const isMatch = !evtChId || evtChId === activeChannel.id || 
-                      (event.cid && activeChannel.cid && event.cid === activeChannel.cid) ||
-                      (event.channel?.id === activeChannel.id);
-      if (!isMatch) return;
-
-      if (!activeChannel.state) activeChannel.state = { messages: [] };
-      if (!Array.isArray(activeChannel.state.messages)) activeChannel.state.messages = [];
-
-      if (eventType === 'message.new' || eventType === 'notification.message_new') {
-        if (event.message) {
-          const idx = activeChannel.state.messages.findIndex(m => m.id === event.message.id);
-          if (idx >= 0) {
-            activeChannel.state.messages[idx] = { ...activeChannel.state.messages[idx], ...event.message };
-          } else {
-            activeChannel.state.messages.push(event.message);
-          }
-          activeChannel.state.messages.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
-        }
-      } else if (eventType === 'message.updated') {
-        if (event.message) {
-          const idx = activeChannel.state.messages.findIndex(m => m.id === event.message.id);
-          if (idx >= 0) {
-            activeChannel.state.messages[idx] = { ...activeChannel.state.messages[idx], ...event.message };
-          } else {
-            activeChannel.state.messages.push(event.message);
-          }
-          activeChannel.state.messages.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
-        }
-      } else if (eventType === 'message.deleted') {
-        const delId = event.message?.id || event.id;
-        if (delId) {
-          activeChannel.state.messages = activeChannel.state.messages.filter(m => m.id !== delId);
-        }
-      } else if (eventType === 'channel.updated') {
-        if (event.channel?.muted_users) {
-          activeChannel.data = activeChannel.data || {};
-          activeChannel.data.muted_users = event.channel.muted_users;
-          activeChannel.data.muted_user_ids = event.channel.muted_users;
-          getAllMountedPanes().forEach(pane => renderUI(pane));
-          return;
-        }
-      } else if (eventType === 'user.banned' || eventType === 'user.unbanned') {
-        const bannedUserId = event.user?.id;
-        if (bannedUserId && activeChannel) {
-          activeChannel.data = activeChannel.data || {};
-          let mutedList = Array.isArray(activeChannel.data.muted_users) ? [...activeChannel.data.muted_users] : [];
-          if (eventType === 'user.banned') {
-            if (!mutedList.includes(bannedUserId)) mutedList.push(bannedUserId);
-          } else {
-            mutedList = mutedList.filter(id => id !== bannedUserId);
-          }
-          activeChannel.data.muted_users = mutedList;
-          activeChannel.data.muted_user_ids = mutedList;
-          getAllMountedPanes().forEach(pane => renderUI(pane));
-          return;
-        }
-      } else if (eventType === 'channel.truncated' || eventType === 'notification.channel_truncate') {
-        activeChannel.state.messages = [];
-      }
-
-      renderPinnedBarAndList();
-    };
 
     const eventTypes = [
       'message.new',

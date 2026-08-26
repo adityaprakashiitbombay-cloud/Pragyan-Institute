@@ -9327,6 +9327,9 @@ const inputRoll = modalEl.querySelector('#deleteConfirmRollInput')?.value.trim()
 
     // Guard against destructive re-renders: if Stream chat is already mounted and active in this pane, retain DOM & state
     if (activePane.querySelector('.stream-chat-wrapper')) {
+      if (window.PragyanStreamChat && typeof window.PragyanStreamChat.syncActiveChannelMessages === 'function') {
+        window.PragyanStreamChat.syncActiveChannelMessages();
+      }
       return;
     }
 
