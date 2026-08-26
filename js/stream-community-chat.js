@@ -320,6 +320,19 @@
     }
   } catch (_) {}
 
+  try {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', e => {
+        if (e.key === 'pragyan_stream_chat_sync' && e.newValue) {
+          try {
+            const parsed = JSON.parse(e.newValue);
+            handleIncomingSync(parsed);
+          } catch (_) {}
+        }
+      });
+    }
+  } catch (_) {}
+
   function broadcastMessageSync(messageObj) {
     const payload = {
       type: 'sync_channel',
@@ -468,6 +481,46 @@
         handleMsgEvent(evt, event);
       });
     });
+  }
+
+  function setupRealtimeListeners() {
+    if (!client || isListening) return;
+    isListening = true;
+
+    const eventTypes = [
+      'message.new',
+      'message.updated',
+      'message.deleted',
+      'channel.updated',
+      'channel.truncated',
+      'user.banned',
+      'user.unbanned',
+      'notification.message_new',
+      'notification.channel_truncate'
+    ];
+
+    eventTypes.forEach(evtType => {
+      client.on(evtType, event => {
+        handleMsgEvent(evtType, event);
+      });
+    });
+
+    client.on('connection.recovered', () => {
+      syncActiveChannelMessages();
+    });
+
+    client.on('connection.changed', e => {
+      if (e?.online) {
+        syncActiveChannelMessages();
+      }
+    });
+  }
+
+  function stopPeriodicSync() {
+    if (syncIntervalId) {
+      clearInterval(syncIntervalId);
+      syncIntervalId = null;
+    }
   }
 
   async function syncActiveChannelMessages() {

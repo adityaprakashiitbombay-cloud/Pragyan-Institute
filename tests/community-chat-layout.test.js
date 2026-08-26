@@ -326,6 +326,11 @@ export function runCommunityChatLayoutTests(assert) {
          chatJs.includes("document.querySelectorAll('#stream-pinned-bar-wrapper')") &&
          chatJs.includes("evtChId.replace(/^batch-/, '') === activeChannel.id.replace(/^batch-/, '')"),
     'T35.96: js/stream-community-chat.js executes direct universal DOM rendering and normalized channel matching for instant live updates');
+
+  assert(chatJs.includes('function setupRealtimeListeners()') &&
+         chatJs.includes('function stopPeriodicSync()') &&
+         chatJs.includes("e.key === 'pragyan_stream_chat_sync'"),
+    'T35.97: js/stream-community-chat.js implements module-level setupRealtimeListeners, stopPeriodicSync, and cross-tab storage sync');
 }
 
 
