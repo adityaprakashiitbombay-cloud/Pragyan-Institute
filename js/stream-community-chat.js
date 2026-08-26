@@ -480,18 +480,18 @@
 
     if (!messages || !messages.length) {
       return `
-        <div style="text-align: center; color: var(--text-muted, #64748B); margin: auto; padding: 3rem 1.5rem; max-width: 440px;">
-          <div style="width: 64px; height: 64px; border-radius: 50%; background: ${channelMeta.badgeColor}18; color: ${channelMeta.badgeColor}; display: inline-flex; align-items: center; justify-content: center; font-size: 1.85rem; margin-bottom: 0.85rem; border: 2px solid ${channelMeta.badgeColor}33;">
+        <div style="text-align: center; color: var(--text-muted, #64748B); margin: auto; padding: 2.5rem 1rem; max-width: 420px;">
+          <div style="width: 48px; height: 48px; border-radius: 50%; background: ${channelMeta.badgeColor}18; color: ${channelMeta.badgeColor}; display: inline-flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 0.6rem; border: 1.5px solid ${channelMeta.badgeColor}33;">
             ${channelMeta.icon}
           </div>
-          <h4 style="font-weight: 800; font-size: 1.1rem; color: #1E293B; margin-bottom: 0.35rem;">
+          <h4 style="font-weight: 800; font-size: 1.05rem; color: #1E293B; margin-bottom: 0.25rem;">
             Welcome to ${escapeHtml(channelMeta.name)}
           </h4>
-          <p style="font-size: 0.85rem; line-height: 1.5; color: #64748B; margin-bottom: 1rem;">
+          <p style="font-size: 0.82rem; line-height: 1.4; color: #64748B; margin-bottom: 0.75rem;">
             ${escapeHtml(channelMeta.tagline)}
           </p>
-          <div style="display: inline-flex; align-items: center; gap: 0.4rem; background: #FFFFFF; border: 1px dashed ${channelMeta.badgeColor}; padding: 0.45rem 0.85rem; border-radius: 8px; font-size: 0.8rem; font-weight: 700; color: #334155;">
-            ✨ Start the class discussion, ask doubts (/quest), or share notes below!
+          <div style="display: inline-flex; align-items: center; gap: 0.35rem; background: #FFFFFF; border: 1px dashed ${channelMeta.badgeColor}; padding: 0.35rem 0.75rem; border-radius: 8px; font-size: 0.78rem; font-weight: 700; color: #334155;">
+            ✨ Start class discussion, ask doubts (/quest), or share notes!
           </div>
         </div>
       `;
@@ -509,49 +509,77 @@
 
       const avatar = m.user?.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.user?.name || 'User')}&background=${isFaculty ? 'D97706' : '064E3B'}&color=fff`;
       const formattedBody = formatMessageBody(m.text || '');
+      const timeStr = fmtTime(m.created_at);
+
+      // Compact Admin Actions (Hover / Inline pill)
+      let actionsHtml = '';
+      if (currentUser.role === 'admin') {
+        actionsHtml = `
+          <span class="stream-msg-actions" style="display: inline-flex; align-items: center; gap: 0.2rem; margin-left: 0.35rem;">
+            <button type="button" class="${isPinned ? 'btn-unpin-msg' : 'btn-pin-msg'}" data-${isPinned ? 'unpin' : 'pin'}-msg="${escapeHtml(m.id)}" style="background: rgba(0,0,0,0.06); border: none; font-size: 0.65rem; color: ${isPinned ? '#D97706' : '#059669'}; cursor: pointer; padding: 2px 5px; border-radius: 4px; font-weight: 700; line-height: 1;" title="${isPinned ? 'Unpin message' : 'Pin to top'}">
+              <i class="fa-solid fa-thumbtack" aria-hidden="true"></i> ${isPinned ? 'Unpin' : 'Pin'}
+            </button>
+            <button type="button" class="btn-del-msg" data-del-msg="${escapeHtml(m.id)}" style="background: rgba(220,38,38,0.08); border: none; font-size: 0.65rem; color: #DC2626; cursor: pointer; padding: 2px 5px; border-radius: 4px; font-weight: 700; line-height: 1;" title="Delete message" aria-label="Delete message">
+              <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+            </button>
+          </span>
+        `;
+      }
 
       let bubbleContentHtml = '';
       if (isQuestion) {
         bubbleContentHtml = `
-          <div class="stream-msg-bubble stream-msg-question" style="background: linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%); color: #1E1B4B; border: 2px solid #6366F1; padding: 0.85rem 1.15rem; border-radius: 12px; font-size: 0.95rem; line-height: 1.55; box-shadow: 0 4px 20px rgba(99, 102, 241, 0.22); position: relative;">
-            <div style="font-size: 0.74rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; color: #4338CA; margin-bottom: 0.4rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(99, 102, 241, 0.25); padding-bottom: 0.35rem;">
-              <span style="display: inline-flex; align-items: center; gap: 0.35rem;">
-                <span style="font-size: 0.95rem;">❓</span> <strong>STUDENT QUESTION &amp; DOUBT</strong>
+          <div class="stream-msg-bubble stream-msg-question" style="background: linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%); color: #1E1B4B; border: 1.5px solid #6366F1; padding: 0.45rem 0.75rem; border-radius: 10px; font-size: 0.88rem; line-height: 1.4; box-shadow: 0 2px 8px rgba(99, 102, 241, 0.15); position: relative;">
+            <div style="font-size: 0.7rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.3px; color: #4338CA; margin-bottom: 0.2rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; border-bottom: 1px solid rgba(99, 102, 241, 0.2); padding-bottom: 0.2rem;">
+              <span style="display: inline-flex; align-items: center; gap: 0.25rem;">
+                <span>❓</span> <strong>QUESTION / DOUBT</strong>
               </span>
-              <span style="font-size: 0.72rem; color: #3730A3; background: #C7D2FE; padding: 1px 7px; border-radius: 4px; font-weight: 800;">
-                💡 Academic Doubt
+              <span style="font-size: 0.65rem; color: #3730A3; background: #C7D2FE; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 800;">
+                Academic Doubt
               </span>
             </div>
-            <div style="font-weight: 600; font-size: 0.95rem; color: #1E1B4B;">
+            <div style="font-weight: 600; color: #1E1B4B;">
               ${formattedBody}
+            </div>
+            <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.35rem; margin-top: 0.2rem; font-size: 0.66rem; color: #6366F1;">
+              <span>${timeStr}</span>
+              ${actionsHtml}
             </div>
           </div>
         `;
       } else if (isHighlight) {
         bubbleContentHtml = `
-          <div class="stream-msg-bubble stream-msg-highlight" style="background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%); color: #78350F; border: 2px solid #F59E0B; padding: 0.85rem 1.15rem; border-radius: 12px; font-size: 0.95rem; line-height: 1.55; box-shadow: 0 4px 20px rgba(245, 158, 11, 0.2); position: relative;">
-            <div style="font-size: 0.74rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; color: #B45309; margin-bottom: 0.4rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(217, 119, 6, 0.25); padding-bottom: 0.35rem;">
-              <span style="display: inline-flex; align-items: center; gap: 0.35rem;">
-                <span style="font-size: 0.95rem;">⭐</span> <strong>OFFICIAL ADMIN HIGHLIGHT</strong>
+          <div class="stream-msg-bubble stream-msg-highlight" style="background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%); color: #78350F; border: 1.5px solid #F59E0B; padding: 0.45rem 0.75rem; border-radius: 10px; font-size: 0.88rem; line-height: 1.4; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15); position: relative;">
+            <div style="font-size: 0.7rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.3px; color: #B45309; margin-bottom: 0.2rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; border-bottom: 1px solid rgba(217, 119, 6, 0.2); padding-bottom: 0.2rem;">
+              <span style="display: inline-flex; align-items: center; gap: 0.25rem;">
+                <span>⭐</span> <strong>ADMIN HIGHLIGHT</strong>
               </span>
-              ${isPinned ? `<span style="font-size: 0.72rem; color: #92400E; background: #FDE68A; padding: 1px 6px; border-radius: 4px; font-weight: 800;"><i class="fa-solid fa-thumbtack"></i> Pinned</span>` : ''}
+              ${isPinned ? `<span style="font-size: 0.65rem; color: #92400E; background: #FDE68A; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 800;"><i class="fa-solid fa-thumbtack"></i> Pinned</span>` : ''}
             </div>
-            <div style="font-weight: 600; font-size: 0.95rem; color: #78350F;">
+            <div style="font-weight: 600; color: #78350F;">
               ${formattedBody}
+            </div>
+            <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.35rem; margin-top: 0.2rem; font-size: 0.66rem; color: #B45309;">
+              <span>${timeStr}</span>
+              ${actionsHtml}
             </div>
           </div>
         `;
       } else if (isNotice) {
         bubbleContentHtml = `
-          <div class="stream-msg-bubble stream-msg-notice" style="background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%); color: #064E3B; border: 2px solid #10B981; padding: 0.85rem 1.15rem; border-radius: 12px; font-size: 0.95rem; line-height: 1.55; box-shadow: 0 4px 16px rgba(16, 185, 129, 0.15); position: relative;">
-            <div style="font-size: 0.74rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; color: #047857; margin-bottom: 0.4rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(16, 185, 129, 0.25); padding-bottom: 0.35rem;">
-              <span style="display: inline-flex; align-items: center; gap: 0.35rem;">
-                <span style="font-size: 0.95rem;">📢</span> <strong>OFFICIAL CLASS ANNOUNCEMENT</strong>
+          <div class="stream-msg-bubble stream-msg-notice" style="background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%); color: #064E3B; border: 1.5px solid #10B981; padding: 0.45rem 0.75rem; border-radius: 10px; font-size: 0.88rem; line-height: 1.4; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.12); position: relative;">
+            <div style="font-size: 0.7rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.3px; color: #047857; margin-bottom: 0.2rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; border-bottom: 1px solid rgba(16, 185, 129, 0.2); padding-bottom: 0.2rem;">
+              <span style="display: inline-flex; align-items: center; gap: 0.25rem;">
+                <span>📢</span> <strong>CLASS NOTICE</strong>
               </span>
-              ${isPinned ? `<span style="font-size: 0.72rem; color: #065F46; background: #A7F3D0; padding: 1px 6px; border-radius: 4px; font-weight: 800;"><i class="fa-solid fa-thumbtack"></i> Pinned</span>` : ''}
+              ${isPinned ? `<span style="font-size: 0.65rem; color: #065F46; background: #A7F3D0; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 800;"><i class="fa-solid fa-thumbtack"></i> Pinned</span>` : ''}
             </div>
-            <div style="font-weight: 600; font-size: 0.94rem; color: #064E3B;">
+            <div style="font-weight: 600; color: #064E3B;">
               ${formattedBody}
+            </div>
+            <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.35rem; margin-top: 0.2rem; font-size: 0.66rem; color: #047857;">
+              <span>${timeStr}</span>
+              ${actionsHtml}
             </div>
           </div>
         `;
@@ -559,53 +587,45 @@
         const bubbleBg = isMine ? '#064E3B' : (isFaculty ? '#FFFDF5' : '#FFFFFF');
         const bubbleColor = isMine ? '#FFFFFF' : '#1E293B';
         const bubbleBorder = isMine ? '#064E3B' : (isFaculty ? '#FDE68A' : 'var(--border-sand, #E2E8F0)');
+        const timeColor = isMine ? 'rgba(255,255,255,0.72)' : '#94A3B8';
 
         bubbleContentHtml = `
-          <div class="stream-msg-bubble ${isPinned ? 'is-pinned-bubble' : ''}" style="background: ${bubbleBg}; color: ${bubbleColor}; border: 1.5px solid ${isPinned ? '#F59E0B' : bubbleBorder}; padding: 0.75rem 1rem; border-radius: 12px; font-size: 0.92rem; line-height: 1.5; word-break: break-word; overflow-wrap: anywhere; box-shadow: 0 2px 8px rgba(0,0,0,0.04); position: relative;">
+          <div class="stream-msg-bubble ${isPinned ? 'is-pinned-bubble' : ''}" style="background: ${bubbleBg}; color: ${bubbleColor}; border: 1.5px solid ${isPinned ? '#F59E0B' : bubbleBorder}; padding: 0.38rem 0.7rem; border-radius: 10px; font-size: 0.88rem; line-height: 1.38; word-break: break-word; overflow-wrap: anywhere; box-shadow: 0 1px 4px rgba(0,0,0,0.03); position: relative;">
             ${isPinned ? `
-              <div style="font-size: 0.68rem; font-weight: 800; color: #D97706; margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.25rem;">
-                <i class="fa-solid fa-thumbtack"></i> Pinned by Faculty
+              <div style="font-size: 0.65rem; font-weight: 800; color: #D97706; margin-bottom: 0.2rem; display: flex; align-items: center; gap: 0.2rem;">
+                <i class="fa-solid fa-thumbtack"></i> Pinned
               </div>
             ` : ''}
-            ${formattedBody}
+            <div class="stream-msg-text" style="display: inline;">
+              ${formattedBody}
+            </div>
+            <div class="stream-msg-meta-row" style="display: flex; align-items: center; justify-content: flex-end; gap: 0.35rem; margin-top: 0.15rem; font-size: 0.65rem; color: ${timeColor};">
+              <span>${timeStr}</span>
+              ${actionsHtml}
+            </div>
           </div>
         `;
       }
 
       return `
-        <div class="stream-msg-row ${isMine ? 'mine' : 'theirs'} ${isPinned ? 'stream-msg-pinned' : ''}" id="msg-${escapeHtml(m.id)}" style="display: flex; gap: 0.75rem; align-items: flex-start; margin-bottom: 1rem; ${isMine ? 'flex-direction: row-reverse;' : ''}">
-          <img src="${escapeHtml(avatar)}" alt="${escapeHtml(m.user?.name || '')}" style="width: 38px; height: 38px; border-radius: 50%; object-fit: cover; border: 2px solid ${isFaculty ? '#F59E0B' : (isMine ? '#10B981' : '#059669')}; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.08);">
-          <div style="max-width: 82%; display: flex; flex-direction: column; ${isMine ? 'align-items: flex-end;' : 'align-items: flex-start;'}">
+        <div class="stream-msg-row ${isMine ? 'mine' : 'theirs'} ${isPinned ? 'stream-msg-pinned' : ''}" id="msg-${escapeHtml(m.id)}" style="display: flex; gap: 0.45rem; align-items: flex-start; margin-bottom: 0.35rem; ${isMine ? 'flex-direction: row-reverse;' : ''}">
+          <img src="${escapeHtml(avatar)}" alt="${escapeHtml(m.user?.name || '')}" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover; border: 1.5px solid ${isFaculty ? '#F59E0B' : (isMine ? '#10B981' : '#059669')}; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin-top: 1px;">
+          <div style="max-width: 85%; display: flex; flex-direction: column; ${isMine ? 'align-items: flex-end;' : 'align-items: flex-start;'}">
             
-            <!-- Sender Identity Badges -->
-            <div style="display: flex; gap: 0.45rem; align-items: center; font-size: 0.76rem; margin-bottom: 0.3rem; flex-wrap: wrap; ${isMine ? 'flex-direction: row-reverse;' : ''}">
-              <strong style="color: ${isFaculty ? '#B45309' : (isMine ? '#064E3B' : 'var(--text-mahogany, #5A2E25)')}; font-weight: 800;">
-                ${escapeHtml(m.user?.name || 'User')}
-              </strong>
-              
-              <span style="background: ${identity.badgeBg}; color: ${identity.badgeColor}; border: 1px solid ${identity.badgeBorder}; font-size: 0.68rem; font-weight: 800; padding: 0.1rem 0.45rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 0.25rem;">
-                ${identity.badgeText}
-              </span>
-
-              <span style="color: var(--text-muted, #64748B); font-size: 0.72rem;">
-                ${fmtTime(m.created_at)}
-              </span>
-            </div>
+            <!-- Compact Sender Header (Only for incoming messages) -->
+            ${!isMine ? `
+              <div style="display: flex; gap: 0.35rem; align-items: center; font-size: 0.72rem; margin-bottom: 0.15rem; flex-wrap: wrap;">
+                <strong style="color: ${isFaculty ? '#B45309' : 'var(--text-mahogany, #5A2E25)'}; font-weight: 800;">
+                  ${escapeHtml(m.user?.name || 'User')}
+                </strong>
+                <span style="background: ${identity.badgeBg}; color: ${identity.badgeColor}; border: 1px solid ${identity.badgeBorder}; font-size: 0.62rem; font-weight: 800; padding: 0.05rem 0.35rem; border-radius: 3px; display: inline-flex; align-items: center; gap: 0.2rem;">
+                  ${identity.badgeText}
+                </span>
+              </div>
+            ` : ''}
 
             <!-- Message Bubble -->
             ${bubbleContentHtml}
-
-            <!-- Admin Moderation & Pin Action Row -->
-            ${currentUser.role === 'admin' ? `
-              <div style="display: flex; gap: 0.6rem; margin-top: 0.3rem; align-items: center;">
-                <button type="button" class="${isPinned ? 'btn-unpin-msg' : 'btn-pin-msg'}" data-${isPinned ? 'unpin' : 'pin'}-msg="${escapeHtml(m.id)}" style="background: none; border: none; font-size: 0.74rem; color: ${isPinned ? '#D97706' : '#059669'}; cursor: pointer; padding: 0.1rem 0.35rem; border-radius: 4px; font-weight: 800; opacity: 0.9; transition: all 0.2s;" title="${isPinned ? 'Unpin this message' : 'Pin to top of class forum'}">
-                  <i class="fa-solid fa-thumbtack" aria-hidden="true"></i> ${isPinned ? 'Unpin' : 'Pin'}
-                </button>
-                <button type="button" class="btn-del-msg" data-del-msg="${escapeHtml(m.id)}" style="background: none; border: none; font-size: 0.74rem; color: #DC2626; cursor: pointer; padding: 0.1rem 0.35rem; border-radius: 4px; font-weight: 800; opacity: 0.85; transition: all 0.2s;" aria-label="Delete message">
-                  <i class="fa-solid fa-trash-can" aria-hidden="true"></i> Delete
-                </button>
-              </div>
-            ` : ''}
           </div>
         </div>
       `;
@@ -662,35 +682,42 @@
     const latestPin = pinnedMessages.length ? pinnedMessages[pinnedMessages.length - 1] : null;
 
     container.innerHTML = `
-      <div class="stream-chat-wrapper" style="display: flex; flex-direction: column; height: clamp(540px, 82vh, 840px); max-height: calc(100dvh - 130px); background: #FFFFFF; border-radius: 14px; border: 1.5px solid var(--border-sand, #DDD5CD); overflow: hidden; box-shadow: 0 8px 30px rgba(0,0,0,0.08); position: relative;">
+      <div class="stream-chat-wrapper" style="display: flex; flex-direction: column; height: clamp(560px, calc(100dvh - 140px), 880px); background: #FFFFFF; border-radius: 14px; border: 1.5px solid var(--border-sand, #DDD5CD); overflow: hidden; box-shadow: 0 8px 30px rgba(0,0,0,0.08); position: relative;">
         
-        <!-- TOP APP BAR & LIVE STATUS -->
-        <div class="stream-top-bar" style="background: #042E23; color: #FFFFFF; padding: 0.6rem 1rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.1); flex-shrink: 0;">
-          <div style="display: flex; align-items: center; gap: 0.6rem; overflow: hidden;">
-            <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(16, 185, 129, 0.2); color: #34D399; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">
+        <!-- TOP APP BAR & LIVE STATUS & FULLSCREEN CONTROLS -->
+        <div class="stream-top-bar" style="background: #042E23; color: #FFFFFF; padding: 0.45rem 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.1); flex-shrink: 0;">
+          <div style="display: flex; align-items: center; gap: 0.5rem; overflow: hidden;">
+            <div style="width: 26px; height: 26px; border-radius: 6px; background: rgba(16, 185, 129, 0.2); color: #34D399; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; flex-shrink: 0;">
               ${activeMeta.icon}
             </div>
             <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-              <span style="font-weight: 800; font-size: 0.92rem; color: #FFFFFF; letter-spacing: -0.01em;">
-                Pragyan Class Forum
+              <span style="font-weight: 800; font-size: 0.88rem; color: #FFFFFF; letter-spacing: -0.01em;">
+                Pragyan Community Chat
               </span>
-              <span style="font-size: 0.75rem; color: #A7F3D0; margin-left: 0.4rem; opacity: 0.85;">
-                • ${isAdmin ? '🛡️ Faculty Multi-Class Hub' : `🎓 ${escapeHtml(activeMeta.shortName)}`}
+              <span style="font-size: 0.72rem; color: #A7F3D0; margin-left: 0.35rem; opacity: 0.85;">
+                • ${isAdmin ? '🛡️ Multi-Class Hub' : `🎓 ${escapeHtml(activeMeta.shortName)}`}
               </span>
             </div>
           </div>
 
-          <div style="font-size: 0.78rem; color: #D1FAE5; white-space: nowrap; display: flex; align-items: center; gap: 0.45rem; flex-shrink: 0; background: rgba(255,255,255,0.08); padding: 0.25rem 0.65rem; border-radius: 99px; border: 1px solid rgba(255,255,255,0.15);">
-            <span style="width: 8px; height: 8px; border-radius: 50%; background: #34D399; display: inline-block; box-shadow: 0 0 8px #34D399;"></span>
-            <span id="stream-online-count" style="font-weight: 700;">${onlineCount} active now</span>
+          <div style="display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0;">
+            <div style="font-size: 0.72rem; color: #D1FAE5; white-space: nowrap; display: flex; align-items: center; gap: 0.35rem; background: rgba(255,255,255,0.08); padding: 0.2rem 0.55rem; border-radius: 99px; border: 1px solid rgba(255,255,255,0.15);">
+              <span style="width: 7px; height: 7px; border-radius: 50%; background: #34D399; display: inline-block; box-shadow: 0 0 6px #34D399;"></span>
+              <span id="stream-online-count" style="font-weight: 700;">${onlineCount} active</span>
+            </div>
+
+            <!-- Fullscreen Toggle Button -->
+            <button type="button" id="btn-stream-fullscreen" class="btn-stream-fullscreen" title="Toggle Fullscreen View" aria-label="Toggle Fullscreen View" style="background: rgba(255,255,255,0.12); color: #FFFFFF; border: 1px solid rgba(255,255,255,0.22); border-radius: 6px; padding: 0.22rem 0.6rem; font-size: 0.74rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem; transition: all 0.15s ease;">
+              <i class="fa-solid fa-expand" aria-hidden="true"></i> <span>Fullscreen</span>
+            </button>
           </div>
         </div>
 
         <!-- CATEGORIES FILTER BAR (If Admin) -->
         ${isAdmin ? `
-          <div class="stream-cat-bar" style="background: #F8FAFC; padding: 0.5rem 0.85rem; border-bottom: 1px solid #E2E8F0; display: flex; gap: 0.4rem; align-items: center; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex-shrink: 0;">
+          <div class="stream-cat-bar" style="background: #F8FAFC; padding: 0.35rem 0.75rem; border-bottom: 1px solid #E2E8F0; display: flex; gap: 0.35rem; align-items: center; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex-shrink: 0;">
             ${categories.map(cat => `
-              <button type="button" class="stream-cat-pill ${selectedCategory === cat ? 'active' : ''}" data-cat-name="${escapeHtml(cat)}" style="padding: 0.28rem 0.7rem; border-radius: 99px; font-size: 0.76rem; font-weight: 700; cursor: pointer; border: 1px solid ${selectedCategory === cat ? '#064E3B' : '#CBD5E1'}; background: ${selectedCategory === cat ? '#064E3B' : '#FFFFFF'}; color: ${selectedCategory === cat ? '#FFFFFF' : '#475569'}; white-space: nowrap; transition: all 0.15s ease;">
+              <button type="button" class="stream-cat-pill ${selectedCategory === cat ? 'active' : ''}" data-cat-name="${escapeHtml(cat)}" style="padding: 0.2rem 0.55rem; border-radius: 99px; font-size: 0.72rem; font-weight: 700; cursor: pointer; border: 1px solid ${selectedCategory === cat ? '#064E3B' : '#CBD5E1'}; background: ${selectedCategory === cat ? '#064E3B' : '#FFFFFF'}; color: ${selectedCategory === cat ? '#FFFFFF' : '#475569'}; white-space: nowrap; transition: all 0.15s ease;">
                 ${cat === 'ALL' ? '🌐 All Classes (12)' : escapeHtml(cat)}
               </button>
             `).join('')}
@@ -699,17 +726,17 @@
 
         <!-- CLASS GROUPS HORIZONTAL TABS BAR -->
         ${filteredChannels.length > 1 ? `
-          <div class="stream-channels-scroll-wrap" style="background: #FFFFFF; padding: 0.55rem 0.85rem; border-bottom: 1.5px solid var(--border-sand, #E2E8F0); display: flex; gap: 0.5rem; align-items: center; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex-shrink: 0;">
+          <div class="stream-channels-scroll-wrap" style="background: #FFFFFF; padding: 0.4rem 0.75rem; border-bottom: 1.5px solid var(--border-sand, #E2E8F0); display: flex; gap: 0.4rem; align-items: center; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex-shrink: 0;">
             ${filteredChannels.map(([id]) => {
               const meta = CHANNEL_IDENTITIES[id] || { shortName: id, icon: '💬', badgeColor: '#059669' };
               const isActive = id === activeChannelId;
               const count = getStudentCountForBatch(meta.batchId);
               return `
-                <button type="button" class="stream-ch-pill ${isActive ? 'active' : ''}" data-ch-id="${escapeHtml(id)}" style="display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.4rem 0.85rem; border-radius: 99px; font-size: 0.82rem; font-weight: 700; cursor: pointer; border: 1.5px solid ${isActive ? meta.badgeColor : '#E2E8F0'}; background: ${isActive ? meta.badgeColor : '#F8FAFC'}; color: ${isActive ? '#FFFFFF' : '#334155'}; white-space: nowrap; transition: all 0.2s ease; box-shadow: ${isActive ? '0 3px 10px rgba(0,0,0,0.12)' : 'none'}; min-height: 38px;">
-                  <span style="font-size: 1rem;">${meta.icon}</span>
+                <button type="button" class="stream-ch-pill ${isActive ? 'active' : ''}" data-ch-id="${escapeHtml(id)}" style="display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.3rem 0.7rem; border-radius: 99px; font-size: 0.78rem; font-weight: 700; cursor: pointer; border: 1.5px solid ${isActive ? meta.badgeColor : '#E2E8F0'}; background: ${isActive ? meta.badgeColor : '#F8FAFC'}; color: ${isActive ? '#FFFFFF' : '#334155'}; white-space: nowrap; transition: all 0.2s ease; box-shadow: ${isActive ? '0 2px 8px rgba(0,0,0,0.1)' : 'none'}; min-height: 32px;">
+                  <span style="font-size: 0.9rem;">${meta.icon}</span>
                   <span>${escapeHtml(meta.shortName)}</span>
                   ${count > 0 ? `
-                    <span style="background: ${isActive ? 'rgba(255,255,255,0.25)' : '#E2E8F0'}; color: ${isActive ? '#FFFFFF' : '#475569'}; font-size: 0.72rem; padding: 0.05rem 0.45rem; border-radius: 99px; font-weight: 800;">
+                    <span style="background: ${isActive ? 'rgba(255,255,255,0.25)' : '#E2E8F0'}; color: ${isActive ? '#FFFFFF' : '#475569'}; font-size: 0.68rem; padding: 0.02rem 0.38rem; border-radius: 99px; font-weight: 800;">
                       ${count}
                     </span>
                   ` : ''}
@@ -719,36 +746,36 @@
           </div>
         ` : ''}
 
-        <!-- ACTIVE CLASS IDENTITY BANNER -->
-        <div class="stream-active-banner" style="background: ${activeMeta.bannerBg}; color: #FFFFFF; padding: 0.75rem 1rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-bottom: 2px solid rgba(0,0,0,0.1); flex-shrink: 0;">
-          <div style="display: flex; align-items: center; gap: 0.75rem; overflow: hidden;">
-            <div style="font-size: 1.85rem; width: 44px; height: 44px; border-radius: 10px; background: rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.25);">
+        <!-- ACTIVE CLASS IDENTITY BANNER (Compact & Sleek) -->
+        <div class="stream-active-banner" style="background: ${activeMeta.bannerBg}; color: #FFFFFF; padding: 0.45rem 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; border-bottom: 1.5px solid rgba(0,0,0,0.1); flex-shrink: 0;">
+          <div style="display: flex; align-items: center; gap: 0.5rem; overflow: hidden;">
+            <div style="font-size: 1.25rem; width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.25);">
               ${activeMeta.icon}
             </div>
             <div style="overflow: hidden;">
-              <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                <h3 style="font-size: 1.05rem; font-weight: 800; color: #FFFFFF; margin: 0; letter-spacing: -0.01em;">
+              <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+                <h3 style="font-size: 0.95rem; font-weight: 800; color: #FFFFFF; margin: 0; letter-spacing: -0.01em;">
                   ${escapeHtml(activeMeta.name)}
                 </h3>
-                <span style="background: rgba(255,255,255,0.2); color: #FFFFFF; font-size: 0.7rem; font-weight: 800; padding: 0.1rem 0.5rem; border-radius: 4px; border: 1px solid rgba(255,255,255,0.3);">
+                <span style="background: rgba(255,255,255,0.2); color: #FFFFFF; font-size: 0.65rem; font-weight: 800; padding: 0.05rem 0.4rem; border-radius: 4px; border: 1px solid rgba(255,255,255,0.3);">
                   ${escapeHtml(activeMeta.category)}
                 </span>
               </div>
-              <p style="font-size: 0.78rem; color: #E2E8F0; margin: 0.15rem 0 0 0; opacity: 0.9; text-overflow: ellipsis; white-space: nowrap; overflow: hidden;">
+              <p style="font-size: 0.72rem; color: #E2E8F0; margin: 0.05rem 0 0 0; opacity: 0.9; text-overflow: ellipsis; white-space: nowrap; overflow: hidden;">
                 ${escapeHtml(activeMeta.tagline)} • <strong style="color: #FEF08A;">Mentors: ${escapeHtml(activeMeta.mentors)}</strong>
               </p>
             </div>
           </div>
 
-          <div style="display: flex; align-items: center; gap: 0.6rem; flex-shrink: 0;">
+          <div style="display: flex; align-items: center; gap: 0.45rem; flex-shrink: 0;">
             ${isAdmin ? `
-              <button type="button" class="btn-clear-group-chat" data-ch-id="${escapeHtml(activeChannelId)}" data-ch-name="${escapeHtml(activeMeta.name)}" style="background: rgba(220, 38, 38, 0.28); color: #FFFFFF; border: 1px solid rgba(254, 202, 202, 0.45); padding: 0.35rem 0.75rem; border-radius: 8px; font-size: 0.78rem; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; transition: all 0.2s ease; box-shadow: 0 2px 6px rgba(0,0,0,0.12);" title="Clear and purge message history for this class group">
-                <i class="fa-solid fa-trash-can" aria-hidden="true"></i> <span>Clear Chat</span>
+              <button type="button" class="btn-clear-group-chat" data-ch-id="${escapeHtml(activeChannelId)}" data-ch-name="${escapeHtml(activeMeta.name)}" style="background: rgba(220, 38, 38, 0.28); color: #FFFFFF; border: 1px solid rgba(254, 202, 202, 0.45); padding: 0.22rem 0.55rem; border-radius: 6px; font-size: 0.72rem; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem; transition: all 0.2s ease;" title="Clear chat history for this group">
+                <i class="fa-solid fa-trash-can" aria-hidden="true"></i> <span>Clear</span>
               </button>
             ` : ''}
             <div style="text-align: right; display: none;" class="desktop-banner-stats">
-              <span style="font-size: 0.72rem; color: #D1FAE5; background: rgba(0,0,0,0.2); padding: 0.25rem 0.55rem; border-radius: 6px; font-weight: 700; display: inline-block;">
-                👥 Enrolled Students: ${studentCount}
+              <span style="font-size: 0.68rem; color: #D1FAE5; background: rgba(0,0,0,0.2); padding: 0.18rem 0.45rem; border-radius: 6px; font-weight: 700; display: inline-block;">
+                👥 Enrolled: ${studentCount}
               </span>
             </div>
           </div>
@@ -756,21 +783,21 @@
 
         <!-- STICKY PINNED MESSAGES BANNER -->
         ${latestPin ? `
-          <div id="stream-pinned-bar" style="background: #FFFBEB; border-bottom: 1.5px solid #FCD34D; padding: 0.55rem 1rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; font-size: 0.82rem; color: #92400E; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
-            <div style="display: flex; align-items: center; gap: 0.55rem; overflow: hidden; flex: 1;">
-              <span style="background: #F59E0B; color: #FFF; padding: 0.15rem 0.5rem; border-radius: 6px; font-size: 0.72rem; font-weight: 900; display: inline-flex; align-items: center; gap: 0.3rem; flex-shrink: 0; letter-spacing: 0.3px;">
+          <div id="stream-pinned-bar" style="background: #FFFBEB; border-bottom: 1.5px solid #FCD34D; padding: 0.35rem 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-size: 0.76rem; color: #92400E; flex-shrink: 0; box-shadow: 0 1px 4px rgba(0,0,0,0.03);">
+            <div style="display: flex; align-items: center; gap: 0.45rem; overflow: hidden; flex: 1;">
+              <span style="background: #F59E0B; color: #FFF; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.65rem; font-weight: 900; display: inline-flex; align-items: center; gap: 0.25rem; flex-shrink: 0; letter-spacing: 0.3px;">
                 <i class="fa-solid fa-thumbtack" aria-hidden="true"></i> PINNED (${pinnedMessages.length})
               </span>
-              <span class="pinned-preview-text" style="font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #78350F; font-size: 0.85rem;">
+              <span class="pinned-preview-text" style="font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #78350F; font-size: 0.78rem;">
                 ${escapeHtml(latestPin.text || '')}
               </span>
             </div>
-            <div style="display: flex; align-items: center; gap: 0.45rem; flex-shrink: 0;">
-              <button type="button" class="btn-jump-pin" data-msg-id="${escapeHtml(latestPin.id)}" style="background: #FEF3C7; color: #B45309; border: 1px solid #FCD34D; font-size: 0.75rem; font-weight: 800; padding: 0.25rem 0.65rem; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem;" title="Jump to pinned message">
+            <div style="display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0;">
+              <button type="button" class="btn-jump-pin" data-msg-id="${escapeHtml(latestPin.id)}" style="background: #FEF3C7; color: #B45309; border: 1px solid #FCD34D; font-size: 0.7rem; font-weight: 800; padding: 0.18rem 0.5rem; border-radius: 5px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;" title="Jump to pinned message">
                 <i class="fa-solid fa-arrow-down" aria-hidden="true"></i> Jump
               </button>
               ${isAdmin ? `
-                <button type="button" class="btn-unpin-msg" data-unpin-msg="${escapeHtml(latestPin.id)}" style="background: none; border: none; color: #DC2626; font-size: 0.95rem; cursor: pointer; padding: 0.2rem 0.4rem;" title="Unpin this announcement">
+                <button type="button" class="btn-unpin-msg" data-unpin-msg="${escapeHtml(latestPin.id)}" style="background: none; border: none; color: #DC2626; font-size: 0.85rem; cursor: pointer; padding: 0.15rem 0.35rem;" title="Unpin this announcement">
                   <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                 </button>
               ` : ''}
@@ -779,28 +806,28 @@
         ` : ''}
 
         <!-- MESSAGES FEED CONTAINER -->
-        <div id="stream-msg-list" style="flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 1.25rem 1rem; background: #FAF9F6; display: flex; flex-direction: column;">
+        <div id="stream-msg-list" style="flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0.75rem 0.85rem; background: #FAF9F6; display: flex; flex-direction: column;">
           ${renderMsgList(messages)}
         </div>
 
         <!-- REALTIME TYPING NOTIFIER -->
-        <div id="stream-typing-box" style="padding: 0.2rem 1rem; font-size: 0.75rem; color: #64748B; font-style: italic; min-height: 20px; background: #FAF9F6; border-top: 1px solid rgba(0,0,0,0.03);"></div>
+        <div id="stream-typing-box" style="padding: 0.15rem 0.85rem; font-size: 0.72rem; color: #64748B; font-style: italic; min-height: 18px; background: #FAF9F6; border-top: 1px solid rgba(0,0,0,0.03);"></div>
 
         <!-- FLOATING AUTOCOMPLETE DROPDOWN (@MENTIONS & /SLASH COMMANDS) -->
-        <div id="stream-autocomplete-box" style="display: none; position: absolute; bottom: 64px; left: 1rem; right: 1rem; max-height: 240px; overflow-y: auto; background: #FFFFFF; border: 1.5px solid var(--border-sand, #CBD5E1); border-radius: 12px; box-shadow: 0 14px 40px rgba(0,0,0,0.18); z-index: 9999; padding: 0.35rem 0;"></div>
+        <div id="stream-autocomplete-box" style="display: none; position: absolute; bottom: 58px; left: 0.75rem; right: 0.75rem; max-height: 220px; overflow-y: auto; background: #FFFFFF; border: 1.5px solid var(--border-sand, #CBD5E1); border-radius: 10px; box-shadow: 0 12px 35px rgba(0,0,0,0.16); z-index: 9999; padding: 0.3rem 0;"></div>
 
         <!-- COMPOSER INPUT BAR -->
-        <form id="stream-chat-form" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem; background: #FFFFFF; border-top: 1.5px solid var(--border-sand, #DDD5CD); flex-shrink: 0; position: relative;">
+        <form id="stream-chat-form" style="display: flex; align-items: center; gap: 0.4rem; padding: 0.55rem 0.85rem; background: #FFFFFF; border-top: 1.5px solid var(--border-sand, #DDD5CD); flex-shrink: 0; position: relative;">
           ${isAdmin ? `
-            <button type="button" id="btn-quick-hg" title="Highlight announcement (/hg)" style="background: #FEF3C7; color: #D97706; border: 1.5px solid #FCD34D; width: 44px; height: 44px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; font-size: 1.15rem; cursor: pointer; flex-shrink: 0;" aria-label="Toggle Highlight prefix">
+            <button type="button" id="btn-quick-hg" title="Highlight announcement (/hg)" style="background: #FEF3C7; color: #D97706; border: 1.5px solid #FCD34D; width: 38px; height: 38px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 1rem; cursor: pointer; flex-shrink: 0;" aria-label="Toggle Highlight prefix">
               ⭐
             </button>
           ` : ''}
-          <button type="button" id="btn-quick-quest" title="Ask academic question / doubt (/quest)" style="background: #EEF2FF; color: #4F46E5; border: 1.5px solid #C7D2FE; width: 44px; height: 44px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; font-size: 1.15rem; cursor: pointer; flex-shrink: 0;" aria-label="Ask Question prefix">
+          <button type="button" id="btn-quick-quest" title="Ask academic question / doubt (/quest)" style="background: #EEF2FF; color: #4F46E5; border: 1.5px solid #C7D2FE; width: 38px; height: 38px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 1rem; cursor: pointer; flex-shrink: 0;" aria-label="Ask Question prefix">
             ❓
           </button>
-          <input type="text" id="stream-msg-input" class="portal-input" placeholder="${isAdmin ? 'Type message, @mention student, /hg to highlight, /quest or /pin…' : `Message ${escapeHtml(activeMeta.shortName)} (use /quest to ask doubt)…`}" style="flex: 1; border-radius: 10px; font-size: 16px; min-height: 46px; padding: 0.6rem 0.95rem; border: 1.5px solid var(--border-sand, #CBD5E1); background: #FAF9F6; transition: border-color 0.2s;" autocomplete="off" aria-label="Chat message" required>
-          <button type="submit" class="btn btn-emerald" id="btn-stream-send" style="padding: 0.6rem 1.35rem; font-weight: 800; border-radius: 10px; display: inline-flex; align-items: center; gap: 0.45rem; min-height: 46px; font-size: 0.9rem; flex-shrink: 0; box-shadow: 0 4px 12px rgba(6,78,59,0.2);">
+          <input type="text" id="stream-msg-input" class="portal-input" placeholder="${isAdmin ? 'Type message, @mention student, /hg, /quest, /pin…' : `Message ${escapeHtml(activeMeta.shortName)} (use /quest for doubts)…`}" style="flex: 1; border-radius: 8px; font-size: 15px; min-height: 40px; padding: 0.45rem 0.85rem; border: 1.5px solid var(--border-sand, #CBD5E1); background: #FAF9F6; transition: border-color 0.2s;" autocomplete="off" aria-label="Chat message" required>
+          <button type="submit" class="btn btn-emerald" id="btn-stream-send" style="padding: 0.45rem 1.15rem; font-weight: 800; border-radius: 8px; display: inline-flex; align-items: center; gap: 0.35rem; min-height: 40px; font-size: 0.85rem; flex-shrink: 0; box-shadow: 0 2px 8px rgba(6,78,59,0.2);">
             <span>Send</span> <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
           </button>
         </form>
@@ -812,6 +839,45 @@
   }
 
   function wireEvents(container) {
+    // 0. Fullscreen Toggle Controller
+    const fullscreenBtn = container.querySelector('#btn-stream-fullscreen');
+    const chatWrapper = container.querySelector('.stream-chat-wrapper');
+    if (fullscreenBtn && chatWrapper) {
+      fullscreenBtn.addEventListener('click', () => {
+        const isFull = chatWrapper.classList.toggle('stream-fullscreen');
+        fullscreenBtn.innerHTML = isFull
+          ? '<i class="fa-solid fa-compress" aria-hidden="true"></i> <span>Exit Fullscreen</span>'
+          : '<i class="fa-solid fa-expand" aria-hidden="true"></i> <span>Fullscreen</span>';
+        fullscreenBtn.title = isFull ? 'Exit Fullscreen Mode (Esc)' : 'Toggle Fullscreen View';
+        if (isFull) {
+          document.body.classList.add('stream-body-fullscreen-lock');
+        } else {
+          document.body.classList.remove('stream-body-fullscreen-lock');
+        }
+        scrollBottom();
+      });
+    }
+
+    // Support Esc key to exit fullscreen
+    if (!window._streamEscHandlerBound) {
+      window._streamEscHandlerBound = true;
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          const activeFullWrapper = document.querySelector('.stream-chat-wrapper.stream-fullscreen');
+          if (activeFullWrapper) {
+            activeFullWrapper.classList.remove('stream-fullscreen');
+            document.body.classList.remove('stream-body-fullscreen-lock');
+            const fsBtn = activeFullWrapper.querySelector('#btn-stream-fullscreen');
+            if (fsBtn) {
+              fsBtn.innerHTML = '<i class="fa-solid fa-expand" aria-hidden="true"></i> <span>Fullscreen</span>';
+              fsBtn.title = 'Toggle Fullscreen View';
+            }
+            scrollBottom();
+          }
+        }
+      });
+    }
+
     // 1. Channel switcher
     container.querySelectorAll('.stream-ch-pill').forEach(btn => {
       btn.addEventListener('click', async () => {

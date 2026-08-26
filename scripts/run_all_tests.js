@@ -20,9 +20,10 @@ import { runClassScheduleTests } from '../tests/class-schedule.test.js';
 import { runStudentFeeViewTests } from '../tests/student-fee-view.test.js';
 import { runBatchManagementTests } from '../tests/batch-management.test.js';
 import { runFeeLedgerEmailTests } from '../tests/fee-ledger-email.test.js';
+import { runCommunityChatLayoutTests } from '../tests/community-chat-layout.test.js';
 
 console.log('================================================================');
-console.log('   PRAGYAN INSTITUTE — T1 TO T34 MASTER TEST RUNNER & AUDIT     ');
+console.log('   PRAGYAN INSTITUTE — T1 TO T35 MASTER TEST RUNNER & AUDIT     ');
 console.log('================================================================\n');
 
 let pass = 0;
@@ -917,6 +918,14 @@ runBatchManagementTests(assert);
 // -----------------------------------------------------------------------------
 console.log('\n--- [T34] Fee Billing Ledger & Email Dispatch Log Suite ---');
 await runFeeLedgerEmailTests(assert);
+
+// -----------------------------------------------------------------------------
+// T35 — Community Chat Density, Fullscreen View & Responsive Layout Suite.
+// Covers compact message bubbles, avatar scaling, inline hover actions,
+// fullscreen viewport toggle, Escape key dismiss, and mobile responsive rules.
+// -----------------------------------------------------------------------------
+console.log('\n--- [T35] Community Chat Density, Fullscreen View & Responsive Layout Suite ---');
+runCommunityChatLayoutTests(assert);
 
 console.log('\n================================================================');
 console.log(`MASTER TEST RESULTS: ${pass} Passed, ${fail} Failed`);
