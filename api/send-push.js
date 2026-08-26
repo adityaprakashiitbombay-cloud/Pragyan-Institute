@@ -385,10 +385,11 @@ export default async function handler(req, res) {
         const messageBody = interpolate(rawBody, studentInfo);
         const resolvedActions = actions.map(act => ({
           ...act,
+          title: interpolate(act.title || '', studentInfo),
           url: resolveActionUrl(act.url, act.title, studentInfo)
         }));
 
-        const primaryUrl = resolvedActions[0]?.url || (studentInfo.student_id ? `/pay.html?id=${encodeURIComponent(studentInfo.student_id)}&name=${encodeURIComponent(studentInfo.name || '')}` : '/portal.html');
+        const primaryUrl = resolvedActions[0]?.url || (studentInfo.student_id ? `/pay.html?id=${encodeURIComponent(studentInfo.student_id)}&name=${encodeURIComponent(studentInfo.name || '')}&amount=${encodeURIComponent(studentInfo.pending_balance || 0)}` : '/portal.html');
 
         const payloadObj = {
           title,

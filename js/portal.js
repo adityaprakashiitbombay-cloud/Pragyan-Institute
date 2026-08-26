@@ -13761,17 +13761,18 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
                 <button type="button" class="btn-var-tag" data-tag="{{due_date}}" title="Insert Due Date">📅 {{due_date}}</button>
                 <button type="button" class="btn-var-tag" data-tag="{{guardian_name}}" title="Insert Parent/Guardian Name">👨‍👩‍👦 {{guardian_name}}</button>
                 <button type="button" class="btn-var-tag" data-tag="{{institute_name}}" title="Insert Institute Name">🏛️ {{institute_name}}</button>
+                <button type="button" class="btn-var-tag" data-tag="{{pay_url}}" title="Insert Personalized Payment Link">💳 {{pay_url}}</button>
               </div>
 
               <!-- Action Buttons Grid -->
               <div class="push-grid-2col push-actions-grid">
                 <div>
                   <label for="pushAction1Title" class="push-sub-label">Action 1 (Label)</label>
-                  <input type="text" id="pushAction1Title" aria-label="Action 1 (Label)" class="portal-input" value="💳 Pay Fees">
+                  <input type="text" id="pushAction1Title" aria-label="Action 1 (Label)" class="portal-input" value="💳 Pay Fees ({{pending_dues}})">
                 </div>
                 <div>
                   <label for="pushAction1Url" class="push-sub-label">Action 1 (Target URL)</label>
-                  <input type="text" id="pushAction1Url" aria-label="Action 1 (Target URL)" class="portal-input" value="/pay.html">
+                  <input type="text" id="pushAction1Url" aria-label="Action 1 (Target URL)" class="portal-input" value="/pay.html?id={{student_id}}&name={{student_name}}&amount={{pending_dues}}">
                 </div>
               </div>
 
