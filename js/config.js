@@ -31,6 +31,24 @@
         return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
       });
     };
+
+    window.sanitizeUrl = window.sanitizeUrl || function(value) {
+      if (!value || typeof value !== 'string') return '';
+      const trimmed = value.trim();
+      if (trimmed.startsWith('data:image/')) {
+        if (/^data:image\/(png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/i.test(trimmed)) {
+          return trimmed;
+        }
+        return '';
+      }
+      try {
+        const base = (typeof window !== 'undefined' && window.location?.origin) ? window.location.origin : 'https://pragyaninstitute.com';
+        const url = new URL(trimmed, base);
+        return ['https:', 'http:', 'blob:'].includes(url.protocol) ? url.href : '';
+      } catch (_) {
+        return '';
+      }
+    };
   }
 
   if (typeof module !== 'undefined' && module.exports) {

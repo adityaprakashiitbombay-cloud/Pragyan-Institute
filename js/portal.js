@@ -127,7 +127,7 @@
     }
     try {
       const url = new URL(trimmed, window.location.origin);
-      return ['https:', 'http:'].includes(url.protocol) ? sanitizeInput(url.href) : '';
+      return ['https:', 'http:', 'blob:'].includes(url.protocol) ? sanitizeInput(url.href) : '';
     } catch (_) {
       return '';
     }

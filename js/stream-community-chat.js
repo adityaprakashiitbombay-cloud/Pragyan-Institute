@@ -211,9 +211,6 @@
   }
 
   function sanitizeUrl(value) {
-    if (typeof window !== 'undefined' && typeof window.sanitizeUrl === 'function') {
-      return window.sanitizeUrl(value);
-    }
     if (!value || typeof value !== 'string') return '';
     const trimmed = value.trim();
     if (trimmed.startsWith('data:image/')) {
@@ -229,6 +226,9 @@
     } catch (_) {
       return '';
     }
+  }
+  if (typeof window !== 'undefined') {
+    window.sanitizeUrl = window.sanitizeUrl || sanitizeUrl;
   }
 
   function loadScript(src) {
