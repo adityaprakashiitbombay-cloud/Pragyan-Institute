@@ -288,6 +288,10 @@ export function runCommunityChatLayoutTests(assert) {
          portalJs.includes('window.PragyanStreamChat.exitMobileFullscreen()') &&
          portalJs.includes('} catch (_) {}'),
     'T35.88: js/portal.js wraps exitMobileFullscreen in error-resilient try-catch on student and admin tab switching');
+
+  assert(chatJs.includes('const mediaList = getMediaAttachmentsFromMessages(messages);') &&
+         chatJs.includes('renderMediaGalleryHtml(mediaList, activeMeta)'),
+    'T35.89: js/stream-community-chat.js defines mediaList from active channel messages for renderUI and media gallery');
 }
 
 

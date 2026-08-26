@@ -1734,6 +1734,7 @@
     const showChBar = isAdmin || filteredChannels.length > 1;
     const messages = (activeChannel?.state?.messages || []).filter(m => !m.deleted_at);
     const pinnedMessages = messages.filter(m => m.pinned || m.is_pinned || Boolean(m.pinned_at));
+    const mediaList = getMediaAttachmentsFromMessages(messages);
     const isMobileView = (typeof window !== 'undefined' && (window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)));
 
     // On mobile devices, show the Entry Gateway card first unless the user explicitly entered chat
