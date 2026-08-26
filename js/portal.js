@@ -12796,10 +12796,10 @@ const inputRoll = modalEl.querySelector('#deleteConfirmRollInput')?.value.trim()
 
     const modalHtml = `
       <div class="inner-modal-backdrop active" id="auditPurgeModal" style="display: flex; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 99999; align-items: center; justify-content: center; padding: 0.75rem; backdrop-filter: blur(5px); overflow-y: auto; -webkit-overflow-scrolling: touch;">
-        <div class="inner-modal-content" style="max-width: 580px; width: 100%; max-height: calc(100vh - 1.5rem); max-height: calc(100dvh - 1.5rem); background: #FFFFFF; border-radius: 12px; border: 2.5px solid #DC2626; box-shadow: 0 20px 50px rgba(220,38,38,0.3); overflow: hidden; display: flex; flex-direction: column; padding: 0 !important; margin: auto;">
+        <div class="inner-modal-content audit-purge-modal-card" style="max-width: 540px; width: 100%; max-height: min(92vh, 92dvh); background: #FFFFFF; border-radius: 12px; border: 2.5px solid #DC2626; box-shadow: 0 20px 50px rgba(220,38,38,0.35); overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; padding: 0 !important; margin: auto;">
           
           <!-- Danger Header -->
-          <div class="audit-purge-header" style="background: linear-gradient(135deg, #DC2626 0%, #991B1B 100%); color: #fff; padding: 0.85rem 1.15rem; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+          <div class="audit-purge-header" style="background: linear-gradient(135deg, #DC2626 0%, #991B1B 100%); color: #fff; padding: 0.85rem 1.15rem; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; border-top-left-radius: 9px; border-top-right-radius: 9px;">
             <div style="display: flex; align-items: center; gap: 0.65rem;">
               <i aria-hidden="true" class="fa-solid fa-triangle-exclamation" style="font-size: 1.35rem; color: #FEE2E2;"></i>
               <div>
@@ -12814,8 +12814,8 @@ const inputRoll = modalEl.querySelector('#deleteConfirmRollInput')?.value.trim()
             </button>
           </div>
 
-          <!-- Body (Scrollable with min-height: 0 so flexbox allows scrolling) -->
-          <div class="audit-purge-body" style="padding: 1rem 1.15rem; display: flex; flex-direction: column; gap: 0.75rem; overflow-y: auto; -webkit-overflow-scrolling: touch; flex: 1 1 auto; min-height: 0; max-height: calc(100dvh - 150px);">
+          <!-- Body Content -->
+          <div style="padding: 1rem 1.15rem; display: flex; flex-direction: column; gap: 0.75rem;">
             
             <!-- Warning Alert Box -->
             <div style="background: #FEF2F2; border: 1.5px solid #F87171; border-radius: 8px; padding: 0.65rem 0.85rem; color: #991B1B;">
@@ -12842,22 +12842,22 @@ const inputRoll = modalEl.querySelector('#deleteConfirmRollInput')?.value.trim()
 
             <!-- Typed Confirmation Input -->
             <div>
-              <label for="confirmAuditPurgeInput" style="display: block; font-size: 0.8rem; font-weight: 700; color: var(--text-mahogany); margin-bottom: 0.3rem;">
+              <label for="confirmAuditPurgeInput" style="display: block; font-size: 0.8rem; font-weight: 700; color: var(--text-mahogany, #5A2E25); margin-bottom: 0.3rem;">
                 To confirm permanent deletion, type <code style="background: #FEE2E2; color: #991B1B; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 800;">DELETE</code> below:
               </label>
-              <input type="text" id="confirmAuditPurgeInput" class="portal-input" placeholder="TYPE DELETE TO ENABLE BUTTON" style="width: 100%; font-size: 0.88rem; padding: 0.5rem 0.85rem; border: 1.5px solid #CBD5E1; text-transform: uppercase;">
+              <input type="text" id="confirmAuditPurgeInput" class="portal-input" placeholder="TYPE DELETE TO ENABLE BUTTON" style="width: 100%; font-size: 0.88rem; padding: 0.55rem 0.85rem; border: 1.5px solid #CBD5E1; border-radius: 6px; text-transform: uppercase; box-sizing: border-box;">
             </div>
 
-          </div>
+            <!-- Action Buttons Footer directly inside dialog flow -->
+            <div style="display: flex; justify-content: flex-end; align-items: center; gap: 0.65rem; margin-top: 0.35rem; padding-top: 0.65rem; border-top: 1px solid #E2E8F0; flex-wrap: wrap;">
+              <button type="button" id="btnCancelPurgeAuditLogs" class="btn" style="background: #E2E8F0; color: #334155; font-weight: 800; padding: 0.55rem 1.1rem; font-size: 0.85rem; border-radius: 6px; cursor: pointer; border: none; min-height: 38px;">
+                Cancel / Keep Data
+              </button>
+              <button type="button" id="btnConfirmPurgeAuditLogs" class="btn" disabled style="background: #94A3B8; color: #fff; font-weight: 800; padding: 0.55rem 1.25rem; font-size: 0.85rem; border-radius: 6px; cursor: not-allowed; display: inline-flex; align-items: center; gap: 0.4rem; border: none; min-height: 38px; transition: all 0.2s;">
+                <i aria-hidden="true" class="fa-solid fa-trash-can"></i> Permanently Purge Logs
+              </button>
+            </div>
 
-          <!-- Sticky Action Buttons Footer -->
-          <div class="audit-purge-footer" style="padding: 0.65rem 1.15rem; background: #F8FAFC; border-top: 1px solid #E2E8F0; display: flex; justify-content: flex-end; gap: 0.65rem; flex-shrink: 0; z-index: 10;">
-            <button type="button" id="btnCancelPurgeAuditLogs" class="btn" style="background: #E2E8F0; color: #334155; font-weight: 700; padding: 0.5rem 1rem; font-size: 0.82rem; border-radius: 6px; cursor: pointer;">
-              Cancel / Keep Data
-            </button>
-            <button type="button" id="btnConfirmPurgeAuditLogs" class="btn" disabled style="background: #94A3B8; color: #fff; font-weight: 800; padding: 0.5rem 1.15rem; font-size: 0.82rem; border-radius: 6px; cursor: not-allowed; display: inline-flex; align-items: center; gap: 0.4rem; transition: all 0.2s;">
-              <i aria-hidden="true" class="fa-solid fa-trash-can"></i> Permanently Purge Logs
-            </button>
           </div>
 
         </div>
