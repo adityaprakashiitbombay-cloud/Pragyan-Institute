@@ -13,6 +13,8 @@ function read(rel) {
 export function runCommunityChatLayoutTests(assert) {
   const chatJs = read('js/stream-community-chat.js');
   const portalCss = read('css/portal.css');
+  const healthJs = read('api/health.js');
+  const portalJs = read('js/portal.js');
 
   // --- 1. Compact Message Architecture & Reduced Bloat ---
   assert(chatJs.includes('renderMsgList'), 'T35.1: js/stream-community-chat.js defines renderMsgList');
@@ -44,4 +46,16 @@ export function runCommunityChatLayoutTests(assert) {
     'T35.12: css/portal.css styles .stream-msg-actions with smooth hover transitions');
   assert(portalCss.includes('@media (max-width: 768px)') && portalCss.includes('padding: 0.32rem 0.6rem !important'),
     'T35.13: css/portal.css defines mobile responsive compact bubble padding for small screens');
+
+  // --- 4. Student Multi-Class Support & Channel Accessibility ---
+  assert(chatJs.includes('function resolveStudentBatches') && chatJs.includes('resolveBatches'),
+    'T35.14: js/stream-community-chat.js defines resolveStudentBatches with multi-class resolution');
+  assert(chatJs.includes('function getActiveCommunityPane') && chatJs.includes('isAdminVisible'),
+    'T35.15: js/stream-community-chat.js defines getActiveCommunityPane targeting visible student/admin dashboard');
+  assert(chatJs.includes('stream-ch-enrolled') && chatJs.includes('My Class'),
+    'T35.16: renderUI marks student enrolled batches with "My Class" badge in channel navigation bar');
+  assert(healthJs.includes('serverClient.channel(\'livestream\', chId') && healthJs.includes('photo_url'),
+    'T35.17: api/health.js pre-seeds canonical livestream channels and synchronizes student avatar photo');
+  assert(portalJs.includes('isAdminVisible') && portalJs.includes('renderCommunityChatTab'),
+    'T35.18: js/portal.js renderCommunityChatTab cleanly checks visible dashboard container');
 }

@@ -223,26 +223,80 @@
     return data;
   }
 
-  function resolveBatchId() {
-    try {
-      const user = (typeof window !== 'undefined' && window.AppState?.currentUser) || (typeof AppState !== 'undefined' && AppState.currentUser) || {};
-      if (user.batchId && String(user.batchId).startsWith('BAT-')) return user.batchId;
-      if (user.batch_id && String(user.batch_id).startsWith('BAT-')) return user.batch_id;
+  function getActiveCommunityPane() {
+    const adminContainer = document.getElementById('adminDashboardContainer');
+    const isAdminVisible = adminContainer && 
+      adminContainer.style.display !== 'none' && 
+      !adminContainer.hasAttribute('hidden') && 
+      !adminContainer.classList.contains('hidden-view');
+    
+    const adminPane = document.getElementById('adminTabPane-community');
+    const studentPane = document.getElementById('studentTabPane-community');
 
-      const cn = user.className || user.class_name || user.class || user.batch || '';
+    if (isAdminVisible) {
+      return adminPane || studentPane;
+    }
+    return studentPane || adminPane;
+  }
+
+  function resolveStudentBatches() {
+    try {
+      let user = (typeof window !== 'undefined' && window.AppState?.currentUser) || (typeof AppState !== 'undefined' && AppState.currentUser) || null;
+      if (!user) {
+        try {
+          const raw = sessionStorage.getItem('pragyan_portal_user') || localStorage.getItem('pragyan_portal_user');
+          if (raw) user = JSON.parse(raw);
+        } catch (_) {}
+      }
+      user = user || {};
+
+      const enrolledIds = new Set();
+      const cn = user.className || user.class_name || user.class || user.batch || user.batchName || user.batch_name || '';
+
+      // Check enrolledBatches array if present
+      if (Array.isArray(user.enrolledBatches)) {
+        user.enrolledBatches.forEach(b => {
+          if (typeof b === 'string') {
+            const res = window.PRAGYAN_ACADEMIC?.resolveBatch ? window.PRAGYAN_ACADEMIC.resolveBatch(b) : null;
+            if (res?.batchId) enrolledIds.add(res.batchId);
+            else if (b.startsWith('BAT-')) enrolledIds.add(b);
+          } else if (b && typeof b === 'object') {
+            if (b.batchId || b.id) enrolledIds.add(b.batchId || b.id);
+          }
+        });
+      }
+
+      if (window.PRAGYAN_ACADEMIC && typeof window.PRAGYAN_ACADEMIC.resolveBatches === 'function') {
+        const resolvedList = window.PRAGYAN_ACADEMIC.resolveBatches(cn);
+        if (Array.isArray(resolvedList)) {
+          resolvedList.forEach(b => { if (b.batchId) enrolledIds.add(b.batchId); });
+        }
+      }
+
       if (window.PRAGYAN_ACADEMIC && typeof window.PRAGYAN_ACADEMIC.resolveBatch === 'function') {
-        const batch = window.PRAGYAN_ACADEMIC.resolveBatch(cn);
-        if (batch) return batch.batchId;
+        const primary = window.PRAGYAN_ACADEMIC.resolveBatch(cn);
+        if (primary?.batchId) enrolledIds.add(primary.batchId);
       }
 
       const roll = String(user.student_id || user.rollNo || user.id || '');
-      if (roll.length >= 4 && window.PRAGYAN_ACADEMIC && typeof window.PRAGYAN_ACADEMIC.resolveBatch === 'function') {
+      if (roll.length >= 4 && window.PRAGYAN_ACADEMIC) {
         const classCode = roll.substring(2, 4);
         const batch = (window.PRAGYAN_ACADEMIC.BATCHES || []).find(b => b.classCode === classCode);
-        if (batch) return batch.batchId;
+        if (batch) enrolledIds.add(batch.batchId);
       }
-    } catch (_) {}
-    return '';
+
+      if (user.batchId && String(user.batchId).startsWith('BAT-')) enrolledIds.add(user.batchId);
+      if (user.batch_id && String(user.batch_id).startsWith('BAT-')) enrolledIds.add(user.batch_id);
+
+      return Array.from(enrolledIds);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function resolveBatchId() {
+    const enrolled = resolveStudentBatches();
+    return enrolled[0] || 'BAT-10';
   }
 
   function getStudentCountForBatch(batchId) {
@@ -335,12 +389,12 @@
   async function setupChannels() {
     channelsMap.clear();
     const isAdmin = currentUser.role === 'admin';
-    const myBatch = resolveBatchId();
+    const enrolledBatches = resolveStudentBatches();
+    const primaryBatch = enrolledBatches[0] || resolveBatchId() || 'BAT-10';
     const batches = (window.PRAGYAN_ACADEMIC && window.PRAGYAN_ACADEMIC.BATCHES) || [];
 
-    // Register all class-specific batch channels
+    // Register all class-specific batch channels for everyone
     for (const b of batches) {
-      if (!isAdmin && myBatch && b.batchId !== myBatch) continue;
       const chId = `batch-${b.batchId}`;
       const meta = CHANNEL_IDENTITIES[chId] || { name: b.name || b.batchId };
       const ch = client.channel(CHANNEL_TYPE, chId, {
@@ -349,20 +403,10 @@
       channelsMap.set(chId, ch);
     }
 
-    // Fallback: if student's specific batch was not resolved, expose all channels so student is never blocked
-    if (!isAdmin && channelsMap.size === 0) {
-      for (const b of batches) {
-        const chId = `batch-${b.batchId}`;
-        const meta = CHANNEL_IDENTITIES[chId] || { name: b.name || b.batchId };
-        const ch = client.channel(CHANNEL_TYPE, chId, { name: meta.name });
-        channelsMap.set(chId, ch);
-      }
-    }
-
-    // Set default active channel
+    // Set default active channel to student's primary enrolled batch
     if (!isAdmin) {
-      if (myBatch && channelsMap.has(`batch-${myBatch}`)) {
-        activeChannelId = `batch-${myBatch}`;
+      if (primaryBatch && channelsMap.has(`batch-${primaryBatch}`)) {
+        activeChannelId = `batch-${primaryBatch}`;
       } else if (channelsMap.size > 0) {
         activeChannelId = Array.from(channelsMap.keys())[0];
       }
@@ -633,8 +677,6 @@
   }
 
   function getCategoriesList() {
-    const isAdmin = currentUser.role === 'admin';
-    if (!isAdmin) return ['ALL'];
     return ['ALL', 'Senior Secondary', 'Secondary', 'Junior & Middle', 'Special English'];
   }
 
@@ -649,6 +691,7 @@
 
   function renderUI(container) {
     const isAdmin = currentUser.role === 'admin';
+    const enrolledBatches = resolveStudentBatches();
     const channelList = Array.from(channelsMap.entries());
 
     const filteredChannels = channelList.filter(([id]) => {
@@ -713,16 +756,14 @@
           </div>
         </div>
 
-        <!-- CATEGORIES FILTER BAR (If Admin) -->
-        ${isAdmin ? `
-          <div class="stream-cat-bar" style="background: #F8FAFC; padding: 0.35rem 0.75rem; border-bottom: 1px solid #E2E8F0; display: flex; gap: 0.35rem; align-items: center; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex-shrink: 0;">
-            ${categories.map(cat => `
-              <button type="button" class="stream-cat-pill ${selectedCategory === cat ? 'active' : ''}" data-cat-name="${escapeHtml(cat)}" style="padding: 0.2rem 0.55rem; border-radius: 99px; font-size: 0.72rem; font-weight: 700; cursor: pointer; border: 1px solid ${selectedCategory === cat ? '#064E3B' : '#CBD5E1'}; background: ${selectedCategory === cat ? '#064E3B' : '#FFFFFF'}; color: ${selectedCategory === cat ? '#FFFFFF' : '#475569'}; white-space: nowrap; transition: all 0.15s ease;">
-                ${cat === 'ALL' ? '🌐 All Classes (12)' : escapeHtml(cat)}
-              </button>
-            `).join('')}
-          </div>
-        ` : ''}
+        <!-- CATEGORIES FILTER BAR -->
+        <div class="stream-cat-bar" style="background: #F8FAFC; padding: 0.35rem 0.75rem; border-bottom: 1px solid #E2E8F0; display: flex; gap: 0.35rem; align-items: center; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex-shrink: 0;">
+          ${categories.map(cat => `
+            <button type="button" class="stream-cat-pill ${selectedCategory === cat ? 'active' : ''}" data-cat-name="${escapeHtml(cat)}" style="padding: 0.2rem 0.55rem; border-radius: 99px; font-size: 0.72rem; font-weight: 700; cursor: pointer; border: 1px solid ${selectedCategory === cat ? '#064E3B' : '#CBD5E1'}; background: ${selectedCategory === cat ? '#064E3B' : '#FFFFFF'}; color: ${selectedCategory === cat ? '#FFFFFF' : '#475569'}; white-space: nowrap; transition: all 0.15s ease;">
+              ${cat === 'ALL' ? '🌐 All Classes (12)' : escapeHtml(cat)}
+            </button>
+          `).join('')}
+        </div>
 
         <!-- CLASS GROUPS HORIZONTAL TABS BAR -->
         ${filteredChannels.length > 1 ? `
@@ -730,11 +771,13 @@
             ${filteredChannels.map(([id]) => {
               const meta = CHANNEL_IDENTITIES[id] || { shortName: id, icon: '💬', badgeColor: '#059669' };
               const isActive = id === activeChannelId;
+              const isEnrolled = enrolledBatches.includes(meta.batchId);
               const count = getStudentCountForBatch(meta.batchId);
               return `
-                <button type="button" class="stream-ch-pill ${isActive ? 'active' : ''}" data-ch-id="${escapeHtml(id)}" style="display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.3rem 0.7rem; border-radius: 99px; font-size: 0.78rem; font-weight: 700; cursor: pointer; border: 1.5px solid ${isActive ? meta.badgeColor : '#E2E8F0'}; background: ${isActive ? meta.badgeColor : '#F8FAFC'}; color: ${isActive ? '#FFFFFF' : '#334155'}; white-space: nowrap; transition: all 0.2s ease; box-shadow: ${isActive ? '0 2px 8px rgba(0,0,0,0.1)' : 'none'}; min-height: 32px;">
+                <button type="button" class="stream-ch-pill ${isActive ? 'active' : ''} ${isEnrolled ? 'stream-ch-enrolled' : ''}" data-ch-id="${escapeHtml(id)}" style="display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.3rem 0.7rem; border-radius: 99px; font-size: 0.78rem; font-weight: 700; cursor: pointer; border: 1.5px solid ${isActive ? meta.badgeColor : (isEnrolled ? '#10B981' : '#E2E8F0')}; background: ${isActive ? meta.badgeColor : (isEnrolled ? '#ECFDF5' : '#F8FAFC')}; color: ${isActive ? '#FFFFFF' : (isEnrolled ? '#065F46' : '#334155')}; white-space: nowrap; transition: all 0.2s ease; box-shadow: ${isActive ? '0 2px 8px rgba(0,0,0,0.1)' : 'none'}; min-height: 32px;">
                   <span style="font-size: 0.9rem;">${meta.icon}</span>
                   <span>${escapeHtml(meta.shortName)}</span>
+                  ${isEnrolled ? `<span style="font-size: 0.65rem; background: ${isActive ? 'rgba(255,255,255,0.3)' : '#D1FAE5'}; color: ${isActive ? '#FFFFFF' : '#047857'}; padding: 0.05rem 0.35rem; border-radius: 4px; font-weight: 800;">My Class</span>` : ''}
                   ${count > 0 ? `
                     <span style="background: ${isActive ? 'rgba(255,255,255,0.25)' : '#E2E8F0'}; color: ${isActive ? '#FFFFFF' : '#475569'}; font-size: 0.68rem; padding: 0.02rem 0.38rem; border-radius: 99px; font-weight: 800;">
                       ${count}
@@ -1504,11 +1547,11 @@
   window.PragyanStreamChat = {
     init,
     reconnect() {
-      const pane = document.getElementById('adminTabPane-community') || document.getElementById('studentTabPane-community');
+      const pane = getActiveCommunityPane();
       if (pane) init(pane);
     },
     switchChannel(chId) {
-      const pane = document.getElementById('adminTabPane-community') || document.getElementById('studentTabPane-community');
+      const pane = getActiveCommunityPane();
       if (pane) switchChannel(chId, pane);
     },
     deleteMessage: async (msgId) => { if (client) { await client.deleteMessage(msgId); } },
@@ -1518,7 +1561,7 @@
   };
 
   window.initGetStreamChat = async function () {
-    const pane = document.getElementById('adminTabPane-community') || document.getElementById('studentTabPane-community');
+    const pane = getActiveCommunityPane();
     if (pane) { await init(pane); }
   };
 })();

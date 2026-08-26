@@ -9208,9 +9208,13 @@ const inputRoll = modalEl.querySelector('#deleteConfirmRollInput')?.value.trim()
     if (adminBtn) adminBtn.style.display = ENABLE_COMMUNITY_CHAT ? '' : 'none';
     if (studentBtn) studentBtn.style.display = ENABLE_COMMUNITY_CHAT ? '' : 'none';
 
-    const activePane = (AppState.currentRole === 'admin')
-      ? document.getElementById('adminTabPane-community')
-      : document.getElementById('studentTabPane-community');
+    const adminContainer = document.getElementById('adminDashboardContainer');
+    const isAdminVisible = adminContainer && adminContainer.style.display !== 'none' && !adminContainer.hasAttribute('hidden') && !adminContainer.classList.contains('hidden-view');
+    const isAdminSession = (AppState.currentRole === 'admin' || AppState.currentUser?.role === 'admin' || (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pragyan_portal_role') === 'admin'));
+    
+    const activePane = (isAdminVisible || isAdminSession)
+      ? (document.getElementById('adminTabPane-community') || document.getElementById('studentTabPane-community'))
+      : (document.getElementById('studentTabPane-community') || document.getElementById('adminTabPane-community'));
 
     if (!activePane) return;
 

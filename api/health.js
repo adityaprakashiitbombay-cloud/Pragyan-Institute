@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { StreamChat } from 'stream-chat';
 import { getSupabase, requireSession, optionalSession, applyCors } from './_lib/auth.js';
+import { BATCHES } from './_lib/academic-config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -47,28 +48,10 @@ export default async function handler(req, res) {
 
     try {
       const serverClient = StreamChat.getInstance(apiKey, apiSecret);
-      try {
-        await serverClient.upsertUser({
-          id: userId,
-          name: userName,
-          role: userRole,
-          image: `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=064E3B&color=fff`,
-        });
-      } catch (upsertErr) {
-        console.warn('[health/stream-token] upsertUser fallback note:', upsertErr.message);
-        try {
-          await serverClient.partialUpdateUser({
-            id: userId,
-            set: { role: userRole }
-          });
-        } catch (_) {}
-      }
+      
+      let userAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=064E3B&color=fff`;
 
-      const CHAT_TOKEN_TTL_SECONDS = 24 * 60 * 60;
-      const exp = Math.floor(Date.now() / 1000) + CHAT_TOKEN_TTL_SECONDS;
-      const token = serverClient.createToken(userId, exp);
-
-      // Persist / synchronize stream_user_id in Supabase Postgres
+      // Persist / synchronize stream_user_id in Supabase Postgres & fetch profile photo if available
       try {
         const supabase = getSupabase();
         if (supabase) {
@@ -79,12 +62,53 @@ export default async function handler(req, res) {
             const sid = session.student_id || session.sub || session.roll;
             if (sid) {
               supabase.from('students').update({ stream_user_id: userId }).or(`student_id.eq.${sid},id.eq.${sid}`).then(() => {}).catch(() => {});
+              // Fetch photo url if available
+              const { data: stuRows } = await supabase.from('students').select('photo_url').or(`student_id.eq.${sid},id.eq.${sid}`).limit(1);
+              if (stuRows && stuRows[0] && stuRows[0].photo_url) {
+                userAvatar = stuRows[0].photo_url;
+              }
             }
           }
         }
       } catch (dbErr) {
         console.warn('[health/stream-token] DB stream_user_id sync note:', dbErr.message);
       }
+
+      try {
+        await serverClient.upsertUser({
+          id: userId,
+          name: userName,
+          role: userRole,
+          image: userAvatar,
+        });
+      } catch (upsertErr) {
+        console.warn('[health/stream-token] upsertUser fallback note:', upsertErr.message);
+        try {
+          await serverClient.partialUpdateUser({
+            id: userId,
+            set: { role: userRole, name: userName, image: userAvatar }
+          });
+        } catch (_) {}
+      }
+
+      // Pre-seed canonical batch channels with admin ownership so students can join without 403
+      (async () => {
+        try {
+          const canonicalBatches = Array.isArray(BATCHES) ? BATCHES : [];
+          for (const b of canonicalBatches) {
+            const chId = `batch-${b.batchId}`;
+            const channel = serverClient.channel('livestream', chId, {
+              name: b.name || b.batchId,
+              created_by_id: 'admin_chandan'
+            });
+            await channel.create().catch(() => {});
+          }
+        } catch (_) {}
+      })();
+
+      const CHAT_TOKEN_TTL_SECONDS = 24 * 60 * 60;
+      const exp = Math.floor(Date.now() / 1000) + CHAT_TOKEN_TTL_SECONDS;
+      const token = serverClient.createToken(userId, exp);
 
       return res.status(200).json({
         success: true,
