@@ -1672,20 +1672,28 @@
     const showChBar = isAdmin || filteredChannels.length > 1;
     const messages = (activeChannel?.state?.messages || []).filter(m => !m.deleted_at);
     const pinnedMessages = messages.filter(m => m.pinned || m.is_pinned || Boolean(m.pinned_at));
-    const mediaList = getMediaAttachmentsFromMessages(messages);
+    const isMobileView = (typeof window !== 'undefined' && window.innerWidth <= 768);
+    const fullscreenBtnHtml = isMobileView
+      ? `<button type="button" id="btn-stream-fullscreen" class="btn-stream-fullscreen btn-mobile-exit" title="Exit Community Chat and return to dashboard" aria-label="Exit Community Chat" style="background: rgba(255,255,255,0.18); color: #FFFFFF; border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; padding: 0.22rem 0.55rem; font-size: 0.76rem; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem; transition: all 0.15s ease;">
+          <i class="fa-solid fa-arrow-left" aria-hidden="true"></i> <span>Back</span>
+        </button>`
+      : `<button type="button" id="btn-stream-fullscreen" class="btn-stream-fullscreen" title="Toggle Fullscreen View" aria-label="Toggle Fullscreen View" style="background: rgba(255,255,255,0.18); color: #FFFFFF; border: 1px solid rgba(255,255,255,0.28); border-radius: 6px; padding: 0.22rem 0.6rem; font-size: 0.74rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem; transition: all 0.15s ease;">
+          <i class="fa-solid fa-expand" aria-hidden="true"></i> <span>Fullscreen</span>
+        </button>`;
 
     container.innerHTML = `
       <div class="stream-chat-wrapper">
         
         <!-- TOP APP BAR & LIVE STATUS & FULLSCREEN CONTROLS -->
-        <div class="stream-top-bar" style="background: #042E23; color: #FFFFFF; padding: 0.45rem 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.1); flex-shrink: 0;">
-          <div style="display: flex; align-items: center; gap: 0.5rem; overflow: hidden;">
+        <div class="stream-top-bar" style="background: #042E23; color: #FFFFFF; padding: 0.4rem 0.75rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; min-height: 42px; box-sizing: border-box;">
+          <div style="display: flex; align-items: center; gap: 0.45rem; overflow: hidden; min-width: 0; flex: 1;">
+            ${fullscreenBtnHtml}
             <div style="width: 26px; height: 26px; border-radius: 6px; background: rgba(16, 185, 129, 0.2); color: #34D399; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; flex-shrink: 0;">
               ${activeMeta.icon}
             </div>
-            <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;">
               <span style="font-weight: 800; font-size: 0.88rem; color: #FFFFFF; letter-spacing: -0.01em;">
-                Pragyan Community Chat
+                Pragyan Community
               </span>
               <span class="stream-top-title-extra" style="font-size: 0.72rem; color: #A7F3D0; margin-left: 0.35rem; opacity: 0.85;">
                 • ${isAdmin ? '🛡️ Multi-Class Hub' : `🎓 ${escapeHtml(activeMeta.shortName)}`}
@@ -1698,11 +1706,6 @@
               <span style="width: 7px; height: 7px; border-radius: 50%; background: #34D399; display: inline-block; box-shadow: 0 0 6px #34D399;"></span>
               <span id="stream-online-count" style="font-weight: 700;">${onlineCount} active</span>
             </div>
-
-            <!-- Fullscreen / Mobile Exit Button -->
-            <button type="button" id="btn-stream-fullscreen" class="btn-stream-fullscreen" title="Toggle Fullscreen View" aria-label="Toggle Fullscreen View" style="background: rgba(255,255,255,0.18); color: #FFFFFF; border: 1px solid rgba(255,255,255,0.28); border-radius: 6px; padding: 0.22rem 0.6rem; font-size: 0.74rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem; transition: all 0.15s ease;">
-              <i class="fa-solid fa-expand" aria-hidden="true"></i> <span>Fullscreen</span>
-            </button>
           </div>
         </div>
 

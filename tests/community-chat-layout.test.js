@@ -251,6 +251,16 @@ export function runCommunityChatLayoutTests(assert) {
          chatJs.includes('isMobileScreen') &&
          chatJs.includes("switchAdminTab('students')"),
     'T35.80: js/portal.js and stream-community-chat.js manage body fullscreen lock and mobile exit transition to default tabs');
+
+  assert(portalCss.includes('#btn-stream-send span') &&
+         portalCss.includes('display: none !important;') &&
+         portalCss.includes('#btn-stream-send i'),
+    'T35.81: css/portal.css hides text span inside circular #btn-stream-send button to prevent text overflow on mobile');
+
+  assert(chatJs.includes('btn-mobile-exit') &&
+         chatJs.includes('fa-arrow-left') &&
+         portalCss.includes('.btn-stream-fullscreen span'),
+    'T35.82: js/stream-community-chat.js and css/portal.css render dedicated mobile back button with clean arrow icon');
 }
 
 
