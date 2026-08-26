@@ -177,7 +177,7 @@ async function handlePushBroadcast(req, res) {
   try {
     let subsQuery = supabase
       .from('push_subscriptions')
-      .select('endpoint, p256dh_key, auth_key, student_id, batch_id');
+      .select('endpoint, p256dh_key, auth_key, student_id, batch_id, created_at, updated_at');
 
     if (targetType === 'STUDENT' && Array.isArray(target.students) && target.students.length > 0) {
       const rawTargetIds = target.students.map(s => String(s || '').trim()).filter(Boolean);
@@ -283,9 +283,33 @@ async function handlePushBroadcast(req, res) {
       }
     }
 
-    let targetSubs = subscriptions;
+    // Single Active Device per Student Policy:
+    // Only student devices receive notifications, and if a student is on multiple devices, send only to their latest device.
+    const studentLatestDeviceMap = new Map();
+    for (const sub of (subscriptions || [])) {
+      const rawKey = (sub.student_id || '').trim();
+      if (!rawKey) {
+        // Skip unbound/anonymous endpoints (only students devices receive notifications)
+        continue;
+      }
+      const matchedStud = studentMap.get(rawKey) || studentMap.get(rawKey.toLowerCase());
+      const canonicalKey = (matchedStud?.student_id || matchedStud?.id || rawKey).toLowerCase();
+
+      const existing = studentLatestDeviceMap.get(canonicalKey);
+      if (!existing) {
+        studentLatestDeviceMap.set(canonicalKey, sub);
+      } else {
+        const existingTime = new Date(existing.updated_at || existing.created_at || 0).getTime();
+        const subTime = new Date(sub.updated_at || sub.created_at || 0).getTime();
+        if (subTime >= existingTime) {
+          studentLatestDeviceMap.set(canonicalKey, sub);
+        }
+      }
+    }
+
+    let targetSubs = Array.from(studentLatestDeviceMap.values());
     if (targetType === 'DUES') {
-      targetSubs = subscriptions.filter(s => {
+      targetSubs = targetSubs.filter(s => {
         const stud = studentMap.get(s.student_id) || (s.student_id ? studentMap.get(String(s.student_id).toLowerCase()) : null);
         return stud && Number(stud.pending_balance || stud.pending_fee || 0) > 0;
       });

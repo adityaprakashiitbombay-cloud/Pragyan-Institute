@@ -487,7 +487,18 @@ export default async function handler(req, res) {
         if (studentId) {
           const newEndpoint = (data && typeof data === 'object' && (data.endpoint || data[0]?.endpoint)) || '';
           if (newEndpoint) {
-            await supabase.from('push_subscriptions').delete().eq('student_id', studentId).neq('endpoint', newEndpoint).catch(() => {});
+            try {
+              const { data: studMatch } = await supabase.from('students').select('id, student_id, roll_no').or(`id.eq.${studentId},student_id.eq.${studentId},roll_no.eq.${studentId}`).limit(1);
+              const aliases = new Set([studentId]);
+              if (studMatch && studMatch[0]) {
+                if (studMatch[0].id) aliases.add(studMatch[0].id);
+                if (studMatch[0].student_id) aliases.add(studMatch[0].student_id);
+                if (studMatch[0].roll_no) aliases.add(studMatch[0].roll_no);
+              }
+              await supabase.from('push_subscriptions').delete().in('student_id', Array.from(aliases)).neq('endpoint', newEndpoint).catch(() => {});
+            } catch (_) {
+              await supabase.from('push_subscriptions').delete().eq('student_id', studentId).neq('endpoint', newEndpoint).catch(() => {});
+            }
           }
         }
       }
@@ -506,7 +517,18 @@ export default async function handler(req, res) {
         if (studentId) {
           const newEndpoint = (data && typeof data === 'object' && (data.endpoint || data[0]?.endpoint)) || '';
           if (newEndpoint) {
-            await supabase.from('push_subscriptions').delete().eq('student_id', studentId).neq('endpoint', newEndpoint).catch(() => {});
+            try {
+              const { data: studMatch } = await supabase.from('students').select('id, student_id, roll_no').or(`id.eq.${studentId},student_id.eq.${studentId},roll_no.eq.${studentId}`).limit(1);
+              const aliases = new Set([studentId]);
+              if (studMatch && studMatch[0]) {
+                if (studMatch[0].id) aliases.add(studMatch[0].id);
+                if (studMatch[0].student_id) aliases.add(studMatch[0].student_id);
+                if (studMatch[0].roll_no) aliases.add(studMatch[0].roll_no);
+              }
+              await supabase.from('push_subscriptions').delete().in('student_id', Array.from(aliases)).neq('endpoint', newEndpoint).catch(() => {});
+            } catch (_) {
+              await supabase.from('push_subscriptions').delete().eq('student_id', studentId).neq('endpoint', newEndpoint).catch(() => {});
+            }
           }
         }
       }
