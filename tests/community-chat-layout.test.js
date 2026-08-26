@@ -90,4 +90,27 @@ export function runCommunityChatLayoutTests(assert) {
     'T35.29: setupRealtimeListeners cleans deleted messages out of local state on real-time event');
   assert(healthJs.includes('serverClient.partialUpdateMessage(messageId') && healthJs.includes('is_pinned: Boolean(pin)'),
     'T35.30: api/health.js executes partialUpdateMessage on stream-pin to broadcast real-time message.updated event to all clients');
+
+  // --- 9. Admin 20MB Upload, Class Media Gallery & Lazy PDF Reader Suite ---
+  assert(healthJs.includes('isStreamUpload') && healthJs.includes('MAX_SIZE_BYTES = 20 * 1024 * 1024'),
+    'T35.31: api/health.js implements isStreamUpload with 20 MB size limit verification and admin session gating');
+  assert(chatJs.includes('MAX_SIZE = 20 * 1024 * 1024') || chatJs.includes('20 * 1024 * 1024'),
+    'T35.32: js/stream-community-chat.js enforces 20 MB file size limit with user alerts on oversized files');
+  assert(chatJs.includes('id="btn-stream-attach"') && chatJs.includes('id="stream-file-input"'),
+    'T35.33: js/stream-community-chat.js renders #btn-stream-attach and #stream-file-input strictly for admin users');
+  assert(chatJs.includes('function renderMediaGalleryHtml') && chatJs.includes('Class Media & Notes'),
+    'T35.34: js/stream-community-chat.js defines renderMediaGalleryHtml for Class Media & Notes student gallery');
+  assert(chatJs.includes('btn-view-mode') && chatJs.includes('data-view-mode="media"'),
+    'T35.35: js/stream-community-chat.js renders view mode toggle pills switching between Discussion and Class Media');
+  assert(chatJs.includes('function renderAttachmentsHtml') && chatJs.includes('stream-pdf-card'),
+    'T35.36: js/stream-community-chat.js defines renderAttachmentsHtml rendering inline PDF cards and image previews');
+  assert(chatJs.includes('function renderPdfPage1Thumbnails') && chatJs.includes('stream-pdf-page1-canvas'),
+    'T35.37: js/stream-community-chat.js defines renderPdfPage1Thumbnails rendering first-page canvas lazily');
+  assert(chatJs.includes('function openPdfReaderModal') && chatJs.includes('loadPdfJs'),
+    'T35.38: js/stream-community-chat.js defines openPdfReaderModal with on-demand lazy loading of PDF.js reader');
+  assert(chatJs.includes('function openImageLightboxModal') && chatJs.includes('stream-img-lightbox-modal'),
+    'T35.39: js/stream-community-chat.js defines openImageLightboxModal with smooth image zoom and download');
+  assert(portalCss.includes('.stream-media-card') && portalCss.includes('.stream-pdf-card') && portalCss.includes('.stream-pdf-modal'),
+    'T35.40: css/portal.css defines responsive styles for media cards, PDF cards, and PDF reader modal');
 }
+

@@ -294,6 +294,86 @@ export default async function handler(req, res) {
     }
   }
 
+  // Stream file/image upload sub-route (Admin Only, Up to 20MB)
+  const isStreamUpload = (req.url && (req.url.includes('stream-upload') || req.url.includes('action=stream-upload') || req.url.includes('route=stream-upload'))) ||
+    req.query?.action === 'stream-upload' ||
+    req.query?.route === 'stream-upload' ||
+    (req.headers['x-matched-path'] && req.headers['x-matched-path'].includes('stream-upload')) ||
+    (req.headers['x-vercel-matched-path'] && req.headers['x-vercel-matched-path'].includes('stream-upload'));
+
+  if (isStreamUpload) {
+    if (req.method !== 'POST') {
+      return res.status(405).json({ success: false, error: 'Method not allowed' });
+    }
+    const session = requireSession(req, res, ['admin']);
+    if (!session) return;
+
+    const { channelId, channelType = 'livestream', fileName, fileType, fileBase64, fileSize } = req.body || {};
+    if (!fileBase64 || !fileName) {
+      return res.status(400).json({ success: false, error: 'fileName and fileBase64 are required' });
+    }
+
+    const MAX_SIZE_BYTES = 20 * 1024 * 1024; // 20 MB limit
+    if (fileSize && fileSize > MAX_SIZE_BYTES) {
+      return res.status(400).json({ success: false, error: 'File size exceeds maximum allowed limit of 20 MB' });
+    }
+
+    try {
+      const apiKey = process.env.STREAM_API_KEY || 'w9gs6k2jh9wg';
+      const apiSecret = process.env.STREAM_API_SECRET || '76mehp9ua5k2dr65g2na5p52gr34a3thzgkjncbd56u7arvggdhgpnnpc4df4c7s';
+      const serverClient = StreamChat.getInstance(apiKey, apiSecret);
+      const ch = serverClient.channel(channelType, channelId || 'batch-BAT-10');
+
+      const buffer = Buffer.from(fileBase64.replace(/^data:[^;]+;base64,/, ''), 'base64');
+      if (buffer.length > MAX_SIZE_BYTES) {
+        return res.status(400).json({ success: false, error: 'File size exceeds maximum allowed limit of 20 MB' });
+      }
+
+      const isImage = (fileType && fileType.startsWith('image/')) || /\.(png|jpe?g|webp|gif)$/i.test(fileName);
+      let fileUrl = '';
+
+      if (isImage && typeof ch.sendImage === 'function') {
+        const upRes = await ch.sendImage(buffer, fileName, fileType || 'image/jpeg').catch(() => null);
+        fileUrl = upRes?.file || upRes?.url || '';
+      } else if (typeof ch.sendFile === 'function') {
+        const upRes = await ch.sendFile(buffer, fileName, fileType || 'application/pdf').catch(() => null);
+        fileUrl = upRes?.file || upRes?.url || '';
+      }
+
+      // If Stream direct upload wasn't available, upload to Supabase Storage pragyan-media/community_media
+      if (!fileUrl) {
+        const supabase = getSupabase();
+        if (supabase) {
+          const safeName = `${Date.now()}_${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+          const path = `community_media/${safeName}`;
+          const { data: upData, error: upErr } = await supabase.storage.from('pragyan-media').upload(path, buffer, {
+            contentType: fileType || 'application/octet-stream',
+            upsert: true
+          });
+          if (!upErr && upData) {
+            const { data: pubUrl } = supabase.storage.from('pragyan-media').getPublicUrl(path);
+            fileUrl = pubUrl?.publicUrl || '';
+          }
+        }
+      }
+
+      if (!fileUrl) {
+        throw new Error('Unable to store file to Stream media store.');
+      }
+
+      return res.status(200).json({
+        success: true,
+        fileUrl,
+        fileName,
+        fileType: isImage ? 'image' : 'file',
+        fileSize: buffer.length
+      });
+    } catch (err) {
+      console.error('[health/stream-upload] error:', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
   // Health check route
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
 

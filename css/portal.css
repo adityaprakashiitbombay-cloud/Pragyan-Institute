@@ -10250,3 +10250,47 @@ body.stream-body-fullscreen-lock {
   from { opacity: 0; transform: translateY(-8px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* ── Stream Community Chat Media & PDF Gallery Styles ── */
+.stream-media-card {
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s ease;
+}
+
+.stream-media-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08) !important;
+}
+
+.stream-pdf-card:hover {
+  border-color: #EF4444 !important;
+}
+
+.stream-img-lightbox-trigger:hover img {
+  transform: scale(1.02);
+}
+
+.stream-pdf-page1-preview-wrap {
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.stream-pdf-page1-preview-wrap:hover {
+  background-color: #F1F5F9 !important;
+  border-color: #94A3B8 !important;
+}
+
+.btn-read-pdf:hover {
+  background: #B91C1C !important;
+}
+
+.btn-media-filter.active {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.stream-pdf-modal {
+  animation: streamModalFadeIn 0.2s ease;
+}
+
+@keyframes streamModalFadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}

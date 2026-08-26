@@ -21,6 +21,10 @@
   let selectedCategory = 'ALL';
   let searchQuery = '';
   let isListening = false;
+  let activeChatViewMode = 'chat'; // 'chat' | 'media'
+  let mediaFilterType = 'ALL'; // 'ALL' | 'PDF' | 'IMAGE'
+  let mediaSearchQuery = '';
+  let pdfjsLibLoaded = false;
 
   const CHANNEL_IDENTITIES = {
     'batch-BAT-12PCM': {
@@ -514,6 +518,551 @@
     return safe.replace(/\n/g, '<br>');
   }
 
+  function formatBytes(bytes) {
+    if (!bytes || isNaN(bytes)) return '';
+    const b = Number(bytes);
+    if (b < 1024) return `${b} B`;
+    if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+    return `${(b / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  async function loadPdfJs() {
+    if (window.pdfjsLib) return window.pdfjsLib;
+    if (pdfjsLibLoaded && window.pdfjsLib) return window.pdfjsLib;
+
+    return new Promise((resolve) => {
+      if (window.pdfjsLib) {
+        resolve(window.pdfjsLib);
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+      script.onload = () => {
+        pdfjsLibLoaded = true;
+        if (window.pdfjsLib) {
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+        resolve(window.pdfjsLib);
+      };
+      script.onerror = () => {
+        resolve(null);
+      };
+      document.head.appendChild(script);
+    });
+  }
+
+  async function renderPdfPage1Thumbnails(container) {
+    const previewWraps = (container || document).querySelectorAll('.stream-pdf-page1-preview-wrap:not(.is-rendered)');
+    if (!previewWraps.length) return;
+
+    const pdfjs = await loadPdfJs().catch(() => null);
+    if (!pdfjs || !pdfjs.getDocument) return;
+
+    previewWraps.forEach(async (wrap) => {
+      wrap.classList.add('is-rendered');
+      const url = wrap.dataset.pdfUrl;
+      const canvas = wrap.querySelector('.stream-pdf-page1-canvas');
+      const placeholder = wrap.querySelector('.stream-pdf-page1-placeholder');
+      if (!url || !canvas) return;
+
+      try {
+        const loadingTask = pdfjs.getDocument({ url: url });
+        const doc = await loadingTask.promise;
+        const page = await doc.getPage(1);
+        const viewport = page.getViewport({ scale: 0.4 });
+        const ctx = canvas.getContext('2d');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        await page.render({ canvasContext: ctx, viewport }).promise;
+        if (placeholder) placeholder.style.display = 'none';
+        canvas.style.display = 'block';
+      } catch (_) {}
+    });
+  }
+
+  let currentPdfDoc = null;
+  let currentPdfPage = 1;
+  let currentPdfZoom = 1.0;
+
+  async function openPdfReaderModal(pdfUrl, pdfTitle) {
+    const existing = document.getElementById('stream-pdf-reader-modal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'stream-pdf-reader-modal';
+    modal.className = 'stream-pdf-modal';
+    modal.style.cssText = 'position: fixed; inset: 0; z-index: 9999999; background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(8px); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.75rem;';
+
+    modal.innerHTML = `
+      <div style="background: #FFFFFF; border-radius: 12px; width: 100%; max-width: 960px; height: 92vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 60px rgba(0,0,0,0.35); border: 1.5px solid #CBD5E1;">
+        
+        <!-- MODAL TOP BAR -->
+        <div style="background: #0F172A; color: #FFFFFF; padding: 0.55rem 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-shrink: 0;">
+          <div style="display: flex; align-items: center; gap: 0.5rem; overflow: hidden;">
+            <div style="width: 28px; height: 28px; border-radius: 6px; background: #DC2626; color: #FFF; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; flex-shrink: 0;">
+              <i class="fa-solid fa-file-pdf"></i>
+            </div>
+            <div style="font-weight: 800; font-size: 0.88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 480px;">
+              ${escapeHtml(pdfTitle || 'Class PDF Document')}
+            </div>
+          </div>
+
+          <!-- CONTROLS: PAGE & ZOOM & DOWNLOAD & CLOSE -->
+          <div style="display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0;">
+            
+            <!-- Page Nav -->
+            <div style="display: flex; align-items: center; gap: 0.25rem; background: rgba(255,255,255,0.1); padding: 0.15rem 0.45rem; border-radius: 6px; font-size: 0.75rem;">
+              <button type="button" id="btn-pdf-prev" style="background: none; border: none; color: #FFF; cursor: pointer; padding: 0.1rem 0.3rem;" title="Previous Page">
+                <i class="fa-solid fa-chevron-left"></i>
+              </button>
+              <span>Page <strong id="pdf-page-num">1</strong> / <span id="pdf-page-count">…</span></span>
+              <button type="button" id="btn-pdf-next" style="background: none; border: none; color: #FFF; cursor: pointer; padding: 0.1rem 0.3rem;" title="Next Page">
+                <i class="fa-solid fa-chevron-right"></i>
+              </button>
+            </div>
+
+            <!-- Zoom -->
+            <div style="display: flex; align-items: center; gap: 0.2rem; background: rgba(255,255,255,0.1); padding: 0.15rem 0.4rem; border-radius: 6px; font-size: 0.75rem;">
+              <button type="button" id="btn-pdf-zoom-out" style="background: none; border: none; color: #FFF; cursor: pointer;" title="Zoom Out"><i class="fa-solid fa-minus"></i></button>
+              <span id="pdf-zoom-val" style="font-weight: 700; min-width: 36px; text-align: center;">100%</span>
+              <button type="button" id="btn-pdf-zoom-in" style="background: none; border: none; color: #FFF; cursor: pointer;" title="Zoom In"><i class="fa-solid fa-plus"></i></button>
+            </div>
+
+            <a href="${escapeHtml(pdfUrl)}" download="${escapeHtml(pdfTitle || 'document.pdf')}" target="_blank" rel="noopener noreferrer" style="background: #10B981; color: #FFFFFF; border-radius: 6px; padding: 0.25rem 0.6rem; font-size: 0.74rem; font-weight: 800; text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem;">
+              <i class="fa-solid fa-download"></i> <span>Download</span>
+            </a>
+
+            <button type="button" id="btn-pdf-close" style="background: rgba(255,255,255,0.15); color: #FFFFFF; border: none; border-radius: 6px; width: 28px; height: 28px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.95rem;" title="Close Viewer (Esc)">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- CANVAS VIEWER CONTAINER -->
+        <div id="pdf-canvas-container" style="flex: 1; overflow: auto; background: #334155; display: flex; align-items: flex-start; justify-content: center; padding: 1rem; position: relative;">
+          <div id="pdf-loading-spinner" style="position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: #FFFFFF;">
+            <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 2.5rem; color: #38BDF8; margin-bottom: 0.5rem;"></i>
+            <div style="font-weight: 800; font-size: 0.95rem;">Loading Class PDF Document…</div>
+            <div style="font-size: 0.75rem; color: #94A3B8; margin-top: 0.2rem;">Streaming on-demand from Pragyan Stream CDN</div>
+          </div>
+          <canvas id="pdf-render-canvas" style="display: none; box-shadow: 0 8px 30px rgba(0,0,0,0.4); border-radius: 4px; background: #FFF;"></canvas>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    document.body.classList.add('stream-body-fullscreen-lock');
+
+    const closeModal = () => {
+      modal.remove();
+      document.body.classList.remove('stream-body-fullscreen-lock');
+      window.removeEventListener('keydown', keyHandler);
+    };
+
+    const keyHandler = (e) => {
+      if (e.key === 'Escape') closeModal();
+      if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+        if (currentPdfDoc && currentPdfPage < currentPdfDoc.numPages) {
+          currentPdfPage++;
+          renderPdfPage(currentPdfPage);
+        }
+      }
+      if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        if (currentPdfDoc && currentPdfPage > 1) {
+          currentPdfPage--;
+          renderPdfPage(currentPdfPage);
+        }
+      }
+    };
+    window.addEventListener('keydown', keyHandler);
+
+    modal.querySelector('#btn-pdf-close')?.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+
+    const canvas = modal.querySelector('#pdf-render-canvas');
+    const spinner = modal.querySelector('#pdf-loading-spinner');
+    const pageNumEl = modal.querySelector('#pdf-page-num');
+    const pageCountEl = modal.querySelector('#pdf-page-count');
+    const zoomValEl = modal.querySelector('#pdf-zoom-val');
+
+    async function renderPdfPage(num) {
+      if (!currentPdfDoc || !canvas) return;
+      try {
+        const page = await currentPdfDoc.getPage(num);
+        const viewport = page.getViewport({ scale: currentPdfZoom });
+        const ctx = canvas.getContext('2d');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        if (spinner) spinner.style.display = 'none';
+        canvas.style.display = 'block';
+        if (pageNumEl) pageNumEl.textContent = String(num);
+
+        const renderContext = {
+          canvasContext: ctx,
+          viewport: viewport
+        };
+        await page.render(renderContext).promise;
+      } catch (err) {
+        console.error('[PDF Render Page Error]', err);
+      }
+    }
+
+    try {
+      const pdfjs = await loadPdfJs();
+      if (pdfjs && pdfjs.getDocument) {
+        const loadingTask = pdfjs.getDocument({ url: pdfUrl });
+        currentPdfDoc = await loadingTask.promise;
+        currentPdfPage = 1;
+        currentPdfZoom = 1.25;
+
+        if (pageCountEl) pageCountEl.textContent = String(currentPdfDoc.numPages);
+        if (zoomValEl) zoomValEl.textContent = `${Math.round(currentPdfZoom * 100)}%`;
+
+        await renderPdfPage(1);
+
+        modal.querySelector('#btn-pdf-prev')?.addEventListener('click', () => {
+          if (currentPdfPage > 1) {
+            currentPdfPage--;
+            renderPdfPage(currentPdfPage);
+          }
+        });
+
+        modal.querySelector('#btn-pdf-next')?.addEventListener('click', () => {
+          if (currentPdfDoc && currentPdfPage < currentPdfDoc.numPages) {
+            currentPdfPage++;
+            renderPdfPage(currentPdfPage);
+          }
+        });
+
+        modal.querySelector('#btn-pdf-zoom-in')?.addEventListener('click', () => {
+          if (currentPdfZoom < 2.5) {
+            currentPdfZoom += 0.25;
+            if (zoomValEl) zoomValEl.textContent = `${Math.round(currentPdfZoom * 100)}%`;
+            renderPdfPage(currentPdfPage);
+          }
+        });
+
+        modal.querySelector('#btn-pdf-zoom-out')?.addEventListener('click', () => {
+          if (currentPdfZoom > 0.5) {
+            currentPdfZoom -= 0.25;
+            if (zoomValEl) zoomValEl.textContent = `${Math.round(currentPdfZoom * 100)}%`;
+            renderPdfPage(currentPdfPage);
+          }
+        });
+      } else {
+        const c = modal.querySelector('#pdf-canvas-container');
+        if (c) {
+          c.innerHTML = `<iframe src="${escapeHtml(pdfUrl)}" style="width: 100%; height: 100%; border: none; border-radius: 6px;"></iframe>`;
+        }
+      }
+    } catch (loadErr) {
+      const c = modal.querySelector('#pdf-canvas-container');
+      if (c) {
+        c.innerHTML = `<iframe src="${escapeHtml(pdfUrl)}" style="width: 100%; height: 100%; border: none; border-radius: 6px;"></iframe>`;
+      }
+    }
+  }
+
+  function openImageLightboxModal(imgUrl, imgTitle) {
+    const existing = document.getElementById('stream-img-lightbox-modal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'stream-img-lightbox-modal';
+    modal.style.cssText = 'position: fixed; inset: 0; z-index: 9999999; background: rgba(0, 0, 0, 0.9); backdrop-filter: blur(8px); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1rem;';
+
+    modal.innerHTML = `
+      <div style="position: absolute; top: 1rem; right: 1rem; display: flex; align-items: center; gap: 0.5rem; z-index: 10;">
+        <a href="${escapeHtml(imgUrl)}" download="${escapeHtml(imgTitle || 'image')}" target="_blank" rel="noopener noreferrer" style="background: #10B981; color: #FFF; padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.8rem; font-weight: 800; text-decoration: none;">
+          <i class="fa-solid fa-download"></i> Download
+        </a>
+        <button type="button" id="btn-img-lightbox-close" style="background: rgba(255,255,255,0.2); color: #FFF; border: none; border-radius: 6px; width: 34px; height: 34px; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div style="max-width: 90vw; max-height: 85vh; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+        <img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(imgTitle || 'Image')}" style="max-width: 100%; max-height: 85vh; object-fit: contain; border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
+      </div>
+      ${imgTitle ? `<div style="color: #FFF; font-size: 0.85rem; font-weight: 700; margin-top: 0.6rem; text-align: center;">${escapeHtml(imgTitle)}</div>` : ''}
+    `;
+
+    document.body.appendChild(modal);
+    document.body.classList.add('stream-body-fullscreen-lock');
+
+    const close = () => {
+      modal.remove();
+      document.body.classList.remove('stream-body-fullscreen-lock');
+      window.removeEventListener('keydown', keyEsc);
+    };
+
+    const keyEsc = (e) => { if (e.key === 'Escape') close(); };
+    window.addEventListener('keydown', keyEsc);
+
+    modal.querySelector('#btn-img-lightbox-close')?.addEventListener('click', close);
+    modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+  }
+
+  function renderAttachmentsHtml(attachments) {
+    if (!Array.isArray(attachments) || !attachments.length) return '';
+
+    return attachments.map((att) => {
+      const type = String(att.type || '').toLowerCase();
+      const mime = String(att.mime_type || '').toLowerCase();
+      const url = sanitizeUrl(att.asset_url || att.image_url || att.url || att.thumb_url || '');
+      const title = escapeHtml(att.title || att.name || (type === 'image' ? 'Class Image' : 'Class Document.pdf'));
+      const sizeStr = formatBytes(att.file_size || att.size);
+      const isPdf = type === 'file' || mime.includes('pdf') || /\.pdf(\?|$)/i.test(url) || /\.pdf$/i.test(title);
+      const isImage = type === 'image' || mime.startsWith('image/') || /\.(png|jpe?g|webp|gif)(\?|$)/i.test(url);
+
+      if (isImage) {
+        return `
+          <div class="stream-attachment-wrap stream-attachment-image" style="margin-top: 0.35rem; border-radius: 8px; overflow: hidden; border: 1px solid rgba(0,0,0,0.1); background: #000; max-width: 320px;">
+            <a href="${url}" target="_blank" rel="noopener noreferrer" class="stream-img-lightbox-trigger" data-img-url="${url}" data-img-title="${title}" style="display: block; position: relative; cursor: pointer;">
+              <img src="${url}" alt="${title}" loading="lazy" style="width: 100%; max-height: 200px; object-fit: cover; display: block; transition: transform 0.2s ease;">
+              <div style="position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%); color: #FFF; font-size: 0.7rem; padding: 0.3rem 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 80%;">${title}</span>
+                ${sizeStr ? `<span style="font-size: 0.65rem; opacity: 0.85;">${sizeStr}</span>` : ''}
+              </div>
+            </a>
+          </div>
+        `;
+      }
+
+      if (isPdf) {
+        return `
+          <div class="stream-attachment-wrap stream-attachment-pdf" style="margin-top: 0.4rem; background: #FFFDF9; border: 1.5px solid #F87171; border-radius: 10px; padding: 0.5rem 0.65rem; max-width: 360px; box-shadow: 0 2px 6px rgba(220, 38, 38, 0.08);">
+            <div style="display: flex; align-items: flex-start; gap: 0.5rem;">
+              <div style="width: 36px; height: 42px; background: #FEE2E2; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #DC2626; flex-shrink: 0; border: 1px solid #FCA5A5;">
+                <i class="fa-solid fa-file-pdf" style="font-size: 1.25rem;"></i>
+                <span style="font-size: 0.55rem; font-weight: 900; line-height: 1; margin-top: 2px;">PDF</span>
+              </div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-weight: 800; font-size: 0.82rem; color: #1E293B; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${title}">
+                  ${title}
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.35rem; margin-top: 0.2rem; font-size: 0.68rem; color: #64748B;">
+                  <span style="background: #F1F5F9; padding: 0.05rem 0.35rem; border-radius: 4px; font-weight: 700; color: #475569;">
+                    ${sizeStr || 'Document'}
+                  </span>
+                  <span>• First Page Preview</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Page 1 Lazy Canvas Preview Container -->
+            <div class="stream-pdf-page1-preview-wrap" data-pdf-url="${url}" style="margin-top: 0.4rem; background: #F8FAFC; border-radius: 6px; border: 1px dashed #CBD5E1; min-height: 80px; max-height: 120px; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center;">
+              <canvas class="stream-pdf-page1-canvas" style="display: none; max-width: 100%; max-height: 120px;"></canvas>
+              <div class="stream-pdf-page1-placeholder" style="text-align: center; padding: 0.4rem; color: #64748B; font-size: 0.7rem;">
+                <i class="fa-solid fa-file-pdf" style="font-size: 1.2rem; color: #EF4444; margin-bottom: 0.2rem; display: block;"></i>
+                <span>Click <strong>Read PDF</strong> to view full document</span>
+              </div>
+            </div>
+
+            <!-- Action Buttons: Read PDF (Lazy Viewer) & Download -->
+            <div style="display: flex; align-items: center; gap: 0.35rem; margin-top: 0.45rem;">
+              <button type="button" class="btn-read-pdf" data-pdf-url="${url}" data-pdf-title="${title}" style="flex: 1; background: #DC2626; color: #FFFFFF; border: none; padding: 0.28rem 0.55rem; border-radius: 6px; font-size: 0.72rem; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 0.25rem;">
+                <i class="fa-solid fa-book-open"></i> <span>Read PDF</span>
+              </button>
+              <a href="${url}" download="${title}" target="_blank" rel="noopener noreferrer" style="background: #FEE2E2; color: #991B1B; border: 1px solid #FCA5A5; padding: 0.28rem 0.55rem; border-radius: 6px; font-size: 0.72rem; font-weight: 800; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 0.2rem;">
+                <i class="fa-solid fa-download"></i> <span>Download</span>
+              </a>
+            </div>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="stream-attachment-wrap" style="margin-top: 0.35rem; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 0.45rem 0.65rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">
+          <div style="display: flex; align-items: center; gap: 0.4rem; overflow: hidden;">
+            <i class="fa-solid fa-file" style="color: #64748B;"></i>
+            <span style="font-size: 0.8rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${title}</span>
+            ${sizeStr ? `<span style="font-size: 0.68rem; color: #94A3B8;">(${sizeStr})</span>` : ''}
+          </div>
+          <a href="${url}" download="${title}" target="_blank" rel="noopener noreferrer" style="color: #059669; font-size: 0.75rem; font-weight: 800;">Download</a>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function getMediaAttachmentsFromMessages(messages) {
+    const mediaList = [];
+    if (!Array.isArray(messages)) return mediaList;
+
+    messages.forEach(m => {
+      if (m.deleted_at) return;
+      if (Array.isArray(m.attachments) && m.attachments.length) {
+        m.attachments.forEach((att, idx) => {
+          const type = String(att.type || '').toLowerCase();
+          const mime = String(att.mime_type || '').toLowerCase();
+          const url = att.asset_url || att.image_url || att.url || att.thumb_url || '';
+          const isPdf = type === 'file' || mime.includes('pdf') || /\.pdf(\?|$)/i.test(url) || /\.pdf$/i.test(att.title || '');
+          const isImage = type === 'image' || mime.startsWith('image/') || /\.(png|jpe?g|webp|gif)(\?|$)/i.test(url);
+          
+          if (url) {
+            mediaList.push({
+              messageId: m.id,
+              attachmentIndex: idx,
+              type: isPdf ? 'pdf' : (isImage ? 'image' : 'file'),
+              title: att.title || att.name || (isPdf ? 'Class Notes.pdf' : 'Class Image'),
+              url: url,
+              fileSize: att.file_size || att.size || 0,
+              mimeType: att.mime_type || '',
+              createdAt: m.created_at,
+              user: m.user
+            });
+          }
+        });
+      }
+    });
+
+    return mediaList.reverse();
+  }
+
+  function renderMediaGalleryHtml(mediaList, activeMeta) {
+    const filtered = mediaList.filter(item => {
+      if (mediaFilterType === 'PDF' && item.type !== 'pdf') return false;
+      if (mediaFilterType === 'IMAGE' && item.type !== 'image') return false;
+      if (mediaSearchQuery) {
+        const q = mediaSearchQuery.toLowerCase();
+        return item.title.toLowerCase().includes(q) || (item.user?.name && item.user.name.toLowerCase().includes(q));
+      }
+      return true;
+    });
+
+    return `
+      <div class="stream-media-gallery-wrap" style="flex: 1; display: flex; flex-direction: column; background: #FAF9F6; overflow-y: auto; padding: 0.75rem 0.85rem;">
+        
+        <!-- MEDIA HEADER & FILTER CONTROLS -->
+        <div style="background: #FFFFFF; border-radius: 10px; border: 1.5px solid var(--border-sand, #E2E8F0); padding: 0.6rem 0.8rem; margin-bottom: 0.75rem; box-shadow: 0 1px 4px rgba(0,0,0,0.04);">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem;">
+            <div>
+              <h4 style="font-size: 0.92rem; font-weight: 800; color: #064E3B; margin: 0; display: flex; align-items: center; gap: 0.35rem;">
+                <i class="fa-solid fa-folder-open" style="color: #059669;"></i> Class Media & Notes
+              </h4>
+              <p style="font-size: 0.72rem; color: #64748B; margin: 0.1rem 0 0 0;">
+                All chapter PDFs, lecture notes, question papers & diagrams shared in ${escapeHtml(activeMeta.shortName || 'this class')}
+              </p>
+            </div>
+            <div style="display: flex; gap: 0.3rem;">
+              <button type="button" class="btn-media-filter ${mediaFilterType === 'ALL' ? 'active' : ''}" data-media-filter="ALL" style="padding: 0.2rem 0.55rem; border-radius: 6px; font-size: 0.72rem; font-weight: 800; cursor: pointer; border: 1px solid ${mediaFilterType === 'ALL' ? '#064E3B' : '#CBD5E1'}; background: ${mediaFilterType === 'ALL' ? '#064E3B' : '#FFFFFF'}; color: ${mediaFilterType === 'ALL' ? '#FFF' : '#475569'};">
+                All (${mediaList.length})
+              </button>
+              <button type="button" class="btn-media-filter ${mediaFilterType === 'PDF' ? 'active' : ''}" data-media-filter="PDF" style="padding: 0.2rem 0.55rem; border-radius: 6px; font-size: 0.72rem; font-weight: 800; cursor: pointer; border: 1px solid ${mediaFilterType === 'PDF' ? '#DC2626' : '#CBD5E1'}; background: ${mediaFilterType === 'PDF' ? '#DC2626' : '#FFFFFF'}; color: ${mediaFilterType === 'PDF' ? '#FFF' : '#475569'};">
+                📄 PDFs (${mediaList.filter(m => m.type === 'pdf').length})
+              </button>
+              <button type="button" class="btn-media-filter ${mediaFilterType === 'IMAGE' ? 'active' : ''}" data-media-filter="IMAGE" style="padding: 0.2rem 0.55rem; border-radius: 6px; font-size: 0.72rem; font-weight: 800; cursor: pointer; border: 1px solid ${mediaFilterType === 'IMAGE' ? '#2563EB' : '#CBD5E1'}; background: ${mediaFilterType === 'IMAGE' ? '#2563EB' : '#FFFFFF'}; color: ${mediaFilterType === 'IMAGE' ? '#FFF' : '#475569'};">
+                🖼️ Images (${mediaList.filter(m => m.type === 'image').length})
+              </button>
+            </div>
+          </div>
+
+          <!-- MEDIA SEARCH BAR -->
+          <div style="position: relative;">
+            <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 0.65rem; top: 50%; transform: translateY(-50%); font-size: 0.75rem; color: #94A3B8;"></i>
+            <input type="text" id="stream-media-search-input" value="${escapeHtml(mediaSearchQuery)}" placeholder="Search study notes, chapter PDFs, assignments…" style="width: 100%; padding: 0.35rem 0.65rem 0.35rem 1.85rem; font-size: 0.78rem; border-radius: 6px; border: 1px solid #CBD5E1; background: #F8FAFC;">
+          </div>
+        </div>
+
+        <!-- MEDIA LIST GRID -->
+        ${!filtered.length ? `
+          <div style="text-align: center; margin: auto; padding: 3rem 1rem; color: #64748B;">
+            <div style="width: 52px; height: 52px; border-radius: 50%; background: #EEF2FF; color: #4F46E5; display: inline-flex; align-items: center; justify-content: center; font-size: 1.6rem; margin-bottom: 0.6rem;">
+              📁
+            </div>
+            <h4 style="font-weight: 800; font-size: 0.95rem; color: #1E293B; margin-bottom: 0.25rem;">
+              ${mediaSearchQuery ? 'No matching study files found' : 'No media files shared yet'}
+            </h4>
+            <p style="font-size: 0.78rem; color: #64748B; max-width: 340px; margin: 0 auto;">
+              ${currentUser.role === 'admin' ? 'Click the 📎 paperclip icon in the message bar to broadcast PDF notes or study images (up to 20 MB).' : 'Your faculty and teachers will share chapter PDFs, notes, and study material here.'}
+            </p>
+          </div>
+        ` : `
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.75rem;">
+            ${filtered.map(item => {
+              const isPdf = item.type === 'pdf';
+              const sizeStr = formatBytes(item.fileSize);
+              const uploaderName = item.user?.name || 'Faculty / Admin';
+              const dateStr = item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '';
+
+              if (isPdf) {
+                return `
+                  <div class="stream-media-card stream-pdf-card" style="background: #FFFFFF; border: 1.5px solid #FCA5A5; border-radius: 10px; padding: 0.65rem; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 8px rgba(220, 38, 38, 0.06);">
+                    <div>
+                      <div style="display: flex; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.45rem;">
+                        <div style="width: 36px; height: 42px; background: #FEE2E2; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #DC2626; flex-shrink: 0; border: 1px solid #FCA5A5;">
+                          <i class="fa-solid fa-file-pdf" style="font-size: 1.25rem;"></i>
+                          <span style="font-size: 0.55rem; font-weight: 900; line-height: 1; margin-top: 2px;">PDF</span>
+                        </div>
+                        <div style="flex: 1; min-width: 0;">
+                          <div style="font-weight: 800; font-size: 0.84rem; color: #1E293B; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;" title="${escapeHtml(item.title)}">
+                            ${escapeHtml(item.title)}
+                          </div>
+                          <div style="font-size: 0.68rem; color: #64748B; margin-top: 0.15rem;">
+                            <span>${escapeHtml(uploaderName)}</span> • <span>${dateStr}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- PDF Page 1 Preview Canvas/Thumbnail Container -->
+                      <div class="stream-pdf-page1-preview-wrap" data-pdf-url="${escapeHtml(item.url)}" style="background: #F8FAFC; border-radius: 6px; border: 1px dashed #CBD5E1; min-height: 80px; max-height: 110px; overflow: hidden; display: flex; align-items: center; justify-content: center; margin-bottom: 0.45rem;">
+                        <canvas class="stream-pdf-page1-canvas" style="display: none; max-width: 100%; max-height: 110px;"></canvas>
+                        <div class="stream-pdf-page1-placeholder" style="text-align: center; color: #64748B; font-size: 0.7rem; padding: 0.4rem;">
+                          <i class="fa-solid fa-file-pdf" style="color: #EF4444; font-size: 1.2rem; margin-bottom: 0.2rem; display: block;"></i>
+                          <span>${sizeStr ? sizeStr + ' • ' : ''}Click <strong>Read PDF</strong></span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 0.35rem; margin-top: 0.2rem;">
+                      <button type="button" class="btn-read-pdf" data-pdf-url="${escapeHtml(item.url)}" data-pdf-title="${escapeHtml(item.title)}" style="flex: 1; background: #DC2626; color: #FFFFFF; border: none; padding: 0.3rem 0.5rem; border-radius: 6px; font-size: 0.72rem; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 0.25rem;">
+                        <i class="fa-solid fa-book-open"></i> <span>Read PDF</span>
+                      </button>
+                      <a href="${escapeHtml(item.url)}" download="${escapeHtml(item.title)}" target="_blank" rel="noopener noreferrer" style="background: #FEE2E2; color: #991B1B; border: 1px solid #FCA5A5; padding: 0.3rem 0.5rem; border-radius: 6px; font-size: 0.72rem; font-weight: 800; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 0.2rem;">
+                        <i class="fa-solid fa-download"></i> <span>Download</span>
+                      </a>
+                    </div>
+                  </div>
+                `;
+              }
+
+              // Image Card
+              return `
+                <div class="stream-media-card stream-img-card" style="background: #FFFFFF; border: 1.5px solid var(--border-sand, #E2E8F0); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+                  <div style="position: relative; background: #0F172A;">
+                    <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer" class="stream-img-lightbox-trigger" data-img-url="${escapeHtml(item.url)}" data-img-title="${escapeHtml(item.title)}" style="display: block;">
+                      <img src="${escapeHtml(item.url)}" alt="${escapeHtml(item.title)}" loading="lazy" style="width: 100%; height: 120px; object-fit: cover; display: block;">
+                    </a>
+                  </div>
+                  <div style="padding: 0.5rem 0.65rem;">
+                    <div style="font-weight: 800; font-size: 0.82rem; color: #1E293B; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(item.title)}">
+                      ${escapeHtml(item.title)}
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.2rem; font-size: 0.68rem; color: #64748B;">
+                      <span>${escapeHtml(uploaderName)} • ${dateStr}</span>
+                      <span style="font-weight: 700; color: #065F46;">${sizeStr}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.35rem; margin-top: 0.4rem;">
+                      <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer" class="stream-img-lightbox-trigger" data-img-url="${escapeHtml(item.url)}" data-img-title="${escapeHtml(item.title)}" style="flex: 1; background: #2563EB; color: #FFFFFF; border: none; padding: 0.25rem 0.45rem; border-radius: 5px; font-size: 0.7rem; font-weight: 800; text-align: center; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 0.25rem;">
+                        <i class="fa-solid fa-expand"></i> <span>View</span>
+                      </a>
+                      <a href="${escapeHtml(item.url)}" download="${escapeHtml(item.title)}" target="_blank" rel="noopener noreferrer" style="background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; padding: 0.25rem 0.45rem; border-radius: 5px; font-size: 0.7rem; font-weight: 800; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 0.2rem;">
+                        <i class="fa-solid fa-download"></i> <span>Download</span>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `}
+      </div>
+    `;
+  }
+
   function renderMsgList(messages) {
     const channelMeta = CHANNEL_IDENTITIES[activeChannelId] || {
       name: activeChannel?.data?.name || 'Class Forum',
@@ -554,6 +1103,7 @@
       const avatar = m.user?.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.user?.name || 'User')}&background=${isFaculty ? 'D97706' : '064E3B'}&color=fff`;
       const formattedBody = formatMessageBody(m.text || '');
       const timeStr = fmtTime(m.created_at);
+      const attachmentsHtml = renderAttachmentsHtml(m.attachments);
 
       // Compact Admin Actions (Hover / Inline pill)
       let actionsHtml = '';
@@ -585,6 +1135,7 @@
             <div style="font-weight: 600; color: #1E1B4B;">
               ${formattedBody}
             </div>
+            ${attachmentsHtml}
             <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.35rem; margin-top: 0.2rem; font-size: 0.66rem; color: #6366F1;">
               <span>${timeStr}</span>
               ${actionsHtml}
@@ -603,6 +1154,7 @@
             <div style="font-weight: 600; color: #78350F;">
               ${formattedBody}
             </div>
+            ${attachmentsHtml}
             <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.35rem; margin-top: 0.2rem; font-size: 0.66rem; color: #B45309;">
               <span>${timeStr}</span>
               ${actionsHtml}
@@ -621,6 +1173,7 @@
             <div style="font-weight: 600; color: #064E3B;">
               ${formattedBody}
             </div>
+            ${attachmentsHtml}
             <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.35rem; margin-top: 0.2rem; font-size: 0.66rem; color: #047857;">
               <span>${timeStr}</span>
               ${actionsHtml}
@@ -643,6 +1196,7 @@
             <div class="stream-msg-text" style="display: inline;">
               ${formattedBody}
             </div>
+            ${attachmentsHtml}
             <div class="stream-msg-meta-row" style="display: flex; align-items: center; justify-content: flex-end; gap: 0.35rem; margin-top: 0.15rem; font-size: 0.65rem; color: ${timeColor};">
               <span>${timeStr}</span>
               ${actionsHtml}
@@ -683,9 +1237,9 @@
   function showHelpModal() {
     const isAdminUser = currentUser?.role === 'admin';
     if (isAdminUser) {
-      alert('✨ Available Admin & Class Commands:\n\n• /quest <question> — Ask highlighted question / doubt in indigo card\n• /hg <text> — Broadcast highlighted announcement in gold callout card\n• /pin <text> — Post and pin announcement\n• /notice <text> — Broadcast class notice\n• /clear — Clear group message history\n• @<name> — Mention specific student\n• /help — Show this help menu');
+      alert('✨ Available Admin & Class Commands:\n\n• 📎 Paperclip icon — Upload PDF notes & study images (up to 20 MB)\n• /quest <question> — Ask highlighted question / doubt in indigo card\n• /hg <text> — Broadcast highlighted announcement in gold callout card\n• /pin <text> — Post and pin announcement\n• /notice <text> — Broadcast class notice\n• /clear — Clear group message history\n• @<name> — Mention specific student\n• /help — Show this help menu');
     } else {
-      alert('✨ Available Student Commands:\n\n• /quest <question> — Ask question / doubt (highlighted in indigo card for mentors & classmates)\n• @<name> — Mention a classmate or student\n• /help — Show commands');
+      alert('✨ Available Student Commands:\n\n• 📁 Class Media tab — Browse & download all PDFs, chapter notes & diagrams\n• /quest <question> — Ask question / doubt (highlighted in indigo card for mentors & classmates)\n• @<name> — Mention a classmate or student\n• /help — Show commands');
     }
   }
 
@@ -730,12 +1284,24 @@
       pinWrapper.innerHTML = renderPinnedBarHtml(pinnedMessages, isAdmin);
     }
 
-    // 2. Update Messages Feed
-    const list = pane.querySelector('#stream-msg-list');
-    if (list) {
-      list.innerHTML = renderMsgList(messages);
-      scrollBottom(pane);
+    // 2. Update Messages Feed or Media Gallery
+    if (activeChatViewMode === 'media') {
+      const activeMeta = CHANNEL_IDENTITIES[activeChannelId] || { shortName: 'Class Forum' };
+      const mediaList = getMediaAttachmentsFromMessages(messages);
+      const mediaGalleryContainer = pane.querySelector('.stream-media-gallery-wrap');
+      if (mediaGalleryContainer) {
+        mediaGalleryContainer.outerHTML = renderMediaGalleryHtml(mediaList, activeMeta);
+      }
+    } else {
+      const list = pane.querySelector('#stream-msg-list');
+      if (list) {
+        list.innerHTML = renderMsgList(messages);
+        scrollBottom(pane);
+      }
     }
+
+    // Render Page 1 PDF thumbnails lazily
+    renderPdfPage1Thumbnails(pane);
   }
 
   function renderUI(container) {
@@ -771,6 +1337,7 @@
     const categories = getCategoriesList();
     const messages = (activeChannel?.state?.messages || []).filter(m => !m.deleted_at);
     const pinnedMessages = messages.filter(m => m.pinned || m.is_pinned || Boolean(m.pinned_at));
+    const mediaList = getMediaAttachmentsFromMessages(messages);
 
     container.innerHTML = `
       <div class="stream-chat-wrapper" style="display: flex; flex-direction: column; height: clamp(560px, calc(100dvh - 140px), 880px); background: #FFFFFF; border-radius: 14px; border: 1.5px solid var(--border-sand, #DDD5CD); overflow: hidden; box-shadow: 0 8px 30px rgba(0,0,0,0.08); position: relative;">
@@ -829,7 +1396,7 @@
           }).join('')}
         </div>
 
-        <!-- ACTIVE CHANNEL CONDENSED HERO BANNER -->
+        <!-- ACTIVE CHANNEL CONDENSED HERO BANNER & VIEW SWITCHER (Discussion vs Media) -->
         <div class="stream-active-banner" style="background: ${activeMeta.bannerBg}; color: #FFFFFF; padding: 0.4rem 0.85rem; border-bottom: 1.5px solid ${activeMeta.accentBorder}; display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; flex-shrink: 0;">
           <div style="display: flex; align-items: center; gap: 0.5rem; min-width: 0;">
             <div class="stream-banner-icon" style="width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,0.18); display: flex; align-items: center; justify-content: center; font-size: 1.25rem; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.25);">
@@ -851,28 +1418,39 @@
           </div>
 
           <div style="display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0;">
+            
+            <!-- VIEW MODE TOGGLE PILLS: 💬 Discussion / 📁 Class Media -->
+            <div class="stream-view-toggle-wrap" style="display: inline-flex; background: rgba(0,0,0,0.25); padding: 2px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15);">
+              <button type="button" class="btn-view-mode ${activeChatViewMode === 'chat' ? 'active' : ''}" data-view-mode="chat" style="background: ${activeChatViewMode === 'chat' ? '#FFFFFF' : 'transparent'}; color: ${activeChatViewMode === 'chat' ? '#064E3B' : '#E2E8F0'}; border: none; border-radius: 6px; font-size: 0.72rem; font-weight: 800; padding: 0.2rem 0.55rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem; transition: all 0.15s ease;">
+                <span>💬 Chat</span>
+              </button>
+              <button type="button" class="btn-view-mode ${activeChatViewMode === 'media' ? 'active' : ''}" data-view-mode="media" style="background: ${activeChatViewMode === 'media' ? '#FFFFFF' : 'transparent'}; color: ${activeChatViewMode === 'media' ? '#064E3B' : '#E2E8F0'}; border: none; border-radius: 6px; font-size: 0.72rem; font-weight: 800; padding: 0.2rem 0.55rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem; transition: all 0.15s ease;">
+                <span>📁 Media & Notes</span>
+                ${mediaList.length > 0 ? `<span style="background: ${activeChatViewMode === 'media' ? '#064E3B' : 'rgba(255,255,255,0.3)'}; color: ${activeChatViewMode === 'media' ? '#FFF' : '#FFF'}; font-size: 0.62rem; padding: 1px 4px; border-radius: 99px;">${mediaList.length}</span>` : ''}
+              </button>
+            </div>
+
             ${isAdmin ? `
               <button type="button" class="btn-clear-group-chat" data-ch-id="${escapeHtml(activeChannelId)}" data-ch-name="${escapeHtml(activeMeta.name)}" style="background: rgba(220, 38, 38, 0.2); color: #FCA5A5; border: 1px solid rgba(239, 68, 68, 0.4); font-size: 0.72rem; font-weight: 800; padding: 0.22rem 0.55rem; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem;" title="Clear group messages">
-                <i class="fa-solid fa-trash-can" aria-hidden="true"></i> <span>Clear Chat</span>
+                <i class="fa-solid fa-trash-can" aria-hidden="true"></i> <span>Clear</span>
               </button>
             ` : ''}
-            <div class="desktop-banner-stats" style="display: none; text-align: right;">
-              <span style="font-size: 0.68rem; color: #D1FAE5; background: rgba(0,0,0,0.2); padding: 0.18rem 0.45rem; border-radius: 6px; font-weight: 700; display: inline-block;">
-                👥 Enrolled: ${studentCount}
-              </span>
-            </div>
           </div>
         </div>
 
-        <!-- STICKY PINNED MESSAGES BANNER CONTAINER -->
+        <!-- STICKY PINNED MESSAGES BANNER CONTAINER (Only in Chat mode) -->
         <div id="stream-pinned-bar-wrapper">
-          ${renderPinnedBarHtml(pinnedMessages, isAdmin)}
+          ${activeChatViewMode === 'chat' ? renderPinnedBarHtml(pinnedMessages, isAdmin) : ''}
         </div>
 
-        <!-- MESSAGES FEED CONTAINER -->
-        <div id="stream-msg-list" style="flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0.75rem 0.85rem; background: #FAF9F6; display: flex; flex-direction: column;">
-          ${renderMsgList(messages)}
-        </div>
+        <!-- MAIN VIEW: MESSAGES FEED OR MEDIA GALLERY -->
+        ${activeChatViewMode === 'media' ? `
+          ${renderMediaGalleryHtml(mediaList, activeMeta)}
+        ` : `
+          <div id="stream-msg-list" style="flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0.75rem 0.85rem; background: #FAF9F6; display: flex; flex-direction: column;">
+            ${renderMsgList(messages)}
+          </div>
+        `}
 
         <!-- REALTIME TYPING NOTIFIER -->
         <div id="stream-typing-box" style="padding: 0.15rem 0.85rem; font-size: 0.72rem; color: #64748B; font-style: italic; min-height: 18px; background: #FAF9F6; border-top: 1px solid rgba(0,0,0,0.03);"></div>
@@ -883,6 +1461,12 @@
         <!-- COMPOSER INPUT BAR -->
         <form id="stream-chat-form" style="display: flex; align-items: center; gap: 0.4rem; padding: 0.55rem 0.85rem; background: #FFFFFF; border-top: 1.5px solid var(--border-sand, #DDD5CD); flex-shrink: 0; position: relative;">
           ${isAdmin ? `
+            <!-- Admin Attach File (PDF / Images up to 20MB) -->
+            <button type="button" id="btn-stream-attach" title="Attach PDF notes or image (up to 20 MB)" style="background: #ECFDF5; color: #065F46; border: 1.5px solid #A7F3D0; width: 38px; height: 38px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 1rem; cursor: pointer; flex-shrink: 0; transition: all 0.15s ease;" aria-label="Attach PDF or Image">
+              <i class="fa-solid fa-paperclip"></i>
+            </button>
+            <input type="file" id="stream-file-input" accept="application/pdf,image/png,image/jpeg,image/webp,image/gif" style="display: none;">
+            
             <button type="button" id="btn-quick-hg" title="Highlight announcement (/hg)" style="background: #FEF3C7; color: #D97706; border: 1.5px solid #FCD34D; width: 38px; height: 38px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 1rem; cursor: pointer; flex-shrink: 0;" aria-label="Toggle Highlight prefix">
               ⭐
             </button>
@@ -890,7 +1474,7 @@
           <button type="button" id="btn-quick-quest" title="Ask academic question / doubt (/quest)" style="background: #EEF2FF; color: #4F46E5; border: 1.5px solid #C7D2FE; width: 38px; height: 38px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 1rem; cursor: pointer; flex-shrink: 0;" aria-label="Ask Question prefix">
             ❓
           </button>
-          <input type="text" id="stream-msg-input" class="portal-input" placeholder="${isAdmin ? 'Type message, @mention student, /hg, /quest, /pin…' : `Message ${escapeHtml(activeMeta.shortName)} (use /quest for doubts)…`}" style="flex: 1; border-radius: 8px; font-size: 16px; min-height: 40px; padding: 0.45rem 0.85rem; border: 1.5px solid var(--border-sand, #CBD5E1); background: #FAF9F6; transition: border-color 0.2s;" autocomplete="off" aria-label="Chat message" required>
+          <input type="text" id="stream-msg-input" class="portal-input" placeholder="${isAdmin ? 'Type message, @mention, /hg, /quest, /pin, or attach PDF notes…' : `Message ${escapeHtml(activeMeta.shortName)} (use /quest for doubts)…`}" style="flex: 1; border-radius: 8px; font-size: 16px; min-height: 40px; padding: 0.45rem 0.85rem; border: 1.5px solid var(--border-sand, #CBD5E1); background: #FAF9F6; transition: border-color 0.2s;" autocomplete="off" aria-label="Chat message">
           <button type="submit" class="btn btn-emerald" id="btn-stream-send" style="padding: 0.45rem 1.15rem; font-weight: 800; border-radius: 8px; display: inline-flex; align-items: center; gap: 0.35rem; min-height: 40px; font-size: 0.85rem; flex-shrink: 0; box-shadow: 0 2px 8px rgba(6,78,59,0.2);">
             <span>Send</span> <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
           </button>
@@ -899,7 +1483,10 @@
     `;
 
     wireEvents(container);
-    scrollBottom(container);
+    if (activeChatViewMode === 'chat') {
+      scrollBottom(container);
+    }
+    renderPdfPage1Thumbnails(container);
   }
 
   function setupRealtimeListeners() {
@@ -1383,8 +1970,211 @@
       renderPinnedBarAndList(container);
     }
 
-    // 8. Event delegation on container for Pin, Unpin, Delete, Jump
+    // 7.1 Media Search Input Controller
+    const mediaSearchInput = container.querySelector('#stream-media-search-input');
+    if (mediaSearchInput) {
+      mediaSearchInput.addEventListener('input', (e) => {
+        mediaSearchQuery = (e.target.value || '').trim();
+        const messages = (activeChannel?.state?.messages || []).filter(m => !m.deleted_at);
+        const activeMeta = CHANNEL_IDENTITIES[activeChannelId] || { shortName: 'Class Forum' };
+        const mediaList = getMediaAttachmentsFromMessages(messages);
+        const mediaWrap = container.querySelector('.stream-media-gallery-wrap');
+        if (mediaWrap) {
+          mediaWrap.outerHTML = renderMediaGalleryHtml(mediaList, activeMeta);
+          renderPdfPage1Thumbnails(container);
+          const newSearch = container.querySelector('#stream-media-search-input');
+          if (newSearch) {
+            newSearch.focus();
+            newSearch.setSelectionRange(newSearch.value.length, newSearch.value.length);
+          }
+        }
+      });
+    }
+
+    // 7.2 Admin Attach File (PDFs & Images up to 20 MB)
+    const attachBtn = container.querySelector('#btn-stream-attach');
+    const fileInput = container.querySelector('#stream-file-input');
+    if (attachBtn && fileInput) {
+      attachBtn.addEventListener('click', () => {
+        fileInput.value = '';
+        fileInput.click();
+      });
+
+      fileInput.addEventListener('change', async () => {
+        const file = fileInput.files?.[0];
+        if (!file) return;
+
+        const MAX_SIZE = 20 * 1024 * 1024; // 20 MB
+        if (file.size > MAX_SIZE) {
+          alert(`⚠️ File is too large (${(file.size / (1024 * 1024)).toFixed(1)} MB).\n\nThe maximum allowed file size is 20 MB.`);
+          fileInput.value = '';
+          return;
+        }
+
+        const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+        const isImg = file.type.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(file.name);
+
+        if (!isPdf && !isImg) {
+          alert('⚠️ Only PDF documents and image files (PNG, JPG, WebP, GIF) up to 20 MB are supported.');
+          fileInput.value = '';
+          return;
+        }
+
+        const typingBox = container.querySelector('#stream-typing-box');
+        const sendBtn = container.querySelector('#btn-stream-send');
+        if (attachBtn) attachBtn.disabled = true;
+        if (sendBtn) sendBtn.disabled = true;
+        if (typingBox) {
+          typingBox.innerHTML = `⏳ Uploading "<b>${escapeHtml(file.name)}</b>" (${(file.size / (1024 * 1024)).toFixed(1)} MB) to class cloud...`;
+        }
+
+        try {
+          let uploadedUrl = '';
+          let attachmentType = isImg ? 'image' : 'file';
+
+          // Try direct Stream Chat client upload first
+          if (activeChannel && client) {
+            try {
+              if (isImg && typeof activeChannel.sendImage === 'function') {
+                const res = await activeChannel.sendImage(file);
+                uploadedUrl = res?.file || res?.url || '';
+              } else if (typeof activeChannel.sendFile === 'function') {
+                const res = await activeChannel.sendFile(file);
+                uploadedUrl = res?.file || res?.url || '';
+              }
+            } catch (streamUpErr) {
+              console.warn('[Stream direct upload note]', streamUpErr.message);
+            }
+          }
+
+          // Fallback to server-side upload gateway if direct upload failed
+          if (!uploadedUrl) {
+            const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pragyan_portal_token')) || '';
+            const base64Data = await new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result);
+              reader.onerror = reject;
+              reader.readAsDataURL(file);
+            });
+
+            const srvRes = await fetch('/api/health?action=stream-upload', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                channelId: activeChannelId,
+                channelType: 'livestream',
+                fileName: file.name,
+                fileType: file.type || (isPdf ? 'application/pdf' : 'image/jpeg'),
+                fileBase64: base64Data,
+                fileSize: file.size
+              })
+            });
+
+            const srvData = await srvRes.json();
+            if (!srvRes.ok || !srvData.success) {
+              throw new Error(srvData.error || 'Server upload failed');
+            }
+            uploadedUrl = srvData.fileUrl;
+            attachmentType = srvData.fileType || attachmentType;
+          }
+
+          if (!uploadedUrl) {
+            throw new Error('Unable to obtain uploaded file URL');
+          }
+
+          // Send message with attachments
+          const attachmentObj = {
+            type: attachmentType,
+            asset_url: uploadedUrl,
+            url: uploadedUrl,
+            image_url: isImg ? uploadedUrl : undefined,
+            title: file.name,
+            file_size: file.size,
+            mime_type: file.type || (isPdf ? 'application/pdf' : 'image/jpeg')
+          };
+
+          const msgPayload = {
+            text: isPdf ? `📄 Shared Study Notes: ${file.name}` : `🖼️ Shared Image: ${file.name}`,
+            attachments: [attachmentObj],
+            is_attachment: true
+          };
+
+          const sent = await activeChannel.sendMessage(msgPayload);
+          if (sent?.message && activeChannel?.state?.messages) {
+            if (!activeChannel.state.messages.some(m => m.id === sent.message.id)) {
+              activeChannel.state.messages.push(sent.message);
+            }
+          }
+
+          if (typingBox) typingBox.innerHTML = '';
+          fileInput.value = '';
+          renderPinnedBarAndList(container);
+          renderPdfPage1Thumbnails(container);
+        } catch (err) {
+          console.error('[Upload attachment error]', err);
+          alert(`❌ Failed to upload file: ${err.message}`);
+          if (typingBox) typingBox.innerHTML = '';
+        } finally {
+          if (attachBtn) attachBtn.disabled = false;
+          if (sendBtn) sendBtn.disabled = false;
+          fileInput.value = '';
+        }
+      });
+    }
+
+    // 8. Event delegation on container for View Mode, Media Filters, PDF Reader, Image Lightbox, Pin, Unpin, Delete, Jump
     container.addEventListener('click', async e => {
+      // View Mode Toggle (💬 Chat / 📁 Media & Notes)
+      const viewModeBtn = e.target.closest('.btn-view-mode');
+      if (viewModeBtn) {
+        e.preventDefault();
+        const mode = viewModeBtn.dataset.viewMode;
+        if (mode && mode !== activeChatViewMode) {
+          activeChatViewMode = mode;
+          renderUI(container);
+        }
+        return;
+      }
+
+      // Media Filter Toggle (ALL / PDF / IMAGE)
+      const filterBtn = e.target.closest('.btn-media-filter');
+      if (filterBtn) {
+        e.preventDefault();
+        const filter = filterBtn.dataset.mediaFilter;
+        if (filter && filter !== mediaFilterType) {
+          mediaFilterType = filter;
+          renderUI(container);
+        }
+        return;
+      }
+
+      // Read PDF Lazy Reader Modal
+      const readPdfBtn = e.target.closest('.btn-read-pdf');
+      if (readPdfBtn) {
+        e.preventDefault();
+        const pdfUrl = readPdfBtn.dataset.pdfUrl;
+        const pdfTitle = readPdfBtn.dataset.pdfTitle || 'PDF Notes';
+        if (pdfUrl) {
+          openPdfReaderModal(pdfUrl, pdfTitle);
+        }
+        return;
+      }
+
+      // Image Lightbox Modal
+      const imgTrigger = e.target.closest('.stream-img-lightbox-trigger');
+      if (imgTrigger) {
+        e.preventDefault();
+        const imgUrl = imgTrigger.dataset.imgUrl || imgTrigger.src;
+        const imgTitle = imgTrigger.dataset.imgTitle || 'Class Image';
+        if (imgUrl) {
+          openImageLightboxModal(imgUrl, imgTitle);
+        }
+        return;
+      }
+
       // Pin message
       const pinBtn = e.target.closest('[data-pin-msg]');
       if (pinBtn) {
