@@ -2819,6 +2819,15 @@
   overflow-y: auto;
 }
 
+#auditPurgeModal .inner-modal-content {
+  padding: 0 !important;
+  max-height: calc(100vh - 2rem) !important;
+  max-height: calc(100dvh - 2rem) !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
 .inner-modal-header {
   display: flex;
   justify-content: space-between;

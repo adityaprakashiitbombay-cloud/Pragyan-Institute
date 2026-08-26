@@ -12796,17 +12796,17 @@ const inputRoll = modalEl.querySelector('#deleteConfirmRollInput')?.value.trim()
 
     const modalHtml = `
       <div class="inner-modal-backdrop active" id="auditPurgeModal" style="display: flex; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 99999; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(5px);">
-        <div class="inner-modal-content" style="max-width: 580px; width: 100%; background: #FFFFFF; border-radius: 12px; border: 2.5px solid #DC2626; box-shadow: 0 20px 50px rgba(220,38,38,0.3); overflow: hidden; display: flex; flex-direction: column;">
+        <div class="inner-modal-content" style="max-width: 580px; width: 100%; max-height: calc(100vh - 2rem); max-height: calc(100dvh - 2rem); background: #FFFFFF; border-radius: 12px; border: 2.5px solid #DC2626; box-shadow: 0 20px 50px rgba(220,38,38,0.3); overflow: hidden; display: flex; flex-direction: column; padding: 0 !important;">
           
           <!-- Danger Header -->
-          <div style="background: linear-gradient(135deg, #DC2626 0%, #991B1B 100%); color: #fff; padding: 1.15rem 1.35rem; display: flex; justify-content: space-between; align-items: center;">
+          <div style="background: linear-gradient(135deg, #DC2626 0%, #991B1B 100%); color: #fff; padding: 0.95rem 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
             <div style="display: flex; align-items: center; gap: 0.65rem;">
-              <i aria-hidden="true" class="fa-solid fa-triangle-exclamation" style="font-size: 1.6rem; color: #FEE2E2;"></i>
+              <i aria-hidden="true" class="fa-solid fa-triangle-exclamation" style="font-size: 1.45rem; color: #FEE2E2;"></i>
               <div>
-                <h3 style="margin: 0; font-size: 1.15rem; font-weight: 800; color: #fff; letter-spacing: 0.3px;">
+                <h3 style="margin: 0; font-size: 1.05rem; font-weight: 800; color: #fff; letter-spacing: 0.2px;">
                   ⚠️ STRICT SECURITY CONFIRMATION
                 </h3>
-                <div style="font-size: 0.8rem; color: #FEE2E2; margin-top: 0.15rem;">Main Admin Exclusive Action — Chandan Kumar</div>
+                <div style="font-size: 0.78rem; color: #FEE2E2; margin-top: 0.1rem;">Main Admin Exclusive Action — Chandan Kumar</div>
               </div>
             </div>
             <button type="button" id="btnCloseAuditPurgeHeader" aria-label="Close audit purge dialog" style="background: none; border: none; color: #fff; font-size: 1.25rem; cursor: pointer; padding: 0.25rem; min-width: 36px; min-height: 36px; display: inline-flex; align-items: center; justify-content: center;">
@@ -12814,25 +12814,25 @@ const inputRoll = modalEl.querySelector('#deleteConfirmRollInput')?.value.trim()
             </button>
           </div>
 
-          <!-- Body -->
-          <div style="padding: 1.35rem; display: flex; flex-direction: column; gap: 1rem;">
+          <!-- Body (Scrollable if screen height is constrained) -->
+          <div style="padding: 1.15rem 1.25rem; display: flex; flex-direction: column; gap: 0.85rem; overflow-y: auto; -webkit-overflow-scrolling: touch; flex: 1;">
             
             <!-- Warning Alert Box -->
-            <div style="background: #FEF2F2; border: 1.5px solid #F87171; border-radius: 8px; padding: 1rem; color: #991B1B;">
-              <div style="font-weight: 800; font-size: 0.95rem; display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.35rem;">
+            <div style="background: #FEF2F2; border: 1.5px solid #F87171; border-radius: 8px; padding: 0.75rem 0.95rem; color: #991B1B;">
+              <div style="font-weight: 800; font-size: 0.9rem; display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.25rem;">
                 <i aria-hidden="true" class="fa-solid fa-trash-can"></i> Action: Permanent Deletion of All Audit Logs (${totalCount} Records)
               </div>
-              <p style="font-size: 0.84rem; line-height: 1.5; margin: 0; color: #7F1D1D;">
+              <p style="font-size: 0.82rem; line-height: 1.45; margin: 0; color: #7F1D1D;">
                 You are about to permanently purge all <strong>${totalCount} historical activity logs</strong> from both local browser storage and the cloud database. Once deleted, this activity timeline cannot be recovered.
               </p>
             </div>
 
             <!-- Guaranteed Protected Data Card -->
-            <div style="background: #F0FDF4; border: 1.5px solid #86EFAC; border-radius: 8px; padding: 1rem; color: #166534;">
-              <div style="font-weight: 800; font-size: 0.9rem; display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.45rem; color: #14532D;">
+            <div style="background: #F0FDF4; border: 1.5px solid #86EFAC; border-radius: 8px; padding: 0.75rem 0.95rem; color: #166534;">
+              <div style="font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.35rem; color: #14532D;">
                 <i aria-hidden="true" class="fa-solid fa-shield-halved" style="color: #16A34A;"></i> GUARANTEED DATA SAFETY (100% Protected & Zero Impact):
               </div>
-              <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.82rem; line-height: 1.6; color: #166534;">
+              <ul style="margin: 0; padding-left: 1.15rem; font-size: 0.8rem; line-height: 1.5; color: #166534;">
                 <li><strong>Student Pending Dues & Balances:</strong> 100% Intact & Unaffected</li>
                 <li><strong>Collected Revenue & Fee Receipts:</strong> 100% Intact & Unaffected</li>
                 <li><strong>Student Profiles, Roll Numbers & Classes:</strong> 100% Intact & Unaffected</li>
@@ -12842,23 +12842,24 @@ const inputRoll = modalEl.querySelector('#deleteConfirmRollInput')?.value.trim()
 
             <!-- Typed Confirmation Input -->
             <div>
-              <label for="confirmAuditPurgeInput" style="display: block; font-size: 0.84rem; font-weight: 700; color: var(--text-mahogany); margin-bottom: 0.35rem;">
+              <label for="confirmAuditPurgeInput" style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--text-mahogany); margin-bottom: 0.35rem;">
                 To confirm permanent deletion, type <code style="background: #FEE2E2; color: #991B1B; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 800;">DELETE</code> below:
               </label>
-              <input type="text" id="confirmAuditPurgeInput" class="portal-input" placeholder="Type DELETE to enable button" style="width: 100%; font-size: 0.9rem; padding: 0.6rem 0.85rem; border: 1.5px solid #CBD5E1; text-transform: uppercase;">
-            </div>
-
-            <!-- Action Buttons -->
-            <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 0.35rem;">
-              <button type="button" id="btnCancelPurgeAuditLogs" class="btn" style="background: #E2E8F0; color: #334155; font-weight: 700; padding: 0.6rem 1.15rem; font-size: 0.85rem; border-radius: 6px; cursor: pointer;">
-                Cancel / Keep Data
-              </button>
-              <button type="button" id="btnConfirmPurgeAuditLogs" class="btn" disabled style="background: #94A3B8; color: #fff; font-weight: 800; padding: 0.6rem 1.25rem; font-size: 0.85rem; border-radius: 6px; cursor: not-allowed; display: inline-flex; align-items: center; gap: 0.4rem; transition: all 0.2s;">
-                <i aria-hidden="true" class="fa-solid fa-trash-can"></i> Permanently Purge Logs
-              </button>
+              <input type="text" id="confirmAuditPurgeInput" class="portal-input" placeholder="TYPE DELETE TO ENABLE BUTTON" style="width: 100%; font-size: 0.88rem; padding: 0.55rem 0.85rem; border: 1.5px solid #CBD5E1; text-transform: uppercase;">
             </div>
 
           </div>
+
+          <!-- Sticky Action Buttons Footer -->
+          <div style="padding: 0.75rem 1.25rem; background: #F8FAFC; border-top: 1px solid #E2E8F0; display: flex; justify-content: flex-end; gap: 0.75rem; flex-shrink: 0;">
+            <button type="button" id="btnCancelPurgeAuditLogs" class="btn" style="background: #E2E8F0; color: #334155; font-weight: 700; padding: 0.55rem 1.15rem; font-size: 0.85rem; border-radius: 6px; cursor: pointer;">
+              Cancel / Keep Data
+            </button>
+            <button type="button" id="btnConfirmPurgeAuditLogs" class="btn" disabled style="background: #94A3B8; color: #fff; font-weight: 800; padding: 0.55rem 1.25rem; font-size: 0.85rem; border-radius: 6px; cursor: not-allowed; display: inline-flex; align-items: center; gap: 0.4rem; transition: all 0.2s;">
+              <i aria-hidden="true" class="fa-solid fa-trash-can"></i> Permanently Purge Logs
+            </button>
+          </div>
+
         </div>
       </div>
     `;
