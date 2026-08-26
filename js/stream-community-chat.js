@@ -1861,6 +1861,51 @@
       });
     }
 
+    // Support mobile visualViewport resize & keyboard adjustments
+    if (typeof window !== 'undefined' && window.visualViewport && !window._streamViewportBound) {
+      window._streamViewportBound = true;
+      const onViewportChange = () => {
+        const activeFullWrapper = document.querySelector('.stream-chat-wrapper.stream-fullscreen');
+        if (activeFullWrapper) {
+          activeFullWrapper.style.height = `${window.visualViewport.height}px`;
+        }
+        scrollBottom();
+      };
+      window.visualViewport.addEventListener('resize', onViewportChange);
+      window.visualViewport.addEventListener('scroll', onViewportChange);
+    }
+
+    // Support network offline & online reconnection lifecycle
+    if (typeof window !== 'undefined' && !window._streamNetworkHandlerBound) {
+      window._streamNetworkHandlerBound = true;
+      window.addEventListener('offline', () => {
+        const pane = getActiveCommunityPane();
+        const typingBox = pane?.querySelector('#stream-typing-box');
+        if (typingBox) {
+          typingBox.innerHTML = '<span style="color: #DC2626; font-weight: 800;"><i class="fa-solid fa-wifi-slash"></i> Offline. Realtime connection paused...</span>';
+        }
+      });
+      window.addEventListener('online', () => {
+        const pane = getActiveCommunityPane();
+        const typingBox = pane?.querySelector('#stream-typing-box');
+        if (typingBox) {
+          typingBox.innerHTML = '<span style="color: #059669; font-weight: 800;"><i class="fa-solid fa-wifi"></i> Online. Reconnected to class forum.</span>';
+          setTimeout(() => { if (typingBox) typingBox.innerHTML = ''; }, 3000);
+        }
+        if (typeof window.PragyanStreamChat?.reconnect === 'function') {
+          window.PragyanStreamChat.reconnect();
+        }
+      });
+    }
+
+    // Smooth scroll down when mobile input is focused
+    const msgInput = container.querySelector('#stream-msg-input');
+    if (msgInput) {
+      msgInput.addEventListener('focus', () => {
+        setTimeout(() => scrollBottom(container), 250);
+      });
+    }
+
     let autoSelectedIndex = 0;
     let autoMode = null; // 'slash' | 'mention' | null
 
@@ -2739,16 +2784,34 @@
           e.preventDefault();
           autoSelectedIndex = (autoSelectedIndex + 1) % items.length;
           items.forEach((it, idx) => it.style.background = (idx === autoSelectedIndex) ? '#ECFDF5' : '#FFFFFF');
+          items[autoSelectedIndex]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         } else if (e.key === 'ArrowUp') {
           e.preventDefault();
           autoSelectedIndex = (autoSelectedIndex - 1 + items.length) % items.length;
           items.forEach((it, idx) => it.style.background = (idx === autoSelectedIndex) ? '#ECFDF5' : '#FFFFFF');
+          items[autoSelectedIndex]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         } else if (e.key === 'Enter' || e.key === 'Tab') {
           e.preventDefault();
           const sel = items[autoSelectedIndex];
           if (sel) sel.click();
         } else if (e.key === 'Escape') {
           hideAutocomplete();
+        }
+      }
+    });
+
+    // Sync autocomplete hover with selection index
+    container.addEventListener('mouseover', e => {
+      const autoItem = e.target.closest('.auto-item');
+      if (autoItem) {
+        const autoBox = container.querySelector('#stream-autocomplete-box');
+        if (autoBox) {
+          const items = autoBox.querySelectorAll('.auto-item');
+          const idx = Array.from(items).indexOf(autoItem);
+          if (idx >= 0) {
+            autoSelectedIndex = idx;
+            items.forEach((it, i) => it.style.background = (i === autoSelectedIndex) ? '#ECFDF5' : '#FFFFFF');
+          }
         }
       }
     });

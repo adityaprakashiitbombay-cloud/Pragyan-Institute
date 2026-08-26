@@ -15,6 +15,7 @@ export function runCommunityChatLayoutTests(assert) {
   const portalCss = read('css/portal.css');
   const healthJs = read('api/health.js');
   const portalJs = read('js/portal.js');
+  const vercelJson = read('vercel.json');
 
   // --- 1. Compact Message Architecture & Reduced Bloat ---
   assert(chatJs.includes('renderMsgList'), 'T35.1: js/stream-community-chat.js defines renderMsgList');
@@ -148,6 +149,16 @@ export function runCommunityChatLayoutTests(assert) {
     'T35.53: js/stream-community-chat.js and css/portal.css implement /imp urgent announcement badge with glowing crimson-gold styling');
   assert(healthJs.includes("isStreamMute") && healthJs.includes("isStreamUnmute") && healthJs.includes("banUser") && healthJs.includes("unbanUser"),
     'T35.54: api/health.js implements stream-mute and stream-unmute subroutes with Stream API user ban/unban and channel state synchronization');
+
+  // --- 14. Serverless Rewrites, Mobile Viewport & Network Resilience Suite ---
+  assert(vercelJson.includes('/api/stream-delete') && vercelJson.includes('/api/stream-mute') && vercelJson.includes('/api/stream-unmute') && vercelJson.includes('/api/stream-upload'),
+    'T35.55: vercel.json defines explicit serverless rewrite routes for stream-delete, stream-mute, stream-unmute, and stream-upload');
+  assert(chatJs.includes('window.visualViewport') && chatJs.includes('onViewportChange') && chatJs.includes('msgInput.addEventListener(\'focus\''),
+    'T35.56: js/stream-community-chat.js implements mobile visualViewport resize adjustments and input focus scroll down');
+  assert(chatJs.includes("window.addEventListener('offline'") && chatJs.includes("window.addEventListener('online'") && chatJs.includes('PragyanStreamChat.reconnect()'),
+    'T35.57: js/stream-community-chat.js implements network offline/online lifecycle listeners and automatic reconnection');
+  assert(chatJs.includes("scrollIntoView({ block: 'nearest'") && chatJs.includes("autoItem") && chatJs.includes("mouseover"),
+    'T35.58: js/stream-community-chat.js implements autocomplete scrollIntoView for keyboard navigation and mouseover index synchronization');
 }
 
 

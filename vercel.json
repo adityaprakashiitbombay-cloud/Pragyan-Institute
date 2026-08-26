@@ -27,6 +27,22 @@
       "destination": "/api/health?action=stream-pin"
     },
     {
+      "source": "/api/stream-delete",
+      "destination": "/api/health?action=stream-delete"
+    },
+    {
+      "source": "/api/stream-mute",
+      "destination": "/api/health?action=stream-mute"
+    },
+    {
+      "source": "/api/stream-unmute",
+      "destination": "/api/health?action=stream-unmute"
+    },
+    {
+      "source": "/api/stream-upload",
+      "destination": "/api/health?action=stream-upload"
+    },
+    {
       "source": "/api/student-id",
       "destination": "/api/upload-file"
     },
