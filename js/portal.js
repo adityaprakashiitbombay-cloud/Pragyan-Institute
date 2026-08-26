@@ -3525,6 +3525,7 @@ function renderStudentDashboard() {
     const studentWrapper = document.getElementById('studentDashboardContainer');
     const portalOverlayEl = document.getElementById('portalOverlay');
     const portalModalCardEl = document.querySelector('.portal-modal-card');
+
     if (tabName === 'community') {
       studentWrapper?.classList.add('community-tab-active');
       portalOverlayEl?.classList.add('community-tab-active');
@@ -3534,9 +3535,11 @@ function renderStudentDashboard() {
       portalOverlayEl?.classList.remove('community-tab-active');
       portalModalCardEl?.classList.remove('community-tab-active');
       document.body.classList.remove('stream-body-fullscreen-lock');
-      if (window.PragyanStreamChat && typeof window.PragyanStreamChat.exitMobileFullscreen === 'function') {
-        window.PragyanStreamChat.exitMobileFullscreen();
-      }
+      try {
+        if (window.PragyanStreamChat && typeof window.PragyanStreamChat.exitMobileFullscreen === 'function') {
+          window.PragyanStreamChat.exitMobileFullscreen();
+        }
+      } catch (_) {}
     }
 
     // Reset content scroll so switching tabs resets to top
@@ -3562,7 +3565,7 @@ function renderStudentDashboard() {
       if (pane.id === `studentTabPane-${tabName}`) {
         pane.classList.add('active');
         pane.removeAttribute('hidden');
-        pane.style.setProperty('display', (tabName === 'community') ? 'flex' : 'block', 'important');
+        pane.style.removeProperty('display');
       } else {
         pane.classList.remove('active');
         pane.setAttribute('hidden', '');
@@ -6393,6 +6396,7 @@ function renderStudentDashboard() {
     const adminWrapper = document.getElementById('adminDashboardContainer');
     const portalOverlayEl = document.getElementById('portalOverlay');
     const portalModalCardEl = document.querySelector('.portal-modal-card');
+
     if (tabName === 'community') {
       adminWrapper?.classList.add('community-tab-active');
       portalOverlayEl?.classList.add('community-tab-active');
@@ -6402,9 +6406,11 @@ function renderStudentDashboard() {
       portalOverlayEl?.classList.remove('community-tab-active');
       portalModalCardEl?.classList.remove('community-tab-active');
       document.body.classList.remove('stream-body-fullscreen-lock');
-      if (window.PragyanStreamChat && typeof window.PragyanStreamChat.exitMobileFullscreen === 'function') {
-        window.PragyanStreamChat.exitMobileFullscreen();
-      }
+      try {
+        if (window.PragyanStreamChat && typeof window.PragyanStreamChat.exitMobileFullscreen === 'function') {
+          window.PragyanStreamChat.exitMobileFullscreen();
+        }
+      } catch (_) {}
     }
 
     // Toggle Overview KPI cards: show strictly on Students tab
@@ -6442,7 +6448,7 @@ function renderStudentDashboard() {
       if (pane.id === `adminTabPane-${tabName}`) {
         pane.classList.add('active');
         pane.removeAttribute('hidden');
-        pane.style.setProperty('display', (tabName === 'community') ? 'flex' : 'block', 'important');
+        pane.style.removeProperty('display');
       } else {
         pane.classList.remove('active');
         pane.setAttribute('hidden', '');

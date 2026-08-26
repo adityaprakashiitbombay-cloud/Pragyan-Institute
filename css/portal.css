@@ -10777,96 +10777,27 @@ body.stream-chat-is-fullscreen #stream-community-chat-app {
 
 /* ── Mobile Tablet & Phone Responsive Layout Rules (< 768px) ── */
 @media (max-width: 768px) {
-  /* Edge-to-edge modal fitting for Community Forum tab on mobile */
-  .portal-overlay.community-tab-active,
-  .portal-overlay:has(.community-tab-active) {
-    position: fixed !important;
-    inset: 0 !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    width: 100vw !important;
-    width: 100dvw !important;
-    height: 100vh !important;
-    height: 100dvh !important;
-    max-height: 100dvh !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    overflow: hidden !important;
+  /* Mobile edge-to-edge container styling for Community Tab */
+  .portal-overlay.community-tab-active {
     display: flex !important;
     flex-direction: column !important;
     align-items: stretch !important;
-    justify-content: stretch !important;
-    z-index: 9999 !important;
   }
 
-  .portal-modal-card.community-tab-active,
-  .portal-overlay.community-tab-active .portal-modal-card,
-  .portal-overlay:has(.community-tab-active) .portal-modal-card {
-    width: 100vw !important;
-    width: 100dvw !important;
-    max-width: 100vw !important;
-    max-width: 100dvw !important;
-    height: 100vh !important;
-    height: 100dvh !important;
-    max-height: 100vh !important;
-    max-height: 100dvh !important;
-    border-radius: 0 !important;
-    border: none !important;
-    box-shadow: none !important;
-    margin: 0 !important;
-    padding: 0 !important;
+  .portal-modal-card.community-tab-active {
     display: flex !important;
     flex-direction: column !important;
     flex: 1 1 0 !important;
     min-height: 0 !important;
-    overflow: hidden !important;
     position: relative !important;
-    background: #ffffff !important;
   }
 
-  /* Keep Dashboard Header and Tabs NORMAL and CLEAN on Community Tab */
-  .dashboard-wrapper.community-tab-active {
-    display: flex !important;
-    flex-direction: column !important;
-    flex: 1 1 0 !important;
-    height: 100% !important;
-    max-height: 100% !important;
-    min-height: 0 !important;
-    width: 100% !important;
-    overflow: hidden !important;
-  }
-
-  /* Isolate body padding for full-height chat container */
-  .dashboard-wrapper.community-tab-active .dashboard-content-body {
-    padding: 0 !important;
-    margin: 0 !important;
-    flex: 1 1 0 !important;
-    min-height: 0 !important;
-    height: 100% !important;
-    max-height: 100% !important;
-    display: flex !important;
-    flex-direction: column !important;
-    overflow: hidden !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-  }
-
-  .dashboard-wrapper.community-tab-active #adminTabPane-community.active,
-  .dashboard-wrapper.community-tab-active #studentTabPane-community.active,
   #adminTabPane-community.active,
   #studentTabPane-community.active {
-    flex: 1 1 0 !important;
-    min-height: 0 !important;
-    height: 100% !important;
-    max-height: 100% !important;
-    display: flex !important;
-    flex-direction: column !important;
-    overflow: hidden !important;
-    padding: 0 !important;
-    margin: 0 !important;
+    display: block !important;
     width: 100% !important;
+    min-height: 0 !important;
+    box-sizing: border-box !important;
   }
 
   #adminTabPane-community:not(.active),
@@ -10876,15 +10807,10 @@ body.stream-chat-is-fullscreen #stream-community-chat-app {
 
   #stream-community-chat-app {
     flex: 1 1 auto !important;
-    min-height: 0 !important;
-    height: 100% !important;
-    max-height: 100% !important;
-    display: flex !important;
-    flex-direction: column !important;
-    overflow: hidden !important;
     width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
+    box-sizing: border-box !important;
   }
 
   /* Mobile Launch Gateway Card (Enter Chat Position) */

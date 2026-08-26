@@ -1694,7 +1694,8 @@
   }
 
   function renderUI(container) {
-    const isAdmin = currentUser.role === 'admin';
+    if (!container) return;
+    const isAdmin = Boolean(currentUser?.role === 'admin' || (typeof AppState !== 'undefined' && AppState.adminLoggedIn));
     const rawEnrolled = resolveStudentBatches();
     const primaryBatch = rawEnrolled[0] || resolveBatchId() || 'BAT-10';
     const enrolledBatches = (!isAdmin && rawEnrolled.length === 0) ? [primaryBatch] : rawEnrolled;
@@ -3326,7 +3327,12 @@
       if (typeof document !== 'undefined') {
         document.body.classList.remove('stream-body-fullscreen-lock');
       }
-      getAllCommunityPanes().forEach(pane => renderUI(pane));
+      if (currentUser) {
+        const activePane = getActiveCommunityPane();
+        if (activePane && !activePane.hasAttribute('hidden') && activePane.style.display !== 'none') {
+          renderUI(activePane);
+        }
+      }
     },
     disconnect
   };

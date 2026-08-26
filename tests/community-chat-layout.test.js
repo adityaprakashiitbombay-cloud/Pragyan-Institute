@@ -276,6 +276,18 @@ export function runCommunityChatLayoutTests(assert) {
          chatJs.includes('isMobileChatOpen = false') &&
          chatJs.includes('getAllCommunityPanes().forEach(pane => renderUI(pane))'),
     'T35.85: js/stream-community-chat.js wires Escape key to return mobile user cleanly to entry card in Community tab');
+
+  assert(portalJs.includes('pane.style.removeProperty(\'display\')'),
+    'T35.86: js/portal.js restores natural tab pane display properties on active student and admin tab panes');
+
+  assert(chatJs.includes('Boolean(currentUser?.role === \'admin\'') &&
+         chatJs.includes('if (!container) return;'),
+    'T35.87: js/stream-community-chat.js renderUI is completely null-safe against uninitialized currentUser');
+
+  assert(portalJs.includes('try {') &&
+         portalJs.includes('window.PragyanStreamChat.exitMobileFullscreen()') &&
+         portalJs.includes('} catch (_) {}'),
+    'T35.88: js/portal.js wraps exitMobileFullscreen in error-resilient try-catch on student and admin tab switching');
 }
 
 
