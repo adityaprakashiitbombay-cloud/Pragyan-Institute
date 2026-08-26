@@ -50,4 +50,4 @@ Bucket `pragyan-media` folders currently used: `profile_pictures/`, `notificatio
 4. Student receipt pulls depend on receipts carrying TEXT `student_id`; legacy UUID-keyed rows pre-date the gateway scope widening — verify live data after deploy.
 5. Mid-month batch transfers remain a product gap (no adjustment flow).
 6. Gemini model IDs unverifiable offline; chat silently falls back to the local knowledge base if all models fail.
-7. `package.json` version drives the cache-bust base (`90.0.x`); bump major.minor deliberately.
+7. `package.json` version drives the cache-bust base (`126.9.x`); bump major.minor deliberately.
