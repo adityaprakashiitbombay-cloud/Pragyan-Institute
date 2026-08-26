@@ -285,9 +285,14 @@
   function handleIncomingSync(data) {
     if (!data || data.type !== 'sync_channel') return;
 
-    if (data.channelId && data.channelId !== activeChannelId) {
-      if (channelsMap.has(data.channelId) && data.message) {
-        const targetCh = channelsMap.get(data.channelId);
+    const incomingChId = data.channelId || '';
+    const isSameCh = !incomingChId || !activeChannelId || 
+                     incomingChId === activeChannelId || 
+                     incomingChId.replace(/^batch-/, '') === activeChannelId.replace(/^batch-/, '');
+
+    if (!isSameCh) {
+      if (channelsMap.has(incomingChId) && data.message) {
+        const targetCh = channelsMap.get(incomingChId);
         if (targetCh && targetCh.state && Array.isArray(targetCh.state.messages)) {
           if (!targetCh.state.messages.some(m => m.id === data.message.id)) {
             targetCh.state.messages.push(data.message);
@@ -298,7 +303,9 @@
       return;
     }
 
-    if (data.message && activeChannel?.state?.messages) {
+    if (data.message && activeChannel) {
+      if (!activeChannel.state) activeChannel.state = { messages: [] };
+      if (!Array.isArray(activeChannel.state.messages)) activeChannel.state.messages = [];
       const incoming = data.message;
       if (!activeChannel.state.messages.some(m => m.id === incoming.id)) {
         activeChannel.state.messages.push(incoming);
@@ -514,12 +521,95 @@
         syncActiveChannelMessages();
       }
     });
+
+    client.on('user.presence.changed', () => {
+      const pane = getActiveCommunityPane();
+      const cntEl = pane?.querySelector('#stream-online-count');
+      if (cntEl && activeChannel) {
+        cntEl.textContent = `${activeChannel.state?.watcher_count || 1} active`;
+      }
+    });
+
+    client.on('typing.start', e => {
+      if (e.user?.id !== currentUser?.id && activeChannel && (e.channel_id === activeChannel.id || e.cid === activeChannel.cid)) {
+        const pane = getActiveCommunityPane();
+        const box = pane?.querySelector('#stream-typing-box');
+        if (box) box.textContent = `✍️ ${escapeHtml(e.user?.name || 'Someone')} is typing in this group...`;
+      }
+    });
+
+    client.on('typing.stop', e => {
+      if (e.user?.id !== currentUser?.id && activeChannel && (e.channel_id === activeChannel.id || e.cid === activeChannel.cid)) {
+        const pane = getActiveCommunityPane();
+        const box = pane?.querySelector('#stream-typing-box');
+        if (box) box.textContent = '';
+      }
+    });
   }
 
   function stopPeriodicSync() {
     if (syncIntervalId) {
       clearInterval(syncIntervalId);
       syncIntervalId = null;
+    }
+  }
+
+  function scrollBottom(container) {
+    try {
+      if (container) {
+        const list = container.querySelector('#stream-msg-list');
+        if (list) {
+          list.scrollTop = list.scrollHeight;
+        }
+      }
+      const allLists = document.querySelectorAll('#stream-msg-list');
+      allLists.forEach(l => {
+        l.scrollTop = l.scrollHeight;
+      });
+    } catch (_) {}
+  }
+
+  function updateReplyBar(container) {
+    try {
+      const html = renderReplyBarHtml();
+      const wrappers = document.querySelectorAll('#stream-reply-bar-wrapper');
+      wrappers.forEach(w => {
+        w.innerHTML = html;
+      });
+      if (container) {
+        const localWrapper = container.querySelector('#stream-reply-bar-wrapper');
+        if (localWrapper) localWrapper.innerHTML = html;
+      }
+    } catch (_) {}
+  }
+
+  function openMobileFullscreen(container) {
+    isMobileChatOpen = true;
+    if (typeof document !== 'undefined') {
+      document.body.classList.add('stream-body-fullscreen-lock');
+    }
+    const targetPane = container || getActiveCommunityPane();
+    if (targetPane) {
+      renderUI(targetPane);
+      const list = targetPane.querySelector('#stream-msg-list');
+      if (list) {
+        list.scrollTop = list.scrollHeight;
+      }
+      const input = targetPane.querySelector('#stream-msg-input');
+      if (input) {
+        setTimeout(() => { try { input.focus(); } catch (_) {} }, 250);
+      }
+    }
+  }
+
+  function exitMobileFullscreen() {
+    isMobileChatOpen = false;
+    if (typeof document !== 'undefined') {
+      document.body.classList.remove('stream-body-fullscreen-lock');
+    }
+    const activePane = getActiveCommunityPane();
+    if (activePane && !activePane.hasAttribute('hidden') && activePane.style.display !== 'none') {
+      renderUI(activePane);
     }
   }
 
@@ -1730,15 +1820,6 @@
     `;
   }
 
-  function updateReplyBar(targetPane) {
-    const pane = targetPane || getActiveCommunityPane();
-    if (!pane) return;
-    const replyWrapper = pane.querySelector('#stream-reply-bar-wrapper');
-    if (replyWrapper) {
-      replyWrapper.innerHTML = renderReplyBarHtml();
-    }
-  }
-
   function renderPinnedBarHtml(pinnedMessages, isAdmin) {
     if (!pinnedMessages || !pinnedMessages.length) return '';
     const latestPin = pinnedMessages[pinnedMessages.length - 1];
@@ -1767,50 +1848,57 @@
   }
 
   function renderPinnedBarAndList(targetPane) {
-    const panes = targetPane ? [targetPane] : getAllCommunityPanes();
-    const messages = (activeChannel?.state?.messages || []).filter(m => !m.deleted_at);
-    const pinnedMessages = messages.filter(m => m.pinned || m.is_pinned || Boolean(m.pinned_at));
-    const isAdmin = Boolean(currentUser?.role === 'admin' || (typeof AppState !== 'undefined' && AppState.adminLoggedIn));
+    try {
+      const panes = targetPane ? [targetPane] : getAllCommunityPanes();
+      const messages = (activeChannel?.state?.messages || []).filter(m => !m.deleted_at);
+      const pinnedMessages = messages.filter(m => m.pinned || m.is_pinned || Boolean(m.pinned_at));
+      const isAdmin = Boolean(currentUser?.role === 'admin' || (typeof AppState !== 'undefined' && AppState.adminLoggedIn));
 
-    if (panes && panes.length > 0) {
-      panes.forEach(pane => {
-        const pinWrapper = pane.querySelector('#stream-pinned-bar-wrapper');
-        if (pinWrapper) {
-          pinWrapper.innerHTML = renderPinnedBarHtml(pinnedMessages, isAdmin);
-        }
-        const list = pane.querySelector('#stream-msg-list');
-        if (list) {
-          list.innerHTML = renderMsgList(messages);
-          list.scrollTop = list.scrollHeight;
-        }
+      const renderedHtml = renderMsgList(messages);
+      const renderedPinsHtml = renderPinnedBarHtml(pinnedMessages, isAdmin);
+
+      if (panes && panes.length > 0) {
+        panes.forEach(pane => {
+          const pinWrapper = pane.querySelector('#stream-pinned-bar-wrapper');
+          if (pinWrapper) {
+            pinWrapper.innerHTML = renderedPinsHtml;
+          }
+          const list = pane.querySelector('#stream-msg-list');
+          if (list) {
+            list.innerHTML = renderedHtml;
+            list.scrollTop = list.scrollHeight;
+          }
+        });
+      }
+
+      // Direct universal update across all mounted message lists in document
+      const msgLists = document.querySelectorAll('#stream-msg-list');
+      msgLists.forEach(list => {
+        list.innerHTML = renderedHtml;
+        list.scrollTop = list.scrollHeight;
       });
-    }
 
-    // Direct universal update across all mounted message lists in document
-    const msgLists = document.querySelectorAll('#stream-msg-list');
-    msgLists.forEach(list => {
-      list.innerHTML = renderMsgList(messages);
-      list.scrollTop = list.scrollHeight;
-    });
-
-    const pinWrappers = document.querySelectorAll('#stream-pinned-bar-wrapper');
-    pinWrappers.forEach(pinWrapper => {
-      pinWrapper.innerHTML = renderPinnedBarHtml(pinnedMessages, isAdmin);
-    });
-
-    // Update Media Gallery if media view is active
-    if (activeChatViewMode === 'media') {
-      const activeMeta = CHANNEL_IDENTITIES[activeChannelId] || { shortName: 'Class Forum' };
-      const mediaList = getMediaAttachmentsFromMessages(messages);
-      document.querySelectorAll('.stream-media-gallery-wrap').forEach(mediaWrap => {
-        mediaWrap.outerHTML = renderMediaGalleryHtml(mediaList, activeMeta);
+      const pinWrappers = document.querySelectorAll('#stream-pinned-bar-wrapper');
+      pinWrappers.forEach(pinWrapper => {
+        pinWrapper.innerHTML = renderedPinsHtml;
       });
-    }
 
-    // Render Page 1 PDF thumbnails lazily across all wrappers
-    document.querySelectorAll('.stream-chat-wrapper').forEach(wrap => {
-      renderPdfPage1Thumbnails(wrap);
-    });
+      // Update Media Gallery if media view is active
+      if (activeChatViewMode === 'media') {
+        const activeMeta = CHANNEL_IDENTITIES[activeChannelId] || { shortName: 'Class Forum' };
+        const mediaList = getMediaAttachmentsFromMessages(messages);
+        document.querySelectorAll('.stream-media-gallery-wrap').forEach(mediaWrap => {
+          mediaWrap.outerHTML = renderMediaGalleryHtml(mediaList, activeMeta);
+        });
+      }
+
+      // Render Page 1 PDF thumbnails lazily across all wrappers
+      document.querySelectorAll('.stream-chat-wrapper').forEach(wrap => {
+        renderPdfPage1Thumbnails(wrap);
+      });
+    } catch (err) {
+      console.warn('[StreamChat renderPinnedBarAndList warning]', err);
+    }
   }
 
   function renderMobileLaunchCardHtml(activeMeta, onlineCount, isAdmin) {
@@ -2127,62 +2215,7 @@
     renderPdfPage1Thumbnails(container);
   }
 
-  function setupRealtimeListeners() {
-    if (!client || isListening) return;
-    isListening = true;
 
-    const eventTypes = [
-      'message.new',
-      'message.updated',
-      'message.deleted',
-      'channel.updated',
-      'channel.truncated',
-      'user.banned',
-      'user.unbanned',
-      'notification.message_new',
-      'notification.channel_truncate'
-    ];
-
-    eventTypes.forEach(evtType => {
-      client.on(evtType, event => {
-        handleMsgEvent(evtType, event);
-      });
-    });
-
-    client.on('connection.recovered', () => {
-      syncActiveChannelMessages();
-    });
-
-    client.on('connection.changed', e => {
-      if (e?.online) {
-        syncActiveChannelMessages();
-      }
-    });
-
-    client.on('user.presence.changed', () => {
-      const pane = getActiveCommunityPane();
-      const cntEl = pane?.querySelector('#stream-online-count');
-      if (cntEl && activeChannel) {
-        cntEl.textContent = `${activeChannel.state?.watcher_count || 1} active`;
-      }
-    });
-
-    client.on('typing.start', e => {
-      if (e.user?.id !== currentUser?.id && activeChannel && (e.channel_id === activeChannel.id || e.cid === activeChannel.cid)) {
-        const pane = getActiveCommunityPane();
-        const box = pane?.querySelector('#stream-typing-box');
-        if (box) box.textContent = `✍️ ${escapeHtml(e.user?.name || 'Someone')} is typing in this group...`;
-      }
-    });
-
-    client.on('typing.stop', e => {
-      if (e.user?.id !== currentUser?.id && activeChannel && (e.channel_id === activeChannel.id || e.cid === activeChannel.cid)) {
-        const pane = getActiveCommunityPane();
-        const box = pane?.querySelector('#stream-typing-box');
-        if (box) box.textContent = '';
-      }
-    });
-  }
 
   async function handlePinAction(messageId, pin = true) {
     if (!messageId) return;
@@ -2477,46 +2510,7 @@
       input.focus();
     }
 
-    // Pin / Unpin Action Handler
-    async function handlePinAction(msgId, shouldPin) {
-      const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pragyan_portal_token')) || '';
-      
-      try {
-        const res = await fetch('/api/health?action=stream-pin', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify({ messageId: msgId, pin: shouldPin })
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data.success) {
-          throw new Error(data.error || 'Failed to update pin state on server');
-        }
-      } catch (srvErr) {
-        console.warn('[Pin server note]', srvErr.message);
-        if (client) {
-          if (shouldPin) {
-            try { await client.pinMessage({ id: msgId }); } catch (_) {}
-          } else {
-            try { await client.unpinMessage({ id: msgId }); } catch (_) {}
-          }
-        }
-      }
 
-      // Update local state and refresh
-      if (activeChannel?.state?.messages) {
-        const target = activeChannel.state.messages.find(m => m.id === msgId);
-        if (target) {
-          target.pinned = shouldPin;
-          target.is_pinned = shouldPin;
-          target.pinned_at = shouldPin ? new Date().toISOString() : null;
-        }
-      }
-
-      renderPinnedBarAndList(container);
-    }
 
     // --- DELEGATED CONTAINER CLICK LISTENER ---
     container.addEventListener('click', async e => {

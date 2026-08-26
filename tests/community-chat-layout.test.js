@@ -331,6 +331,17 @@ export function runCommunityChatLayoutTests(assert) {
          chatJs.includes('function stopPeriodicSync()') &&
          chatJs.includes("e.key === 'pragyan_stream_chat_sync'"),
     'T35.97: js/stream-community-chat.js implements module-level setupRealtimeListeners, stopPeriodicSync, and cross-tab storage sync');
+
+  assert(chatJs.includes('function scrollBottom(container)') &&
+         chatJs.includes('function updateReplyBar(') &&
+         chatJs.includes('function openMobileFullscreen(') &&
+         chatJs.includes('function exitMobileFullscreen()'),
+    'T35.98: js/stream-community-chat.js defines scrollBottom, updateReplyBar, openMobileFullscreen, and exitMobileFullscreen helpers');
+
+  assert(chatJs.includes("incomingChId.replace(/^batch-/, '') === activeChannelId.replace(/^batch-/, '')") &&
+         chatJs.includes('renderPinnedBarAndList(targetPane)') &&
+         chatJs.includes('[StreamChat renderPinnedBarAndList warning]'),
+    'T35.99: js/stream-community-chat.js implements prefix-resilient handleIncomingSync and error-safe renderPinnedBarAndList');
 }
 
 
