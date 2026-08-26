@@ -187,14 +187,15 @@
   };
 
   const SLASH_COMMANDS = [
-    { cmd: '/quest', usage: '/quest <question>', label: 'Ask Question / Doubt', desc: 'Highlight question in vibrant indigo card for mentors & classmates', icon: '❓', forStudents: true },
-    { cmd: '/question', usage: '/question <question>', label: 'Ask Question / Doubt', desc: 'Highlight question in vibrant indigo card for mentors & classmates', icon: '💡', forStudents: true },
-    { cmd: '/hg', usage: '/hg <message>', label: 'Highlight Text', desc: 'Broadcast highlighted announcement in glowing gold callout banner', icon: '⭐', adminOnly: true },
-    { cmd: '/highlight', usage: '/highlight <message>', label: 'Highlight Text', desc: 'Broadcast highlighted announcement in glowing gold callout banner', icon: '🌟', adminOnly: true },
+    { cmd: '/question', usage: '/question <question>', label: 'Ask Question / Doubt', desc: 'Post question in vibrant indigo card for mentors & classmates', icon: '❓', studentOnly: true },
+    { cmd: '/quest', usage: '/quest <question>', label: 'Ask Question / Doubt', desc: 'Post question in vibrant indigo card for mentors & classmates', icon: '💡', studentOnly: true },
+    { cmd: '/ask', usage: '/ask <question>', label: 'Ask Question / Doubt', desc: 'Post question in vibrant indigo card for mentors & classmates', icon: '❓', studentOnly: true },
+    { cmd: '/hg', usage: '/hg <message>', label: 'Highlight Announcement', desc: 'Broadcast highlighted announcement in glowing gold callout banner', icon: '⭐', adminOnly: true },
+    { cmd: '/highlight', usage: '/highlight <message>', label: 'Highlight Announcement', desc: 'Broadcast highlighted announcement in glowing gold callout banner', icon: '🌟', adminOnly: true },
     { cmd: '/pin', usage: '/pin <message>', label: 'Post & Pin Message', desc: 'Send message and immediately pin it to the top of group', icon: '📌', adminOnly: true },
     { cmd: '/notice', usage: '/notice <message>', label: 'Official Notice', desc: 'Post as an official class notice announcement', icon: '📢', adminOnly: true },
     { cmd: '/clear', usage: '/clear', label: 'Clear Group Chat', desc: 'Prompt to purge entire message history for this class', icon: '🧹', adminOnly: true },
-    { cmd: '/help', usage: '/help', label: 'Show Commands', desc: 'View list of available slash commands and shortcuts', icon: '📖', forStudents: true }
+    { cmd: '/help', usage: '/help', label: 'Show Commands', desc: 'View list of available slash commands and shortcuts', icon: '📖', forStudents: true, forAdmins: true }
   ];
 
   function escapeHtml(s) {
@@ -1265,9 +1266,9 @@
   function showHelpModal() {
     const isAdminUser = currentUser?.role === 'admin';
     if (isAdminUser) {
-      alert('✨ Available Admin & Class Commands:\n\n• ↩️ Reply button — Reply to any student or teacher message with quote reference\n• 📎 Paperclip icon — Upload PDF notes & study images (up to 20 MB)\n• /quest <question> — Ask highlighted question / doubt in indigo card\n• /hg <text> — Broadcast highlighted announcement in gold callout card\n• /pin <text> — Post and pin announcement\n• /notice <text> — Broadcast class notice\n• /clear — Clear group message history\n• @<name> — Mention specific student\n• /help — Show this help menu');
+      alert('✨ Available Admin & Faculty Broadcast Commands:\n\n• ↩️ Reply button — Reply to any student message with quote reference\n• 📎 Paperclip icon — Upload PDF notes & study images (up to 20 MB)\n• ⭐ Quick Highlight or /hg <text> — Broadcast highlighted announcement in gold callout card\n• /pin <text> — Post and immediately pin announcement\n• /notice <text> — Broadcast official class notice\n• /clear — Clear group message history\n• @<name> — Mention specific student\n• /help — Show this help menu');
     } else {
-      alert('✨ Available Student Commands:\n\n• ↩️ Reply button — Reply directly to classmate or faculty message\n• 📁 Class Media tab — Browse & download all PDFs, chapter notes & diagrams\n• /quest <question> — Ask question / doubt (highlighted in indigo card for mentors & classmates)\n• @<name> — Mention a classmate or student\n• /help — Show commands');
+      alert('✨ Available Student Commands:\n\n• ❓ Question button or /question <doubt> — Ask academic doubt / question (highlighted in indigo card for mentors & classmates)\n• ↩️ Reply button — Reply directly to classmate or faculty message\n• 📁 Class Media tab — Browse & download all PDFs, chapter notes & diagrams\n• @<name> — Mention a classmate or student\n• /help — Show commands');
     }
   }
 
@@ -1532,11 +1533,13 @@
             <button type="button" id="btn-quick-hg" title="Highlight announcement (/hg)" style="background: #FEF3C7; color: #D97706; border: 1.5px solid #FCD34D; width: 38px; height: 38px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 1rem; cursor: pointer; flex-shrink: 0;" aria-label="Toggle Highlight prefix">
               ⭐
             </button>
-          ` : ''}
-          <button type="button" id="btn-quick-quest" title="Ask academic question / doubt (/quest)" style="background: #EEF2FF; color: #4F46E5; border: 1.5px solid #C7D2FE; width: 38px; height: 38px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 1rem; cursor: pointer; flex-shrink: 0;" aria-label="Ask Question prefix">
-            ❓
-          </button>
-          <input type="text" id="stream-msg-input" class="portal-input" placeholder="${isAdmin ? 'Type message, @mention, /hg, /quest, /pin, or attach PDF notes…' : `Message ${escapeHtml(activeMeta.shortName)} (use /quest for doubts)…`}" style="flex: 1; border-radius: 8px; font-size: 16px; min-height: 40px; padding: 0.45rem 0.85rem; border: 1.5px solid var(--border-sand, #CBD5E1); background: #FAF9F6; transition: border-color 0.2s;" autocomplete="off" aria-label="Chat message">
+          ` : `
+            <!-- Student Quick Question Button -->
+            <button type="button" id="btn-quick-quest" title="Ask academic question / doubt (/question)" style="background: #EEF2FF; color: #4F46E5; border: 1.5px solid #C7D2FE; width: 38px; height: 38px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 1rem; cursor: pointer; flex-shrink: 0;" aria-label="Ask Question prefix">
+              ❓
+            </button>
+          `}
+          <input type="text" id="stream-msg-input" class="portal-input" placeholder="${isAdmin ? 'Type announcement, @mention, /hg, /pin, /notice, or attach notes…' : `Message ${escapeHtml(activeMeta.shortName)} (use /question for doubts)…`}" style="flex: 1; border-radius: 8px; font-size: 16px; min-height: 40px; padding: 0.45rem 0.85rem; border: 1.5px solid var(--border-sand, #CBD5E1); background: #FAF9F6; transition: border-color 0.2s;" autocomplete="off" aria-label="Chat message">
           <button type="submit" class="btn btn-emerald" id="btn-stream-send" style="padding: 0.45rem 1.15rem; font-weight: 800; border-radius: 8px; display: inline-flex; align-items: center; gap: 0.35rem; min-height: 40px; font-size: 0.85rem; flex-shrink: 0; box-shadow: 0 2px 8px rgba(6,78,59,0.2);">
             <span>Send</span> <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
           </button>
@@ -1683,7 +1686,7 @@
       if (!autoBox) return;
       const q = filterQuery.toLowerCase().trim();
       const isAdminUser = currentUser?.role === 'admin';
-      const availableCmds = SLASH_COMMANDS.filter(c => isAdminUser ? true : c.forStudents);
+      const availableCmds = SLASH_COMMANDS.filter(c => isAdminUser ? !c.studentOnly : !c.adminOnly);
       const filtered = availableCmds.filter(c => c.cmd.toLowerCase().includes(q) || c.label.toLowerCase().includes(q));
       if (!filtered.length) { hideAutocomplete(); return; }
 
@@ -1693,7 +1696,7 @@
 
       autoBox.innerHTML = `
         <div style="padding: 0.4rem 0.85rem; font-size: 0.74rem; font-weight: 800; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #F1F5F9; background: #FAF9F6;">
-          ⚡ ${isAdminUser ? 'Admin & Class Commands' : 'Class Commands'}
+          ⚡ ${isAdminUser ? 'Admin & Faculty Broadcast Commands' : 'Student Question & Command Shortcuts'}
         </div>
         ${filtered.map((c, i) => `
           <div class="auto-item ${i === autoSelectedIndex ? 'active' : ''}" data-cmd="${escapeHtml(c.cmd)}" style="display: flex; align-items: center; justify-content: space-between; padding: 0.55rem 0.85rem; cursor: pointer; background: ${i === autoSelectedIndex ? '#ECFDF5' : '#FFFFFF'}; border-bottom: 1px solid #F8FAFC; transition: background 0.1s;">
@@ -1870,17 +1873,19 @@
         return;
       }
 
-      // 5. Quick Question Prefix (/quest)
+      // 5. Quick Question Prefix (/question) - Students Only
       const quickQuestBtn = e.target.closest('#btn-quick-quest');
       if (quickQuestBtn) {
         e.preventDefault();
         const input = container.querySelector('#stream-msg-input');
         if (input) {
-          if (input.value.startsWith('/quest ')) {
+          if (input.value.startsWith('/question ')) {
+            input.value = input.value.replace(/^\/question\s*/i, '');
+          } else if (input.value.startsWith('/quest ')) {
             input.value = input.value.replace(/^\/quest\s*/i, '');
           } else {
-            const cleaned = input.value.replace(/^\/(hg|highlight|pin|notice|question)\s*/i, '');
-            input.value = `/quest ${cleaned.trim()}`;
+            const cleaned = input.value.replace(/^\/(hg|highlight|pin|notice|question|quest|ask)\s*/i, '');
+            input.value = `/question ${cleaned.trim()}`;
           }
           hideAutocomplete();
           input.focus();
@@ -2016,8 +2021,8 @@
         if (inputEl) {
           const meta = CHANNEL_IDENTITIES[activeChannelId] || {};
           inputEl.placeholder = (currentUser?.role === 'admin')
-            ? 'Type message, @mention, /hg, /quest, /pin, or attach PDF notes…'
-            : `Message ${escapeHtml(meta.shortName || 'class')} (use /quest for doubts)…`;
+            ? 'Type announcement, @mention, /hg, /pin, /notice, or attach notes…'
+            : `Message ${escapeHtml(meta.shortName || 'class')} (use /question for doubts)…`;
         }
         return;
       }
@@ -2482,8 +2487,8 @@
             updateReplyBar(container);
             const meta = CHANNEL_IDENTITIES[activeChannelId] || {};
             input.placeholder = (currentUser?.role === 'admin')
-              ? 'Type message, @mention, /hg, /quest, /pin, or attach PDF notes…'
-              : `Message ${escapeHtml(meta.shortName || 'class')} (use /quest for doubts)…`;
+              ? 'Type announcement, @mention, /hg, /pin, /notice, or attach notes…'
+              : `Message ${escapeHtml(meta.shortName || 'class')} (use /question for doubts)…`;
           }
           return;
         }
