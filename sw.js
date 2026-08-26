@@ -17,7 +17,7 @@
 //      with { ignoreSearch: true }.
 // ============================================================================
 
-const CACHE_NAME = 'pragyan-portal-v90.0.71a60c00';
+const CACHE_NAME = 'pragyan-portal-v90.0.b54b43fa';
 
 // Static assets to pre-cache for instant loads
 const PRECACHE_ASSETS = [
@@ -26,20 +26,20 @@ const PRECACHE_ASSETS = [
   './pay.html',
   './features.html',
   './manifest.json',
-  './css/variables.css?v=90.0.71a60c00',
-  './css/main.css?v=90.0.71a60c00',
-  './css/components.css?v=90.0.71a60c00',
-  './css/animations.css?v=90.0.71a60c00',
-  './css/portal.css?v=90.0.71a60c00',
-  './js/stream-community-chat.js?v=90.0.71a60c00',
-  './js/blog-markdown.js?v=90.0.71a60c00',
-  './js/push-client.js?v=90.0.71a60c00',
-  './js/config.js?v=90.0.71a60c00',
-  './js/academic-config.js?v=90.0.71a60c00',
-  './js/supabase-sync.js?v=90.0.71a60c00',
-  './js/chat.js?v=90.0.71a60c00',
-  './js/app.js?v=90.0.71a60c00',
-  './js/portal.js?v=90.0.71a60c00',
+  './css/variables.css?v=90.0.b54b43fa',
+  './css/main.css?v=90.0.b54b43fa',
+  './css/components.css?v=90.0.b54b43fa',
+  './css/animations.css?v=90.0.b54b43fa',
+  './css/portal.css?v=90.0.b54b43fa',
+  './js/stream-community-chat.js?v=90.0.b54b43fa',
+  './js/blog-markdown.js?v=90.0.b54b43fa',
+  './js/push-client.js?v=90.0.b54b43fa',
+  './js/config.js?v=90.0.b54b43fa',
+  './js/academic-config.js?v=90.0.b54b43fa',
+  './js/supabase-sync.js?v=90.0.b54b43fa',
+  './js/chat.js?v=90.0.b54b43fa',
+  './js/app.js?v=90.0.b54b43fa',
+  './js/portal.js?v=90.0.b54b43fa',
   './assets/images/favicon.ico',
   './assets/images/logo.png',
   './assets/images/apple-touch-icon.png',
