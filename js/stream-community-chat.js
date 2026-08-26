@@ -193,15 +193,12 @@
   const SLASH_COMMANDS = [
     { cmd: '/imp', usage: '/imp <message>', label: 'Very Important Announcement', desc: 'Broadcast high-priority urgent announcement in red alert card', icon: '🚨', adminOnly: true },
     { cmd: '/hg', usage: '/hg <message>', label: 'Highlight Announcement', desc: 'Broadcast highlighted announcement in glowing gold callout banner', icon: '⭐', adminOnly: true },
-    { cmd: '/highlight', usage: '/highlight <message>', label: 'Highlight Announcement', desc: 'Broadcast highlighted announcement in glowing gold callout banner', icon: '🌟', adminOnly: true },
     { cmd: '/mute', usage: '/mute @<student> or /mute <roll>', label: 'Mute Student Messages', desc: 'Prevent student from sending messages until unmuted', icon: '🔇', adminOnly: true },
     { cmd: '/unmute', usage: '/unmute @<student> or /unmute <roll>', label: 'Unmute Student Messages', desc: 'Restore student permission to send messages in this class', icon: '🔊', adminOnly: true },
     { cmd: '/pin', usage: '/pin <message>', label: 'Post & Pin Message', desc: 'Send message and immediately pin it to the top of group', icon: '📌', adminOnly: true },
     { cmd: '/notice', usage: '/notice <message>', label: 'Official Notice', desc: 'Post as an official class notice announcement', icon: '📢', adminOnly: true },
     { cmd: '/clear', usage: '/clear', label: 'Clear Group Chat', desc: 'Prompt to purge entire message history for this class', icon: '🧹', adminOnly: true },
-    { cmd: '/question', usage: '/question <question>', label: 'Ask Question / Doubt', desc: 'Post question in vibrant indigo card for mentors & classmates', icon: '❓', studentOnly: true },
-    { cmd: '/quest', usage: '/quest <question>', label: 'Ask Question / Doubt', desc: 'Post question in vibrant indigo card for mentors & classmates', icon: '💡', studentOnly: true },
-    { cmd: '/ask', usage: '/ask <question>', label: 'Ask Question / Doubt', desc: 'Post question in vibrant indigo card for mentors & classmates', icon: '❓', studentOnly: true },
+    { cmd: '/quest', usage: '/quest <question>', label: 'Ask Question / Doubt', desc: 'Post question in vibrant indigo card for mentors & classmates', icon: '❓', studentOnly: true },
     { cmd: '/help', usage: '/help', label: 'Show Commands', desc: 'View list of available slash commands and shortcuts', icon: '📖', forStudents: true, forAdmins: true }
   ];
 
@@ -1649,7 +1646,7 @@
     if (isAdminUser) {
       alert('✨ Available Admin & Faculty Broadcast Commands:\n\n• 🚨 /imp <text> — Broadcast high-priority very important announcement in red alert banner\n• ⭐ /hg <text> — Broadcast highlighted announcement in gold callout banner\n• 🔇 /mute @<student> — Mute student from sending messages in this class\n• 🔊 /unmute @<student> — Unmute student and restore message permissions\n• 📌 /pin <text> — Post and immediately pin announcement to the top\n• 📢 /notice <text> — Broadcast official class notice\n• 📎 Paperclip icon — Upload PDF notes & study images (up to 20 MB)\n• ↩️ Reply button — Reply to any student message with quote reference\n• 🧹 /clear — Clear group message history\n• @<name> — Mention / tag specific student\n• /help — Show this help menu');
     } else {
-      alert('✨ Available Student Commands:\n\n• ❓ Question button or /question <doubt> — Ask academic doubt / question (highlighted in indigo card for mentors & classmates)\n• ↩️ Reply button — Reply directly to classmate or faculty message\n• 📁 Class Media tab — Browse & download all PDFs, chapter notes & diagrams\n• @<name> — Mention a classmate or student\n• /help — Show commands');
+      alert('✨ Available Student Commands:\n\n• ❓ Question button or /quest <doubt> — Ask academic doubt / question (highlighted in indigo card for mentors & classmates)\n• ↩️ Reply button — Reply directly to classmate or faculty message\n• 📁 Class Media tab — Browse & download all PDFs, chapter notes & diagrams\n• @<name> — Mention a classmate or student\n• /help — Show commands');
     }
   }
 
@@ -2040,11 +2037,11 @@
             </button>
           ` : `
             <!-- Student Quick Question Button -->
-            <button type="button" id="btn-quick-quest" ${isCurrentUserMuted() ? 'disabled' : ''} title="Ask academic question / doubt (/question)" style="background: ${isCurrentUserMuted() ? '#F1F5F9' : '#EEF2FF'}; color: ${isCurrentUserMuted() ? '#94A3B8' : '#4F46E5'}; border: 1.5px solid ${isCurrentUserMuted() ? '#CBD5E1' : '#C7D2FE'}; width: 38px; height: 38px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 1rem; cursor: ${isCurrentUserMuted() ? 'not-allowed' : 'pointer'}; flex-shrink: 0;" aria-label="Ask Question prefix">
+            <button type="button" id="btn-quick-quest" ${isCurrentUserMuted() ? 'disabled' : ''} title="Ask academic question / doubt (/quest)" style="background: ${isCurrentUserMuted() ? '#F1F5F9' : '#EEF2FF'}; color: ${isCurrentUserMuted() ? '#94A3B8' : '#4F46E5'}; border: 1.5px solid ${isCurrentUserMuted() ? '#CBD5E1' : '#C7D2FE'}; width: 38px; height: 38px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 1rem; cursor: ${isCurrentUserMuted() ? 'not-allowed' : 'pointer'}; flex-shrink: 0;" aria-label="Ask Question prefix">
               ❓
             </button>
           `}
-          <input type="text" id="stream-msg-input" class="portal-input" ${isCurrentUserMuted() ? 'disabled' : ''} placeholder="${isCurrentUserMuted() ? '🔒 You have been muted by faculty in this class' : (isAdmin ? 'Type announcement, @mention, /hg, /imp, /mute, /notice, or attach notes…' : `Message ${escapeHtml(activeMeta.shortName)} (use /question for doubts)…`)}" style="flex: 1; border-radius: 8px; font-size: 16px; min-height: 40px; padding: 0.45rem 0.85rem; border: 1.5px solid var(--border-sand, #CBD5E1); background: ${isCurrentUserMuted() ? '#F1F5F9' : '#FAF9F6'}; color: ${isCurrentUserMuted() ? '#94A3B8' : '#1E293B'}; cursor: ${isCurrentUserMuted() ? 'not-allowed' : 'text'}; transition: border-color 0.2s;" autocomplete="off" aria-label="Chat message">
+          <input type="text" id="stream-msg-input" class="portal-input" ${isCurrentUserMuted() ? 'disabled' : ''} placeholder="${isCurrentUserMuted() ? '🔒 You have been muted by faculty in this class' : (isAdmin ? 'Type announcement, @mention, /hg, /imp, /mute, /notice, or attach notes…' : `Message ${escapeHtml(activeMeta.shortName)} (use /quest for doubts)…`)}" style="flex: 1; border-radius: 8px; font-size: 16px; min-height: 40px; padding: 0.45rem 0.85rem; border: 1.5px solid var(--border-sand, #CBD5E1); background: ${isCurrentUserMuted() ? '#F1F5F9' : '#FAF9F6'}; color: ${isCurrentUserMuted() ? '#94A3B8' : '#1E293B'}; cursor: ${isCurrentUserMuted() ? 'not-allowed' : 'text'}; transition: border-color 0.2s;" autocomplete="off" aria-label="Chat message">
           <button type="submit" class="btn btn-emerald" id="btn-stream-send" ${isCurrentUserMuted() ? 'disabled' : ''} style="padding: 0.45rem 1.15rem; font-weight: 800; border-radius: 8px; display: inline-flex; align-items: center; gap: 0.35rem; min-height: 40px; font-size: 0.85rem; flex-shrink: 0; box-shadow: 0 2px 8px rgba(6,78,59,0.2); opacity: ${isCurrentUserMuted() ? '0.5' : '1'}; cursor: ${isCurrentUserMuted() ? 'not-allowed' : 'pointer'};">
             <span>Send</span> <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
           </button>
@@ -2530,19 +2527,17 @@
         return;
       }
 
-      // 5. Quick Question Prefix (/question) - Students Only
+      // 5. Quick Question Prefix (/quest) - Students Only
       const quickQuestBtn = e.target.closest('#btn-quick-quest');
       if (quickQuestBtn) {
         e.preventDefault();
         const input = container.querySelector('#stream-msg-input');
         if (input) {
-          if (input.value.startsWith('/question ')) {
-            input.value = input.value.replace(/^\/question\s*/i, '');
-          } else if (input.value.startsWith('/quest ')) {
+          if (input.value.startsWith('/quest ')) {
             input.value = input.value.replace(/^\/quest\s*/i, '');
           } else {
             const cleaned = input.value.replace(/^\/(hg|highlight|pin|notice|question|quest|ask)\s*/i, '');
-            input.value = `/question ${cleaned.trim()}`;
+            input.value = `/quest ${cleaned.trim()}`;
           }
           hideAutocomplete();
           input.focus();
@@ -2679,7 +2674,7 @@
           const meta = CHANNEL_IDENTITIES[activeChannelId] || {};
           inputEl.placeholder = (currentUser?.role === 'admin')
             ? 'Type announcement, @mention, /hg, /pin, /notice, or attach notes…'
-            : `Message ${escapeHtml(meta.shortName || 'class')} (use /question for doubts)…`;
+            : `Message ${escapeHtml(meta.shortName || 'class')} (use /quest for doubts)…`;
         }
         return;
       }
@@ -2940,7 +2935,7 @@
       const hasCustomFormatting = isImportant || isQuestion || isHighlight || isPinCommand || isNotice;
 
       if (hasCustomFormatting && !cleanBody) {
-        alert(`⚠️ Please type your message text after the slash command (e.g. ${isImportant ? '/imp Exam postponed to Monday' : (isHighlight ? '/hg Live lecture at 5 PM' : '/question What is thermodynamics?')})`);
+        alert(`⚠️ Please type your message text after the slash command (e.g. ${isImportant ? '/imp Exam postponed to Monday' : (isHighlight ? '/hg Live lecture at 5 PM' : '/quest What is thermodynamics?')})`);
         input.focus();
         return;
       }
@@ -3199,7 +3194,7 @@
             const meta = CHANNEL_IDENTITIES[activeChannelId] || {};
             input.placeholder = (currentUser?.role === 'admin')
               ? 'Type announcement, @mention, /hg, /pin, /notice, or attach notes…'
-              : `Message ${escapeHtml(meta.shortName || 'class')} (use /question for doubts)…`;
+              : `Message ${escapeHtml(meta.shortName || 'class')} (use /quest for doubts)…`;
           }
           return;
         }

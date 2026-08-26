@@ -136,8 +136,8 @@ export function runCommunityChatLayoutTests(assert) {
     'T35.48: js/stream-community-chat.js optimistically fades and removes deleted message DOM elements immediately on confirmed delete');
 
   // --- 12. Student-Only Question Slash Commands & Composer Buttons Suite ---
-  assert(chatJs.includes("cmd: '/question'") && chatJs.includes('studentOnly: true') && chatJs.includes('!c.studentOnly : !c.adminOnly'),
-    'T35.49: js/stream-community-chat.js scopes /question and /quest commands strictly for students and hides question shortcuts from teachers/admins');
+  assert(chatJs.includes("cmd: '/quest'") && !chatJs.includes("cmd: '/question'") && chatJs.includes('studentOnly: true') && chatJs.includes('!c.studentOnly : !c.adminOnly'),
+    'T35.49: js/stream-community-chat.js scopes /quest command strictly for students and deduplicates /question from command list');
   assert(chatJs.includes('btn-quick-quest') && chatJs.includes('<!-- Student Quick Question Button -->') && chatJs.includes('!isAdmin'),
     'T35.50: js/stream-community-chat.js renders #btn-quick-quest button strictly for students while reserving moderation and highlight tools for teachers');
 
@@ -315,6 +315,12 @@ export function runCommunityChatLayoutTests(assert) {
          chatJs.includes('panes.add(adminPane)') &&
          chatJs.includes('panes.add(studentPane)'),
     'T35.94: js/portal.js and stream-community-chat.js ensure seamless re-activation sync across both student and admin community panes');
+
+  assert(chatJs.includes("cmd: '/quest'") &&
+         !chatJs.includes("cmd: '/question'") &&
+         chatJs.includes("input.value = `/quest ${cleaned.trim()}`;") &&
+         chatJs.includes("use /quest for doubts"),
+    'T35.95: js/stream-community-chat.js standardizes exclusively on /quest for student questions without duplicate /question entries');
 }
 
 
