@@ -321,6 +321,11 @@ export function runCommunityChatLayoutTests(assert) {
          chatJs.includes("input.value = `/quest ${cleaned.trim()}`;") &&
          chatJs.includes("use /quest for doubts"),
     'T35.95: js/stream-community-chat.js standardizes exclusively on /quest for student questions without duplicate /question entries');
+
+  assert(chatJs.includes("document.querySelectorAll('#stream-msg-list')") &&
+         chatJs.includes("document.querySelectorAll('#stream-pinned-bar-wrapper')") &&
+         chatJs.includes("evtChId.replace(/^batch-/, '') === activeChannel.id.replace(/^batch-/, '')"),
+    'T35.96: js/stream-community-chat.js executes direct universal DOM rendering and normalized channel matching for instant live updates');
 }
 
 

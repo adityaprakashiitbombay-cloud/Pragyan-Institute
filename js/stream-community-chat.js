@@ -388,9 +388,12 @@
 
     // 2. If it matches our active channel (or no channel specified), process for active UI
     if (!activeChannel) return;
-    const isMatch = !evtChId || evtChId === activeChannel.id || 
+    const isMatch = !evtChId || 
+                    evtChId === activeChannel.id || 
+                    evtChId === activeChannelId ||
+                    evtChId.replace(/^batch-/, '') === activeChannel.id.replace(/^batch-/, '') ||
                     (event.cid && activeChannel.cid && event.cid === activeChannel.cid) ||
-                    (event.channel?.id === activeChannel.id);
+                    (event.channel?.id && (event.channel.id === activeChannel.id || event.channel.id.replace(/^batch-/, '') === activeChannel.id.replace(/^batch-/, '')));
     if (!isMatch) return;
 
     if (!activeChannel.state) activeChannel.state = { messages: [] };
@@ -473,7 +476,8 @@
     try {
       const queryRes = await activeChannel.query({
         messages: { limit: 100 },
-        watchers: { limit: 100 }
+        watchers: { limit: 100 },
+        state: true
       });
       if (queryRes?.messages && activeChannel.state) {
         const msgMap = new Map();
@@ -496,7 +500,7 @@
       if (typeof document !== 'undefined' && document.visibilityState === 'visible' && client?.userID && activeChannel) {
         syncActiveChannelMessages();
       }
-    }, 3000);
+    }, 2500);
   }
 
   function resolveStudentBatches() {
@@ -1430,8 +1434,11 @@
       `;
     }
 
+    const myId = currentUser?.id || '';
+    const isUserAdmin = Boolean(currentUser?.role === 'admin' || (typeof AppState !== 'undefined' && AppState.adminLoggedIn));
+
     return messages.map(m => {
-      const isMine = m.user && m.user.id === currentUser.id;
+      const isMine = Boolean(m.user && myId && m.user.id === myId);
       const identity = extractUserBadge(m.user, channelMeta);
       const isFaculty = identity.isFaculty;
       const isStudentSender = !isFaculty && (m.user?.role !== 'admin' && !m.user?.id?.startsWith('admin_'));
@@ -1474,7 +1481,7 @@
           <button type="button" class="btn-reply-msg" data-reply-msg="${escapeHtml(m.id)}" data-reply-author="${escapeHtml(m.user?.name || 'User')}" data-reply-text="${escapeHtml((m.text || '').substring(0, 100))}" style="background: rgba(0,0,0,0.06); border: none; font-size: 0.65rem; color: #475569; cursor: pointer; padding: 2px 5px; border-radius: 4px; font-weight: 700; line-height: 1; display: inline-flex; align-items: center; gap: 0.2rem;" title="Reply to this message" aria-label="Reply to message">
             <i class="fa-solid fa-reply" aria-hidden="true"></i> <span>Reply</span>
           </button>
-          ${currentUser.role === 'admin' ? `
+          ${isUserAdmin ? `
             ${isStudentSender ? `
               <button type="button" class="btn-toggle-mute" data-mute-student="${escapeHtml(m.user?.id || '')}" data-student-name="${escapeHtml(m.user?.name || '')}" data-is-muted="${isTargetMuted ? 'true' : 'false'}" style="background: ${isTargetMuted ? 'rgba(239, 68, 68, 0.15)' : 'rgba(0,0,0,0.06)'}; border: none; font-size: 0.65rem; color: ${isTargetMuted ? '#DC2626' : '#64748B'}; cursor: pointer; padding: 2px 5px; border-radius: 4px; font-weight: 700; line-height: 1; display: inline-flex; align-items: center; gap: 0.2rem;" title="${isTargetMuted ? 'Unmute student messages' : 'Mute student from sending messages'}">
                 <i class="fa-solid ${isTargetMuted ? 'fa-volume-high' : 'fa-volume-xmark'}"></i> <span>${isTargetMuted ? 'Unmute' : 'Mute'}</span>
@@ -1708,37 +1715,48 @@
 
   function renderPinnedBarAndList(targetPane) {
     const panes = targetPane ? [targetPane] : getAllCommunityPanes();
-    if (!panes.length) return;
-
     const messages = (activeChannel?.state?.messages || []).filter(m => !m.deleted_at);
     const pinnedMessages = messages.filter(m => m.pinned || m.is_pinned || Boolean(m.pinned_at));
-    const isAdmin = currentUser?.role === 'admin';
+    const isAdmin = Boolean(currentUser?.role === 'admin' || (typeof AppState !== 'undefined' && AppState.adminLoggedIn));
 
-    panes.forEach(pane => {
-      // 1. Update Pinned Bar Container
-      const pinWrapper = pane.querySelector('#stream-pinned-bar-wrapper');
-      if (pinWrapper) {
-        pinWrapper.innerHTML = renderPinnedBarHtml(pinnedMessages, isAdmin);
-      }
-
-      // 2. Update Messages Feed or Media Gallery
-      if (activeChatViewMode === 'media') {
-        const activeMeta = CHANNEL_IDENTITIES[activeChannelId] || { shortName: 'Class Forum' };
-        const mediaList = getMediaAttachmentsFromMessages(messages);
-        const mediaGalleryContainer = pane.querySelector('.stream-media-gallery-wrap');
-        if (mediaGalleryContainer) {
-          mediaGalleryContainer.outerHTML = renderMediaGalleryHtml(mediaList, activeMeta);
+    if (panes && panes.length > 0) {
+      panes.forEach(pane => {
+        const pinWrapper = pane.querySelector('#stream-pinned-bar-wrapper');
+        if (pinWrapper) {
+          pinWrapper.innerHTML = renderPinnedBarHtml(pinnedMessages, isAdmin);
         }
-      } else {
         const list = pane.querySelector('#stream-msg-list');
         if (list) {
           list.innerHTML = renderMsgList(messages);
-          scrollBottom(pane);
+          list.scrollTop = list.scrollHeight;
         }
-      }
+      });
+    }
 
-      // Render Page 1 PDF thumbnails lazily
-      renderPdfPage1Thumbnails(pane);
+    // Direct universal update across all mounted message lists in document
+    const msgLists = document.querySelectorAll('#stream-msg-list');
+    msgLists.forEach(list => {
+      list.innerHTML = renderMsgList(messages);
+      list.scrollTop = list.scrollHeight;
+    });
+
+    const pinWrappers = document.querySelectorAll('#stream-pinned-bar-wrapper');
+    pinWrappers.forEach(pinWrapper => {
+      pinWrapper.innerHTML = renderPinnedBarHtml(pinnedMessages, isAdmin);
+    });
+
+    // Update Media Gallery if media view is active
+    if (activeChatViewMode === 'media') {
+      const activeMeta = CHANNEL_IDENTITIES[activeChannelId] || { shortName: 'Class Forum' };
+      const mediaList = getMediaAttachmentsFromMessages(messages);
+      document.querySelectorAll('.stream-media-gallery-wrap').forEach(mediaWrap => {
+        mediaWrap.outerHTML = renderMediaGalleryHtml(mediaList, activeMeta);
+      });
+    }
+
+    // Render Page 1 PDF thumbnails lazily across all wrappers
+    document.querySelectorAll('.stream-chat-wrapper').forEach(wrap => {
+      renderPdfPage1Thumbnails(wrap);
     });
   }
 
