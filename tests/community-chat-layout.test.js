@@ -230,6 +230,15 @@ export function runCommunityChatLayoutTests(assert) {
   assert(portalCss.includes('grid-template-columns: repeat(2, 1fr) !important') &&
          portalCss.includes('overscroll-behavior: contain !important'),
     'T35.76: css/portal.css optimizes mobile admin overview stats grid and scroll containment');
+
+  assert(portalJs.includes("overviewStats.classList.add('hidden-stats')") &&
+         portalCss.includes('.admin-stats-grid.hidden-stats') &&
+         portalCss.includes('.tab-pane[hidden]'),
+    'T35.77: js/portal.js and css/portal.css enforce strict tab pane isolation and hiding of overview stats grid on non-student tabs');
+
+  assert(portalJs.includes('contentBody.scrollTop = 0') &&
+         portalJs.includes("btn.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' })"),
+    'T35.78: js/portal.js resets dashboard content scroll on mobile tab switch and scrolls active tab button into view');
 }
 
 

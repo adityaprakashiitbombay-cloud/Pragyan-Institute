@@ -3535,10 +3535,19 @@ function renderStudentDashboard() {
       portalModalCardEl?.classList.remove('community-tab-active');
     }
 
+    // Reset content scroll so switching tabs resets to top
+    const contentBody = studentWrapper?.querySelector('.dashboard-content-body');
+    if (contentBody) {
+      contentBody.scrollTop = 0;
+    }
+
     // Update Tab Button Active States
     document.querySelectorAll('.student-tab-btn').forEach(btn => {
       if (btn.dataset.tab === tabName) {
         btn.classList.add('active');
+        if (typeof btn.scrollIntoView === 'function') {
+          btn.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
+        }
       } else {
         btn.classList.remove('active');
       }
@@ -3548,10 +3557,12 @@ function renderStudentDashboard() {
     document.querySelectorAll('.student-tab-pane').forEach(pane => {
       if (pane.id === `studentTabPane-${tabName}`) {
         pane.classList.add('active');
-        pane.style.display = (tabName === 'community') ? 'flex' : 'block';
+        pane.removeAttribute('hidden');
+        pane.style.setProperty('display', (tabName === 'community') ? 'flex' : 'block', 'important');
       } else {
         pane.classList.remove('active');
-        pane.style.display = 'none';
+        pane.setAttribute('hidden', '');
+        pane.style.setProperty('display', 'none', 'important');
       }
     });
 
@@ -6388,15 +6399,32 @@ function renderStudentDashboard() {
       portalModalCardEl?.classList.remove('community-tab-active');
     }
 
-    // Toggle Overview KPI cards: show only on Students tab
+    // Toggle Overview KPI cards: show strictly on Students tab
     const overviewStats = document.getElementById('adminOverviewStats');
     if (overviewStats) {
-      overviewStats.style.display = (tabName === 'students') ? 'grid' : 'none';
+      if (tabName === 'students') {
+        overviewStats.classList.remove('hidden-stats');
+        overviewStats.removeAttribute('hidden');
+        overviewStats.style.setProperty('display', 'grid', 'important');
+      } else {
+        overviewStats.classList.add('hidden-stats');
+        overviewStats.setAttribute('hidden', '');
+        overviewStats.style.setProperty('display', 'none', 'important');
+      }
+    }
+
+    // Reset content scroll so switching tabs resets to top
+    const contentBody = adminWrapper?.querySelector('.dashboard-content-body');
+    if (contentBody) {
+      contentBody.scrollTop = 0;
     }
 
     document.querySelectorAll('.admin-tab-btn').forEach(btn => {
       if (btn.dataset.tab === tabName) {
         btn.classList.add('active');
+        if (typeof btn.scrollIntoView === 'function') {
+          btn.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
+        }
       } else {
         btn.classList.remove('active');
       }
@@ -6405,10 +6433,12 @@ function renderStudentDashboard() {
     document.querySelectorAll('.admin-tab-pane').forEach(pane => {
       if (pane.id === `adminTabPane-${tabName}`) {
         pane.classList.add('active');
-        pane.style.display = (tabName === 'community') ? 'flex' : 'block';
+        pane.removeAttribute('hidden');
+        pane.style.setProperty('display', (tabName === 'community') ? 'flex' : 'block', 'important');
       } else {
         pane.classList.remove('active');
-        pane.style.display = 'none';
+        pane.setAttribute('hidden', '');
+        pane.style.setProperty('display', 'none', 'important');
       }
     });
 

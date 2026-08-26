@@ -758,7 +758,12 @@
   display: block;
 }
 
-.tab-pane:not(.active) {
+.tab-pane:not(.active),
+.tab-pane[hidden],
+.admin-tab-pane:not(.active),
+.admin-tab-pane[hidden],
+.student-tab-pane:not(.active),
+.student-tab-pane[hidden] {
   display: none !important;
 }
 
@@ -4154,10 +4159,19 @@
 
   /* Admin Overview Stat Cards (Compact 2x2 Grid on Mobile) */
   .admin-stats-grid {
-    display: grid !important;
+    display: grid;
     grid-template-columns: repeat(2, 1fr) !important;
     gap: 0.5rem !important;
     margin-bottom: 0.85rem !important;
+  }
+
+  .admin-stats-grid.hidden-stats,
+  .admin-stats-grid[hidden],
+  #adminOverviewStats[hidden],
+  #adminOverviewStats.hidden-stats,
+  .admin-stats-grid[style*="display: none"],
+  #adminOverviewStats[style*="display: none"] {
+    display: none !important;
   }
 
   .admin-stat-card {
