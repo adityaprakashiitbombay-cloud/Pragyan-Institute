@@ -1283,14 +1283,13 @@
       const isMine = m.user && m.user.id === currentUser.id;
       const identity = extractUserBadge(m.user, channelMeta);
       const isFaculty = identity.isFaculty;
-
+      const isStudentSender = !isFaculty && (m.user?.role !== 'admin' && !m.user?.id?.startsWith('admin_'));
       const isImportant = Boolean(m.is_important) || m.custom_type === 'important' || (m.text && /^\/(imp|important|urgent|alert)\b/i.test(m.text));
-      const isQuestion = Boolean(m.is_question) || m.custom_type === 'question' || (m.text && /^\/(quest|question|doubt|ask|q)\b/i.test(m.text));
+      const isQuestion = isStudentSender && (Boolean(m.is_question) || m.custom_type === 'question' || (m.text && /^\/(quest|question|doubt|ask|q)\b/i.test(m.text)));
       const isHighlight = Boolean(m.is_highlighted) || m.custom_type === 'highlight' || (m.text && /^\/(hg|highlight|star)\b/i.test(m.text));
       const isPinned = m.pinned || m.is_pinned || Boolean(m.pinned_at);
       const isNotice = Boolean(m.is_notice) || m.custom_type === 'notice' || (m.text && /^\/(notice|announcement|announce)\b/i.test(m.text));
 
-      const isStudentSender = !isFaculty && (m.user?.role !== 'admin' && !m.user?.id?.startsWith('admin_'));
       const isTargetMuted = isUserMutedById(m.user?.id);
 
       const avatar = m.user?.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.user?.name || 'User')}&background=${isFaculty ? 'D97706' : '064E3B'}&color=fff`;
