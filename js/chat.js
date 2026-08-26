@@ -828,10 +828,30 @@ ${batchBlock}
         flex-shrink: 0;
       }
 
+      @media (max-width: 768px) {
+        .pragyan-chat-widget {
+          left: 0.75rem;
+          bottom: max(0.75rem, env(safe-area-inset-bottom));
+          right: 0.75rem;
+        }
+        .chat-window {
+          left: 0 !important;
+          right: 0 !important;
+          width: 100% !important;
+          max-width: calc(100vw - 1.5rem) !important;
+          bottom: max(3.85rem, calc(env(safe-area-inset-bottom) + 3.2rem)) !important;
+          height: clamp(380px, calc(100dvh - 5.5rem), 580px) !important;
+          max-height: calc(100vh - 5.5rem) !important;
+          max-height: calc(100dvh - 5.5rem) !important;
+          min-height: 320px;
+          border-radius: 1.15rem !important;
+        }
+      }
+
       @media (max-width: 480px) {
         .pragyan-chat-widget {
           left: 0.5rem;
-          bottom: 0.75rem;
+          bottom: max(0.6rem, env(safe-area-inset-bottom));
           right: 0.5rem;
         }
         .chat-toggle-btn {
@@ -844,7 +864,7 @@ ${batchBlock}
           right: 0 !important;
           width: calc(100vw - 1rem) !important;
           max-width: calc(100vw - 1rem) !important;
-          bottom: 3.85rem !important;
+          bottom: max(3.85rem, calc(env(safe-area-inset-bottom) + 3.2rem)) !important;
           /* dvh, and it has to be repeated here: the desktop rule's dvh
              max-height was overridden by this block's !important vh value, so on
              every phone with a retracting address bar the panel was sized against
@@ -884,6 +904,7 @@ ${batchBlock}
         .chat-msg {
           max-width: 90%;
           font-size: 0.85rem;
+          word-break: break-word;
         }
         .chat-suggestions {
           gap: 0.35rem;

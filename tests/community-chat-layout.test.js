@@ -194,6 +194,15 @@ export function runCommunityChatLayoutTests(assert) {
   assert(aiChatJs.includes('height: clamp(380px, calc(100dvh - 5.5rem), 560px) !important') &&
          portalCss.includes('.stream-msg-quote-header') && portalCss.includes('overflow: hidden !important'),
     'T35.68: js/chat.js and css/portal.css enforce clean mobile responsive dimensions and overflow protection');
+
+  assert(portalCss.includes('width: 100% !important') &&
+         portalCss.includes('.btn-stream-fullscreen span') &&
+         portalCss.includes('display: none !important'),
+    'T35.69: css/portal.css enforces 100% container width and compact single-row buttons on mobile');
+
+  assert(aiChatJs.includes('@media (max-width: 768px)') &&
+         aiChatJs.includes('env(safe-area-inset-bottom)'),
+    'T35.70: js/chat.js supports tablet and mobile safe-area insets seamlessly');
 }
 
 
