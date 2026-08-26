@@ -653,16 +653,16 @@
 
       return `
         <div class="stream-msg-row ${isMine ? 'mine' : 'theirs'} ${isPinned ? 'stream-msg-pinned' : ''}" id="msg-${escapeHtml(m.id)}" style="display: flex; gap: 0.45rem; align-items: flex-start; margin-bottom: 0.35rem; ${isMine ? 'flex-direction: row-reverse;' : ''}">
-          <img src="${escapeHtml(avatar)}" alt="${escapeHtml(m.user?.name || '')}" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover; border: 1.5px solid ${isFaculty ? '#F59E0B' : (isMine ? '#10B981' : '#059669')}; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin-top: 1px;">
-          <div style="max-width: 85%; display: flex; flex-direction: column; ${isMine ? 'align-items: flex-end;' : 'align-items: flex-start;'}">
+          <img src="${escapeHtml(avatar)}" class="stream-avatar" alt="${escapeHtml(m.user?.name || '')}" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover; border: 1.5px solid ${isFaculty ? '#F59E0B' : (isMine ? '#10B981' : '#059669')}; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin-top: 1px;">
+          <div class="stream-msg-bubble-col" style="max-width: 85%; display: flex; flex-direction: column; ${isMine ? 'align-items: flex-end;' : 'align-items: flex-start;'}">
             
             <!-- Compact Sender Header (Only for incoming messages) -->
             ${!isMine ? `
-              <div style="display: flex; gap: 0.35rem; align-items: center; font-size: 0.72rem; margin-bottom: 0.15rem; flex-wrap: wrap;">
-                <strong style="color: ${isFaculty ? '#B45309' : 'var(--text-mahogany, #5A2E25)'}; font-weight: 800;">
+              <div class="stream-msg-sender-wrap" style="display: flex; gap: 0.35rem; align-items: center; font-size: 0.72rem; margin-bottom: 0.15rem; flex-wrap: wrap;">
+                <strong class="stream-msg-sender-name" style="color: ${isFaculty ? '#B45309' : 'var(--text-mahogany, #5A2E25)'}; font-weight: 800;">
                   ${escapeHtml(m.user?.name || 'User')}
                 </strong>
-                <span style="background: ${identity.badgeBg}; color: ${identity.badgeColor}; border: 1px solid ${identity.badgeBorder}; font-size: 0.62rem; font-weight: 800; padding: 0.05rem 0.35rem; border-radius: 3px; display: inline-flex; align-items: center; gap: 0.2rem;">
+                <span class="stream-msg-badge" style="background: ${identity.badgeBg}; color: ${identity.badgeColor}; border: 1px solid ${identity.badgeBorder}; font-size: 0.62rem; font-weight: 800; padding: 0.05rem 0.35rem; border-radius: 3px; display: inline-flex; align-items: center; gap: 0.2rem;">
                   ${identity.badgeText}
                 </span>
               </div>
@@ -737,7 +737,7 @@
               <span style="font-weight: 800; font-size: 0.88rem; color: #FFFFFF; letter-spacing: -0.01em;">
                 Pragyan Community Chat
               </span>
-              <span style="font-size: 0.72rem; color: #A7F3D0; margin-left: 0.35rem; opacity: 0.85;">
+              <span class="stream-top-title-extra" style="font-size: 0.72rem; color: #A7F3D0; margin-left: 0.35rem; opacity: 0.85;">
                 • ${isAdmin ? '🛡️ Multi-Class Hub' : `🎓 ${escapeHtml(activeMeta.shortName)}`}
               </span>
             </div>
@@ -792,7 +792,7 @@
         <!-- ACTIVE CLASS IDENTITY BANNER (Compact & Sleek) -->
         <div class="stream-active-banner" style="background: ${activeMeta.bannerBg}; color: #FFFFFF; padding: 0.45rem 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; border-bottom: 1.5px solid rgba(0,0,0,0.1); flex-shrink: 0;">
           <div style="display: flex; align-items: center; gap: 0.5rem; overflow: hidden;">
-            <div style="font-size: 1.25rem; width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.25);">
+            <div class="stream-banner-icon" style="font-size: 1.25rem; width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.25);">
               ${activeMeta.icon}
             </div>
             <div style="overflow: hidden;">
@@ -804,7 +804,7 @@
                   ${escapeHtml(activeMeta.category)}
                 </span>
               </div>
-              <p style="font-size: 0.72rem; color: #E2E8F0; margin: 0.05rem 0 0 0; opacity: 0.9; text-overflow: ellipsis; white-space: nowrap; overflow: hidden;">
+              <p class="stream-banner-tagline" style="font-size: 0.72rem; color: #E2E8F0; margin: 0.05rem 0 0 0; opacity: 0.9; text-overflow: ellipsis; white-space: nowrap; overflow: hidden;">
                 ${escapeHtml(activeMeta.tagline)} • <strong style="color: #FEF08A;">Mentors: ${escapeHtml(activeMeta.mentors)}</strong>
               </p>
             </div>
@@ -869,7 +869,7 @@
           <button type="button" id="btn-quick-quest" title="Ask academic question / doubt (/quest)" style="background: #EEF2FF; color: #4F46E5; border: 1.5px solid #C7D2FE; width: 38px; height: 38px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 1rem; cursor: pointer; flex-shrink: 0;" aria-label="Ask Question prefix">
             ❓
           </button>
-          <input type="text" id="stream-msg-input" class="portal-input" placeholder="${isAdmin ? 'Type message, @mention student, /hg, /quest, /pin…' : `Message ${escapeHtml(activeMeta.shortName)} (use /quest for doubts)…`}" style="flex: 1; border-radius: 8px; font-size: 15px; min-height: 40px; padding: 0.45rem 0.85rem; border: 1.5px solid var(--border-sand, #CBD5E1); background: #FAF9F6; transition: border-color 0.2s;" autocomplete="off" aria-label="Chat message" required>
+          <input type="text" id="stream-msg-input" class="portal-input" placeholder="${isAdmin ? 'Type message, @mention student, /hg, /quest, /pin…' : `Message ${escapeHtml(activeMeta.shortName)} (use /quest for doubts)…`}" style="flex: 1; border-radius: 8px; font-size: 16px; min-height: 40px; padding: 0.45rem 0.85rem; border: 1.5px solid var(--border-sand, #CBD5E1); background: #FAF9F6; transition: border-color 0.2s;" autocomplete="off" aria-label="Chat message" required>
           <button type="submit" class="btn btn-emerald" id="btn-stream-send" style="padding: 0.45rem 1.15rem; font-weight: 800; border-radius: 8px; display: inline-flex; align-items: center; gap: 0.35rem; min-height: 40px; font-size: 0.85rem; flex-shrink: 0; box-shadow: 0 2px 8px rgba(6,78,59,0.2);">
             <span>Send</span> <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
           </button>

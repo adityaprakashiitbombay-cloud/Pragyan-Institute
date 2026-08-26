@@ -44,8 +44,8 @@ export function runCommunityChatLayoutTests(assert) {
     'T35.11: css/portal.css defines .stream-body-fullscreen-lock to prevent background scrolling');
   assert(portalCss.includes('.stream-msg-actions') && portalCss.includes('.stream-msg-row:hover .stream-msg-actions'),
     'T35.12: css/portal.css styles .stream-msg-actions with smooth hover transitions');
-  assert(portalCss.includes('@media (max-width: 768px)') && portalCss.includes('padding: 0.32rem 0.6rem !important'),
-    'T35.13: css/portal.css defines mobile responsive compact bubble padding for small screens');
+  assert(portalCss.includes('@media (max-width: 768px)') && portalCss.includes('.stream-banner-tagline'),
+    'T35.13: css/portal.css defines mobile responsive compact bubble and header rules for small screens');
 
   // --- 4. Student Multi-Class Support & Channel Accessibility ---
   assert(chatJs.includes('function resolveStudentBatches') && chatJs.includes('resolveBatches'),
@@ -58,4 +58,14 @@ export function runCommunityChatLayoutTests(assert) {
     'T35.17: api/health.js pre-seeds canonical livestream channels and synchronizes student avatar photo');
   assert(portalJs.includes('isAdminVisible') && portalJs.includes('renderCommunityChatTab'),
     'T35.18: js/portal.js renderCommunityChatTab cleanly checks visible dashboard container');
+
+  // --- 5. Mobile Device (<768px & <480px) Layout Optimizations ---
+  assert(portalCss.includes('.stream-banner-tagline') && portalCss.includes('display: none !important'),
+    'T35.19: css/portal.css hides verbose banner taglines on mobile to reclaim vertical screen estate');
+  assert(portalCss.includes('font-size: 16px !important') && chatJs.includes('font-size: 16px'),
+    'T35.20: css/portal.css and stream-community-chat.js enforce 16px font-size on message input to prevent iOS auto-zoom');
+  assert(portalCss.includes('.stream-msg-bubble-col') && portalCss.includes('.stream-avatar'),
+    'T35.21: css/portal.css defines responsive phone bubble width (90%-92%) and compact 24px avatars');
+  assert(portalCss.includes('@media (max-width: 480px)') && portalCss.includes('env(safe-area-inset-bottom)'),
+    'T35.22: css/portal.css handles ultra-compact 480px phone screens and safe-area insets');
 }
