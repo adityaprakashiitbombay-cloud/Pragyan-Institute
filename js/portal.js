@@ -3406,7 +3406,8 @@ const supaPayload = pushableReqs.map(r => ({
       if (sdc) {
         sdc.classList.remove('hidden-view');
         sdc.removeAttribute('hidden');
-        sdc.style.setProperty('display', 'block', 'important');
+        sdc.style.removeProperty('display');
+        sdc.style.display = 'flex';
       }
       if (adc) {
         adc.classList.add('hidden-view');
@@ -3427,7 +3428,8 @@ const supaPayload = pushableReqs.map(r => ({
       if (adc) {
         adc.classList.remove('hidden-view');
         adc.removeAttribute('hidden');
-        adc.style.setProperty('display', 'block', 'important');
+        adc.style.removeProperty('display');
+        adc.style.display = 'flex';
       }
       try {
         renderAdminDashboard();
@@ -3546,7 +3548,7 @@ function renderStudentDashboard() {
     document.querySelectorAll('.student-tab-pane').forEach(pane => {
       if (pane.id === `studentTabPane-${tabName}`) {
         pane.classList.add('active');
-        pane.style.display = 'block';
+        pane.style.display = (tabName === 'community') ? 'flex' : 'block';
       } else {
         pane.classList.remove('active');
         pane.style.display = 'none';
@@ -6403,7 +6405,7 @@ function renderStudentDashboard() {
     document.querySelectorAll('.admin-tab-pane').forEach(pane => {
       if (pane.id === `adminTabPane-${tabName}`) {
         pane.classList.add('active');
-        pane.style.display = 'block';
+        pane.style.display = (tabName === 'community') ? 'flex' : 'block';
       } else {
         pane.classList.remove('active');
         pane.style.display = 'none';

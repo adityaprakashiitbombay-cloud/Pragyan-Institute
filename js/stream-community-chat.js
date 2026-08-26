@@ -1736,41 +1736,40 @@
         ` : ''}
 
         <!-- ACTIVE CHANNEL CONDENSED HERO BANNER & VIEW SWITCHER (Discussion vs Media) -->
-        <div class="stream-active-banner" style="background: ${activeMeta.bannerBg}; color: #FFFFFF; padding: 0.4rem 0.85rem; border-bottom: 1.5px solid ${activeMeta.accentBorder}; display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; flex-shrink: 0;">
-          <div style="display: flex; align-items: center; gap: 0.5rem; min-width: 0;">
-            <div class="stream-banner-icon" style="width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,0.18); display: flex; align-items: center; justify-content: center; font-size: 1.25rem; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.25);">
+        <div class="stream-active-banner" style="background: ${activeMeta.bannerBg}; color: #FFFFFF; padding: 0.35rem 0.75rem; border-bottom: 1.5px solid ${activeMeta.accentBorder}; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-shrink: 0; min-width: 0; box-sizing: border-box;">
+          <div class="stream-banner-left" style="display: flex; align-items: center; gap: 0.45rem; min-width: 0; flex: 1; overflow: hidden;">
+            <div class="stream-banner-icon" style="width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,0.18); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.25);">
               ${activeMeta.icon}
             </div>
-            <div style="min-width: 0;">
-              <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
-                <h3 style="margin: 0; font-size: 0.96rem; font-weight: 900; color: #FFFFFF; letter-spacing: -0.01em; line-height: 1.2;">
+            <div style="min-width: 0; flex: 1; overflow: hidden;">
+              <div style="display: flex; align-items: center; gap: 0.35rem; min-width: 0;">
+                <h3 style="margin: 0; font-size: 0.92rem; font-weight: 900; color: #FFFFFF; letter-spacing: -0.01em; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;">
                   ${escapeHtml(activeMeta.name)}
                 </h3>
-                <span style="font-size: 0.68rem; background: rgba(255,255,255,0.2); padding: 0.12rem 0.4rem; border-radius: 4px; font-weight: 800;">
+                <span class="stream-banner-cat-badge" style="font-size: 0.65rem; background: rgba(255,255,255,0.2); padding: 0.1rem 0.35rem; border-radius: 4px; font-weight: 800; flex-shrink: 0;">
                   ${escapeHtml(activeMeta.category)}
                 </span>
               </div>
-              <div class="stream-banner-tagline" style="font-size: 0.73rem; opacity: 0.92; color: #F0FDF4; line-height: 1.2; margin-top: 0.1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              <div class="stream-banner-tagline" style="font-size: 0.72rem; opacity: 0.92; color: #F0FDF4; line-height: 1.2; margin-top: 0.1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                 👨‍🏫 Mentors: <strong>${escapeHtml(activeMeta.mentors)}</strong> • ${escapeHtml(activeMeta.tagline)}
               </div>
             </div>
           </div>
 
-          <div style="display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0;">
-            
+          <div class="stream-banner-actions" style="display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0;">
             <!-- VIEW MODE TOGGLE PILLS: 💬 Discussion / 📁 Class Media -->
-            <div class="stream-view-toggle-wrap" style="display: inline-flex; background: rgba(0,0,0,0.25); padding: 2px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15);">
-              <button type="button" class="btn-view-mode ${activeChatViewMode === 'chat' ? 'active' : ''}" data-view-mode="chat" style="background: ${activeChatViewMode === 'chat' ? '#FFFFFF' : 'transparent'}; color: ${activeChatViewMode === 'chat' ? '#064E3B' : '#E2E8F0'}; border: none; border-radius: 6px; font-size: 0.72rem; font-weight: 800; padding: 0.2rem 0.55rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem; transition: all 0.15s ease;">
+            <div class="stream-view-toggle-wrap" style="display: inline-flex; background: rgba(0,0,0,0.25); padding: 2px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); flex-shrink: 0;">
+              <button type="button" class="btn-view-mode ${activeChatViewMode === 'chat' ? 'active' : ''}" data-view-mode="chat" style="background: ${activeChatViewMode === 'chat' ? '#FFFFFF' : 'transparent'}; color: ${activeChatViewMode === 'chat' ? '#064E3B' : '#E2E8F0'}; border: none; border-radius: 4px; font-size: 0.7rem; font-weight: 800; padding: 0.18rem 0.45rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.2rem; transition: all 0.15s ease;">
                 <span>💬 Chat</span>
               </button>
-              <button type="button" class="btn-view-mode ${activeChatViewMode === 'media' ? 'active' : ''}" data-view-mode="media" style="background: ${activeChatViewMode === 'media' ? '#FFFFFF' : 'transparent'}; color: ${activeChatViewMode === 'media' ? '#064E3B' : '#E2E8F0'}; border: none; border-radius: 6px; font-size: 0.72rem; font-weight: 800; padding: 0.2rem 0.55rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem; transition: all 0.15s ease;">
+              <button type="button" class="btn-view-mode ${activeChatViewMode === 'media' ? 'active' : ''}" data-view-mode="media" style="background: ${activeChatViewMode === 'media' ? '#FFFFFF' : 'transparent'}; color: ${activeChatViewMode === 'media' ? '#064E3B' : '#E2E8F0'}; border: none; border-radius: 4px; font-size: 0.7rem; font-weight: 800; padding: 0.18rem 0.45rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.2rem; transition: all 0.15s ease;">
                 <span>📁 Media & Notes</span>
-                ${mediaList.length > 0 ? `<span style="background: ${activeChatViewMode === 'media' ? '#064E3B' : 'rgba(255,255,255,0.3)'}; color: ${activeChatViewMode === 'media' ? '#FFF' : '#FFF'}; font-size: 0.62rem; padding: 1px 4px; border-radius: 99px;">${mediaList.length}</span>` : ''}
+                ${mediaList.length > 0 ? `<span style="background: ${activeChatViewMode === 'media' ? '#064E3B' : 'rgba(255,255,255,0.3)'}; color: ${activeChatViewMode === 'media' ? '#FFF' : '#FFF'}; font-size: 0.6rem; padding: 1px 4px; border-radius: 99px;">${mediaList.length}</span>` : ''}
               </button>
             </div>
 
             ${isAdmin ? `
-              <button type="button" class="btn-clear-group-chat" data-ch-id="${escapeHtml(activeChannelId)}" data-ch-name="${escapeHtml(activeMeta.name)}" style="background: rgba(220, 38, 38, 0.2); color: #FCA5A5; border: 1px solid rgba(239, 68, 68, 0.4); font-size: 0.72rem; font-weight: 800; padding: 0.22rem 0.55rem; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem;" title="Clear group messages">
+              <button type="button" class="btn-clear-group-chat" data-ch-id="${escapeHtml(activeChannelId)}" data-ch-name="${escapeHtml(activeMeta.name)}" style="background: rgba(220, 38, 38, 0.25); color: #FCA5A5; border: 1px solid rgba(239, 68, 68, 0.4); font-size: 0.7rem; font-weight: 800; padding: 0.18rem 0.45rem; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem; flex-shrink: 0;" title="Clear group messages">
                 <i class="fa-solid fa-trash-can" aria-hidden="true"></i> <span>Clear</span>
               </button>
             ` : ''}
