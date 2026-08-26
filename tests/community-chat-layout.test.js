@@ -68,4 +68,10 @@ export function runCommunityChatLayoutTests(assert) {
     'T35.21: css/portal.css defines responsive phone bubble width (90%-92%) and compact 24px avatars');
   assert(portalCss.includes('@media (max-width: 480px)') && portalCss.includes('env(safe-area-inset-bottom)'),
     'T35.22: css/portal.css handles ultra-compact 480px phone screens and safe-area insets');
+
+  // --- 6. Slash Command Sanitization & Stream API Compatibility ---
+  assert(chatJs.includes('hasCustomFormatting ? cleanBody : rawText') && chatJs.includes("textToSend.replace(/^\\/+/"),
+    'T35.23: js/stream-community-chat.js strips leading slash from message text before Stream API dispatch to avoid command error');
+  assert(chatJs.includes('is_highlighted: Boolean(isHighlight)') && chatJs.includes('is_question: Boolean(isQuestion)'),
+    'T35.24: js/stream-community-chat.js sends explicit boolean flags for questions and highlights in custom message payload');
 }

@@ -499,7 +499,7 @@
     let text = String(rawText);
 
     // Clean slash prefixes case-insensitively
-    const cleaned = text.replace(/^\/(quest|question|hg|highlight|pin|notice)\s*/i, '').trim();
+    const cleaned = text.replace(/^\/(quest|question|doubt|ask|q|hg|highlight|star|imp|important|pin|sticky|notice|announcement|announce)\s*/i, '').trim();
     if (cleaned) {
       text = cleaned;
     }
@@ -546,10 +546,10 @@
       const identity = extractUserBadge(m.user, channelMeta);
       const isFaculty = identity.isFaculty;
 
-      const isQuestion = (m.text && /^\/(quest|question)\b/i.test(m.text)) || m.is_question || m.custom_type === 'question';
-      const isHighlight = (m.text && /^\/(hg|highlight)\b/i.test(m.text)) || m.is_highlighted || m.custom_type === 'highlight';
+      const isQuestion = Boolean(m.is_question) || m.custom_type === 'question' || (m.text && /^\/(quest|question|doubt|ask|q)\b/i.test(m.text));
+      const isHighlight = Boolean(m.is_highlighted) || m.custom_type === 'highlight' || (m.text && /^\/(hg|highlight|star|imp|important)\b/i.test(m.text));
       const isPinned = m.pinned || m.is_pinned || Boolean(m.pinned_at);
-      const isNotice = (m.text && /^\/notice\b/i.test(m.text)) || m.is_notice;
+      const isNotice = Boolean(m.is_notice) || m.custom_type === 'notice' || (m.text && /^\/(notice|announcement|announce)\b/i.test(m.text));
 
       const avatar = m.user?.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.user?.name || 'User')}&background=${isFaculty ? 'D97706' : '064E3B'}&color=fff`;
       const formattedBody = formatMessageBody(m.text || '');
@@ -1241,28 +1241,37 @@
         return;
       }
 
-      const isQuestion = /^\/(quest|question)\b/i.test(rawText);
-      const isHighlight = /^\/(hg|highlight)\b/i.test(rawText);
-      const isPinCommand = /^\/pin\b/i.test(rawText);
-      const isNotice = /^\/notice\b/i.test(rawText);
+      const isQuestion = /^\/(quest|question|doubt|ask|q)\b/i.test(rawText);
+      const isHighlight = /^\/(hg|highlight|star|imp|important)\b/i.test(rawText);
+      const isPinCommand = /^\/(pin|sticky)\b/i.test(rawText);
+      const isNotice = /^\/(notice|announcement|announce)\b/i.test(rawText);
 
       // Validate that user entered actual message text after command
-      const cleanBody = rawText.replace(/^\/(quest|question|hg|highlight|pin|notice)\s*/i, '').trim();
-      if ((isQuestion || isHighlight || isPinCommand || isNotice) && !cleanBody) {
-        alert('⚠️ Please type your message text after the slash command (e.g. /quest What is thermodynamics?)');
+      const cleanBody = rawText.replace(/^\/(quest|question|doubt|ask|q|hg|highlight|star|imp|important|pin|sticky|notice|announcement|announce)\s*/i, '').trim();
+      const hasCustomFormatting = isQuestion || isHighlight || isPinCommand || isNotice;
+
+      if (hasCustomFormatting && !cleanBody) {
+        alert('⚠️ Please type your message text after the slash command (e.g. /hg Exam schedule or /quest What is thermodynamics?)');
         input.focus();
         return;
       }
+
+      // Strip leading slashes to prevent GetStream API built-in slash command parser error: "Sorry, command ... doesn't exist"
+      let textToSend = hasCustomFormatting ? cleanBody : rawText;
+      if (textToSend.startsWith('/')) {
+        textToSend = textToSend.replace(/^\/+/, '');
+      }
+      if (!textToSend.trim()) return;
 
       input.value = '';
       if (sendBtn) sendBtn.disabled = true;
 
       try {
         const msgPayload = {
-          text: rawText,
-          is_question: isQuestion,
-          is_highlighted: isHighlight,
-          is_notice: isNotice,
+          text: textToSend,
+          is_question: Boolean(isQuestion),
+          is_highlighted: Boolean(isHighlight),
+          is_notice: Boolean(isNotice),
           custom_type: isQuestion ? 'question' : (isHighlight ? 'highlight' : (isNotice ? 'notice' : 'text'))
         };
 
