@@ -181,8 +181,8 @@ export function runCommunityChatLayoutTests(assert) {
   const dbJs = read('api/db.js');
   const aiChatJs = read('js/chat.js');
 
-  assert(chatJs.includes('!isAdmin && enrolledBatches.length > 0 && !enrolledBatches.includes(b.batchId)') &&
-         chatJs.includes('!isAdmin && enrolledBatches.length > 0 && meta.batchId && !enrolledBatches.includes(meta.batchId)'),
+  assert(chatJs.includes('!isAdmin && !enrolledBatches.includes(b.batchId)') &&
+         chatJs.includes('!isAdmin && meta.batchId && !enrolledBatches.includes(meta.batchId)'),
     'T35.65: js/stream-community-chat.js strictly scopes channel setup and rendering to student enrolled classes only');
 
   assert(chatJs.includes('Student access restricted to enrolled class chat only'),
