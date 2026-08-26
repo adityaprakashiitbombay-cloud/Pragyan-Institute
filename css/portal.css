@@ -10498,6 +10498,34 @@ button, a, input, select, textarea {
 
 
 /* ── Stream Community Chat Responsive Design ─────────────────────────────── */
+#adminTabPane-community.active,
+#studentTabPane-community.active {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  box-sizing: border-box !important;
+}
+
+.stream-loading-card {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: clamp(440px, calc(100dvh - 200px), 720px) !important;
+  background: #ffffff !important;
+  border-radius: 12px !important;
+  border: 1.5px solid var(--border-sand, #DDD5CD) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  padding: 3.5rem 2rem !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05) !important;
+  margin: 0 auto !important;
+  box-sizing: border-box !important;
+}
+
 .stream-chat-wrapper {
   display: flex;
   flex-direction: column;
@@ -10507,6 +10535,8 @@ button, a, input, select, textarea {
   border: 1.5px solid var(--border-sand, #DDD5CD);
   overflow: hidden;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Fullscreen Mode & Ancestor Constraints Neutralization */
@@ -10843,7 +10873,8 @@ body.stream-chat-is-fullscreen #stream-community-chat-app {
     padding: 0 !important;
   }
 
-  .stream-chat-wrapper {
+  .stream-chat-wrapper,
+  .stream-loading-card {
     flex: 1 1 0 !important;
     min-height: 0 !important;
     height: 100% !important;

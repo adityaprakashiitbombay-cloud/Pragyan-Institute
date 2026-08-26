@@ -3112,10 +3112,15 @@
     try {
       if (!containerEl.querySelector('.stream-chat-wrapper')) {
         containerEl.innerHTML = `
-          <div style="padding: 4rem 1.5rem; text-align: center; color: #64748B;">
-            <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 2.5rem; color: #064E3B;" aria-hidden="true"></i>
-            <p style="margin-top: 1.25rem; font-weight: 800; font-size: 1.05rem; color: #1E293B;">Connecting to Pragyan Realtime Class Gateway…</p>
-            <p style="font-size: 0.85rem; color: #64748B;">Syncing live class channels and message archives from Stream cloud...</p>
+          <div class="stream-loading-card" style="width: 100%; min-height: clamp(440px, calc(100dvh - 200px), 720px); background: #ffffff; border-radius: 12px; border: 1.5px solid var(--border-sand, #DDD5CD); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 3.5rem 2rem; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); margin: 0 auto; box-sizing: border-box;">
+            <div style="width: 72px; height: 72px; border-radius: 50%; background: #ECFDF5; border: 2px solid #A7F3D0; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 1.5rem; box-shadow: 0 8px 24px rgba(6, 78, 59, 0.12);">
+              <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 2.4rem; color: #064E3B;" aria-hidden="true"></i>
+            </div>
+            <h3 style="margin: 0 0 0.5rem 0; font-family: var(--font-heading, 'Cinzel', serif); font-size: 1.25rem; font-weight: 800; color: #0F172A; letter-spacing: -0.01em;">Connecting to Pragyan Realtime Class Gateway…</h3>
+            <p style="margin: 0 0 1.25rem 0; font-size: 0.92rem; color: #64748B; max-width: 480px; line-height: 1.5;">Syncing live class channels and message archives from Stream cloud..</p>
+            <div style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.95rem; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 9999px; font-size: 0.78rem; font-weight: 700; color: #475569;">
+              <i class="fa-solid fa-bolt" style="color: #059669;" aria-hidden="true"></i> Live WebSocket Session
+            </div>
           </div>
         `;
       }
