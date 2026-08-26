@@ -685,9 +685,9 @@
 /* Dashboard Nav Tabs */
 .dashboard-nav-tabs {
   background-color: #ffffff;
-  padding: 0 2rem;
+  padding: 0 2.25rem;
   display: flex;
-  gap: 0.4rem;
+  gap: 0.5rem;
   border-bottom: 1px solid var(--border-sand);
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -699,14 +699,14 @@
 }
 
 .dash-tab-btn {
-  padding: 0.95rem 1.25rem;
-  font-size: 0.92rem;
+  padding: 1.1rem 1.35rem;
+  font-size: 0.95rem;
   font-weight: 600;
   color: var(--text-muted);
   border-bottom: 3px solid transparent;
   display: inline-flex;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.6rem;
   white-space: nowrap;
   transition: all var(--transition-fast);
   flex-shrink: 0;
@@ -4192,7 +4192,6 @@
   .stat-click-hint {
     font-size: 0.68rem !important;
     margin-top: 0.15rem !important;
-  }
   }
 
   /* 4. High-Density Dashboard Content & Cards */
@@ -11201,12 +11200,6 @@ body.stream-chat-is-fullscreen #stream-community-chat-app {
   #stream-autocomplete-box {
     left: 0.35rem !important;
     right: 0.35rem !important;
-    max-height: 180px !important;
-    bottom: calc(100% + 4px) !important;
-    z-index: 99999 !important;
-    border-radius: 8px !important;
-  }
-}
     max-height: 180px !important;
     bottom: calc(100% + 4px) !important;
     z-index: 99999 !important;
