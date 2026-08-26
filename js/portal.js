@@ -3513,6 +3513,15 @@ function renderStudentDashboard() {
     AppState.activeStudentTab = tabName;
     AppState.activeTab = tabName;
 
+    const studentWrapper = document.getElementById('studentDashboardContainer');
+    if (studentWrapper) {
+      if (tabName === 'community') {
+        studentWrapper.classList.add('community-tab-active');
+      } else {
+        studentWrapper.classList.remove('community-tab-active');
+      }
+    }
+
     // Update Tab Button Active States
     document.querySelectorAll('.student-tab-btn').forEach(btn => {
       if (btn.dataset.tab === tabName) {
@@ -6352,6 +6361,15 @@ function renderStudentDashboard() {
     }
 
     AppState.activeAdminTab = tabName;
+
+    const adminWrapper = document.getElementById('adminDashboardContainer');
+    if (adminWrapper) {
+      if (tabName === 'community') {
+        adminWrapper.classList.add('community-tab-active');
+      } else {
+        adminWrapper.classList.remove('community-tab-active');
+      }
+    }
 
     // Toggle Overview KPI cards: show only on Students tab
     const overviewStats = document.getElementById('adminOverviewStats');
