@@ -126,6 +126,13 @@ export function runCommunityChatLayoutTests(assert) {
     'T35.45: js/stream-community-chat.js wires #btn-cancel-reply and Escape key to smoothly dismiss reply mode');
   assert(portalCss.includes('.btn-reply-msg') && portalCss.includes('.stream-msg-quote-header') && portalCss.includes('#stream-reply-bar'),
     'T35.46: css/portal.css defines responsive styles for .btn-reply-msg, .stream-msg-quote-header, and #stream-reply-bar');
+
+  // --- 11. Single-Bound Event Delegation & Reliable Message Delete Suite ---
+  assert(chatJs.includes('_streamEventsBound') && chatJs.includes('if (container._streamEventsBound) return;'),
+    'T35.47: js/stream-community-chat.js implements single-bound event delegation guard preventing multiple click listeners and prompt loops');
+  assert(chatJs.includes('container.querySelector(`#msg-${msgId}`)') && chatJs.includes('msgRow.remove()'),
+    'T35.48: js/stream-community-chat.js optimistically fades and removes deleted message DOM elements immediately on confirmed delete');
 }
+
 
 

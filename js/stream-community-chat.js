@@ -1637,26 +1637,11 @@
   }
 
   function wireEvents(container) {
-    // 0. Fullscreen Toggle Controller
-    const fullscreenBtn = container.querySelector('#btn-stream-fullscreen');
-    const chatWrapper = container.querySelector('.stream-chat-wrapper');
-    if (fullscreenBtn && chatWrapper) {
-      fullscreenBtn.addEventListener('click', () => {
-        const isFull = chatWrapper.classList.toggle('stream-fullscreen');
-        fullscreenBtn.innerHTML = isFull
-          ? '<i class="fa-solid fa-compress" aria-hidden="true"></i> <span>Exit Fullscreen</span>'
-          : '<i class="fa-solid fa-expand" aria-hidden="true"></i> <span>Fullscreen</span>';
-        fullscreenBtn.title = isFull ? 'Exit Fullscreen Mode (Esc)' : 'Toggle Fullscreen View';
-        if (isFull) {
-          document.body.classList.add('stream-body-fullscreen-lock');
-        } else {
-          document.body.classList.remove('stream-body-fullscreen-lock');
-        }
-        scrollBottom(container);
-      });
-    }
+    if (!container) return;
+    if (container._streamEventsBound) return;
+    container._streamEventsBound = true;
 
-    // Support Esc key to exit fullscreen
+    // Support Esc key globally to exit fullscreen or cancel reply
     if (!window._streamEscHandlerBound) {
       window._streamEscHandlerBound = true;
       window.addEventListener('keydown', (e) => {
@@ -1680,62 +1665,11 @@
       });
     }
 
-    // 1. Channel switcher
-    container.querySelectorAll('.stream-ch-pill').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const id = btn.dataset.chId;
-        if (id && channelsMap.has(id) && id !== activeChannelId) {
-          await switchChannel(id, container);
-        }
-      });
-    });
-
-    // 2. Category filter pills (Admin)
-    container.querySelectorAll('.stream-cat-pill').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const cat = btn.dataset.catName;
-        if (cat) {
-          selectedCategory = cat;
-          renderUI(container);
-        }
-      });
-    });
-
-    // 3. Autocomplete popup controller (@mentions & /slash commands)
-    const input = container.querySelector('#stream-msg-input');
-    const autoBox = container.querySelector('#stream-autocomplete-box');
-    const quickHgBtn = container.querySelector('#btn-quick-hg');
-    const quickQuestBtn = container.querySelector('#btn-quick-quest');
     let autoSelectedIndex = 0;
     let autoMode = null; // 'slash' | 'mention' | null
 
-    if (quickHgBtn && input) {
-      quickHgBtn.addEventListener('click', () => {
-        if (input.value.startsWith('/hg ')) {
-          input.value = input.value.replace(/^\/hg\s*/i, '');
-        } else {
-          const cleaned = input.value.replace(/^\/(quest|question|pin|notice|highlight)\s*/i, '');
-          input.value = `/hg ${cleaned.trim()}`;
-        }
-        hideAutocomplete();
-        input.focus();
-      });
-    }
-
-    if (quickQuestBtn && input) {
-      quickQuestBtn.addEventListener('click', () => {
-        if (input.value.startsWith('/quest ')) {
-          input.value = input.value.replace(/^\/quest\s*/i, '');
-        } else {
-          const cleaned = input.value.replace(/^\/(hg|highlight|pin|notice|question)\s*/i, '');
-          input.value = `/quest ${cleaned.trim()}`;
-        }
-        hideAutocomplete();
-        input.focus();
-      });
-    }
-
     function hideAutocomplete() {
+      const autoBox = container.querySelector('#stream-autocomplete-box');
       if (autoBox) {
         autoBox.style.display = 'none';
         autoBox.innerHTML = '';
@@ -1745,8 +1679,10 @@
     }
 
     function renderSlashCommands(filterQuery) {
+      const autoBox = container.querySelector('#stream-autocomplete-box');
+      if (!autoBox) return;
       const q = filterQuery.toLowerCase().trim();
-      const isAdminUser = currentUser.role === 'admin';
+      const isAdminUser = currentUser?.role === 'admin';
       const availableCmds = SLASH_COMMANDS.filter(c => isAdminUser ? true : c.forStudents);
       const filtered = availableCmds.filter(c => c.cmd.toLowerCase().includes(q) || c.label.toLowerCase().includes(q));
       if (!filtered.length) { hideAutocomplete(); return; }
@@ -1773,32 +1709,11 @@
         `).join('')}
       `;
       autoBox.style.display = 'block';
-
-      autoBox.querySelectorAll('.auto-item').forEach(item => {
-        item.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          const cmd = item.dataset.cmd;
-          if (cmd === '/clear') {
-            input.value = '';
-            hideAutocomplete();
-            container.querySelector('.btn-clear-group-chat')?.click();
-            return;
-          }
-          if (cmd === '/help') {
-            input.value = '';
-            hideAutocomplete();
-            showHelpModal();
-            return;
-          }
-          input.value = `${cmd} `;
-          hideAutocomplete();
-          input.focus();
-        });
-      });
     }
 
     function renderMentions(filterQuery) {
+      const autoBox = container.querySelector('#stream-autocomplete-box');
+      if (!autoBox) return;
       const students = getStudentsListForMention(filterQuery);
       if (!students.length) { hideAutocomplete(); return; }
 
@@ -1830,18 +1745,11 @@
         }).join('')}
       `;
       autoBox.style.display = 'block';
-
-      autoBox.querySelectorAll('.auto-item').forEach(item => {
-        item.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          const mentionText = item.dataset.mention;
-          insertMentionIntoInput(mentionText);
-        });
-      });
     }
 
     function insertMentionIntoInput(mentionText) {
+      const input = container.querySelector('#stream-msg-input');
+      if (!input) return;
       const val = input.value;
       const cursorPos = input.selectionStart ?? val.length;
       const textBeforeCursor = val.substring(0, cursorPos);
@@ -1857,76 +1765,447 @@
       input.focus();
     }
 
-    input?.addEventListener('input', () => {
-      const val = input.value;
-      const cursorPos = input.selectionStart ?? val.length;
-      const textBeforeCursor = val.substring(0, cursorPos);
+    // Pin / Unpin Action Handler
+    async function handlePinAction(msgId, shouldPin) {
+      const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pragyan_portal_token')) || '';
+      
+      try {
+        const res = await fetch('/api/health?action=stream-pin', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ messageId: msgId, pin: shouldPin })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || 'Failed to update pin state on server');
+        }
+      } catch (srvErr) {
+        console.warn('[Pin server note]', srvErr.message);
+        if (client) {
+          if (shouldPin) {
+            try { await client.pinMessage({ id: msgId }); } catch (_) {}
+          } else {
+            try { await client.unpinMessage({ id: msgId }); } catch (_) {}
+          }
+        }
+      }
 
-      if (activeChannel) activeChannel.keystroke().catch(() => {});
+      // Update local state and refresh
+      if (activeChannel?.state?.messages) {
+        const target = activeChannel.state.messages.find(m => m.id === msgId);
+        if (target) {
+          target.pinned = shouldPin;
+          target.is_pinned = shouldPin;
+          target.pinned_at = shouldPin ? new Date().toISOString() : null;
+        }
+      }
 
-      // 1. Slash commands trigger: Only when input starts with '/' AND has not typed a space yet
-      if (val.startsWith('/') && !val.includes(' ')) {
-        renderSlashCommands(val.slice(1));
+      renderPinnedBarAndList(container);
+    }
+
+    // --- DELEGATED CONTAINER CLICK LISTENER ---
+    container.addEventListener('click', async e => {
+      // 1. Fullscreen Toggle
+      const fullscreenBtn = e.target.closest('#btn-stream-fullscreen');
+      if (fullscreenBtn) {
+        e.preventDefault();
+        const chatWrapper = container.querySelector('.stream-chat-wrapper');
+        if (chatWrapper) {
+          const isFull = chatWrapper.classList.toggle('stream-fullscreen');
+          fullscreenBtn.innerHTML = isFull
+            ? '<i class="fa-solid fa-compress" aria-hidden="true"></i> <span>Exit Fullscreen</span>'
+            : '<i class="fa-solid fa-expand" aria-hidden="true"></i> <span>Fullscreen</span>';
+          fullscreenBtn.title = isFull ? 'Exit Fullscreen Mode (Esc)' : 'Toggle Fullscreen View';
+          if (isFull) {
+            document.body.classList.add('stream-body-fullscreen-lock');
+          } else {
+            document.body.classList.remove('stream-body-fullscreen-lock');
+          }
+          scrollBottom(container);
+        }
         return;
       }
 
-      // 2. Mentions trigger: When user typed '@' before cursor and has not typed a space after '@'
-      const lastAt = textBeforeCursor.lastIndexOf('@');
-      if (lastAt >= 0) {
-        const textAfterAt = textBeforeCursor.substring(lastAt + 1);
-        if (!textAfterAt.includes(' ')) {
-          renderMentions(textAfterAt);
-          return;
+      // 2. Channel Switcher Pill
+      const chBtn = e.target.closest('.stream-ch-pill');
+      if (chBtn) {
+        e.preventDefault();
+        const id = chBtn.dataset.chId;
+        if (id && channelsMap.has(id) && id !== activeChannelId) {
+          await switchChannel(id, container);
         }
+        return;
       }
 
-      hideAutocomplete();
-    });
+      // 3. Category Filter Pill
+      const catBtn = e.target.closest('.stream-cat-pill');
+      if (catBtn) {
+        e.preventDefault();
+        const cat = catBtn.dataset.catName;
+        if (cat) {
+          selectedCategory = cat;
+          renderUI(container);
+        }
+        return;
+      }
 
-    input?.addEventListener('keydown', e => {
-      if (!autoMode || !autoBox || autoBox.style.display === 'none') return;
-      const items = autoBox.querySelectorAll('.auto-item');
-      if (!items.length) return;
-
-      if (e.key === 'ArrowDown') {
+      // 4. Quick Highlight Prefix (/hg)
+      const quickHgBtn = e.target.closest('#btn-quick-hg');
+      if (quickHgBtn) {
         e.preventDefault();
-        autoSelectedIndex = (autoSelectedIndex + 1) % items.length;
-        items.forEach((it, idx) => it.style.background = (idx === autoSelectedIndex) ? '#ECFDF5' : '#FFFFFF');
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        autoSelectedIndex = (autoSelectedIndex - 1 + items.length) % items.length;
-        items.forEach((it, idx) => it.style.background = (idx === autoSelectedIndex) ? '#ECFDF5' : '#FFFFFF');
-      } else if (e.key === 'Enter' || e.key === 'Tab') {
-        e.preventDefault();
-        const sel = items[autoSelectedIndex];
-        if (sel) sel.click();
-      } else if (e.key === 'Escape') {
-        if (autoMode && autoBox && autoBox.style.display !== 'none') {
+        const input = container.querySelector('#stream-msg-input');
+        if (input) {
+          if (input.value.startsWith('/hg ')) {
+            input.value = input.value.replace(/^\/hg\s*/i, '');
+          } else {
+            const cleaned = input.value.replace(/^\/(quest|question|pin|notice|highlight)\s*/i, '');
+            input.value = `/hg ${cleaned.trim()}`;
+          }
           hideAutocomplete();
-        } else if (replyingToMessage) {
-          replyingToMessage = null;
+          input.focus();
+        }
+        return;
+      }
+
+      // 5. Quick Question Prefix (/quest)
+      const quickQuestBtn = e.target.closest('#btn-quick-quest');
+      if (quickQuestBtn) {
+        e.preventDefault();
+        const input = container.querySelector('#stream-msg-input');
+        if (input) {
+          if (input.value.startsWith('/quest ')) {
+            input.value = input.value.replace(/^\/quest\s*/i, '');
+          } else {
+            const cleaned = input.value.replace(/^\/(hg|highlight|pin|notice|question)\s*/i, '');
+            input.value = `/quest ${cleaned.trim()}`;
+          }
+          hideAutocomplete();
+          input.focus();
+        }
+        return;
+      }
+
+      // 6. Admin Attach Paperclip Button
+      const attachBtn = e.target.closest('#btn-stream-attach');
+      if (attachBtn) {
+        e.preventDefault();
+        const fileInput = container.querySelector('#stream-file-input');
+        if (fileInput) {
+          fileInput.value = '';
+          fileInput.click();
+        }
+        return;
+      }
+
+      // 7. Autocomplete Slash Command Item Click
+      const autoCmdItem = e.target.closest('.auto-item[data-cmd]');
+      if (autoCmdItem) {
+        e.preventDefault();
+        e.stopPropagation();
+        const cmd = autoCmdItem.dataset.cmd;
+        const input = container.querySelector('#stream-msg-input');
+        if (cmd === '/clear') {
+          if (input) input.value = '';
+          hideAutocomplete();
+          container.querySelector('.btn-clear-group-chat')?.click();
+          return;
+        }
+        if (cmd === '/help') {
+          if (input) input.value = '';
+          hideAutocomplete();
+          showHelpModal();
+          return;
+        }
+        if (input) {
+          input.value = `${cmd} `;
+          hideAutocomplete();
+          input.focus();
+        }
+        return;
+      }
+
+      // 8. Autocomplete Mention Item Click
+      const autoMentionItem = e.target.closest('.auto-item[data-mention]');
+      if (autoMentionItem) {
+        e.preventDefault();
+        e.stopPropagation();
+        const mentionText = autoMentionItem.dataset.mention;
+        insertMentionIntoInput(mentionText);
+        return;
+      }
+
+      // 9. View Mode Toggle (💬 Chat / 📁 Media & Notes)
+      const viewModeBtn = e.target.closest('.btn-view-mode');
+      if (viewModeBtn) {
+        e.preventDefault();
+        const mode = viewModeBtn.dataset.viewMode;
+        if (mode && mode !== activeChatViewMode) {
+          activeChatViewMode = mode;
+          renderUI(container);
+        }
+        return;
+      }
+
+      // 10. Media Filter Toggle (ALL / PDF / IMAGE)
+      const filterBtn = e.target.closest('.btn-media-filter');
+      if (filterBtn) {
+        e.preventDefault();
+        const filter = filterBtn.dataset.mediaFilter;
+        if (filter && filter !== mediaFilterType) {
+          mediaFilterType = filter;
+          renderUI(container);
+        }
+        return;
+      }
+
+      // 11. Read PDF Lazy Reader Modal
+      const readPdfBtn = e.target.closest('.btn-read-pdf');
+      if (readPdfBtn) {
+        e.preventDefault();
+        const pdfUrl = readPdfBtn.dataset.pdfUrl;
+        const pdfTitle = readPdfBtn.dataset.pdfTitle || 'PDF Notes';
+        if (pdfUrl) {
+          openPdfReaderModal(pdfUrl, pdfTitle);
+        }
+        return;
+      }
+
+      // 12. Image Lightbox Modal
+      const imgTrigger = e.target.closest('.stream-img-lightbox-trigger');
+      if (imgTrigger) {
+        e.preventDefault();
+        const imgUrl = imgTrigger.dataset.imgUrl || imgTrigger.src;
+        const imgTitle = imgTrigger.dataset.imgTitle || 'Class Image';
+        if (imgUrl) {
+          openImageLightboxModal(imgUrl, imgTitle);
+        }
+        return;
+      }
+
+      // 13. Reply to message (Students, Faculty, and Admin)
+      const replyBtn = e.target.closest('.btn-reply-msg');
+      if (replyBtn) {
+        e.preventDefault();
+        const msgId = replyBtn.dataset.replyMsg;
+        const author = replyBtn.dataset.replyAuthor || 'User';
+        const text = replyBtn.dataset.replyText || '';
+        if (msgId) {
+          replyingToMessage = { id: msgId, author, text };
           updateReplyBar(container);
+          const inputEl = container.querySelector('#stream-msg-input');
+          if (inputEl) {
+            inputEl.focus();
+            if (!inputEl.value) {
+              inputEl.placeholder = `Replying to @${author}…`;
+            }
+          }
+        }
+        return;
+      }
+
+      // 14. Cancel reply
+      const cancelReplyBtn = e.target.closest('#btn-cancel-reply');
+      if (cancelReplyBtn) {
+        e.preventDefault();
+        replyingToMessage = null;
+        updateReplyBar(container);
+        const inputEl = container.querySelector('#stream-msg-input');
+        if (inputEl) {
           const meta = CHANNEL_IDENTITIES[activeChannelId] || {};
-          input.placeholder = (currentUser?.role === 'admin')
+          inputEl.placeholder = (currentUser?.role === 'admin')
             ? 'Type message, @mention, /hg, /quest, /pin, or attach PDF notes…'
             : `Message ${escapeHtml(meta.shortName || 'class')} (use /quest for doubts)…`;
         }
+        return;
+      }
+
+      // 15. Pin message
+      const pinBtn = e.target.closest('[data-pin-msg]');
+      if (pinBtn) {
+        e.preventDefault();
+        const msgId = pinBtn.dataset.pinMsg;
+        if (!msgId) return;
+        pinBtn.disabled = true;
+        pinBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+        await handlePinAction(msgId, true);
+        return;
+      }
+
+      // 16. Unpin message
+      const unpinBtn = e.target.closest('[data-unpin-msg]');
+      if (unpinBtn) {
+        e.preventDefault();
+        const msgId = unpinBtn.dataset.unpinMsg;
+        if (!msgId) return;
+        unpinBtn.disabled = true;
+        unpinBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+        await handlePinAction(msgId, false);
+        return;
+      }
+
+      // 17. Jump to pinned or quoted message
+      const jumpBtn = e.target.closest('.btn-jump-pin, .btn-jump-msg');
+      if (jumpBtn) {
+        e.preventDefault();
+        const msgId = jumpBtn.dataset.msgId;
+        if (!msgId) return;
+        const targetEl = container.querySelector(`#msg-${msgId}`);
+        if (targetEl) {
+          targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          targetEl.style.transition = 'box-shadow 0.3s ease, transform 0.3s ease';
+          targetEl.style.transform = 'scale(1.02)';
+          targetEl.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.6)';
+          setTimeout(() => {
+            targetEl.style.transform = '';
+            targetEl.style.boxShadow = '';
+          }, 1500);
+        }
+        return;
+      }
+
+      // 18. Delete message (Admin Only - Reliable Single-Prompt Execution)
+      const delBtn = e.target.closest('[data-del-msg]');
+      if (delBtn) {
+        e.preventDefault();
+        const msgId = delBtn.dataset.delMsg;
+        if (!msgId) return;
+
+        // Prevent multiple simultaneous clicks on delete
+        if (delBtn.disabled) return;
+
+        const confirmed = confirm('Are you sure you want to permanently delete this message for everyone?');
+        if (!confirmed) return;
+
+        delBtn.disabled = true;
+        delBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+        // Optimistically remove from DOM immediately
+        const msgRow = container.querySelector(`#msg-${msgId}`);
+        if (msgRow) {
+          msgRow.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+          msgRow.style.opacity = '0';
+          msgRow.style.transform = 'scale(0.95)';
+          setTimeout(() => msgRow.remove(), 200);
+        }
+
+        // Remove from local in-memory channel messages
+        if (activeChannel?.state?.messages) {
+          activeChannel.state.messages = activeChannel.state.messages.filter(m => m.id !== msgId);
+        }
+
+        try {
+          // 1. Client-side hard delete on Stream Chat
+          if (client) {
+            try {
+              await client.deleteMessage(msgId, { hard: true });
+            } catch (delErr) {
+              const errMsg = String(delErr?.message || '');
+              const errCode = delErr?.code || delErr?.status;
+              // If message is already deleted or not found on Stream server (error 16, 404, or "doesn't exist"), proceed cleanly
+              if (errCode === 16 || errCode === 404 || /doesn't exist|not found/i.test(errMsg)) {
+                console.warn('[StreamChat Delete Note] Message already gone from server:', msgId);
+              } else {
+                // Try server-side admin delete fallback
+                const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pragyan_portal_token')) || '';
+                await fetch('/api/health?action=stream-delete', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                  body: JSON.stringify({ messageId: msgId })
+                }).catch(() => null);
+              }
+            }
+          }
+
+          // 2. Server-side notification to ensure real-time broadcast
+          const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pragyan_portal_token')) || '';
+          if (token) {
+            fetch('/api/health?action=stream-delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ messageId: msgId })
+            }).catch(() => null);
+          }
+
+          renderPinnedBarAndList(container);
+        } catch (err) {
+          console.warn('[Delete Msg Warning]', err);
+          renderPinnedBarAndList(container);
+        }
+        return;
+      }
+
+      // 19. Admin Clear Group Chat (Purge all messages in channel)
+      const clearBtn = e.target.closest('.btn-clear-group-chat');
+      if (clearBtn) {
+        e.preventDefault();
+        const chId = clearBtn.dataset.chId || activeChannelId;
+        const chName = clearBtn.dataset.chName || 'this class';
+
+        const confirmed = confirm(
+          `⚠️ Clear All Messages for "${chName}"?\n\nAre you sure you want to permanently clear the entire chat history for all students and faculty in this group?\n\nThis action cannot be undone.`
+        );
+        if (!confirmed) return;
+
+        const originalHtml = clearBtn.innerHTML;
+        clearBtn.disabled = true;
+        clearBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Clearing...';
+
+        try {
+          const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pragyan_portal_token')) || '';
+          const res = await fetch('/api/health?action=stream-clear', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ channelId: chId, channelType: 'livestream', hardDelete: true })
+          });
+
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data.success) {
+            throw new Error(data.error || 'Failed to clear channel on server');
+          }
+
+          if (activeChannel) {
+            try { await activeChannel.truncate(); } catch (_) {}
+            if (activeChannel.state) activeChannel.state.messages = [];
+          }
+
+          renderUI(container);
+          alert(`🧹 Group chat for "${chName}" has been successfully cleared.`);
+        } catch (err) {
+          console.error('[StreamChat Clear Error]', err);
+          alert(`❌ Failed to clear group chat: ${err.message}`);
+        } finally {
+          clearBtn.disabled = false;
+          clearBtn.innerHTML = originalHtml;
+        }
+        return;
       }
     });
 
     // Close autocomplete on click outside
     document.addEventListener('click', (e) => {
+      const autoBox = container.querySelector('#stream-autocomplete-box');
+      const input = container.querySelector('#stream-msg-input');
       if (autoBox && autoBox.style.display !== 'none' && !autoBox.contains(e.target) && e.target !== input) {
         hideAutocomplete();
       }
     });
 
-    // 6. Send message form
-    const form = container.querySelector('#stream-chat-form');
-    const sendBtn = container.querySelector('#btn-stream-send');
-
-    form?.addEventListener('submit', async e => {
+    // --- DELEGATED FORM SUBMISSION LISTENER ---
+    container.addEventListener('submit', async e => {
+      const form = e.target.closest('#stream-chat-form');
+      if (!form) return;
       e.preventDefault();
+
+      const input = container.querySelector('#stream-msg-input');
+      const sendBtn = container.querySelector('#btn-stream-send');
+      if (!input) return;
+
       const rawText = (input.value || '').trim();
       if (!rawText) return;
 
@@ -2015,78 +2294,10 @@
       }
     });
 
-    // 7. Pin / Unpin Action Handler
-    async function handlePinAction(msgId, shouldPin) {
-      const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pragyan_portal_token')) || '';
-      
-      try {
-        const res = await fetch('/api/health?action=stream-pin', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify({ messageId: msgId, pin: shouldPin })
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data.success) {
-          throw new Error(data.error || 'Failed to update pin state on server');
-        }
-      } catch (srvErr) {
-        console.warn('[Pin server note]', srvErr.message);
-        if (client) {
-          if (shouldPin) {
-            try { await client.pinMessage({ id: msgId }); } catch (_) {}
-          } else {
-            try { await client.unpinMessage({ id: msgId }); } catch (_) {}
-          }
-        }
-      }
-
-      // Update local state and refresh
-      if (activeChannel?.state?.messages) {
-        const target = activeChannel.state.messages.find(m => m.id === msgId);
-        if (target) {
-          target.pinned = shouldPin;
-          target.is_pinned = shouldPin;
-          target.pinned_at = shouldPin ? new Date().toISOString() : null;
-        }
-      }
-
-      renderPinnedBarAndList(container);
-    }
-
-    // 7.1 Media Search Input Controller
-    const mediaSearchInput = container.querySelector('#stream-media-search-input');
-    if (mediaSearchInput) {
-      mediaSearchInput.addEventListener('input', (e) => {
-        mediaSearchQuery = (e.target.value || '').trim();
-        const messages = (activeChannel?.state?.messages || []).filter(m => !m.deleted_at);
-        const activeMeta = CHANNEL_IDENTITIES[activeChannelId] || { shortName: 'Class Forum' };
-        const mediaList = getMediaAttachmentsFromMessages(messages);
-        const mediaWrap = container.querySelector('.stream-media-gallery-wrap');
-        if (mediaWrap) {
-          mediaWrap.outerHTML = renderMediaGalleryHtml(mediaList, activeMeta);
-          renderPdfPage1Thumbnails(container);
-          const newSearch = container.querySelector('#stream-media-search-input');
-          if (newSearch) {
-            newSearch.focus();
-            newSearch.setSelectionRange(newSearch.value.length, newSearch.value.length);
-          }
-        }
-      });
-    }
-
-    // 7.2 Admin Attach File (PDFs & Images up to 20 MB)
-    const attachBtn = container.querySelector('#btn-stream-attach');
-    const fileInput = container.querySelector('#stream-file-input');
-    if (attachBtn && fileInput) {
-      attachBtn.addEventListener('click', () => {
-        fileInput.value = '';
-        fileInput.click();
-      });
-
-      fileInput.addEventListener('change', async () => {
+    // --- DELEGATED FILE ATTACHMENT CHANGE LISTENER ---
+    container.addEventListener('change', async e => {
+      if (e.target && e.target.id === 'stream-file-input') {
+        const fileInput = e.target;
         const file = fileInput.files?.[0];
         if (!file) return;
 
@@ -2106,6 +2317,7 @@
           return;
         }
 
+        const attachBtn = container.querySelector('#btn-stream-attach');
         const typingBox = container.querySelector('#stream-typing-box');
         const sendBtn = container.querySelector('#btn-stream-send');
         if (attachBtn) attachBtn.disabled = true;
@@ -2159,7 +2371,7 @@
               })
             });
 
-            const srvData = await srvRes.json();
+            const srvData = await srvRes.json().catch(() => ({}));
             if (!srvRes.ok || !srvData.success) {
               throw new Error(srvData.error || 'Server upload failed');
             }
@@ -2208,236 +2420,94 @@
           if (sendBtn) sendBtn.disabled = false;
           fileInput.value = '';
         }
-      });
-    }
-
-    // 8. Event delegation on container for View Mode, Media Filters, PDF Reader, Image Lightbox, Pin, Unpin, Delete, Jump
-    container.addEventListener('click', async e => {
-      // View Mode Toggle (💬 Chat / 📁 Media & Notes)
-      const viewModeBtn = e.target.closest('.btn-view-mode');
-      if (viewModeBtn) {
-        e.preventDefault();
-        const mode = viewModeBtn.dataset.viewMode;
-        if (mode && mode !== activeChatViewMode) {
-          activeChatViewMode = mode;
-          renderUI(container);
-        }
-        return;
-      }
-
-      // Media Filter Toggle (ALL / PDF / IMAGE)
-      const filterBtn = e.target.closest('.btn-media-filter');
-      if (filterBtn) {
-        e.preventDefault();
-        const filter = filterBtn.dataset.mediaFilter;
-        if (filter && filter !== mediaFilterType) {
-          mediaFilterType = filter;
-          renderUI(container);
-        }
-        return;
-      }
-
-      // Read PDF Lazy Reader Modal
-      const readPdfBtn = e.target.closest('.btn-read-pdf');
-      if (readPdfBtn) {
-        e.preventDefault();
-        const pdfUrl = readPdfBtn.dataset.pdfUrl;
-        const pdfTitle = readPdfBtn.dataset.pdfTitle || 'PDF Notes';
-        if (pdfUrl) {
-          openPdfReaderModal(pdfUrl, pdfTitle);
-        }
-        return;
-      }
-
-      // Image Lightbox Modal
-      const imgTrigger = e.target.closest('.stream-img-lightbox-trigger');
-      if (imgTrigger) {
-        e.preventDefault();
-        const imgUrl = imgTrigger.dataset.imgUrl || imgTrigger.src;
-        const imgTitle = imgTrigger.dataset.imgTitle || 'Class Image';
-        if (imgUrl) {
-          openImageLightboxModal(imgUrl, imgTitle);
-        }
-        return;
-      }
-
-      // Reply to message (Students, Faculty, and Admin)
-      const replyBtn = e.target.closest('.btn-reply-msg');
-      if (replyBtn) {
-        e.preventDefault();
-        const msgId = replyBtn.dataset.replyMsg;
-        const author = replyBtn.dataset.replyAuthor || 'User';
-        const text = replyBtn.dataset.replyText || '';
-        if (msgId) {
-          replyingToMessage = { id: msgId, author, text };
-          updateReplyBar(container);
-          const inputEl = container.querySelector('#stream-msg-input');
-          if (inputEl) {
-            inputEl.focus();
-            if (!inputEl.value) {
-              inputEl.placeholder = `Replying to @${author}…`;
-            }
-          }
-        }
-        return;
-      }
-
-      // Cancel reply
-      const cancelReplyBtn = e.target.closest('#btn-cancel-reply');
-      if (cancelReplyBtn) {
-        e.preventDefault();
-        replyingToMessage = null;
-        updateReplyBar(container);
-        const inputEl = container.querySelector('#stream-msg-input');
-        if (inputEl) {
-          const meta = CHANNEL_IDENTITIES[activeChannelId] || {};
-          inputEl.placeholder = (currentUser?.role === 'admin')
-            ? 'Type message, @mention, /hg, /quest, /pin, or attach PDF notes…'
-            : `Message ${escapeHtml(meta.shortName || 'class')} (use /quest for doubts)…`;
-        }
-        return;
-      }
-
-      // Pin message
-      const pinBtn = e.target.closest('[data-pin-msg]');
-      if (pinBtn) {
-        e.preventDefault();
-        const msgId = pinBtn.dataset.pinMsg;
-        if (!msgId) return;
-        pinBtn.disabled = true;
-        pinBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-        await handlePinAction(msgId, true);
-        return;
-      }
-
-      // Unpin message
-      const unpinBtn = e.target.closest('[data-unpin-msg]');
-      if (unpinBtn) {
-        e.preventDefault();
-        const msgId = unpinBtn.dataset.unpinMsg;
-        if (!msgId) return;
-        unpinBtn.disabled = true;
-        unpinBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-        await handlePinAction(msgId, false);
-        return;
-      }
-
-      // Jump to pinned or quoted message
-      const jumpBtn = e.target.closest('.btn-jump-pin, .btn-jump-msg');
-      if (jumpBtn) {
-        e.preventDefault();
-        const msgId = jumpBtn.dataset.msgId;
-        if (!msgId) return;
-        const targetEl = container.querySelector(`#msg-${msgId}`);
-        if (targetEl) {
-          targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          targetEl.style.transition = 'box-shadow 0.3s ease, transform 0.3s ease';
-          targetEl.style.transform = 'scale(1.02)';
-          targetEl.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.6)';
-          setTimeout(() => {
-            targetEl.style.transform = '';
-            targetEl.style.boxShadow = '';
-          }, 1500);
-        }
-        return;
-      }
-
-      // Delete message
-      const delBtn = e.target.closest('[data-del-msg]');
-      if (delBtn) {
-        e.preventDefault();
-        const msgId = delBtn.dataset.delMsg;
-        if (!msgId) return;
-        if (!confirm('Are you sure you want to permanently delete this message for everyone?')) return;
-        delBtn.disabled = true;
-        delBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-
-        try {
-          if (client) {
-            try {
-              await client.deleteMessage(msgId, { hard: true });
-            } catch (delErr) {
-              const errMsg = String(delErr?.message || '');
-              const errCode = delErr?.code || delErr?.status;
-              // If message is already deleted or not found on Stream server (error 16, 404, or "doesn't exist"), proceed cleanly
-              if (errCode === 16 || errCode === 404 || /doesn't exist|not found/i.test(errMsg)) {
-                console.warn('[StreamChat Delete Note] Message already gone from server:', msgId);
-              } else {
-                // Try server-side admin delete fallback
-                const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pragyan_portal_token')) || '';
-                const srvRes = await fetch('/api/health?action=stream-delete', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                  body: JSON.stringify({ messageId: msgId })
-                }).catch(() => null);
-                if (!srvRes || !srvRes.ok) {
-                  throw delErr;
-                }
-              }
-            }
-          }
-          if (activeChannel?.state?.messages) {
-            activeChannel.state.messages = activeChannel.state.messages.filter(m => m.id !== msgId);
-          }
-          renderPinnedBarAndList(container);
-        } catch (err) {
-          console.error('[Delete Msg Error]', err);
-          alert('Delete failed: ' + err.message);
-          delBtn.disabled = false;
-          delBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i> Delete';
-        }
-        return;
       }
     });
 
-    // 9. Admin Clear Group Chat (Purge all messages in channel)
-    const clearBtn = container.querySelector('.btn-clear-group-chat');
-    if (clearBtn) {
-      clearBtn.addEventListener('click', async () => {
-        const chId = clearBtn.dataset.chId || activeChannelId;
-        const chName = clearBtn.dataset.chName || 'this class';
-
-        const confirmed = confirm(
-          `⚠️ Clear All Messages for "${chName}"?\n\nAre you sure you want to permanently clear the entire chat history for all students and faculty in this group?\n\nThis action cannot be undone.`
-        );
-        if (!confirmed) return;
-
-        const originalHtml = clearBtn.innerHTML;
-        clearBtn.disabled = true;
-        clearBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Clearing...';
-
-        try {
-          const token = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pragyan_portal_token')) || '';
-          const res = await fetch('/api/health?action=stream-clear', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ channelId: chId, channelType: 'livestream', hardDelete: true })
-          });
-
-          const data = await res.json();
-          if (!res.ok || !data.success) {
-            throw new Error(data.error || 'Failed to clear channel on server');
+    // --- DELEGATED INPUT LISTENER (TYPING & AUTOCOMPLETE & MEDIA SEARCH) ---
+    container.addEventListener('input', e => {
+      // 1. Media Gallery Search
+      if (e.target && e.target.id === 'stream-media-search-input') {
+        mediaSearchQuery = (e.target.value || '').trim();
+        const messages = (activeChannel?.state?.messages || []).filter(m => !m.deleted_at);
+        const activeMeta = CHANNEL_IDENTITIES[activeChannelId] || { shortName: 'Class Forum' };
+        const mediaList = getMediaAttachmentsFromMessages(messages);
+        const mediaWrap = container.querySelector('.stream-media-gallery-wrap');
+        if (mediaWrap) {
+          mediaWrap.outerHTML = renderMediaGalleryHtml(mediaList, activeMeta);
+          renderPdfPage1Thumbnails(container);
+          const newSearch = container.querySelector('#stream-media-search-input');
+          if (newSearch) {
+            newSearch.focus();
+            newSearch.setSelectionRange(newSearch.value.length, newSearch.value.length);
           }
-
-          if (activeChannel) {
-            try { await activeChannel.truncate(); } catch (_) {}
-            if (activeChannel.state) activeChannel.state.messages = [];
-          }
-
-          renderUI(container);
-          alert(`🧹 Group chat for "${chName}" has been successfully cleared.`);
-        } catch (err) {
-          console.error('[StreamChat Clear Error]', err);
-          alert(`❌ Failed to clear group chat: ${err.message}`);
-        } finally {
-          clearBtn.disabled = false;
-          clearBtn.innerHTML = originalHtml;
         }
-      });
-    }
+        return;
+      }
+
+      // 2. Chat Message Input Autocomplete & Typing
+      if (e.target && e.target.id === 'stream-msg-input') {
+        const input = e.target;
+        const val = input.value;
+        const cursorPos = input.selectionStart ?? val.length;
+        const textBeforeCursor = val.substring(0, cursorPos);
+
+        if (activeChannel) activeChannel.keystroke().catch(() => {});
+
+        if (val.startsWith('/') && !val.includes(' ')) {
+          renderSlashCommands(val.slice(1));
+          return;
+        }
+
+        const lastAt = textBeforeCursor.lastIndexOf('@');
+        if (lastAt >= 0) {
+          const textAfterAt = textBeforeCursor.substring(lastAt + 1);
+          if (!textAfterAt.includes(' ')) {
+            renderMentions(textAfterAt);
+            return;
+          }
+        }
+
+        hideAutocomplete();
+      }
+    });
+
+    // --- DELEGATED KEYDOWN LISTENER (AUTOCOMPLETE NAV & ESCAPE) ---
+    container.addEventListener('keydown', e => {
+      if (e.target && e.target.id === 'stream-msg-input') {
+        const input = e.target;
+        const autoBox = container.querySelector('#stream-autocomplete-box');
+        if (!autoMode || !autoBox || autoBox.style.display === 'none') {
+          if (e.key === 'Escape' && replyingToMessage) {
+            replyingToMessage = null;
+            updateReplyBar(container);
+            const meta = CHANNEL_IDENTITIES[activeChannelId] || {};
+            input.placeholder = (currentUser?.role === 'admin')
+              ? 'Type message, @mention, /hg, /quest, /pin, or attach PDF notes…'
+              : `Message ${escapeHtml(meta.shortName || 'class')} (use /quest for doubts)…`;
+          }
+          return;
+        }
+
+        const items = autoBox.querySelectorAll('.auto-item');
+        if (!items.length) return;
+
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          autoSelectedIndex = (autoSelectedIndex + 1) % items.length;
+          items.forEach((it, idx) => it.style.background = (idx === autoSelectedIndex) ? '#ECFDF5' : '#FFFFFF');
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          autoSelectedIndex = (autoSelectedIndex - 1 + items.length) % items.length;
+          items.forEach((it, idx) => it.style.background = (idx === autoSelectedIndex) ? '#ECFDF5' : '#FFFFFF');
+        } else if (e.key === 'Enter' || e.key === 'Tab') {
+          e.preventDefault();
+          const sel = items[autoSelectedIndex];
+          if (sel) sel.click();
+        } else if (e.key === 'Escape') {
+          hideAutocomplete();
+        }
+      }
+    });
   }
 
   function scrollBottom() {
