@@ -5,8 +5,8 @@
  * (Class 1st to 12th + Special English courses).
  * - Students automatically enter their specific class forum.
  * - Administrators have full multi-class access, moderation, pin & highlight tools.
- * - Mentions (@student), Slash Commands (/hg, /pin, /notice, /clear), Pinned Bar.
- * - Persistent message history, real-time WebSockets, verified badges.
+ * - Mentions (@student), Slash Commands (/quest, /hg, /pin, /notice, /clear, /help).
+ * - Pinned Announcements Bar, Realtime WebSockets, Verified Badges.
  * ========================================================================== */
 (function () {
   'use strict';
@@ -182,8 +182,8 @@
   };
 
   const SLASH_COMMANDS = [
-    { cmd: '/quest', usage: '/quest <question>', label: 'Ask Question / Doubt', desc: 'Highlight academic question in vibrant indigo/cyan card for mentors and peers', icon: '❓', forStudents: true },
-    { cmd: '/question', usage: '/question <question>', label: 'Ask Question / Doubt', desc: 'Highlight academic question in vibrant indigo/cyan card for mentors and peers', icon: '💡', forStudents: true },
+    { cmd: '/quest', usage: '/quest <question>', label: 'Ask Question / Doubt', desc: 'Highlight question in vibrant indigo card for mentors & classmates', icon: '❓', forStudents: true },
+    { cmd: '/question', usage: '/question <question>', label: 'Ask Question / Doubt', desc: 'Highlight question in vibrant indigo card for mentors & classmates', icon: '💡', forStudents: true },
     { cmd: '/hg', usage: '/hg <message>', label: 'Highlight Text', desc: 'Broadcast highlighted announcement in glowing gold callout banner', icon: '⭐', adminOnly: true },
     { cmd: '/highlight', usage: '/highlight <message>', label: 'Highlight Text', desc: 'Broadcast highlighted announcement in glowing gold callout banner', icon: '🌟', adminOnly: true },
     { cmd: '/pin', usage: '/pin <message>', label: 'Post & Pin Message', desc: 'Send message and immediately pin it to the top of group', icon: '📌', adminOnly: true },
@@ -225,7 +225,7 @@
 
   function resolveBatchId() {
     try {
-      const user = (typeof AppState !== 'undefined' && AppState.currentUser) || {};
+      const user = (typeof window !== 'undefined' && window.AppState?.currentUser) || (typeof AppState !== 'undefined' && AppState.currentUser) || {};
       if (user.batchId && String(user.batchId).startsWith('BAT-')) return user.batchId;
       if (user.batch_id && String(user.batch_id).startsWith('BAT-')) return user.batch_id;
 
@@ -247,8 +247,18 @@
 
   function getStudentCountForBatch(batchId) {
     try {
-      if (typeof AppState === 'undefined' || !AppState.getStudents) return 0;
-      const students = AppState.getStudents() || [];
+      let students = [];
+      if (typeof window !== 'undefined' && window.AppState?.getStudents) {
+        students = window.AppState.getStudents() || [];
+      } else if (typeof AppState !== 'undefined' && AppState.getStudents) {
+        students = AppState.getStudents() || [];
+      }
+      if (!students.length) {
+        try {
+          const raw = localStorage.getItem('pragyan_db_students_master');
+          if (raw) students = JSON.parse(raw) || [];
+        } catch (_) {}
+      }
       if (!window.PRAGYAN_ACADEMIC || !window.PRAGYAN_ACADEMIC.resolveBatch) return 0;
       return students.filter(s => {
         const b = window.PRAGYAN_ACADEMIC.resolveBatch(s.className || s.class_name || '');
@@ -261,13 +271,60 @@
 
   function getStudentsListForMention(query = '') {
     try {
-      const allStudents = (typeof AppState !== 'undefined' && AppState.getStudents) ? AppState.getStudents() : [];
+      let allStudents = [];
+      if (typeof window !== 'undefined' && window.AppState && typeof window.AppState.getStudents === 'function') {
+        try { allStudents = window.AppState.getStudents() || []; } catch (_) {}
+      } else if (typeof AppState !== 'undefined' && typeof AppState.getStudents === 'function') {
+        try { allStudents = AppState.getStudents() || []; } catch (_) {}
+      }
+
+      if (!allStudents || !allStudents.length) {
+        try {
+          const raw = localStorage.getItem('pragyan_db_students_master') ||
+            localStorage.getItem('pragyan_db_students_v3') ||
+            localStorage.getItem('pragyan_students_data');
+          if (raw) allStudents = JSON.parse(raw) || [];
+        } catch (_) {}
+      }
+
+      const uniqueMap = new Map();
+      if (Array.isArray(allStudents)) {
+        allStudents.forEach(s => {
+          const name = s.name || s.studentName || s.student_name || '';
+          const roll = s.rollNo || s.roll_no || s.student_id || s.id || '';
+          const cName = s.className || s.class_name || s.class || 'Student';
+          const photo = s.photoUrl || s.photo_url || s.photo || '';
+          if (name || roll) {
+            const key = (roll || name).toLowerCase();
+            uniqueMap.set(key, { name: name || `Student ${roll}`, rollNo: roll, className: cName, photoUrl: photo });
+          }
+        });
+      }
+
+      // Also gather users from active channel messages if present
+      if (activeChannel?.state?.messages) {
+        activeChannel.state.messages.forEach(m => {
+          if (m.user && m.user.id && !m.user.id.startsWith('admin_')) {
+            const name = m.user.name || '';
+            let roll = '';
+            if (m.user.id.startsWith('student_')) roll = m.user.id.replace('student_', '');
+            if (name || roll) {
+              const key = (roll || name).toLowerCase();
+              if (!uniqueMap.has(key)) {
+                uniqueMap.set(key, { name: name || `Student ${roll}`, rollNo: roll, className: 'Student', photoUrl: m.user.image || '' });
+              }
+            }
+          }
+        });
+      }
+
+      const list = Array.from(uniqueMap.values());
       const q = String(query || '').toLowerCase().trim();
-      if (!q) return allStudents.slice(0, 10);
-      return allStudents.filter(s => {
-        const name = (s.name || s.studentName || '').toLowerCase();
-        const roll = (s.rollNo || s.roll_no || s.student_id || '').toLowerCase();
-        const cName = (s.className || s.class_name || '').toLowerCase();
+      if (!q) return list.slice(0, 10);
+      return list.filter(s => {
+        const name = (s.name || '').toLowerCase();
+        const roll = (s.rollNo || '').toLowerCase();
+        const cName = (s.className || '').toLowerCase();
         return name.includes(q) || roll.includes(q) || cName.includes(q);
       }).slice(0, 10);
     } catch (_) {
@@ -393,17 +450,15 @@
     };
   }
 
-  function formatMessageBody(rawText, isHighlight = false) {
+  function formatMessageBody(rawText) {
     if (!rawText) return '';
-    let text = rawText;
+    let text = String(rawText);
 
-    // Clean slash prefixes
-    if (text.startsWith('/hg ')) text = text.slice(4).trim();
-    else if (text.startsWith('/highlight ')) text = text.slice(11).trim();
-    else if (text.startsWith('/quest ')) text = text.slice(7).trim();
-    else if (text.startsWith('/question ')) text = text.slice(10).trim();
-    else if (text.startsWith('/pin ')) text = text.slice(5).trim();
-    else if (text.startsWith('/notice ')) text = text.slice(8).trim();
+    // Clean slash prefixes case-insensitively
+    const cleaned = text.replace(/^\/(quest|question|hg|highlight|pin|notice)\s*/i, '').trim();
+    if (cleaned) {
+      text = cleaned;
+    }
 
     let safe = escapeHtml(text);
 
@@ -436,7 +491,7 @@
             ${escapeHtml(channelMeta.tagline)}
           </p>
           <div style="display: inline-flex; align-items: center; gap: 0.4rem; background: #FFFFFF; border: 1px dashed ${channelMeta.badgeColor}; padding: 0.45rem 0.85rem; border-radius: 8px; font-size: 0.8rem; font-weight: 700; color: #334155;">
-            ✨ Start the class discussion, ask doubts (/quest), or share lecture notes below!
+            ✨ Start the class discussion, ask doubts (/quest), or share notes below!
           </div>
         </div>
       `;
@@ -447,13 +502,13 @@
       const identity = extractUserBadge(m.user, channelMeta);
       const isFaculty = identity.isFaculty;
 
-      const isQuestion = (m.text && (m.text.startsWith('/quest ') || m.text.startsWith('/question '))) || m.is_question || m.custom_type === 'question';
-      const isHighlight = (m.text && (m.text.startsWith('/hg ') || m.text.startsWith('/highlight '))) || m.is_highlighted || m.custom_type === 'highlight';
+      const isQuestion = (m.text && /^\/(quest|question)\b/i.test(m.text)) || m.is_question || m.custom_type === 'question';
+      const isHighlight = (m.text && /^\/(hg|highlight)\b/i.test(m.text)) || m.is_highlighted || m.custom_type === 'highlight';
       const isPinned = m.pinned || m.is_pinned || Boolean(m.pinned_at);
-      const isNotice = (m.text && m.text.startsWith('/notice ')) || m.is_notice;
+      const isNotice = (m.text && /^\/notice\b/i.test(m.text)) || m.is_notice;
 
       const avatar = m.user?.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.user?.name || 'User')}&background=${isFaculty ? 'D97706' : '064E3B'}&color=fff`;
-      const formattedBody = formatMessageBody(m.text || '', isHighlight);
+      const formattedBody = formatMessageBody(m.text || '');
 
       let bubbleContentHtml = '';
       if (isQuestion) {
@@ -464,7 +519,7 @@
                 <span style="font-size: 0.95rem;">❓</span> <strong>STUDENT QUESTION &amp; DOUBT</strong>
               </span>
               <span style="font-size: 0.72rem; color: #3730A3; background: #C7D2FE; padding: 1px 7px; border-radius: 4px; font-weight: 800;">
-                💡 Needs Faculty Answer
+                💡 Academic Doubt
               </span>
             </div>
             <div style="font-weight: 600; font-size: 0.95rem; color: #1E1B4B;">
@@ -561,6 +616,15 @@
     const isAdmin = currentUser.role === 'admin';
     if (!isAdmin) return ['ALL'];
     return ['ALL', 'Senior Secondary', 'Secondary', 'Junior & Middle', 'Special English'];
+  }
+
+  function showHelpModal() {
+    const isAdminUser = currentUser?.role === 'admin';
+    if (isAdminUser) {
+      alert('✨ Available Admin & Class Commands:\n\n• /quest <question> — Ask highlighted question / doubt in indigo card\n• /hg <text> — Broadcast highlighted announcement in gold callout card\n• /pin <text> — Post and pin announcement\n• /notice <text> — Broadcast class notice\n• /clear — Clear group message history\n• @<name> — Mention specific student\n• /help — Show this help menu');
+    } else {
+      alert('✨ Available Student Commands:\n\n• /quest <question> — Ask question / doubt (highlighted in indigo card for mentors & classmates)\n• @<name> — Mention a classmate or student\n• /help — Show commands');
+    }
   }
 
   function renderUI(container) {
@@ -723,7 +787,7 @@
         <div id="stream-typing-box" style="padding: 0.2rem 1rem; font-size: 0.75rem; color: #64748B; font-style: italic; min-height: 20px; background: #FAF9F6; border-top: 1px solid rgba(0,0,0,0.03);"></div>
 
         <!-- FLOATING AUTOCOMPLETE DROPDOWN (@MENTIONS & /SLASH COMMANDS) -->
-        <div id="stream-autocomplete-box" style="display: none; position: absolute; bottom: 68px; left: 1rem; right: 1rem; max-height: 230px; overflow-y: auto; background: #FFFFFF; border: 1.5px solid var(--border-sand, #CBD5E1); border-radius: 12px; box-shadow: 0 12px 36px rgba(0,0,0,0.18); z-index: 100; padding: 0.35rem 0;"></div>
+        <div id="stream-autocomplete-box" style="display: none; position: absolute; bottom: 64px; left: 1rem; right: 1rem; max-height: 240px; overflow-y: auto; background: #FFFFFF; border: 1.5px solid var(--border-sand, #CBD5E1); border-radius: 12px; box-shadow: 0 14px 40px rgba(0,0,0,0.18); z-index: 9999; padding: 0.35rem 0;"></div>
 
         <!-- COMPOSER INPUT BAR -->
         <form id="stream-chat-form" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem; background: #FFFFFF; border-top: 1.5px solid var(--border-sand, #DDD5CD); flex-shrink: 0; position: relative;">
@@ -784,6 +848,11 @@
 
       client.on('message.new', event => {
         if (activeChannel && (event.channel_id === activeChannel.id || event.cid === activeChannel.cid)) {
+          if (event.message && activeChannel.state?.messages) {
+            if (!activeChannel.state.messages.some(m => m.id === event.message.id)) {
+              activeChannel.state.messages.push(event.message);
+            }
+          }
           refreshMsgList();
         }
       });
@@ -840,10 +909,12 @@
     if (quickHgBtn && input) {
       quickHgBtn.addEventListener('click', () => {
         if (input.value.startsWith('/hg ')) {
-          input.value = input.value.replace(/^\/hg\s*/, '');
+          input.value = input.value.replace(/^\/hg\s*/i, '');
         } else {
-          input.value = `/hg ${input.value.trim()}`;
+          const cleaned = input.value.replace(/^\/(quest|question|pin|notice|highlight)\s*/i, '');
+          input.value = `/hg ${cleaned.trim()}`;
         }
+        hideAutocomplete();
         input.focus();
       });
     }
@@ -851,10 +922,12 @@
     if (quickQuestBtn && input) {
       quickQuestBtn.addEventListener('click', () => {
         if (input.value.startsWith('/quest ')) {
-          input.value = input.value.replace(/^\/quest\s*/, '');
+          input.value = input.value.replace(/^\/quest\s*/i, '');
         } else {
-          input.value = `/quest ${input.value.trim()}`;
+          const cleaned = input.value.replace(/^\/(hg|highlight|pin|notice|question)\s*/i, '');
+          input.value = `/quest ${cleaned.trim()}`;
         }
+        hideAutocomplete();
         input.focus();
       });
     }
@@ -872,18 +945,19 @@
       const q = filterQuery.toLowerCase().trim();
       const isAdminUser = currentUser.role === 'admin';
       const availableCmds = SLASH_COMMANDS.filter(c => isAdminUser ? true : c.forStudents);
-      const filtered = availableCmds.filter(c => c.cmd.includes(q) || c.label.toLowerCase().includes(q));
+      const filtered = availableCmds.filter(c => c.cmd.toLowerCase().includes(q) || c.label.toLowerCase().includes(q));
       if (!filtered.length) { hideAutocomplete(); return; }
 
       autoMode = 'slash';
       autoSelectedIndex = Math.min(autoSelectedIndex, filtered.length - 1);
+      if (autoSelectedIndex < 0) autoSelectedIndex = 0;
 
       autoBox.innerHTML = `
-        <div style="padding: 0.4rem 0.85rem; font-size: 0.74rem; font-weight: 800; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #F1F5F9;">
+        <div style="padding: 0.4rem 0.85rem; font-size: 0.74rem; font-weight: 800; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #F1F5F9; background: #FAF9F6;">
           ⚡ ${isAdminUser ? 'Admin & Class Commands' : 'Class Commands'}
         </div>
         ${filtered.map((c, i) => `
-          <div class="auto-item ${i === autoSelectedIndex ? 'active' : ''}" data-cmd="${escapeHtml(c.usage)}" style="display: flex; align-items: center; justify-content: space-between; padding: 0.55rem 0.85rem; cursor: pointer; background: ${i === autoSelectedIndex ? '#ECFDF5' : '#FFFFFF'}; transition: background 0.1s;">
+          <div class="auto-item ${i === autoSelectedIndex ? 'active' : ''}" data-cmd="${escapeHtml(c.cmd)}" style="display: flex; align-items: center; justify-content: space-between; padding: 0.55rem 0.85rem; cursor: pointer; background: ${i === autoSelectedIndex ? '#ECFDF5' : '#FFFFFF'}; border-bottom: 1px solid #F8FAFC; transition: background 0.1s;">
             <div style="display: flex; align-items: center; gap: 0.6rem;">
               <span style="font-size: 1.15rem;">${c.icon}</span>
               <div>
@@ -891,15 +965,29 @@
                 <div style="font-size: 0.74rem; color: #64748B;">${escapeHtml(c.desc)}</div>
               </div>
             </div>
-            <span style="font-size: 0.7rem; background: #F1F5F9; color: #475569; padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: 700;">Tab</span>
+            <span style="font-size: 0.7rem; background: #F1F5F9; color: #475569; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 700;">Select</span>
           </div>
         `).join('')}
       `;
       autoBox.style.display = 'block';
 
       autoBox.querySelectorAll('.auto-item').forEach(item => {
-        item.addEventListener('click', () => {
+        item.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
           const cmd = item.dataset.cmd;
+          if (cmd === '/clear') {
+            input.value = '';
+            hideAutocomplete();
+            container.querySelector('.btn-clear-group-chat')?.click();
+            return;
+          }
+          if (cmd === '/help') {
+            input.value = '';
+            hideAutocomplete();
+            showHelpModal();
+            return;
+          }
           input.value = `${cmd} `;
           hideAutocomplete();
           input.focus();
@@ -913,10 +1001,11 @@
 
       autoMode = 'mention';
       autoSelectedIndex = Math.min(autoSelectedIndex, students.length - 1);
+      if (autoSelectedIndex < 0) autoSelectedIndex = 0;
 
       autoBox.innerHTML = `
-        <div style="padding: 0.4rem 0.85rem; font-size: 0.74rem; font-weight: 800; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #F1F5F9;">
-          🎓 Mention Student (${students.length})
+        <div style="padding: 0.4rem 0.85rem; font-size: 0.74rem; font-weight: 800; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #F1F5F9; background: #FAF9F6;">
+          🎓 Mention Classmate / Student (${students.length})
         </div>
         ${students.map((s, i) => {
           const sName = s.name || s.studentName || 'Student';
@@ -924,12 +1013,12 @@
           const sClass = s.className || s.class_name || 'Student';
           const sAvatar = s.photoUrl || s.photo_url || s.photo || '';
           return `
-            <div class="auto-item ${i === autoSelectedIndex ? 'active' : ''}" data-mention="@${escapeHtml(sName)}" style="display: flex; align-items: center; justify-content: space-between; padding: 0.55rem 0.85rem; cursor: pointer; background: ${i === autoSelectedIndex ? '#ECFDF5' : '#FFFFFF'}; transition: background 0.1s;">
+            <div class="auto-item ${i === autoSelectedIndex ? 'active' : ''}" data-mention="@${escapeHtml(sName)}" style="display: flex; align-items: center; justify-content: space-between; padding: 0.55rem 0.85rem; cursor: pointer; background: ${i === autoSelectedIndex ? '#ECFDF5' : '#FFFFFF'}; border-bottom: 1px solid #F8FAFC; transition: background 0.1s;">
               <div style="display: flex; align-items: center; gap: 0.6rem;">
                 ${sAvatar ? `<img src="${escapeHtml(sAvatar)}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover;">` : `<div style="width: 28px; height: 28px; border-radius: 50%; background: #064E3B; color: #FFF; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800;">${sName.charAt(0)}</div>`}
                 <div>
                   <div style="font-weight: 800; font-size: 0.86rem; color: #1E293B;">${escapeHtml(sName)}</div>
-                  <div style="font-size: 0.74rem; color: #64748B;">Roll #${escapeHtml(sRoll)} • ${escapeHtml(sClass)}</div>
+                  <div style="font-size: 0.74rem; color: #64748B;">${sRoll ? `Roll #${escapeHtml(sRoll)} • ` : ''}${escapeHtml(sClass)}</div>
                 </div>
               </div>
               <span style="font-size: 0.72rem; background: #E0E7FF; color: #3730A3; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 800;">@${escapeHtml(sRoll || 'Mention')}</span>
@@ -940,7 +1029,9 @@
       autoBox.style.display = 'block';
 
       autoBox.querySelectorAll('.auto-item').forEach(item => {
-        item.addEventListener('click', () => {
+        item.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
           const mentionText = item.dataset.mention;
           insertMentionIntoInput(mentionText);
         });
@@ -949,9 +1040,13 @@
 
     function insertMentionIntoInput(mentionText) {
       const val = input.value;
-      const atIdx = val.lastIndexOf('@');
-      if (atIdx >= 0) {
-        input.value = val.substring(0, atIdx) + `${mentionText} `;
+      const cursorPos = input.selectionStart ?? val.length;
+      const textBeforeCursor = val.substring(0, cursorPos);
+      const textAfterCursor = val.substring(cursorPos);
+      const lastAt = textBeforeCursor.lastIndexOf('@');
+
+      if (lastAt >= 0) {
+        input.value = textBeforeCursor.substring(0, lastAt) + `${mentionText} ` + textAfterCursor;
       } else {
         input.value = `${val} ${mentionText} `;
       }
@@ -961,20 +1056,25 @@
 
     input?.addEventListener('input', () => {
       const val = input.value;
+      const cursorPos = input.selectionStart ?? val.length;
+      const textBeforeCursor = val.substring(0, cursorPos);
+
       if (activeChannel) activeChannel.keystroke().catch(() => {});
 
-      // Slash commands trigger (Students & Admins)
-      if (val.startsWith('/')) {
+      // 1. Slash commands trigger: Only when input starts with '/' AND has not typed a space yet
+      if (val.startsWith('/') && !val.includes(' ')) {
         renderSlashCommands(val.slice(1));
         return;
       }
 
-      // Mentions trigger
-      const lastAt = val.lastIndexOf('@');
-      if (lastAt >= 0 && lastAt === val.length - 1 || (lastAt >= 0 && !val.slice(lastAt).includes(' '))) {
-        const query = val.slice(lastAt + 1);
-        renderMentions(query);
-        return;
+      // 2. Mentions trigger: When user typed '@' before cursor and has not typed a space after '@'
+      const lastAt = textBeforeCursor.lastIndexOf('@');
+      if (lastAt >= 0) {
+        const textAfterAt = textBeforeCursor.substring(lastAt + 1);
+        if (!textAfterAt.includes(' ')) {
+          renderMentions(textAfterAt);
+          return;
+        }
       }
 
       hideAutocomplete();
@@ -1002,6 +1102,13 @@
       }
     });
 
+    // Close autocomplete on click outside
+    document.addEventListener('click', (e) => {
+      if (autoBox && autoBox.style.display !== 'none' && !autoBox.contains(e.target) && e.target !== input) {
+        hideAutocomplete();
+      }
+    });
+
     // 6. Send message form
     const form = container.querySelector('#stream-chat-form');
     const sendBtn = container.querySelector('#btn-stream-send');
@@ -1021,18 +1128,22 @@
       }
       if (rawText === '/help') {
         input.value = '';
-        if (currentUser.role === 'admin') {
-          alert('✨ Available Admin Commands:\n\n• /quest <question> — Ask highlighted question / doubt in indigo card\n• /hg <text> — Broadcast highlighted announcement in gold callout card\n• /pin <text> — Post and pin announcement\n• /notice <text> — Broadcast class notice\n• /clear — Clear group message history\n• @<name> — Mention specific student');
-        } else {
-          alert('✨ Available Student Commands:\n\n• /quest <question> — Ask question / doubt (highlighted in indigo/cyan card for faculty & mentors)\n• @<name> — Mention a classmate or student\n• /help — Show help');
-        }
+        showHelpModal();
         return;
       }
 
-      const isQuestion = rawText.startsWith('/quest ') || rawText.startsWith('/question ');
-      const isHighlight = rawText.startsWith('/hg ') || rawText.startsWith('/highlight ');
-      const isPinCommand = rawText.startsWith('/pin ');
-      const isNotice = rawText.startsWith('/notice ');
+      const isQuestion = /^\/(quest|question)\b/i.test(rawText);
+      const isHighlight = /^\/(hg|highlight)\b/i.test(rawText);
+      const isPinCommand = /^\/pin\b/i.test(rawText);
+      const isNotice = /^\/notice\b/i.test(rawText);
+
+      // Validate that user entered actual message text after command
+      const cleanBody = rawText.replace(/^\/(quest|question|hg|highlight|pin|notice)\s*/i, '').trim();
+      if ((isQuestion || isHighlight || isPinCommand || isNotice) && !cleanBody) {
+        alert('⚠️ Please type your message text after the slash command (e.g. /quest What is thermodynamics?)');
+        input.focus();
+        return;
+      }
 
       input.value = '';
       if (sendBtn) sendBtn.disabled = true;
@@ -1047,6 +1158,13 @@
         };
 
         const sent = await activeChannel.sendMessage(msgPayload);
+
+        // Ensure local activeChannel state has the message immediately
+        if (sent?.message && activeChannel?.state?.messages) {
+          if (!activeChannel.state.messages.some(m => m.id === sent.message.id)) {
+            activeChannel.state.messages.push(sent.message);
+          }
+        }
 
         // If sent with /pin, immediately pin it
         if (isPinCommand && sent?.message?.id) {

@@ -2789,6 +2789,10 @@ const supaPayload = pushableReqs.map(r => ({
     }
   };
 
+  if (typeof window !== 'undefined') {
+    window.AppState = AppState;
+  }
+
   function isStudentRequestMatch(req, student) {
     if (!req || !student) return false;
     const sId = (student.id || student.student_id || '').toString().trim().toLowerCase();
