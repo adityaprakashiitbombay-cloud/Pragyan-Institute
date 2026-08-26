@@ -301,6 +301,10 @@ export function runCommunityChatLayoutTests(assert) {
   assert(chatJs.includes("cmd: '/imp'") &&
          !chatJs.includes("cmd: '/important'"),
     'T35.91: js/stream-community-chat.js retains /imp and removes duplicate /important from SLASH_COMMANDS');
+
+  assert(chatJs.includes('msgPayload.quoted_message_id = replyingToMessage.id;') &&
+         !chatJs.includes('msgPayload.parent_id = replyingToMessage.id;'),
+    'T35.92: js/stream-community-chat.js avoids parent_id thread nesting error while preserving rich in-channel quotes');
 }
 
 

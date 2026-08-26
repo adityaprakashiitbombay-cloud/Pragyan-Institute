@@ -2937,7 +2937,6 @@
         };
 
         if (replyingToMessage) {
-          msgPayload.parent_id = replyingToMessage.id;
           msgPayload.quoted_message_id = replyingToMessage.id;
           msgPayload.quoted_message_author = replyingToMessage.author;
           msgPayload.quoted_message_text = (replyingToMessage.text || '').substring(0, 150);
