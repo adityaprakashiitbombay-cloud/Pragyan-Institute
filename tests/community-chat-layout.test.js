@@ -112,5 +112,20 @@ export function runCommunityChatLayoutTests(assert) {
     'T35.39: js/stream-community-chat.js defines openImageLightboxModal with smooth image zoom and download');
   assert(portalCss.includes('.stream-media-card') && portalCss.includes('.stream-pdf-card') && portalCss.includes('.stream-pdf-modal'),
     'T35.40: css/portal.css defines responsive styles for media cards, PDF cards, and PDF reader modal');
+
+  // --- 10. Reply-to-All, Quote Threading & Jump-to-Message Suite ---
+  assert(chatJs.includes('btn-reply-msg') && chatJs.includes('data-reply-msg'),
+    'T35.41: js/stream-community-chat.js renders .btn-reply-msg on message rows for all users (students, teachers, and admins)');
+  assert(chatJs.includes('function renderReplyBarHtml') && chatJs.includes('id="stream-reply-bar-wrapper"'),
+    'T35.42: js/stream-community-chat.js defines renderReplyBarHtml and mounts dynamic #stream-reply-bar-wrapper');
+  assert(chatJs.includes('quoted_message_id') && chatJs.includes('quoted_message_author') && chatJs.includes('quoted_message_text'),
+    'T35.43: js/stream-community-chat.js attaches parent_id and quoted_message_* metadata to Stream send message payload');
+  assert(chatJs.includes('stream-msg-quote-header') && chatJs.includes('btn-jump-msg'),
+    'T35.44: js/stream-community-chat.js renders .stream-msg-quote-header with interactive jump-to-quote reference in replies');
+  assert(chatJs.includes('id="btn-cancel-reply"') && chatJs.includes('replyingToMessage = null'),
+    'T35.45: js/stream-community-chat.js wires #btn-cancel-reply and Escape key to smoothly dismiss reply mode');
+  assert(portalCss.includes('.btn-reply-msg') && portalCss.includes('.stream-msg-quote-header') && portalCss.includes('#stream-reply-bar'),
+    'T35.46: css/portal.css defines responsive styles for .btn-reply-msg, .stream-msg-quote-header, and #stream-reply-bar');
 }
+
 

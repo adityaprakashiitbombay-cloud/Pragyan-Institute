@@ -25,6 +25,7 @@
   let mediaFilterType = 'ALL'; // 'ALL' | 'PDF' | 'IMAGE'
   let mediaSearchQuery = '';
   let pdfjsLibLoaded = false;
+  let replyingToMessage = null; // { id, author, text }
 
   const CHANNEL_IDENTITIES = {
     'batch-BAT-12PCM': {
@@ -440,6 +441,7 @@
     if (!channelsMap.has(targetChannelId)) return;
     activeChannelId = targetChannelId;
     activeChannel = channelsMap.get(targetChannelId);
+    replyingToMessage = null;
 
     const list = container.querySelector('#stream-msg-list');
     if (list) {
@@ -1105,20 +1107,42 @@
       const timeStr = fmtTime(m.created_at);
       const attachmentsHtml = renderAttachmentsHtml(m.attachments);
 
-      // Compact Admin Actions (Hover / Inline pill)
-      let actionsHtml = '';
-      if (currentUser.role === 'admin') {
-        actionsHtml = `
-          <span class="stream-msg-actions" style="display: inline-flex; align-items: center; gap: 0.2rem; margin-left: 0.35rem;">
+      // Quoted Reply Header (if this message is a reply to another message)
+      const quotedAuthor = m.quoted_message_author || (m.quoted_message?.user?.name) || (m.parent_message?.user?.name) || '';
+      const quotedText = m.quoted_message_text || (m.quoted_message?.text) || (m.parent_message?.text) || '';
+      const quotedId = m.quoted_message_id || m.parent_id || '';
+
+      let quoteHeaderHtml = '';
+      if (quotedId && (quotedAuthor || quotedText)) {
+        quoteHeaderHtml = `
+          <div class="stream-msg-quote-header btn-jump-msg" data-msg-id="${escapeHtml(quotedId)}" style="background: rgba(0,0,0,0.06); border-left: 3px solid ${isFaculty ? '#F59E0B' : (isMine ? '#A7F3D0' : '#059669')}; padding: 0.22rem 0.45rem; border-radius: 4px; margin-bottom: 0.3rem; cursor: pointer; font-size: 0.72rem; transition: background 0.15s ease;" title="Click to jump to original message">
+            <div style="font-weight: 800; font-size: 0.68rem; color: ${isMine ? '#D1FAE5' : '#064E3B'}; display: flex; align-items: center; gap: 0.25rem;">
+              <i class="fa-solid fa-reply fa-flip-horizontal" style="font-size: 0.62rem;"></i>
+              <span>Replying to <strong>@${escapeHtml(quotedAuthor || 'User')}</strong></span>
+            </div>
+            <div style="font-size: 0.7rem; color: ${isMine ? '#E2E8F0' : '#475569'}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 280px; font-style: italic; margin-top: 1px;">
+              ${escapeHtml(quotedText || 'View original message')}
+            </div>
+          </div>
+        `;
+      }
+
+      // Message Actions (Reply for everyone, Pin/Delete for Admin)
+      let actionsHtml = `
+        <span class="stream-msg-actions" style="display: inline-flex; align-items: center; gap: 0.2rem; margin-left: 0.35rem;">
+          <button type="button" class="btn-reply-msg" data-reply-msg="${escapeHtml(m.id)}" data-reply-author="${escapeHtml(m.user?.name || 'User')}" data-reply-text="${escapeHtml((m.text || '').substring(0, 100))}" style="background: rgba(0,0,0,0.06); border: none; font-size: 0.65rem; color: #475569; cursor: pointer; padding: 2px 5px; border-radius: 4px; font-weight: 700; line-height: 1; display: inline-flex; align-items: center; gap: 0.2rem;" title="Reply to this message" aria-label="Reply to message">
+            <i class="fa-solid fa-reply" aria-hidden="true"></i> <span>Reply</span>
+          </button>
+          ${currentUser.role === 'admin' ? `
             <button type="button" class="${isPinned ? 'btn-unpin-msg' : 'btn-pin-msg'}" data-${isPinned ? 'unpin' : 'pin'}-msg="${escapeHtml(m.id)}" style="background: rgba(0,0,0,0.06); border: none; font-size: 0.65rem; color: ${isPinned ? '#D97706' : '#059669'}; cursor: pointer; padding: 2px 5px; border-radius: 4px; font-weight: 700; line-height: 1;" title="${isPinned ? 'Unpin message' : 'Pin to top'}">
               <i class="fa-solid fa-thumbtack" aria-hidden="true"></i> ${isPinned ? 'Unpin' : 'Pin'}
             </button>
             <button type="button" class="btn-del-msg" data-del-msg="${escapeHtml(m.id)}" style="background: rgba(220,38,38,0.08); border: none; font-size: 0.65rem; color: #DC2626; cursor: pointer; padding: 2px 5px; border-radius: 4px; font-weight: 700; line-height: 1;" title="Delete message" aria-label="Delete message">
               <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
             </button>
-          </span>
-        `;
-      }
+          ` : ''}
+        </span>
+      `;
 
       let bubbleContentHtml = '';
       if (isQuestion) {
@@ -1132,6 +1156,7 @@
                 Academic Doubt
               </span>
             </div>
+            ${quoteHeaderHtml}
             <div style="font-weight: 600; color: #1E1B4B;">
               ${formattedBody}
             </div>
@@ -1151,6 +1176,7 @@
               </span>
               ${isPinned ? `<span style="font-size: 0.65rem; color: #92400E; background: #FDE68A; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 800;"><i class="fa-solid fa-thumbtack"></i> Pinned</span>` : ''}
             </div>
+            ${quoteHeaderHtml}
             <div style="font-weight: 600; color: #78350F;">
               ${formattedBody}
             </div>
@@ -1170,6 +1196,7 @@
               </span>
               ${isPinned ? `<span style="font-size: 0.65rem; color: #065F46; background: #A7F3D0; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 800;"><i class="fa-solid fa-thumbtack"></i> Pinned</span>` : ''}
             </div>
+            ${quoteHeaderHtml}
             <div style="font-weight: 600; color: #064E3B;">
               ${formattedBody}
             </div>
@@ -1193,6 +1220,7 @@
                 <i class="fa-solid fa-thumbtack"></i> Pinned
               </div>
             ` : ''}
+            ${quoteHeaderHtml}
             <div class="stream-msg-text" style="display: inline;">
               ${formattedBody}
             </div>
@@ -1237,9 +1265,38 @@
   function showHelpModal() {
     const isAdminUser = currentUser?.role === 'admin';
     if (isAdminUser) {
-      alert('✨ Available Admin & Class Commands:\n\n• 📎 Paperclip icon — Upload PDF notes & study images (up to 20 MB)\n• /quest <question> — Ask highlighted question / doubt in indigo card\n• /hg <text> — Broadcast highlighted announcement in gold callout card\n• /pin <text> — Post and pin announcement\n• /notice <text> — Broadcast class notice\n• /clear — Clear group message history\n• @<name> — Mention specific student\n• /help — Show this help menu');
+      alert('✨ Available Admin & Class Commands:\n\n• ↩️ Reply button — Reply to any student or teacher message with quote reference\n• 📎 Paperclip icon — Upload PDF notes & study images (up to 20 MB)\n• /quest <question> — Ask highlighted question / doubt in indigo card\n• /hg <text> — Broadcast highlighted announcement in gold callout card\n• /pin <text> — Post and pin announcement\n• /notice <text> — Broadcast class notice\n• /clear — Clear group message history\n• @<name> — Mention specific student\n• /help — Show this help menu');
     } else {
-      alert('✨ Available Student Commands:\n\n• 📁 Class Media tab — Browse & download all PDFs, chapter notes & diagrams\n• /quest <question> — Ask question / doubt (highlighted in indigo card for mentors & classmates)\n• @<name> — Mention a classmate or student\n• /help — Show commands');
+      alert('✨ Available Student Commands:\n\n• ↩️ Reply button — Reply directly to classmate or faculty message\n• 📁 Class Media tab — Browse & download all PDFs, chapter notes & diagrams\n• /quest <question> — Ask question / doubt (highlighted in indigo card for mentors & classmates)\n• @<name> — Mention a classmate or student\n• /help — Show commands');
+    }
+  }
+
+  function renderReplyBarHtml() {
+    if (!replyingToMessage) return '';
+    return `
+      <div id="stream-reply-bar" style="background: #ECFDF5; border-top: 1.5px solid #6EE7B7; border-bottom: 1px solid #A7F3D0; padding: 0.35rem 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-size: 0.76rem; color: #065F46; flex-shrink: 0; animation: fadeIn 0.15s ease;">
+        <div style="display: flex; align-items: center; gap: 0.45rem; overflow: hidden; flex: 1;">
+          <div style="width: 22px; height: 22px; border-radius: 50%; background: #059669; color: #FFF; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; flex-shrink: 0;">
+            <i class="fa-solid fa-reply"></i>
+          </div>
+          <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            <span>Replying to <strong>@${escapeHtml(replyingToMessage.author || 'User')}</strong></span>
+            <span style="color: #475569; font-style: italic; margin-left: 0.35rem; font-size: 0.72rem;">"${escapeHtml(replyingToMessage.text ? replyingToMessage.text.substring(0, 75) : 'Message')}"</span>
+          </div>
+        </div>
+        <button type="button" id="btn-cancel-reply" style="background: #D1FAE5; border: none; color: #065F46; font-size: 0.75rem; cursor: pointer; padding: 0.2rem 0.45rem; border-radius: 4px; font-weight: 800; display: inline-flex; align-items: center; gap: 0.2rem;" title="Cancel reply (Esc)" aria-label="Cancel reply">
+          <i class="fa-solid fa-xmark"></i> <span>Cancel</span>
+        </button>
+      </div>
+    `;
+  }
+
+  function updateReplyBar(targetPane) {
+    const pane = targetPane || getActiveCommunityPane();
+    if (!pane) return;
+    const replyWrapper = pane.querySelector('#stream-reply-bar-wrapper');
+    if (replyWrapper) {
+      replyWrapper.innerHTML = renderReplyBarHtml();
     }
   }
 
@@ -1455,6 +1512,11 @@
         <!-- REALTIME TYPING NOTIFIER -->
         <div id="stream-typing-box" style="padding: 0.15rem 0.85rem; font-size: 0.72rem; color: #64748B; font-style: italic; min-height: 18px; background: #FAF9F6; border-top: 1px solid rgba(0,0,0,0.03);"></div>
 
+        <!-- REPLYING PREVIEW BANNER CONTAINER -->
+        <div id="stream-reply-bar-wrapper">
+          ${renderReplyBarHtml()}
+        </div>
+
         <!-- FLOATING AUTOCOMPLETE DROPDOWN (@MENTIONS & /SLASH COMMANDS) -->
         <div id="stream-autocomplete-box" style="display: none; position: absolute; bottom: 58px; left: 0.75rem; right: 0.75rem; max-height: 220px; overflow-y: auto; background: #FFFFFF; border: 1.5px solid var(--border-sand, #CBD5E1); border-radius: 10px; box-shadow: 0 12px 35px rgba(0,0,0,0.16); z-index: 9999; padding: 0.3rem 0;"></div>
 
@@ -1599,6 +1661,10 @@
       window._streamEscHandlerBound = true;
       window.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
+          if (replyingToMessage) {
+            replyingToMessage = null;
+            updateReplyBar();
+          }
           const activeFullWrapper = document.querySelector('.stream-chat-wrapper.stream-fullscreen');
           if (activeFullWrapper) {
             activeFullWrapper.classList.remove('stream-fullscreen');
@@ -1835,7 +1901,16 @@
         const sel = items[autoSelectedIndex];
         if (sel) sel.click();
       } else if (e.key === 'Escape') {
-        hideAutocomplete();
+        if (autoMode && autoBox && autoBox.style.display !== 'none') {
+          hideAutocomplete();
+        } else if (replyingToMessage) {
+          replyingToMessage = null;
+          updateReplyBar(container);
+          const meta = CHANNEL_IDENTITIES[activeChannelId] || {};
+          input.placeholder = (currentUser?.role === 'admin')
+            ? 'Type message, @mention, /hg, /quest, /pin, or attach PDF notes…'
+            : `Message ${escapeHtml(meta.shortName || 'class')} (use /quest for doubts)…`;
+        }
       }
     });
 
@@ -1903,7 +1978,18 @@
           custom_type: isQuestion ? 'question' : (isHighlight ? 'highlight' : (isNotice ? 'notice' : 'text'))
         };
 
+        if (replyingToMessage) {
+          msgPayload.parent_id = replyingToMessage.id;
+          msgPayload.quoted_message_id = replyingToMessage.id;
+          msgPayload.quoted_message_author = replyingToMessage.author;
+          msgPayload.quoted_message_text = (replyingToMessage.text || '').substring(0, 150);
+        }
+
         const sent = await activeChannel.sendMessage(msgPayload);
+
+        // Clear reply state after sending
+        replyingToMessage = null;
+        updateReplyBar(container);
 
         // Ensure local activeChannel state has the message immediately
         if (sent?.message && activeChannel?.state?.messages) {
@@ -1919,7 +2005,7 @@
           } catch (_) {}
         }
 
-        refreshMsgList();
+        renderPinnedBarAndList(container);
       } catch (err) {
         console.error('[StreamChat Send Error]', err);
         alert('Failed to send message: ' + err.message);
@@ -2175,6 +2261,43 @@
         return;
       }
 
+      // Reply to message (Students, Faculty, and Admin)
+      const replyBtn = e.target.closest('.btn-reply-msg');
+      if (replyBtn) {
+        e.preventDefault();
+        const msgId = replyBtn.dataset.replyMsg;
+        const author = replyBtn.dataset.replyAuthor || 'User';
+        const text = replyBtn.dataset.replyText || '';
+        if (msgId) {
+          replyingToMessage = { id: msgId, author, text };
+          updateReplyBar(container);
+          const inputEl = container.querySelector('#stream-msg-input');
+          if (inputEl) {
+            inputEl.focus();
+            if (!inputEl.value) {
+              inputEl.placeholder = `Replying to @${author}…`;
+            }
+          }
+        }
+        return;
+      }
+
+      // Cancel reply
+      const cancelReplyBtn = e.target.closest('#btn-cancel-reply');
+      if (cancelReplyBtn) {
+        e.preventDefault();
+        replyingToMessage = null;
+        updateReplyBar(container);
+        const inputEl = container.querySelector('#stream-msg-input');
+        if (inputEl) {
+          const meta = CHANNEL_IDENTITIES[activeChannelId] || {};
+          inputEl.placeholder = (currentUser?.role === 'admin')
+            ? 'Type message, @mention, /hg, /quest, /pin, or attach PDF notes…'
+            : `Message ${escapeHtml(meta.shortName || 'class')} (use /quest for doubts)…`;
+        }
+        return;
+      }
+
       // Pin message
       const pinBtn = e.target.closest('[data-pin-msg]');
       if (pinBtn) {
@@ -2199,8 +2322,8 @@
         return;
       }
 
-      // Jump to pinned message
-      const jumpBtn = e.target.closest('.btn-jump-pin');
+      // Jump to pinned or quoted message
+      const jumpBtn = e.target.closest('.btn-jump-pin, .btn-jump-msg');
       if (jumpBtn) {
         e.preventDefault();
         const msgId = jumpBtn.dataset.msgId;
@@ -2210,7 +2333,7 @@
           targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
           targetEl.style.transition = 'box-shadow 0.3s ease, transform 0.3s ease';
           targetEl.style.transform = 'scale(1.02)';
-          targetEl.style.boxShadow = '0 0 20px rgba(245, 158, 11, 0.6)';
+          targetEl.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.6)';
           setTimeout(() => {
             targetEl.style.transform = '';
             targetEl.style.boxShadow = '';

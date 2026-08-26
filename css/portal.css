@@ -10294,3 +10294,29 @@ body.stream-body-fullscreen-lock {
   from { opacity: 0; transform: scale(0.98); }
   to { opacity: 1; transform: scale(1); }
 }
+
+/* ── Stream Community Chat Reply & Quoted Message Styles ── */
+.btn-reply-msg {
+  transition: all 0.15s ease;
+}
+
+.btn-reply-msg:hover {
+  background: rgba(0, 0, 0, 0.12) !important;
+  color: #065F46 !important;
+}
+
+.stream-msg-quote-header {
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.stream-msg-quote-header:hover {
+  background: rgba(0, 0, 0, 0.12) !important;
+  transform: translateX(2px);
+}
+
+#stream-reply-bar {
+  border-left: 3.5px solid #059669;
+}
