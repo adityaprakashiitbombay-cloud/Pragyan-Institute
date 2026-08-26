@@ -203,7 +203,26 @@ export function runCommunityChatLayoutTests(assert) {
   assert(aiChatJs.includes('@media (max-width: 768px)') &&
          aiChatJs.includes('env(safe-area-inset-bottom)'),
     'T35.70: js/chat.js supports tablet and mobile safe-area insets seamlessly');
+
+  // --- 18. Community Forum Mobile Viewport & Edge-to-Edge Fitting Suite ---
+  assert(portalCss.includes('.portal-overlay.community-tab-active') &&
+         portalCss.includes('.portal-modal-card.community-tab-active') &&
+         portalCss.includes('height: 100dvh !important'),
+    'T35.71: css/portal.css defines edge-to-edge 100dvh height fitting for mobile Community Forum');
+
+  assert(portalCss.includes('#stream-community-chat-app') &&
+         portalCss.includes('flex: 1 1 auto !important'),
+    'T35.72: css/portal.css enforces unbroken flex chain for #stream-community-chat-app on mobile');
+
+  assert(portalJs.includes("portalOverlayEl?.classList.add('community-tab-active')") &&
+         portalJs.includes("portalModalCardEl?.classList.add('community-tab-active')"),
+    'T35.73: js/portal.js synchronizes community-tab-active on modal overlay and card for mobile');
+
+  assert(portalJs.includes("portalOverlay.classList.remove('active', 'community-tab-active')") &&
+         portalJs.includes("document.querySelector('.portal-modal-card')?.classList.remove('community-tab-active')"),
+    'T35.74: js/portal.js cleans up community-tab-active upon closePortal and logout');
 }
+
 
 
 

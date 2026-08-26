@@ -3053,11 +3053,14 @@ const supaPayload = pushableReqs.map(r => ({
   function closePortal() {
     if (!portalOverlay) portalOverlay = document.getElementById('portalOverlay');
     if (portalOverlay) {
-      portalOverlay.classList.remove('active');
+      portalOverlay.classList.remove('active', 'community-tab-active');
       portalOverlay.style.display = 'none';
       portalOverlay.style.opacity = '0';
       portalOverlay.style.visibility = 'hidden';
     }
+    document.querySelector('.portal-modal-card')?.classList.remove('community-tab-active');
+    document.getElementById('studentDashboardContainer')?.classList.remove('community-tab-active');
+    document.getElementById('adminDashboardContainer')?.classList.remove('community-tab-active');
     // Purge any lingering sub-modals
     document.querySelectorAll('.inner-modal-backdrop, .portal-modal-backdrop').forEach(m => {
       try { m.remove(); } catch (_) {}
@@ -3315,6 +3318,10 @@ const supaPayload = pushableReqs.map(r => ({
     document.querySelectorAll('.inner-modal-backdrop, .portal-modal-backdrop').forEach(m => {
       try { m.remove(); } catch (_) {}
     });
+    document.getElementById('portalOverlay')?.classList.remove('community-tab-active');
+    document.querySelector('.portal-modal-card')?.classList.remove('community-tab-active');
+    document.getElementById('studentDashboardContainer')?.classList.remove('community-tab-active');
+    document.getElementById('adminDashboardContainer')?.classList.remove('community-tab-active');
 
     // 2. Clear all storage session items
     sessionStorage.removeItem(STORAGE_KEY_SESSION);
@@ -3514,12 +3521,16 @@ function renderStudentDashboard() {
     AppState.activeTab = tabName;
 
     const studentWrapper = document.getElementById('studentDashboardContainer');
-    if (studentWrapper) {
-      if (tabName === 'community') {
-        studentWrapper.classList.add('community-tab-active');
-      } else {
-        studentWrapper.classList.remove('community-tab-active');
-      }
+    const portalOverlayEl = document.getElementById('portalOverlay');
+    const portalModalCardEl = document.querySelector('.portal-modal-card');
+    if (tabName === 'community') {
+      studentWrapper?.classList.add('community-tab-active');
+      portalOverlayEl?.classList.add('community-tab-active');
+      portalModalCardEl?.classList.add('community-tab-active');
+    } else {
+      studentWrapper?.classList.remove('community-tab-active');
+      portalOverlayEl?.classList.remove('community-tab-active');
+      portalModalCardEl?.classList.remove('community-tab-active');
     }
 
     // Update Tab Button Active States
@@ -6363,12 +6374,16 @@ function renderStudentDashboard() {
     AppState.activeAdminTab = tabName;
 
     const adminWrapper = document.getElementById('adminDashboardContainer');
-    if (adminWrapper) {
-      if (tabName === 'community') {
-        adminWrapper.classList.add('community-tab-active');
-      } else {
-        adminWrapper.classList.remove('community-tab-active');
-      }
+    const portalOverlayEl = document.getElementById('portalOverlay');
+    const portalModalCardEl = document.querySelector('.portal-modal-card');
+    if (tabName === 'community') {
+      adminWrapper?.classList.add('community-tab-active');
+      portalOverlayEl?.classList.add('community-tab-active');
+      portalModalCardEl?.classList.add('community-tab-active');
+    } else {
+      adminWrapper?.classList.remove('community-tab-active');
+      portalOverlayEl?.classList.remove('community-tab-active');
+      portalModalCardEl?.classList.remove('community-tab-active');
     }
 
     // Toggle Overview KPI cards: show only on Students tab
