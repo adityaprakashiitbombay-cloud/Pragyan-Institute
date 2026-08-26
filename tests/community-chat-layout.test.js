@@ -292,6 +292,11 @@ export function runCommunityChatLayoutTests(assert) {
   assert(chatJs.includes('const mediaList = getMediaAttachmentsFromMessages(messages);') &&
          chatJs.includes('renderMediaGalleryHtml(mediaList, activeMeta)'),
     'T35.89: js/stream-community-chat.js defines mediaList from active channel messages for renderUI and media gallery');
+
+  assert(chatJs.includes('openMobileFullscreen') &&
+         chatJs.includes('openMobileFullscreen(container)') &&
+         chatJs.includes('btn-enter-mobile-chat'),
+    'T35.90: js/stream-community-chat.js defines openMobileFullscreen and wires launch button with multi-event listeners');
 }
 
 

@@ -1683,7 +1683,7 @@
             </div>
           </div>
 
-          <button type="button" id="btn-enter-mobile-chat" class="btn btn-emerald stream-launch-chat-btn" title="Open Fullscreen Class Chat">
+          <button type="button" id="btn-enter-mobile-chat" class="btn btn-emerald stream-launch-chat-btn" onclick="if(window.PragyanStreamChat && typeof window.PragyanStreamChat.openMobileFullscreen === 'function'){window.PragyanStreamChat.openMobileFullscreen();}" title="Open Fullscreen Class Chat">
             <i class="fa-solid fa-comments" aria-hidden="true"></i>
             <span>Enter Class Chat</span>
             <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
@@ -1691,6 +1691,19 @@
         </div>
       </div>
     `;
+  }
+
+  function openMobileFullscreen(targetContainer) {
+    isMobileChatOpen = true;
+    if (typeof document !== 'undefined') {
+      document.body.classList.add('stream-body-fullscreen-lock');
+    }
+    const pane = targetContainer || getActiveCommunityPane();
+    if (pane) {
+      renderUI(pane);
+    } else {
+      getAllCommunityPanes().forEach(p => renderUI(p));
+    }
   }
 
   function renderUI(container) {
@@ -1743,13 +1756,18 @@
       container.innerHTML = renderMobileLaunchCardHtml(activeMeta, onlineCount, isAdmin);
       const launchBtn = container.querySelector('#btn-enter-mobile-chat');
       if (launchBtn) {
-        launchBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          isMobileChatOpen = true;
-          document.body.classList.add('stream-body-fullscreen-lock');
-          renderUI(container);
-        });
+        const handleLaunch = (e) => {
+          if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+          openMobileFullscreen(container);
+        };
+        launchBtn.onclick = handleLaunch;
+        launchBtn.addEventListener('click', handleLaunch);
+        launchBtn.addEventListener('touchend', handleLaunch);
       }
+      wireEvents(container);
       return;
     }
 
@@ -2406,6 +2424,14 @@
 
     // --- DELEGATED CONTAINER CLICK LISTENER ---
     container.addEventListener('click', async e => {
+      // 0. Mobile Enter Chat Launch Button
+      const enterChatBtn = e.target.closest('#btn-enter-mobile-chat');
+      if (enterChatBtn) {
+        e.preventDefault();
+        openMobileFullscreen(container);
+        return;
+      }
+
       // 1. Fullscreen Toggle / Mobile Chat Exit
       const fullscreenBtn = e.target.closest('#btn-stream-fullscreen');
       if (fullscreenBtn) {
@@ -3323,6 +3349,7 @@
     syncActiveChannelMessages,
     broadcastMessageSync,
     renderPinnedBarAndList,
+    openMobileFullscreen,
     exitMobileFullscreen() {
       isMobileChatOpen = false;
       if (typeof document !== 'undefined') {
