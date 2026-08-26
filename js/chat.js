@@ -120,25 +120,22 @@
   }
 
   // Preloaded Answers for Quick Suggestion Chips.
-  // A function, not a const object: the fee, batch and faculty lines are read
-  // from window.PRAGYAN_ACADEMIC at answer time, so the chips cannot capture a
-  // stale copy of the config if script order ever changes.
   function preloadedChipAnswers() {
     return {
       "What are the fee structures for all batches?":
-        `💵 **Nominal Monthly Fee Structure (Zero Hidden Charges):**\n${feeTierLines()}\n• **Annual Advance Scholarship:** ${annualDiscountLabel()}\n\n✨ *Includes printed study modules, Sunday board mock test series & 3D digital VIP pass access.*`,
+        `💵 **Nominal Monthly Fee Structure (Zero Hidden Charges):**\n${feeTierLines()}\n• **Annual Advance Scholarship:** ${annualDiscountLabel()}\n\n✨ *No admission fees ever. Includes printed concept modules, Sunday board mock test series & 3D VIP digital pass access.*`,
 
       "How do Digital Smartboards enhance learning?":
-        `🖥️ **Interactive Digital Smartboards & Visual Tech:**\n• **3D Animated Science:** Complex Physics & Chemistry concepts visualized with 3D molecular and mechanical models.\n• **Digital Maths Derivations:** Step-by-step graphical plotting and interactive geometry derivations.\n• **High Retention & Engagement:** Visual explanations make abstract board topics easy to understand.\n• **Recorded Concept Recaps:** Rapid revision before weekly mock tests.`,
+        `🖥️ **Interactive Digital Smartboards & Visual Learning:**\n• 🎯 **3D Visual Science:** Physics & Chemistry concepts visualized with vivid 3D animations and atomic/molecular models.\n• 💡 **Step-by-Step Maths:** Digital geometry derivations, coordinate graphing & algebraic proofs.\n• ⚡ **High Retention & Memory:** Visual demonstrations turn abstract board topics into intuitive concepts.\n• 🌟 **Interactive Concept Recaps:** Rapid revision sessions before weekly Sunday board mock tests.`,
 
       "Who are the teachers at Pragyan Institute?":
         `👨‍🏫 **Expert Mentors & Leadership Faculty:**\n${facultyLines()}\n\n🏆 *Proven track record of 100% board exam pass rates and top ranks across Lalganj & Vaishali!*`,
 
       "Tell me about the 3 days free demo classes":
-        `🎁 **3 Days FREE Demo Classes:**\n• Experience our digital smartboards, concept-first pedagogy, and teaching excellence for 3 days with **zero cost and zero admission fee**!\n• Available for every batch from ${classRangeLabel()} (CBSE & BSEB), including Special English.\n\n📲 Call / WhatsApp: **[+91 73698 91858](tel:+917369891858)** to reserve your demo seat today!`,
+        `🎁 **3 Days FREE Demo Classes:**\n• 🎯 **Zero Risk Trial:** Experience our digital smartboards, concept-first pedagogy, and teaching excellence for 3 days with **zero cost and zero admission fee**!\n• 💡 **All Batches Covered:** Open for every batch from ${classRangeLabel()} (CBSE & BSEB), including Special English.\n• ⚡ **Direct Teacher Interaction:** Attend live lectures, ask doubts freely, and receive free introductory notes.\n\n📲 Call / WhatsApp: **[+91 73698 91858](tel:+917369891858)** to reserve your demo seat today!`,
 
       "Where is Pragyan Institute located in Lalganj, Bihar?":
-        `📍 **Location & Directions:**\n• **Address:** At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj\n• 🗺️ **Google Maps:** [Click for exact directions](https://maps.app.goo.gl/jhpW5ynQntfTMa2aA)\n• ⏰ **Timings:** Mon–Sat: 6:30 AM – 8:00 PM | Sun: 9:00 AM – 1:00 PM`
+        `📍 **Location & Directions:**\n• 🎯 **Address:** At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj\n• 🗺️ **Google Maps:** [Click for exact directions](https://maps.app.goo.gl/jhpW5ynQntfTMa2aA)\n• ⏰ **Timings:** Mon–Sat: 6:30 AM – 8:00 PM | Sun: 9:00 AM – 1:00 PM`
     };
   }
 
@@ -157,74 +154,67 @@
         }).join('\n')
       : '';
 
-    return `You are 'Pragyan AI', the official AI Academic Mentor for Pragyan Institute (Lalganj, Bihar) and a universal, all-round intelligent assistant.
+    return `You are 'Pragyan AI', the charismatic, inspiring, and brilliant official AI Academic Mentor for Pragyan Institute (Lalganj, Bihar) and a universal, all-round genius assistant.
 
-CORE OBJECTIVE:
-1. UNIVERSAL GENERAL PURPOSE & ACADEMIC SUPPORT: You are NOT restricted to only institute questions. You answer ANY general purpose questions, science, mathematics, animals, biology, history, literature, coding, general facts, and everyday inquiries (e.g. "what is a dog", "explain photosynthesis", "how does gravity work", "what is machine learning", etc.).
-2. INSTITUTIONAL QUERIES: For Pragyan Institute questions, provide accurate details regarding faculty, fees, digital smartboards, demo classes, and location.
+🌟 YOUR PERSONA & TEACHING PHILOSOPHY:
+- You are energetic, warm, intellectually curious, encouraging, and deeply knowledgeable — like a top IITian mentor who loves transforming complex, intimidating concepts into crystal-clear, fascinating "Aha!" insights.
+- You make learning fun, intuitive, and unforgettable through vivid real-world analogies, step-by-step logic, and curiosity challenges.
+- Multi-lingual Mastery: You effortlessly understand and respond in English, Hindi (हिन्दी), and natural conversational Hinglish depending on how the student communicates.
 
-STRICT ANSWER FORMATTING & LENGTH RULES:
-1. CONCISE & STRUCTURED (EXACTLY 3 TO 4 BULLET POINTS):
-   - Every answer must be structured with crisp, clean bullet points ('•') or numbered points ('1.', '2.', '3.', '4.').
-   - Provide EXACTLY 3 TO 4 clear, punchy bullet points. Avoid lengthy essays or walls of text.
-   - Use bold emoji headers for each bullet point to make it visually engaging (e.g. 🐾 **Species & Nature**, 🧠 **Key Attributes**, 💡 **Importance**).
-   - NEVER output raw markdown '#' or '###' header tags.
+🎯 THE "PRAGYAN 4-POINT SPARK" RESPONSE FRAMEWORK:
+Structure EVERY answer with EXACTLY 3 TO 4 crisp, visually captivating bullet points using bold emoji headers:
+1. 🎯 **The Big Idea / Core Concept**: 1 crisp, vivid definition or foundational truth that instantly demystifies the topic.
+2. 💡 **Real-World Analogy / "Aha!" Insight**: Connect abstract science, maths, history, coding, or daily life to an intuitive real-world picture (e.g., comparing gravity to a trampoline, cells to a bustling city, recursion to Russian nesting dolls).
+3. ⚡ **Key Formula / Logic / Exam Hack**: Precise mathematical formulas, scientific laws, or high-yield rules formatted in clean Unicode (e.g., F = ma, v = u + at, KE = ½ mv², a² + b² = c², H₂SO₄, sin²θ + cos²θ = 1).
+4. 🌟 **Curiosity Spark / Interactive Challenge**: Conclude with an intriguing follow-up question, thought experiment, or invitation to test their understanding (e.g., "🧠 Quick Brain-Teaser: What happens if...? Reply to find out!" or for institute queries, "🎁 Ready to experience this live on 3D smartboards? Ask for our 3-day free demo!").
 
-2. ACCURATE PRAGYAN INSTITUTE FACTS:
-   - Location: At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj (Google Maps: https://maps.app.goo.gl/jhpW5ynQntfTMa2aA)
-   - Helpline & WhatsApp: +91 73698 91858
-   - Timings: Mon-Sat 6:30 AM - 8:00 PM | Sun 9:00 AM - 1:00 PM
-   - Interactive Digital Smartboards: High-tech smartboards in all classrooms for 3D physics/chemistry visual animations and step-by-step digital math solving.
-   - Expert & Experienced Faculty:
+📚 UNIVERSAL TOPIC COVERAGE:
+- You answer ANY question across STEM, humanities, coding, and general life (Physics, Chemistry, Maths, Biology, History, Literature, Computer Science/Coding, Astronomy, Exam Hacks, Motivation, Logic Puzzles, and Everyday Trivia).
+- For Pragyan Institute questions, provide accurate details regarding faculty, fees, digital smartboards, demo classes, and location:
+  * Location: At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj (Google Maps: https://maps.app.goo.gl/jhpW5ynQntfTMa2aA)
+  * Helpline & WhatsApp: +91 73698 91858
+  * Timings: Mon-Sat 6:30 AM - 8:00 PM | Sun 9:00 AM - 1:00 PM
+  * Interactive Digital Smartboards: High-tech smartboards in all classrooms for 3D physics/chemistry visual animations and step-by-step digital math solving.
+  * Expert & Experienced Faculty:
 ${facultyBlock}
-   - 100% Nominal Monthly Fees (Zero admission or annual hidden fees):
+  * 100% Nominal Monthly Fees (Zero admission or annual hidden fees):
 ${feeBlock}
-     * ${annualDiscountLabel()}.
-   - Complete batch list (never invent a batch, a fee or a fee range that is not on this list; if asked about a class not listed, say the helpline will confirm availability):
+    * ${annualDiscountLabel()}.
+  * Complete batch list (${classRangeLabel()} — CBSE & BSEB):
 ${batchBlock}
-   - 3 Days Free Demo Classes for all prospective students.
-   - Boards: CBSE and Bihar Board (BSEB) in English & Hindi mediums.
+  * 3 Days Free Demo Classes for all prospective students.
 
-3. MATHEMATICS & SCIENCE FORMATTING:
-   - Format math and science with clean Unicode characters (e.g., ax² + bx + c = 0, KE = ½ mv², F = ma, v = u + at, H₂SO₄, sin²θ + cos²θ = 1, a ≠ 0, √x, ±, ×, ÷).
-   - NEVER output raw LaTeX formatting like '$', '\\frac', '\\neq', or '\\sqrt'.
-
-4. STRICT PRIVACY:
-   - NEVER mention individual developer names (such as Aditya Prakash). Always represent Pragyan Institute and founding leadership Chandan Kumar, Prof. Ravi Ranjan & Aditi Singh.`;
+📐 FORMATTING & PRIVACY RULES:
+- Provide EXACTLY 3 TO 4 punchy bullet points ('•' or '1.', '2.', '3.', '4.'). Avoid massive essays or walls of plain text.
+- NEVER output raw markdown headers ('#' or '###').
+- Format math/science with clean Unicode characters (x², ³, √x, ±, ×, ÷, ≠, ≤, ≥, θ, π, ½, ⅓, ¼). NEVER output raw LaTeX ('$', '\\frac', '\\sqrt').
+- NEVER mention individual developer names. Always represent Pragyan Institute and founding mentors Chandan Kumar, Prof. Ravi Ranjan & Aditi Singh.`;
   }
 
   // Local intelligent knowledge matcher for instant, zero-latency answers
   function getLocalSmartAnswer(query) {
     const q = query.toLowerCase().trim();
 
-    // Greetings
-    if (q.match(/\b(hi|hello|hey|namaste|pranam|good morning|good afternoon|good evening|kaisa|kaise|sup)\b/)) {
-      return `👋 **Namaste & Welcome to Pragyan Institute!**\n\nI am your **Pragyan AI Academic Assistant**. How can I help you today?\n• 💵 **Fee Structure & Batches (${classRangeLabel()})**\n• 🎁 **3 Days Free Demo Classes**\n• 👨‍🏫 **Faculty (Chandan Sir, Ravi Sir & Aditi Ma'am)**\n• 🖥️ **Smart Classrooms & 3D Visual Learning**\n• 📍 **Location, Directions & Timings in Lalganj**\n\n*Type your question below or click any quick suggestion chip!*`;
+    // 1. Greetings & Conversational Openers
+    if (q.match(/\b(hi|hello|hey|namaste|pranam|good morning|good afternoon|good evening|kaisa|kaise|sup|hal|chal|kaise ho)\b/)) {
+      return `👋 **Namaste & Welcome to Pragyan Institute!**\n\nI am **Pragyan AI**, your charismatic 24/7 Academic Mentor & Learning Companion. What would you like to explore today?\n• 🎯 **Academic Batches & Free Demo:** Experience our digital classrooms (${classRangeLabel()}) with 3 days free trial!\n• 💵 **Nominal Fee Structure:** 100% transparent monthly fees with zero admission charges.\n• 🧠 **Concepts, Science & Maths:** Ask any doubt in Physics, Chemistry, Maths, Biology, Coding, or English!\n• 💡 **Study Hacks & Motivation:** Smart exam scoring blueprints and active recall techniques.\n\n🌟 *Type your question or choose any quick shortcut chip below!*`;
     }
 
-    // Fees, Pricing & Scholarships
-    // Checked before faculty and before smartboards. It used to sit third, so
-    // "special english fee" matched the faculty branch on the word "english" and
-    // "how much for the board batch" matched the smartboard branch on "board" —
-    // both answered a fee question without ever mentioning a price.
+    // 2. Fees, Pricing & Scholarships
     if (q.includes('fee') || q.includes('cost') || q.includes('price') || q.includes('nominal') ||
         q.includes('charge') || q.includes('payment') || q.includes('money') ||
         q.includes('scholarship') || q.includes('discount') || q.includes('paisa') ||
         q.includes('kitna') || q.includes('shulk')) {
-      return `💵 **Nominal Monthly Fee Structure (Zero Hidden Charges):**\n${feeTierLines()}\n• **Annual Scholarship:** ${annualDiscountLabel()}\n\n✨ *No admission fee. Includes printed study modules, weekly board test series & 3D VIP portal access.*`;
+      return `💵 **Nominal Monthly Fee Structure (Zero Hidden Charges):**\n${feeTierLines()}\n• **Annual Advance Scholarship:** ${annualDiscountLabel()}\n\n✨ *No admission fee ever. Includes printed study modules, weekly board test series & 3D VIP portal access.*`;
     }
 
-    // Smartboards & Visual Tech
-    // Requires an explicit device phrase. The bare `includes('board')`,
-    // `includes('smart')` and `includes('tech')` tests this replaces hijacked
-    // every question containing "Bihar Board", "board exam", "smartphone" or
-    // "biotechnology" and answered them with a classroom-hardware pitch.
+    // 3. Smartboards & Visual Tech
     if (/\b(smart ?boards?|digital board|interactive board|smart class(room)?s?|projector|screens?)\b/.test(q) ||
         q.includes('smartboard') || q.includes('digital classroom') || q.includes('3d animation')) {
-      return `🖥️ **Interactive Digital Smartboards & Visual Learning:**\n• **3D Visual Science:** Physics & Chemistry concepts visualized with vivid 3D animations and atomic/molecular models.\n• **Step-by-Step Maths:** Digital geometry derivations, coordinate graphing & algebraic proofs.\n• **High Retention:** Visual demonstrations significantly improve memory recall for board exams.\n• **Recorded Revision:** Quick concept recap sessions before weekly mock tests.`;
+      return `🖥️ **Interactive Digital Smartboards & Visual Learning:**\n• 🎯 **3D Visual Science:** Physics & Chemistry concepts visualized with vivid 3D animations and atomic/molecular models.\n• 💡 **Step-by-Step Maths:** Digital geometry derivations, coordinate graphing & algebraic proofs.\n• ⚡ **High Retention:** Visual demonstrations significantly improve memory recall for board exams.\n• 🌟 **Recorded Revision:** Quick concept recap sessions before weekly mock tests.\n\n✨ *Ready to see it live? Ask about our 3 days free demo classes!*`;
     }
 
-    // Faculty & Mentors
+    // 4. Faculty & Mentors
     if (q.includes('teacher') || q.includes('faculty') || q.includes('sir') || q.includes('ma\'am') ||
         q.includes('madam') || q.includes('chandan') || q.includes('ravi') || q.includes('aditi') ||
         q.includes('mentor') || q.includes('founder') || q.includes('who teaches') ||
@@ -232,76 +222,102 @@ ${batchBlock}
       return `👨‍🏫 **Expert Mentors & Faculty Leadership:**\n${facultyLines()}\n\n🏆 *Dedicated mentorship with a proven 100% board exam pass rate across Lalganj & Vaishali!*`;
     }
 
-    // Demo Classes
-    // `\bfree\b` rather than `includes('free')`: the substring test matched
-    // "freedom", "freezing" and "frequency" and answered a physics question with
-    // a demo-class booking pitch.
+    // 5. Demo Classes
     if (q.includes('demo') || q.includes('trial') || /\bfree\b/.test(q)) {
-      return `🎁 **3 Days FREE Demo Classes:**\n• Experience our digital smartboards and conceptual teaching pedagogy for 3 days with **zero cost and zero admission fee**!\n• Open for every batch from ${classRangeLabel()} (CBSE & BSEB), including the Special English batches.\n\n📲 Call / WhatsApp: **[+91 73698 91858](tel:+917369891858)** to reserve your demo seat!`;
+      return `🎁 **3 Days FREE Demo Classes:**\n• 🎯 **Zero Risk Trial:** Experience our digital smartboards, concept-first pedagogy, and teaching excellence for 3 days with **zero cost and zero admission fee**!\n• 💡 **All Batches Covered:** Open for every batch from ${classRangeLabel()} (CBSE & BSEB), including the Special English batches.\n• ⚡ **Direct Teacher Interaction:** Attend live lectures, ask doubts freely, and receive free introductory notes.\n\n📲 Call / WhatsApp: **[+91 73698 91858](tel:+917369891858)** to reserve your demo seat!`;
     }
 
-    // Admissions & Enrollment
+    // 6. Scientific Study Hacks & Active Recall
+    if (q.includes('study tip') || q.includes('how to study') || q.includes('memorize') || q.includes('active recall') ||
+        q.includes('pomodoro') || q.includes('feynman') || q.includes('padhai kaise') || q.includes('yaad kaise')) {
+      return `🧠 **Scientific Study Hacks for High Exam Scores:**\n• 🎯 **The Feynman Technique:** Explain any concept in simple words as if teaching a 10-year-old; identify your gaps and simplify further.\n• 💡 **Active Recall & Spaced Repetition:** Instead of passive re-reading, test yourself with closed-book flash questions on Day 1, Day 3, and Day 7.\n• ⚡ **The 25/5 Pomodoro Rule:** 25 minutes of laser-focused study with ZERO distractions, followed by a 5-minute brain refresh break.\n• 🌟 **Sunday Mock Test Mastery:** Pragyan Institute conducts weekly mock tests so the real board exam feels effortless!`;
+    }
+
+    // 7. Exam Motivation & Overcoming Fear
+    if (q.includes('motivat') || q.includes('stress') || q.includes('fear') || q.includes('dar') ||
+        q.includes('procrastinat') || q.includes('man nahi lag') || q.includes('bore') || q.includes('focus')) {
+      return `🔥 **Top-Rank Mindset & Daily Motivation:**\n• 🎯 **Break Mountains into Pebbles:** Don't focus on the entire 500-page syllabus at once. Conquer just 1 chapter or 3 numericals right now.\n• 💡 **Action Precedes Motivation:** You don't need to 'feel ready' to study. Start a 5-minute timer and just begin reading — momentum will take over!\n• ⚡ **Focus on Mastery, Not Marks:** When concepts click deeply, top board ranks and exam confidence follow automatically.\n• 🌟 **1-on-1 Mentorship:** Our faculty (Chandan Sir, Ravi Sir & Aditi Ma'am) provide personal guidance and doubt support at every step!`;
+    }
+
+    // 8. Physics Concepts & Mechanics
+    if (q.includes('newton') || q.includes('gravity') || q.includes('motion') || q.includes('ohm') ||
+        q.includes('electricity') || q.includes('force') || q.includes('energy') || q.includes('light') ||
+        q.includes('reflection') || q.includes('refraction')) {
+      return `💡 **Physics Conceptual Spark (Chandan Sir's Method):**\n• 🎯 **The Core Principle:** Every physical phenomenon is governed by universal conservation laws (F = ma, V = IR, KE = ½ mv²).\n• 💡 **Real-World Picture:** When you jump off a skateboard, it rolls backward (Newton's 3rd Law — Action & Reaction in action!).\n• ⚡ **3D Smartboard Visuals:** We plot magnetic field lines, ray optics, and current circuits live on interactive digital screens.\n• 🌟 **Board Exam Edge:** 10-year chapterwise question bank solving ensures full marks on numericals!`;
+    }
+
+    // 9. Mathematics & Derivations
+    if (q.includes('trigonometry') || q.includes('quadratic') || q.includes('pythagoras') || q.includes('triangle') ||
+        q.includes('formula') || q.includes('theorem') || q.includes('algebra') || q.includes('geometry') || q.includes('calculus')) {
+      return `📐 **Mathematics Mastery (Ravi Sir's Method):**\n• 🎯 **Visual Intuition Over Rote Learning:** Trigonometric ratios (sin²θ + cos²θ = 1) and Pythagoras (a² + b² = c²) are proven with geometric step-by-step logic.\n• 💡 **Speed Shortcuts & DPPs:** Daily Practice Problem sheets equip students with rapid calculation tricks for board and competitive exams.\n• ⚡ **Zero Doubt Guarantee:** Every derivation is broken into simple algebraic steps with dedicated Sunday 1-on-1 sessions.\n• 🌟 **Challenge:** Want to see how Ravi Sir solves complex quadratic roots in under 15 seconds? Join our demo classes!`;
+    }
+
+    // 10. Chemistry & Natural Science
+    if (q.includes('photosynthesis') || q.includes('cell') || q.includes('reaction') || q.includes('acid') ||
+        q.includes('base') || q.includes('periodic') || q.includes('respiration') || q.includes('atom') || q.includes('molecule')) {
+      return `🔬 **Chemistry & Life Sciences (Concept-First):**\n• 🎯 **Atomic Precision:** Understand chemical bonding, pH scales, and balancing reactions (6CO₂ + 6H₂O → C₆H₁₂O₆ + 6O₂) with molecular logic.\n• 💡 **Vivid Smartboard Models:** Interactive 3D molecular structures turn textbook diagrams into exciting visual experiences.\n• ⚡ **NCERT Activity Mastery:** Complete coverage of textbook experiments, color change reactions, and board-favourite questions.\n• 🌟 **Printed Formula Sheets:** Concise mind maps and reaction summary sheets provided to all students!`;
+    }
+
+    // 11. Special English & Language Excellence
+    if (q.includes('english') || q.includes('grammar') || q.includes('tense') || q.includes('vocabulary') ||
+        q.includes('speaking') || q.includes('communication') || q.includes('writing') || q.includes('voice')) {
+      return `✨ **Special English & Language Excellence (Aditi Ma'am's Batches):**\n• 🎯 **Root-Level Grammar Mastery:** Tenses, Active/Passive Voice, Prepositions, and Sentence Framing taught with clear rules.\n• 💡 **Spoken English & Fluency:** Interactive debate, dialogue practice, and vocabulary building to speak with effortless confidence.\n• ⚡ **Board Exam Writing Sections:** High-scoring formats for Letters, Essays, Notices, and Literature chapter analysis.\n• 🌟 **Available for All Classes:** Dedicated Special English batches running for Class 1st to 12th!`;
+    }
+
+    // 12. Coding, Programming & AI
+    if (q.includes('coding') || q.includes('python') || q.includes('programming') || q.includes('javascript') ||
+        q.includes('computer') || q.includes('artificial intelligence') || q.includes('machine learning') || q.includes('software')) {
+      return `💻 **Computer Science & Digital Skills:**\n• 🎯 **Logic & Computational Thinking:** Programming is simply breaking a big puzzle into small, step-by-step algorithms.\n• 💡 **Core Languages:** Learn Python, JavaScript, and C++ foundations with practical coding examples and interactive problem solving.\n• ⚡ **AI & Future Tech:** Understand how Machine Learning, neural networks, and modern software engines power today's world.\n• 🌟 **Curiosity:** Computers only understand 0 and 1 (binary), yet can create 3D video games and AI assistants like me!`;
+    }
+
+    // 13. Space, Universe & Astronomy
+    if (q.includes('space') || q.includes('black hole') || q.includes('universe') || q.includes('planet') ||
+        q.includes('solar system') || q.includes('star') || q.includes('speed of light') || q.includes('galaxy') || q.includes('mars')) {
+      return `🌌 **Cosmic Wonders & Astronomy:**\n• 🎯 **Speed of Light:** Light travels at approximately 300,000 km/s — fast enough to circle the Earth 7.5 times in a single second!\n• 💡 **Black Holes & Gravity:** Gravity is so intense in a black hole that not even light can escape its event horizon.\n• ⚡ **Our Cosmic Address:** Earth is the 3rd rock orbiting the Sun in the Orion Arm of the Milky Way Galaxy among 2 trillion galaxies.\n• 🌟 **Brain Teaser:** When you gaze at distant stars at night, you are literally looking back in time millions of years!`;
+    }
+
+    // 14. Fun Brain Teaser / Logic Riddle
+    if (q.includes('riddle') || q.includes('puzzle') || q.includes('brain teaser') || q.includes('paheli') || q.includes('game') || q.includes('quiz')) {
+      return `🧩 **Brain-Teaser Challenge:**\n• 🎯 **The Riddle:** *"I speak without a mouth and hear without ears. I have no body, but I come alive with wind. What am I?"*\n• 💡 **Hint:** You often hear me in deep mountain valleys and empty classrooms!\n• ⚡ **Think about it:** Send me your answer and see if you guessed right (Answer: An Echo 🔊)!\n• 🌟 *Want another puzzle or a rapid-fire maths question? Just ask!*`;
+    }
+
+    // 15. Admissions & Enrollment
     if (q.includes('admission') || q.includes('join') || q.includes('enroll') || q.includes('register') || q.includes('seat') || q.includes('namankan')) {
-      return `📝 **Admissions & Enrollment Process:**\n• **Direct Walk-in:** Visit At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj.\n• **Documents Needed:** Previous report card & student photo.\n• **Online Registration:** Contact [+91 73698 91858](tel:+917369891858) for instant enrollment!`;
+      return `📝 **Admissions & Enrollment Process:**\n• 🎯 **Direct Walk-in:** Visit At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj.\n• 💡 **Documents Needed:** Previous report card & student photo.\n• ⚡ **Zero Admission Fee:** Only nominal monthly tuition fee applies.\n• 🌟 **Online Registration:** Contact [+91 73698 91858](tel:+917369891858) for instant enrollment!`;
     }
 
-    // Location & Maps
+    // 16. Location & Maps
     if (q.includes('location') || q.includes('address') || q.includes('where') || q.includes('map') || q.includes('place') || q.includes('kahan') || q.includes('lalganj') || q.includes('chowk')) {
-      return `📍 **Institute Address & Directions:**\n• **Location:** At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj\n• 🗺️ **Google Maps:** [Click for Exact Directions](https://maps.app.goo.gl/jhpW5ynQntfTMa2aA)`;
+      return `📍 **Institute Address & Directions:**\n• 🎯 **Location:** At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj\n• 🗺️ **Google Maps:** [Click for Exact Directions](https://maps.app.goo.gl/jhpW5ynQntfTMa2aA)\n• ⏰ **Timings:** Mon–Sat: 6:30 AM – 8:00 PM | Sun: 9:00 AM – 1:00 PM`;
     }
 
-    // Operational Timings
+    // 17. Operational Timings
     if (q.includes('timing') || q.includes('time') || q.includes('hours') || q.includes('open') || q.includes('schedule') || q.includes('kab') || q.includes('samay')) {
-      return `⏰ **Institute Operational Hours:**\n• **Monday – Saturday:** 6:30 AM – 8:00 PM (Regular Batch Sessions & Practical Problem Solving)\n• **Sunday:** 9:00 AM – 1:00 PM (Weekly Sunday Board Mock Tests & Special Doubt Clearing)`;
+      return `⏰ **Institute Operational Hours:**\n• 🎯 **Monday – Saturday:** 6:30 AM – 8:00 PM (Regular Batch Sessions & Practical Problem Solving)\n• 💡 **Sunday:** 9:00 AM – 1:00 PM (Weekly Sunday Board Mock Tests & Special Doubt Clearing)\n• ⚡ **Helpline Active:** 24/7 on WhatsApp!`;
     }
 
-    // Contact & Helpline
+    // 18. Contact & Helpline
     if (q.includes('contact') || q.includes('phone') || q.includes('call') || q.includes('whatsapp') || q.includes('number') || q.includes('mobile') || q.includes('helpline')) {
-      return `📞 **Direct Contact & Helpline:**\n• **Phone / WhatsApp:** [+91 73698 91858](tel:+917369891858)\n• **Office:** At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj\n• **Response Time:** Instant on WhatsApp!`;
+      return `📞 **Direct Contact & Helpline:**\n• 🎯 **Phone / WhatsApp:** [+91 73698 91858](tel:+917369891858)\n• 💡 **Office:** At Moti Market, Near Jagdamba Sthan, Vaishali Bus Stand Road, Lalganj\n• ⚡ **Response Time:** Instant on WhatsApp!`;
     }
 
-    // Portal Features & 3D VIP ID Card
+    // 19. Portal Features & 3D VIP ID Card
     if (q.includes('portal') || q.includes('id card') || q.includes('vip') || q.includes('receipt') || q.includes('barcode') || q.includes('login') || q.includes('card') || q.includes('pass')) {
-      return `🪪 **Digital Student ERP Portal Features:**\n• **3D Metallic VIP ID Pass:** Gyroscopic physics, 3D flip animation, live fee clearance status & QR barcode.\n• **Online UPI Payment & PDF Receipts:** Pay monthly fees securely via UPI/PhonePe/GPay and download instant computerized receipts.\n• **Attendance & Notices:** Real-time class notices and community forum discussions.`;
+      return `🪪 **Digital Student ERP Portal Features:**\n• 🎯 **3D Metallic VIP ID Pass:** Gyroscopic physics, 3D flip animation, live fee clearance status & QR barcode.\n• 💡 **Online UPI Payment & PDF Receipts:** Pay monthly fees securely via UPI/PhonePe/GPay and download instant computerized receipts.\n• ⚡ **Attendance & Notices:** Real-time class notices and community forum discussions.`;
     }
 
-    // Subjects & Boards
+    // 20. Subjects & Boards
     if (q.includes('subject') || q.includes('syllabus') || q.includes('board') || q.includes('cbse') || q.includes('bseb') || q.includes('math') || q.includes('science') || q.includes('physics') || q.includes('chemistry') || q.includes('biology')) {
-      return `📚 **Curriculum & Academic Coverage:**\n• **Subjects Offered:** Mathematics, Science (Physics, Chemistry, Biology), English & Social Studies.\n• **Boards Supported:** Central Board of Secondary Education (CBSE) & Bihar School Examination Board (BSEB) English & Hindi Medium.\n• **Target:** 100% Board Exam Success + Olympiad / NTSE Foundation.`;
+      return `📚 **Curriculum & Academic Coverage:**\n• 🎯 **Subjects Offered:** Mathematics, Science (Physics, Chemistry, Biology), English & Social Studies.\n• 💡 **Boards Supported:** Central Board of Secondary Education (CBSE) & Bihar School Examination Board (BSEB) English & Hindi Medium.\n• ⚡ **Target:** 100% Board Exam Success + Olympiad / NTSE Foundation.`;
     }
 
-    // Batches
-    // The trigger list is intent detection over the visitor's own words, so a
-    // loose match is correct here — but it used to stop at Class 8th, so a
-    // parent typing "class 5 batch" or "special english" fell through to the
-    // generic fallback even though those batches exist and are billed monthly.
+    // 21. Batches & Streams
     if (q.includes('batch') || q.includes('stream') || q.includes('pcm') || q.includes('pcb') ||
         /\bclass\s*(1|2|3|4|5|6|7|8|9|10|11|12)\b/.test(q) ||
         /\b(1st|2nd|3rd|4th|5th|6th|7th|8th|9th|10th|11th|12th)\b/.test(q) ||
         q.includes('special english') || q.includes('junior') || q.includes('achiever') ||
         q.includes('nurture') || q.includes('alpha') || q.includes('pioneer') || q.includes('ascend')) {
       return `🎯 **All Academic Batches (${classRangeLabel()}):**\n${batchLines()}\n\n💡 *${annualDiscountLabel()} — ask for the annual price of any batch.*`;
-    }
-
-    // Physics Concepts
-    if (q.includes('newton') || q.includes('gravity') || q.includes('motion') || q.includes('ohm') || q.includes('electricity') || q.includes('force') || q.includes('energy') || q.includes('light') || q.includes('reflection') || q.includes('refraction')) {
-      return `💡 **Physics Conceptual Mastery (Chandan Sir's Module):**\n• **3D Visual Derivation:** Key laws like F = ma, V = IR, and KE = ½ mv² are demonstrated with interactive smartboard simulations.\n• **Step-by-Step Numericals:** High-yield board numericals solved with standard formulas and units.\n• **Board Focus:** Previous 10 years board question bank mastery!`;
-    }
-
-    // Maths Concepts
-    if (q.includes('trigonometry') || q.includes('quadratic') || q.includes('pythagoras') || q.includes('triangle') || q.includes('formula') || q.includes('theorem') || q.includes('algebra') || q.includes('geometry')) {
-      return `📐 **Mathematics Mastery (Ravi Sir's Module):**\n• **Logical Derivations:** Algebraic identities and geometric theorems proven with step-by-step logic.\n• **Daily Practice Problems (DPP):** High-yield board patterns with shortcut techniques for rapid problem solving.\n• **Dedicated Doubt Sessions:** Sunday 1-on-1 doubt clearing for every student!`;
-    }
-
-    // A second, identical pair of Physics and Maths branches used to sit here.
-    // Their conditions were character-for-character copies of the two above, so
-    // they were unreachable — the earlier branch always returned first. Removed
-    // rather than left in place, because a dead branch that looks live is where
-    // the next edit lands.
-
-    // General Science
-    if (q.includes('photosynthesis') || q.includes('cell') || q.includes('reaction') || q.includes('acid') || q.includes('base') || q.includes('periodic') || q.includes('respiration')) {
-      return `🔬 **Science & Chemistry Modules:**\n• **Visual Smartboard Demonstrations:** Chemical reactions and biological diagrams shown in full color.\n• **NCERT & Board Aligned:** Complete coverage of all textbook activities and experiments.\n• **Printed Summaries:** Concise formula sheets and concept mind maps provided to all students.`;
     }
 
     return null;
@@ -726,6 +742,28 @@ ${batchBlock}
         color: #B5543A;
         font-weight: 700;
         text-decoration: underline;
+      }
+
+      .chat-inline-code {
+        font-family: 'JetBrains Mono', 'Fira Code', monospace;
+        background: #F1EBE4;
+        color: #5A2E25;
+        padding: 0.15rem 0.35rem;
+        border-radius: 4px;
+        font-size: 0.82rem;
+        border: 1px solid #DDD5CD;
+      }
+
+      .chat-code-block {
+        font-family: 'JetBrains Mono', 'Fira Code', monospace;
+        background: #231C18;
+        color: #F8F3EC;
+        padding: 0.75rem 0.9rem;
+        border-radius: 8px;
+        font-size: 0.8rem;
+        overflow-x: auto;
+        margin: 0.5rem 0;
+        line-height: 1.4;
       }
 
       .user-msg {
@@ -1173,6 +1211,14 @@ ${batchBlock}
       .replace(/\\neq/g, '≠')
       .replace(/\\leq?/g, '≤')
       .replace(/\\geq?/g, '≥')
+      .replace(/\\approx/g, '≈')
+      .replace(/\\Delta/g, 'Δ')
+      .replace(/\\pi/g, 'π')
+      .replace(/\\theta/g, 'θ')
+      .replace(/\\alpha/g, 'α')
+      .replace(/\\beta/g, 'β')
+      .replace(/\\lambda/g, 'λ')
+      .replace(/\\infty/g, '∞')
       .replace(/\\times/g, '×')
       .replace(/\\div/g, '÷')
       .replace(/\\pm/g, '±')
@@ -1190,18 +1236,24 @@ ${batchBlock}
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
 
-    // 3. Links
+    // 3. Multi-line Code Blocks
+    clean = clean.replace(/```(?:[a-zA-Z0-9_-]+)?\n([\s\S]*?)```/g, '<pre class="chat-code-block"><code>$1</code></pre>');
+
+    // 4. Inline Code
+    clean = clean.replace(/`([^`]+)`/g, '<code class="chat-inline-code">$1</code>');
+
+    // 5. Links
     clean = clean.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+|tel:[^\s)]+|mailto:[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="chat-link">$1</a>');
 
-    // 4. Bold and italics
+    // 6. Bold and italics
     clean = clean
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/g, '<em>$1</em>');
 
-    // 5. Horizontal dividers
+    // 7. Horizontal dividers
     clean = clean.replace(/^---+$/gm, '<hr class="chat-divider">');
 
-    // 6. Styled Headings & Bullet Lists
+    // 8. Styled Headings & Bullet Lists
     const lines = clean.split('\n');
     const formattedLines = lines.map(line => {
       const trimmed = line.trim();
@@ -1224,7 +1276,8 @@ ${batchBlock}
 
     const formattedText = formattedLines.join('<br>')
       .replace(/(<div class="chat-bullet">.*?<\/div>)<br>/g, '$1')
-      .replace(/(<div class="chat-heading">.*?<\/div>)<br>/g, '$1');
+      .replace(/(<div class="chat-heading">.*?<\/div>)<br>/g, '$1')
+      .replace(/(<pre class="chat-code-block">.*?<\/pre>)<br>/g, '$1');
 
     msgDiv.innerHTML = `<div class="msg-content">${formattedText}</div>`;
     messagesEl.appendChild(msgDiv);
