@@ -342,6 +342,13 @@ export function runCommunityChatLayoutTests(assert) {
          chatJs.includes('renderPinnedBarAndList(targetPane)') &&
          chatJs.includes('[StreamChat renderPinnedBarAndList warning]'),
     'T35.99: js/stream-community-chat.js implements prefix-resilient handleIncomingSync and error-safe renderPinnedBarAndList');
+
+  assert(chatJs.includes('stream-mobile-connecting-card') &&
+         chatJs.includes('stream-mobile-timer-badge') &&
+         chatJs.includes('stream-mobile-progress-fill') &&
+         chatJs.includes('Connecting to Pragyan Realtime Class Gateway…') &&
+         chatJs.includes('connectionPromise'),
+    'T35.100: js/stream-community-chat.js renders 3s countdown progress card on mobile devices while preserving standard gateway loader on laptops');
 }
 
 

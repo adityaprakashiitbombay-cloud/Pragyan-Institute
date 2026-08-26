@@ -3362,48 +3362,120 @@
     if (isInitializing) return;
     isInitializing = true;
 
+    const isMobileDevice = (typeof window !== 'undefined' && (window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)));
+
     try {
       if (!containerEl.querySelector('.stream-chat-wrapper')) {
-        containerEl.innerHTML = `
-          <div class="stream-loading-card" style="width: 100%; min-height: clamp(440px, calc(100dvh - 200px), 720px); background: #ffffff; border-radius: 12px; border: 1.5px solid var(--border-sand, #DDD5CD); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 3.5rem 2rem; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); margin: 0 auto; box-sizing: border-box;">
-            <div style="width: 72px; height: 72px; border-radius: 50%; background: #ECFDF5; border: 2px solid #A7F3D0; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 1.5rem; box-shadow: 0 8px 24px rgba(6, 78, 59, 0.12);">
-              <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 2.4rem; color: #064E3B;" aria-hidden="true"></i>
+        if (isMobileDevice) {
+          // Sleek 3s countdown loader for mobile phones
+          containerEl.innerHTML = `
+            <div class="stream-loading-card stream-mobile-connecting-card" style="width: 100%; min-height: clamp(400px, calc(100dvh - 180px), 680px); background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%); border-radius: 14px; border: 1.5px solid var(--border-sand, #DDD5CD); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 2.5rem 1.5rem; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06); margin: 0 auto; box-sizing: border-box; position: relative; overflow: hidden;">
+              <div style="position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, #059669 0%, #10B981 50%, #34D399 100%);"></div>
+              <div style="position: relative; width: 84px; height: 84px; margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: center;">
+                <div style="position: absolute; inset: 0; border-radius: 50%; background: #ECFDF5; border: 2.5px solid #A7F3D0; box-shadow: 0 10px 25px rgba(6, 78, 59, 0.15); animation: pulse 2s infinite;"></div>
+                <span style="position: relative; font-size: 2.4rem; z-index: 2;">💬</span>
+              </div>
+              <h3 style="margin: 0 0 0.4rem 0; font-family: var(--font-heading, 'Cinzel', serif); font-size: 1.28rem; font-weight: 900; color: #064E3B; letter-spacing: -0.01em;">
+                Connecting to Class Forum…
+              </h3>
+              <p style="margin: 0 0 1.25rem 0; font-size: 0.86rem; color: #64748B; max-width: 320px; line-height: 1.45;">
+                Preparing live doubts, chapter notes, and peer discussion engine
+              </p>
+              <div style="width: 100%; max-width: 280px; margin-bottom: 1.25rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.76rem; font-weight: 800; color: #065F46; margin-bottom: 0.45rem;">
+                  <span style="display: inline-flex; align-items: center; gap: 0.35rem;">
+                    <i class="fa-solid fa-bolt" style="color: #10B981;"></i> Initializing Realtime Gateway
+                  </span>
+                  <span id="stream-mobile-timer-badge" style="background: #D1FAE5; color: #065F46; padding: 0.15rem 0.5rem; border-radius: 99px; font-weight: 900; font-size: 0.74rem;">3s</span>
+                </div>
+                <div style="width: 100%; height: 6px; background: #E2E8F0; border-radius: 99px; overflow: hidden; position: relative;">
+                  <div id="stream-mobile-progress-fill" style="width: 15%; height: 100%; background: linear-gradient(90deg, #059669 0%, #10B981 100%); border-radius: 99px; transition: width 0.3s ease;"></div>
+                </div>
+              </div>
+              <div style="display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.35rem 0.85rem; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 9999px; font-size: 0.74rem; font-weight: 700; color: #475569; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
+                <span style="width: 7px; height: 7px; border-radius: 50%; background: #10B981; display: inline-block; animation: blink 1.2s infinite;"></span>
+                <span>Connecting server in background…</span>
+              </div>
             </div>
-            <h3 style="margin: 0 0 0.5rem 0; font-family: var(--font-heading, 'Cinzel', serif); font-size: 1.25rem; font-weight: 800; color: #0F172A; letter-spacing: -0.01em;">Connecting to Pragyan Realtime Class Gateway…</h3>
-            <p style="margin: 0 0 1.25rem 0; font-size: 0.92rem; color: #64748B; max-width: 480px; line-height: 1.5;">Syncing live class channels and message archives from Stream cloud..</p>
-            <div style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.95rem; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 9999px; font-size: 0.78rem; font-weight: 700; color: #475569;">
-              <i class="fa-solid fa-bolt" style="color: #059669;" aria-hidden="true"></i> Live WebSocket Session
+          `;
+        } else {
+          // Laptops / Desktops: existing loading screen (unchanged)
+          containerEl.innerHTML = `
+            <div class="stream-loading-card" style="width: 100%; min-height: clamp(440px, calc(100dvh - 200px), 720px); background: #ffffff; border-radius: 12px; border: 1.5px solid var(--border-sand, #DDD5CD); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 3.5rem 2rem; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); margin: 0 auto; box-sizing: border-box;">
+              <div style="width: 72px; height: 72px; border-radius: 50%; background: #ECFDF5; border: 2px solid #A7F3D0; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 1.5rem; box-shadow: 0 8px 24px rgba(6, 78, 59, 0.12);">
+                <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 2.4rem; color: #064E3B;" aria-hidden="true"></i>
+              </div>
+              <h3 style="margin: 0 0 0.5rem 0; font-family: var(--font-heading, 'Cinzel', serif); font-size: 1.25rem; font-weight: 800; color: #0F172A; letter-spacing: -0.01em;">Connecting to Pragyan Realtime Class Gateway…</h3>
+              <p style="margin: 0 0 1.25rem 0; font-size: 0.92rem; color: #64748B; max-width: 480px; line-height: 1.5;">Syncing live class channels and message archives from Stream cloud..</p>
+              <div style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.95rem; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 9999px; font-size: 0.78rem; font-weight: 700; color: #475569;">
+                <i class="fa-solid fa-bolt" style="color: #059669;" aria-hidden="true"></i> Live WebSocket Session
+              </div>
             </div>
-          </div>
-        `;
+          `;
+        }
       }
 
-      await loadScript('https://cdn.jsdelivr.net/npm/stream-chat@8.52.0/dist/browser.full-bundle.min.js');
-      if (typeof StreamChat === 'undefined') throw new Error('Stream Chat SDK failed to load.');
+      // Background connection promise
+      const connectionPromise = (async () => {
+        await loadScript('https://cdn.jsdelivr.net/npm/stream-chat@8.52.0/dist/browser.full-bundle.min.js');
+        if (typeof StreamChat === 'undefined') throw new Error('Stream Chat SDK failed to load.');
 
-      const tokenData = await fetchToken();
-      
-      // Clean up previous client connection if switching accounts
-      if (client && client.userID && client.userID !== tokenData.userId) {
-        try { await client.disconnectUser(); } catch (_) {}
-        client = null;
-        isListening = false;
+        const tokenData = await fetchToken();
+        
+        // Clean up previous client connection if switching accounts
+        if (client && client.userID && client.userID !== tokenData.userId) {
+          try { await client.disconnectUser(); } catch (_) {}
+          client = null;
+          isListening = false;
+        }
+
+        if (!client) {
+          client = StreamChat.getInstance(tokenData.apiKey);
+        }
+
+        currentUser = { id: tokenData.userId, name: tokenData.userName, role: tokenData.userRole };
+
+        // Connect user using authenticated user ID token
+        if (!client.userID) {
+          await client.connectUser({ id: tokenData.userId }, tokenData.token);
+        }
+
+        await setupChannels();
+        setupRealtimeListeners();
+        startPeriodicSync();
+      })();
+
+      if (isMobileDevice) {
+        let secondsRemaining = 3;
+        const timerBadge = containerEl.querySelector('#stream-mobile-timer-badge');
+        const progressFill = containerEl.querySelector('#stream-mobile-progress-fill');
+
+        const timerInterval = setInterval(() => {
+          secondsRemaining -= 1;
+          if (timerBadge) {
+            timerBadge.textContent = `${Math.max(secondsRemaining, 0)}s`;
+          }
+          if (progressFill) {
+            const pct = Math.round(((3 - secondsRemaining) / 3) * 100);
+            progressFill.style.width = `${Math.min(Math.max(pct, 15), 100)}%`;
+          }
+          if (secondsRemaining <= 0) {
+            clearInterval(timerInterval);
+          }
+        }, 1000);
+
+        try {
+          await Promise.all([
+            connectionPromise,
+            new Promise(resolve => setTimeout(resolve, 3000))
+          ]);
+        } finally {
+          clearInterval(timerInterval);
+        }
+      } else {
+        await connectionPromise;
       }
 
-      if (!client) {
-        client = StreamChat.getInstance(tokenData.apiKey);
-      }
-
-      currentUser = { id: tokenData.userId, name: tokenData.userName, role: tokenData.userRole };
-
-      // Connect user using authenticated user ID token
-      if (!client.userID) {
-        await client.connectUser({ id: tokenData.userId }, tokenData.token);
-      }
-
-      await setupChannels();
-      setupRealtimeListeners();
-      startPeriodicSync();
       renderUI(containerEl);
     } catch (err) {
       console.error('[StreamChat Error]', err);
