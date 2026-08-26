@@ -132,6 +132,7 @@
       return '';
     }
   }
+  window.sanitizeUrl = sanitizeUrl;
 
   // High-performance Debounce Utility for UI events & input filtering
   function debounce(fn, delay = 150) {
