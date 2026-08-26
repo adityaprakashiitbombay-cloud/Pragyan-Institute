@@ -339,7 +339,7 @@ export function runCommunityChatLayoutTests(assert) {
     'T35.98: js/stream-community-chat.js defines scrollBottom, updateReplyBar, openMobileFullscreen, and exitMobileFullscreen helpers');
 
   assert(chatJs.includes("incomingChId.replace(/^batch-/, '') === activeChannelId.replace(/^batch-/, '')") &&
-         chatJs.includes('renderPinnedBarAndList(targetPane)') &&
+         chatJs.includes('renderPinnedBarAndList(targetPane') &&
          chatJs.includes('[StreamChat renderPinnedBarAndList warning]'),
     'T35.99: js/stream-community-chat.js implements prefix-resilient handleIncomingSync and error-safe renderPinnedBarAndList');
 
@@ -349,6 +349,16 @@ export function runCommunityChatLayoutTests(assert) {
          chatJs.includes('Connecting to Pragyan Realtime Class Gateway…') &&
          chatJs.includes('connectionPromise'),
     'T35.100: js/stream-community-chat.js renders 3s countdown progress card on mobile devices while preserving standard gateway loader on laptops');
+
+  assert(chatJs.includes('function setupSupabaseRealtimeBridge()') &&
+         chatJs.includes('pragyan_community_realtime_broadcast') &&
+         chatJs.includes("event: 'new_class_message'"),
+    'T35.101: js/stream-community-chat.js implements setupSupabaseRealtimeBridge for multi-device realtime broadcast relay');
+
+  assert(chatJs.includes('function getMessagesHash(') &&
+         chatJs.includes('lastRenderedMessagesHash') &&
+         chatJs.includes('wasNearBottom'),
+    'T35.102: js/stream-community-chat.js implements getMessagesHash and smart DOM reconciliation with scroll retention');
 }
 
 

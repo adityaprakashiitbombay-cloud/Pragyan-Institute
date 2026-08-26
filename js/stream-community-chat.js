@@ -317,6 +317,30 @@
     }
   }
 
+  let supabaseChatChannel = null;
+
+  function setupSupabaseRealtimeBridge() {
+    try {
+      const _cfg = (typeof window !== 'undefined' && window.PRAGYAN_CONFIG) ? window.PRAGYAN_CONFIG : {};
+      const supUrl = _cfg.SUPABASE_URL || 'https://ujcmmcaervgskpkcfekm.supabase.co';
+      const supKey = _cfg.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqY21tY2FlcnZnc2twa2NmZWttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NDEzMTksImV4cCI6MjEwMjAxNzMxOX0.pTp51JWa-qWbAz-l5NGLKvrS66TED4lruhLInQ6hvmc';
+
+      if (typeof window !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function' && !supabaseChatChannel) {
+        const supClient = window.supabase.createClient(supUrl, supKey);
+        supabaseChatChannel = supClient.channel('pragyan_community_realtime_broadcast');
+        supabaseChatChannel
+          .on('broadcast', { event: 'new_class_message' }, eventData => {
+            if (eventData && eventData.payload) {
+              handleIncomingSync(eventData.payload);
+            }
+          })
+          .subscribe();
+      }
+    } catch (err) {
+      console.warn('[StreamChat Supabase Realtime Bridge note]:', err.message);
+    }
+  }
+
   // Cross-tab Synchronization via BroadcastChannel & localStorage
   try {
     if (typeof BroadcastChannel !== 'undefined') {
@@ -340,10 +364,10 @@
     }
   } catch (_) {}
 
-  function broadcastMessageSync(messageObj) {
+  function broadcastMessageSync(messageObj, channelId) {
     const payload = {
       type: 'sync_channel',
-      channelId: activeChannelId,
+      channelId: channelId || activeChannelId,
       message: messageObj || null,
       timestamp: Date.now()
     };
@@ -357,6 +381,16 @@
     try {
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem('pragyan_stream_chat_sync', JSON.stringify(payload));
+      }
+    } catch (_) {}
+
+    try {
+      if (supabaseChatChannel && typeof supabaseChatChannel.send === 'function') {
+        supabaseChatChannel.send({
+          type: 'broadcast',
+          event: 'new_class_message',
+          payload: payload
+        }).catch(() => {});
       }
     } catch (_) {}
   }
@@ -643,7 +677,7 @@
       if (typeof document !== 'undefined' && document.visibilityState === 'visible' && client?.userID && activeChannel) {
         syncActiveChannelMessages();
       }
-    }, 1500);
+    }, 1200);
   }
 
   function resolveStudentBatches() {
@@ -1847,12 +1881,27 @@
     `;
   }
 
-  function renderPinnedBarAndList(targetPane) {
+  let lastRenderedMessagesHash = '';
+
+  function getMessagesHash(messages, pinnedMessages) {
+    if (!messages || messages.length === 0) return 'empty';
+    const lastMsg = messages[messages.length - 1];
+    const pinIds = (pinnedMessages || []).map(p => `${p.id}:${p.pinned_at || p.is_pinned}`).join(',');
+    return `${messages.length}_${lastMsg?.id || ''}_${lastMsg?.updated_at || lastMsg?.created_at || ''}_${messages[0]?.id || ''}_${pinIds}_${activeChatViewMode}`;
+  }
+
+  function renderPinnedBarAndList(targetPane, force = false) {
     try {
       const panes = targetPane ? [targetPane] : getAllCommunityPanes();
       const messages = (activeChannel?.state?.messages || []).filter(m => !m.deleted_at);
       const pinnedMessages = messages.filter(m => m.pinned || m.is_pinned || Boolean(m.pinned_at));
       const isAdmin = Boolean(currentUser?.role === 'admin' || (typeof AppState !== 'undefined' && AppState.adminLoggedIn));
+
+      const currentHash = getMessagesHash(messages, pinnedMessages);
+      if (!force && currentHash === lastRenderedMessagesHash && !targetPane) {
+        return;
+      }
+      lastRenderedMessagesHash = currentHash;
 
       const renderedHtml = renderMsgList(messages);
       const renderedPinsHtml = renderPinnedBarHtml(pinnedMessages, isAdmin);
@@ -1865,8 +1914,11 @@
           }
           const list = pane.querySelector('#stream-msg-list');
           if (list) {
+            const wasNearBottom = (list.scrollHeight - list.scrollTop - list.clientHeight) < 140;
             list.innerHTML = renderedHtml;
-            list.scrollTop = list.scrollHeight;
+            if (wasNearBottom) {
+              list.scrollTop = list.scrollHeight;
+            }
           }
         });
       }
@@ -1874,8 +1926,11 @@
       // Direct universal update across all mounted message lists in document
       const msgLists = document.querySelectorAll('#stream-msg-list');
       msgLists.forEach(list => {
+        const wasNearBottom = (list.scrollHeight - list.scrollTop - list.clientHeight) < 140;
         list.innerHTML = renderedHtml;
-        list.scrollTop = list.scrollHeight;
+        if (wasNearBottom) {
+          list.scrollTop = list.scrollHeight;
+        }
       });
 
       const pinWrappers = document.querySelectorAll('#stream-pinned-bar-wrapper');
@@ -3442,6 +3497,7 @@
 
         await setupChannels();
         setupRealtimeListeners();
+        setupSupabaseRealtimeBridge();
         startPeriodicSync();
       })();
 
