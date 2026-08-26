@@ -159,7 +159,18 @@ export function runCommunityChatLayoutTests(assert) {
     'T35.57: js/stream-community-chat.js implements network offline/online lifecycle listeners and automatic reconnection');
   assert(chatJs.includes("scrollIntoView({ block: 'nearest'") && chatJs.includes("autoItem") && chatJs.includes("mouseover"),
     'T35.58: js/stream-community-chat.js implements autocomplete scrollIntoView for keyboard navigation and mouseover index synchronization');
+
+  // --- 15. Cross-Tab Synchronization, Background Polling & Multi-Pane Rendering Suite ---
+  assert(chatJs.includes('pragyan_stream_chat_sync') && (chatJs.includes('new BroadcastChannel') || chatJs.includes('window.BroadcastChannel')),
+    'T35.59: js/stream-community-chat.js implements BroadcastChannel and storage cross-tab synchronization');
+  assert(chatJs.includes('function broadcastMessageSync') && chatJs.includes('function handleIncomingSync'),
+    'T35.60: js/stream-community-chat.js defines broadcastMessageSync and handleIncomingSync for cross-window message relays');
+  assert(chatJs.includes('function startPeriodicSync') && chatJs.includes('syncActiveChannelMessages') && chatJs.includes('stopPeriodicSync'),
+    'T35.61: js/stream-community-chat.js implements background polling sync (startPeriodicSync/stopPeriodicSync) for reliable real-time updates');
+  assert(chatJs.includes('getAllCommunityPanes') && chatJs.includes('panes.forEach(pane =>'),
+    'T35.62: js/stream-community-chat.js renders updates across all active community panes simultaneously');
 }
+
 
 
 

@@ -26,6 +26,9 @@
   let mediaSearchQuery = '';
   let pdfjsLibLoaded = false;
   let replyingToMessage = null; // { id, author, text }
+  let streamBroadcastChannel = null;
+  let syncIntervalId = null;
+  let isSyncingActiveChannel = false;
 
   const CHANNEL_IDENTITIES = {
     'batch-BAT-12PCM': {
@@ -270,6 +273,132 @@
     return studentPane || adminPane;
   }
 
+  function getAllCommunityPanes() {
+    const panes = [];
+    const adminPane = document.getElementById('adminTabPane-community');
+    const studentPane = document.getElementById('studentTabPane-community');
+    if (adminPane && adminPane.querySelector('.stream-chat-wrapper')) panes.push(adminPane);
+    if (studentPane && studentPane.querySelector('.stream-chat-wrapper')) panes.push(studentPane);
+    if (!panes.length) {
+      const fallback = getActiveCommunityPane();
+      if (fallback) panes.push(fallback);
+    }
+    return panes;
+  }
+  const getAllMountedPanes = getAllCommunityPanes;
+
+  function handleIncomingSync(data) {
+    if (!data || data.type !== 'sync_channel') return;
+    if (data.channelId && data.channelId !== activeChannelId) return;
+
+    if (data.message && activeChannel?.state?.messages) {
+      const incoming = data.message;
+      if (!activeChannel.state.messages.some(m => m.id === incoming.id)) {
+        activeChannel.state.messages.push(incoming);
+        activeChannel.state.messages.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+        renderPinnedBarAndList();
+      }
+    } else {
+      syncActiveChannelMessages();
+    }
+  }
+
+  // Cross-tab Synchronization via BroadcastChannel & localStorage
+  try {
+    if (typeof BroadcastChannel !== 'undefined') {
+      streamBroadcastChannel = new BroadcastChannel('pragyan_stream_chat_sync');
+      streamBroadcastChannel.onmessage = (e) => {
+        handleIncomingSync(e.data);
+      };
+    }
+  } catch (_) {}
+
+  function broadcastMessageSync(messageObj) {
+    const payload = {
+      type: 'sync_channel',
+      channelId: activeChannelId,
+      message: messageObj || null,
+      timestamp: Date.now()
+    };
+
+    try {
+      if (streamBroadcastChannel) {
+        streamBroadcastChannel.postMessage(payload);
+      }
+    } catch (_) {}
+
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('pragyan_stream_chat_sync', JSON.stringify(payload));
+      }
+    } catch (_) {}
+  }
+
+  function getEventChannelId(event) {
+    if (!event) return '';
+    if (event.channel_id) return String(event.channel_id);
+    if (event.channel?.id) return String(event.channel.id);
+    if (event.message?.channel_id) return String(event.message.channel_id);
+    if (event.message?.channel?.id) return String(event.message.channel.id);
+    if (event.cid) {
+      const parts = String(event.cid).split(':');
+      return parts.length > 1 ? parts.slice(1).join(':') : parts[0];
+    }
+    if (event.message?.cid) {
+      const parts = String(event.message.cid).split(':');
+      return parts.length > 1 ? parts.slice(1).join(':') : parts[0];
+    }
+    return '';
+  }
+
+  function bindChannelRealtime(ch) {
+    if (!ch || ch._realtimeBound) return;
+    ch._realtimeBound = true;
+    const events = [
+      'message.new', 'message.updated', 'message.deleted',
+      'reaction.new', 'reaction.deleted', 'channel.updated',
+      'channel.truncated', 'user.banned', 'user.unbanned',
+      'notification.message_new', 'notification.channel_truncate'
+    ];
+    events.forEach(evt => {
+      ch.on(evt, event => {
+        handleMsgEvent(evt, event);
+      });
+    });
+  }
+
+  async function syncActiveChannelMessages() {
+    if (!activeChannel || !client || !client.userID || isSyncingActiveChannel) return;
+    isSyncingActiveChannel = true;
+    try {
+      const queryRes = await activeChannel.query({
+        messages: { limit: 100 },
+        watchers: { limit: 100 }
+      });
+      if (queryRes?.messages && activeChannel.state) {
+        const msgMap = new Map();
+        (queryRes.messages || []).forEach(m => { if (m && m.id) msgMap.set(m.id, m); });
+        activeChannel.state.messages = Array.from(msgMap.values()).sort(
+          (a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0)
+        );
+      }
+      renderPinnedBarAndList();
+    } catch (err) {
+      console.warn('[StreamChat syncActiveChannelMessages warning]', err.message);
+    } finally {
+      isSyncingActiveChannel = false;
+    }
+  }
+
+  function startPeriodicSync() {
+    if (syncIntervalId) clearInterval(syncIntervalId);
+    syncIntervalId = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible' && client?.userID && activeChannel) {
+        syncActiveChannelMessages();
+      }
+    }, 5000);
+  }
+
   function resolveStudentBatches() {
     try {
       let user = (typeof window !== 'undefined' && window.AppState?.currentUser) || (typeof AppState !== 'undefined' && AppState.currentUser) || null;
@@ -431,6 +560,7 @@
       const ch = client.channel(CHANNEL_TYPE, chId, {
         name: meta.name
       });
+      bindChannelRealtime(ch);
       channelsMap.set(chId, ch);
     }
 
@@ -456,6 +586,14 @@
     if (activeChannel) {
       try {
         await activeChannel.watch({ state: true, presence: true });
+        const qRes = await activeChannel.query({ messages: { limit: 100 }, watchers: { limit: 100 } });
+        if (qRes?.messages && activeChannel.state) {
+          const msgMap = new Map();
+          (qRes.messages || []).forEach(m => { if (m && m.id) msgMap.set(m.id, m); });
+          activeChannel.state.messages = Array.from(msgMap.values()).sort(
+            (a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0)
+          );
+        }
       } catch (watchErr) {
         console.warn('[StreamChat] Initial watch note:', watchErr.message);
         try { await activeChannel.watch(); } catch (_) {}
@@ -481,6 +619,14 @@
 
     try {
       await activeChannel.watch({ state: true, presence: true });
+      const qRes = await activeChannel.query({ messages: { limit: 100 }, watchers: { limit: 100 } });
+      if (qRes?.messages && activeChannel.state) {
+        const msgMap = new Map();
+        (qRes.messages || []).forEach(m => { if (m && m.id) msgMap.set(m.id, m); });
+        activeChannel.state.messages = Array.from(msgMap.values()).sort(
+          (a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0)
+        );
+      }
     } catch (e) {
       console.warn('[StreamChat] switchChannel watch warning:', e.message);
       try { await activeChannel.watch(); } catch (_) {}
@@ -1398,37 +1544,39 @@
   }
 
   function renderPinnedBarAndList(targetPane) {
-    const pane = targetPane || getActiveCommunityPane();
-    if (!pane) return;
+    const panes = targetPane ? [targetPane] : getAllCommunityPanes();
+    if (!panes.length) return;
 
     const messages = (activeChannel?.state?.messages || []).filter(m => !m.deleted_at);
     const pinnedMessages = messages.filter(m => m.pinned || m.is_pinned || Boolean(m.pinned_at));
     const isAdmin = currentUser?.role === 'admin';
 
-    // 1. Update Pinned Bar Container
-    const pinWrapper = pane.querySelector('#stream-pinned-bar-wrapper');
-    if (pinWrapper) {
-      pinWrapper.innerHTML = renderPinnedBarHtml(pinnedMessages, isAdmin);
-    }
-
-    // 2. Update Messages Feed or Media Gallery
-    if (activeChatViewMode === 'media') {
-      const activeMeta = CHANNEL_IDENTITIES[activeChannelId] || { shortName: 'Class Forum' };
-      const mediaList = getMediaAttachmentsFromMessages(messages);
-      const mediaGalleryContainer = pane.querySelector('.stream-media-gallery-wrap');
-      if (mediaGalleryContainer) {
-        mediaGalleryContainer.outerHTML = renderMediaGalleryHtml(mediaList, activeMeta);
+    panes.forEach(pane => {
+      // 1. Update Pinned Bar Container
+      const pinWrapper = pane.querySelector('#stream-pinned-bar-wrapper');
+      if (pinWrapper) {
+        pinWrapper.innerHTML = renderPinnedBarHtml(pinnedMessages, isAdmin);
       }
-    } else {
-      const list = pane.querySelector('#stream-msg-list');
-      if (list) {
-        list.innerHTML = renderMsgList(messages);
-        scrollBottom(pane);
-      }
-    }
 
-    // Render Page 1 PDF thumbnails lazily
-    renderPdfPage1Thumbnails(pane);
+      // 2. Update Messages Feed or Media Gallery
+      if (activeChatViewMode === 'media') {
+        const activeMeta = CHANNEL_IDENTITIES[activeChannelId] || { shortName: 'Class Forum' };
+        const mediaList = getMediaAttachmentsFromMessages(messages);
+        const mediaGalleryContainer = pane.querySelector('.stream-media-gallery-wrap');
+        if (mediaGalleryContainer) {
+          mediaGalleryContainer.outerHTML = renderMediaGalleryHtml(mediaList, activeMeta);
+        }
+      } else {
+        const list = pane.querySelector('#stream-msg-list');
+        if (list) {
+          list.innerHTML = renderMsgList(messages);
+          scrollBottom(pane);
+        }
+      }
+
+      // Render Page 1 PDF thumbnails lazily
+      renderPdfPage1Thumbnails(pane);
+    });
   }
 
   function renderUI(container) {
@@ -1636,10 +1784,29 @@
     isListening = true;
 
     const handleMsgEvent = (eventType, event) => {
+      const evtChId = getEventChannelId(event);
+
+      // 1. Update channelsMap if the event belongs to another known channel
+      if (evtChId && channelsMap.has(evtChId)) {
+        const targetCh = channelsMap.get(evtChId);
+        if (targetCh && targetCh !== activeChannel && targetCh.state) {
+          if (!Array.isArray(targetCh.state.messages)) targetCh.state.messages = [];
+          if (eventType === 'message.new' || eventType === 'notification.message_new') {
+            if (event.message && !targetCh.state.messages.some(m => m.id === event.message.id)) {
+              targetCh.state.messages.push(event.message);
+            }
+          } else if (eventType === 'message.deleted') {
+            const delId = event.message?.id || event.id;
+            if (delId) targetCh.state.messages = targetCh.state.messages.filter(m => m.id !== delId);
+          }
+        }
+      }
+
+      // 2. If it matches our active channel (or no channel specified), process for active UI
       if (!activeChannel) return;
-      const isMatch = event.channel_id === activeChannel.id || 
-                      event.cid === activeChannel.cid || 
-                      event.channel?.id === activeChannel.id;
+      const isMatch = !evtChId || evtChId === activeChannel.id || 
+                      (event.cid && activeChannel.cid && event.cid === activeChannel.cid) ||
+                      (event.channel?.id === activeChannel.id);
       if (!isMatch) return;
 
       if (!activeChannel.state) activeChannel.state = { messages: [] };
@@ -1653,6 +1820,7 @@
           } else {
             activeChannel.state.messages.push(event.message);
           }
+          activeChannel.state.messages.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
         }
       } else if (eventType === 'message.updated') {
         if (event.message) {
@@ -1662,6 +1830,7 @@
           } else {
             activeChannel.state.messages.push(event.message);
           }
+          activeChannel.state.messages.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
         }
       } else if (eventType === 'message.deleted') {
         const delId = event.message?.id || event.id;
@@ -1670,15 +1839,16 @@
         }
       } else if (eventType === 'channel.updated') {
         if (event.channel?.muted_users) {
+          activeChannel.data = activeChannel.data || {};
           activeChannel.data.muted_users = event.channel.muted_users;
           activeChannel.data.muted_user_ids = event.channel.muted_users;
-          const pane = getActiveCommunityPane();
-          if (pane) renderUI(pane);
+          getAllMountedPanes().forEach(pane => renderUI(pane));
           return;
         }
       } else if (eventType === 'user.banned' || eventType === 'user.unbanned') {
         const bannedUserId = event.user?.id;
-        if (bannedUserId && activeChannel?.data) {
+        if (bannedUserId && activeChannel) {
+          activeChannel.data = activeChannel.data || {};
           let mutedList = Array.isArray(activeChannel.data.muted_users) ? [...activeChannel.data.muted_users] : [];
           if (eventType === 'user.banned') {
             if (!mutedList.includes(bannedUserId)) mutedList.push(bannedUserId);
@@ -1687,8 +1857,7 @@
           }
           activeChannel.data.muted_users = mutedList;
           activeChannel.data.muted_user_ids = mutedList;
-          const pane = getActiveCommunityPane();
-          if (pane) renderUI(pane);
+          getAllMountedPanes().forEach(pane => renderUI(pane));
           return;
         }
       } else if (eventType === 'channel.truncated' || eventType === 'notification.channel_truncate') {
@@ -1714,6 +1883,16 @@
       client.on(evtType, event => {
         handleMsgEvent(evtType, event);
       });
+    });
+
+    client.on('connection.recovered', () => {
+      syncActiveChannelMessages();
+    });
+
+    client.on('connection.changed', e => {
+      if (e?.online) {
+        syncActiveChannelMessages();
+      }
     });
 
     client.on('user.presence.changed', () => {
@@ -2587,6 +2766,11 @@
           }
         }
 
+        // Broadcast to other tabs/windows via BroadcastChannel/localStorage
+        if (sent?.message) {
+          broadcastMessageSync(sent.message, activeChannelId);
+        }
+
         // If sent with /pin, immediately pin it
         if (isPinCommand && sent?.message?.id) {
           try {
@@ -2594,7 +2778,7 @@
           } catch (_) {}
         }
 
-        renderPinnedBarAndList(container);
+        renderPinnedBarAndList();
       } catch (err) {
         console.error('[StreamChat Send Error]', err);
         alert('Failed to send message: ' + err.message);
@@ -2717,9 +2901,13 @@
             }
           }
 
+          if (sent?.message) {
+            broadcastMessageSync(sent.message, activeChannelId);
+          }
+
           if (typingBox) typingBox.innerHTML = '';
           fileInput.value = '';
-          renderPinnedBarAndList(container);
+          renderPinnedBarAndList();
           renderPdfPage1Thumbnails(container);
         } catch (err) {
           console.error('[Upload attachment error]', err);
@@ -2894,6 +3082,7 @@
 
       await setupChannels();
       setupRealtimeListeners();
+      startPeriodicSync();
       renderUI(containerEl);
     } catch (err) {
       console.error('[StreamChat Error]', err);
@@ -2920,6 +3109,7 @@
   }
 
   function disconnect() {
+    stopPeriodicSync();
     if (client) { 
       try { client.disconnectUser(); } catch (_) {}
       client = null; 
@@ -2956,6 +3146,9 @@
     },
     pinMessage: async (msgId) => { if (client) { await client.pinMessage({ id: msgId }); } },
     unpinMessage: async (msgId) => { if (client) { await client.unpinMessage({ id: msgId }); } },
+    syncActiveChannelMessages,
+    broadcastMessageSync,
+    renderPinnedBarAndList,
     disconnect
   };
 
