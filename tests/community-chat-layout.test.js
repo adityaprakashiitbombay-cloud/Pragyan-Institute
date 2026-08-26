@@ -80,4 +80,14 @@ export function runCommunityChatLayoutTests(assert) {
     'T35.25: js/stream-community-chat.js suppresses error code 16 / not found and removes ghost message from UI');
   assert(healthJs.includes('isStreamDelete') && healthJs.includes('deleteMessage(messageId'),
     'T35.26: api/health.js implements stream-delete sub-route with admin session verification');
+
+  // --- 8. Real-Time Pin & Delete Synchronization Suite ---
+  assert(chatJs.includes('function renderPinnedBarHtml') && chatJs.includes('id="stream-pinned-bar-wrapper"'),
+    'T35.27: js/stream-community-chat.js defines renderPinnedBarHtml and mounts dynamic #stream-pinned-bar-wrapper');
+  assert(chatJs.includes('function renderPinnedBarAndList') && chatJs.includes('function setupRealtimeListeners'),
+    'T35.28: js/stream-community-chat.js defines renderPinnedBarAndList and setupRealtimeListeners for live WebSocket event dispatch');
+  assert(chatJs.includes("eventType === 'message.deleted'") && chatJs.includes('activeChannel.state.messages.filter'),
+    'T35.29: setupRealtimeListeners cleans deleted messages out of local state on real-time event');
+  assert(healthJs.includes('serverClient.partialUpdateMessage(messageId') && healthJs.includes('is_pinned: Boolean(pin)'),
+    'T35.30: api/health.js executes partialUpdateMessage on stream-pin to broadcast real-time message.updated event to all clients');
 }

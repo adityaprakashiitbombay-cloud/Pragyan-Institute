@@ -211,32 +211,37 @@ export default async function handler(req, res) {
       const adminId = `admin_${String(session.username || 'chandan').toLowerCase()}`;
 
       if (pin) {
-        await serverClient.pinMessage({ id: messageId }, { pinned_by: { id: adminId } });
+        try {
+          await serverClient.pinMessage(messageId, { user_id: adminId });
+        } catch (_) {
+          try { await serverClient.pinMessage({ id: messageId }); } catch (_) {}
+        }
       } else {
-        await serverClient.unpinMessage({ id: messageId });
+        try {
+          await serverClient.unpinMessage(messageId);
+        } catch (_) {
+          try { await serverClient.unpinMessage({ id: messageId }); } catch (_) {}
+        }
       }
+
+      // Always execute partialUpdateMessage to trigger real-time message.updated WebSocket event to all watching students
+      await serverClient.partialUpdateMessage(messageId, {
+        set: {
+          pinned: Boolean(pin),
+          is_pinned: Boolean(pin),
+          pinned_at: pin ? new Date().toISOString() : null,
+          pinned_by: pin ? (session.name || 'Admin') : null
+        }
+      });
 
       return res.status(200).json({
         success: true,
-        pinned: pin,
+        pinned: Boolean(pin),
         message: `Message ${messageId} successfully ${pin ? 'pinned' : 'unpinned'}.`
       });
     } catch (err) {
-      console.warn('[health/stream-pin] pinMessage fallback note:', err.message);
-      try {
-        const serverClient = StreamChat.getInstance(apiKey, apiSecret);
-        await serverClient.partialUpdateMessage(messageId, {
-          set: {
-            pinned: pin,
-            is_pinned: pin,
-            pinned_at: pin ? new Date().toISOString() : null,
-            pinned_by: pin ? (session.name || 'Admin') : null
-          }
-        });
-        return res.status(200).json({ success: true, pinned: pin });
-      } catch (pErr) {
-        return res.status(500).json({ success: false, error: err.message });
-      }
+      console.warn('[health/stream-pin] error:', err.message);
+      return res.status(500).json({ success: false, error: err.message });
     }
   }
 
@@ -270,10 +275,14 @@ export default async function handler(req, res) {
       try {
         await serverClient.deleteMessage(messageId, { hard: true });
       } catch (delErr) {
-        const errMsg = String(delErr?.message || '');
-        const errCode = delErr?.code || delErr?.status;
-        if (errCode !== 16 && errCode !== 404 && !/doesn't exist|not found/i.test(errMsg)) {
-          throw delErr;
+        try {
+          await serverClient.deleteMessage(messageId, true);
+        } catch (delErr2) {
+          const errMsg = String(delErr2?.message || delErr?.message || '');
+          const errCode = delErr2?.code || delErr?.code || delErr2?.status || delErr?.status;
+          if (errCode !== 16 && errCode !== 404 && !/doesn't exist|not found/i.test(errMsg)) {
+            throw delErr2;
+          }
         }
       }
       return res.status(200).json({

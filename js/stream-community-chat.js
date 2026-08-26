@@ -689,6 +689,55 @@
     }
   }
 
+  function renderPinnedBarHtml(pinnedMessages, isAdmin) {
+    if (!pinnedMessages || !pinnedMessages.length) return '';
+    const latestPin = pinnedMessages[pinnedMessages.length - 1];
+    return `
+      <div id="stream-pinned-bar" style="background: #FFFBEB; border-bottom: 1.5px solid #FCD34D; padding: 0.35rem 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-size: 0.76rem; color: #92400E; flex-shrink: 0; box-shadow: 0 1px 4px rgba(0,0,0,0.03);">
+        <div style="display: flex; align-items: center; gap: 0.45rem; overflow: hidden; flex: 1;">
+          <span style="background: #F59E0B; color: #FFF; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.65rem; font-weight: 900; display: inline-flex; align-items: center; gap: 0.25rem; flex-shrink: 0; letter-spacing: 0.3px;">
+            <i class="fa-solid fa-thumbtack" aria-hidden="true"></i> PINNED (${pinnedMessages.length})
+          </span>
+          <span class="pinned-preview-text" style="font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #78350F; font-size: 0.78rem;">
+            ${escapeHtml(latestPin.text || '')}
+          </span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0;">
+          <button type="button" class="btn-jump-pin" data-msg-id="${escapeHtml(latestPin.id)}" style="background: #FEF3C7; color: #B45309; border: 1px solid #FCD34D; font-size: 0.7rem; font-weight: 800; padding: 0.18rem 0.5rem; border-radius: 5px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;" title="Jump to pinned message">
+            <i class="fa-solid fa-arrow-down" aria-hidden="true"></i> Jump
+          </button>
+          ${isAdmin ? `
+            <button type="button" class="btn-unpin-msg" data-unpin-msg="${escapeHtml(latestPin.id)}" style="background: none; border: none; color: #DC2626; font-size: 0.85rem; cursor: pointer; padding: 0.15rem 0.35rem;" title="Unpin this announcement">
+              <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            </button>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderPinnedBarAndList(targetPane) {
+    const pane = targetPane || getActiveCommunityPane();
+    if (!pane) return;
+
+    const messages = (activeChannel?.state?.messages || []).filter(m => !m.deleted_at);
+    const pinnedMessages = messages.filter(m => m.pinned || m.is_pinned || Boolean(m.pinned_at));
+    const isAdmin = currentUser?.role === 'admin';
+
+    // 1. Update Pinned Bar Container
+    const pinWrapper = pane.querySelector('#stream-pinned-bar-wrapper');
+    if (pinWrapper) {
+      pinWrapper.innerHTML = renderPinnedBarHtml(pinnedMessages, isAdmin);
+    }
+
+    // 2. Update Messages Feed
+    const list = pane.querySelector('#stream-msg-list');
+    if (list) {
+      list.innerHTML = renderMsgList(messages);
+      scrollBottom(pane);
+    }
+  }
+
   function renderUI(container) {
     const isAdmin = currentUser.role === 'admin';
     const enrolledBatches = resolveStudentBatches();
@@ -720,9 +769,8 @@
     const studentCount = getStudentCountForBatch(activeMeta.batchId);
     const onlineCount = activeChannel?.state?.watcher_count || 1;
     const categories = getCategoriesList();
-    const messages = activeChannel?.state?.messages || [];
+    const messages = (activeChannel?.state?.messages || []).filter(m => !m.deleted_at);
     const pinnedMessages = messages.filter(m => m.pinned || m.is_pinned || Boolean(m.pinned_at));
-    const latestPin = pinnedMessages.length ? pinnedMessages[pinnedMessages.length - 1] : null;
 
     container.innerHTML = `
       <div class="stream-chat-wrapper" style="display: flex; flex-direction: column; height: clamp(560px, calc(100dvh - 140px), 880px); background: #FFFFFF; border-radius: 14px; border: 1.5px solid var(--border-sand, #DDD5CD); overflow: hidden; box-shadow: 0 8px 30px rgba(0,0,0,0.08); position: relative;">
@@ -759,64 +807,56 @@
         <!-- CATEGORIES FILTER BAR -->
         <div class="stream-cat-bar" style="background: #F8FAFC; padding: 0.35rem 0.75rem; border-bottom: 1px solid #E2E8F0; display: flex; gap: 0.35rem; align-items: center; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex-shrink: 0;">
           ${categories.map(cat => `
-            <button type="button" class="stream-cat-pill ${selectedCategory === cat ? 'active' : ''}" data-cat-name="${escapeHtml(cat)}" style="padding: 0.2rem 0.55rem; border-radius: 99px; font-size: 0.72rem; font-weight: 700; cursor: pointer; border: 1px solid ${selectedCategory === cat ? '#064E3B' : '#CBD5E1'}; background: ${selectedCategory === cat ? '#064E3B' : '#FFFFFF'}; color: ${selectedCategory === cat ? '#FFFFFF' : '#475569'}; white-space: nowrap; transition: all 0.15s ease;">
-              ${cat === 'ALL' ? '🌐 All Classes (12)' : escapeHtml(cat)}
+            <button type="button" class="stream-cat-pill ${cat === selectedCategory ? 'active' : ''}" data-cat-name="${escapeHtml(cat)}" style="font-size: 0.72rem; font-weight: 800; padding: 0.2rem 0.55rem; border-radius: 99px; border: 1px solid ${cat === selectedCategory ? '#064E3B' : '#CBD5E1'}; background: ${cat === selectedCategory ? '#064E3B' : '#FFFFFF'}; color: ${cat === selectedCategory ? '#FFFFFF' : '#475569'}; cursor: pointer; white-space: nowrap; transition: all 0.15s ease;">
+              ${cat === 'ALL' ? '🌟 All Channels' : escapeHtml(cat)}
             </button>
           `).join('')}
         </div>
 
-        <!-- CLASS GROUPS HORIZONTAL TABS BAR -->
-        ${filteredChannels.length > 1 ? `
-          <div class="stream-channels-scroll-wrap" style="background: #FFFFFF; padding: 0.4rem 0.75rem; border-bottom: 1.5px solid var(--border-sand, #E2E8F0); display: flex; gap: 0.4rem; align-items: center; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex-shrink: 0;">
-            ${filteredChannels.map(([id]) => {
-              const meta = CHANNEL_IDENTITIES[id] || { shortName: id, icon: '💬', badgeColor: '#059669' };
-              const isActive = id === activeChannelId;
-              const isEnrolled = enrolledBatches.includes(meta.batchId);
-              const count = getStudentCountForBatch(meta.batchId);
-              return `
-                <button type="button" class="stream-ch-pill ${isActive ? 'active' : ''} ${isEnrolled ? 'stream-ch-enrolled' : ''}" data-ch-id="${escapeHtml(id)}" style="display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.3rem 0.7rem; border-radius: 99px; font-size: 0.78rem; font-weight: 700; cursor: pointer; border: 1.5px solid ${isActive ? meta.badgeColor : (isEnrolled ? '#10B981' : '#E2E8F0')}; background: ${isActive ? meta.badgeColor : (isEnrolled ? '#ECFDF5' : '#F8FAFC')}; color: ${isActive ? '#FFFFFF' : (isEnrolled ? '#065F46' : '#334155')}; white-space: nowrap; transition: all 0.2s ease; box-shadow: ${isActive ? '0 2px 8px rgba(0,0,0,0.1)' : 'none'}; min-height: 32px;">
-                  <span style="font-size: 0.9rem;">${meta.icon}</span>
-                  <span>${escapeHtml(meta.shortName)}</span>
-                  ${isEnrolled ? `<span style="font-size: 0.65rem; background: ${isActive ? 'rgba(255,255,255,0.3)' : '#D1FAE5'}; color: ${isActive ? '#FFFFFF' : '#047857'}; padding: 0.05rem 0.35rem; border-radius: 4px; font-weight: 800;">My Class</span>` : ''}
-                  ${count > 0 ? `
-                    <span style="background: ${isActive ? 'rgba(255,255,255,0.25)' : '#E2E8F0'}; color: ${isActive ? '#FFFFFF' : '#475569'}; font-size: 0.68rem; padding: 0.02rem 0.38rem; border-radius: 99px; font-weight: 800;">
-                      ${count}
-                    </span>
-                  ` : ''}
-                </button>
-              `;
-            }).join('')}
-          </div>
-        ` : ''}
+        <!-- CHANNELS HORIZONTAL SCROLL BAR -->
+        <div class="stream-channels-scroll-wrap" style="display: flex; gap: 0.35rem; overflow-x: auto; -webkit-overflow-scrolling: touch; padding: 0.4rem 0.75rem; background: #FFFFFF; border-bottom: 1.5px solid var(--border-sand, #E2E8F0); scrollbar-width: none; flex-shrink: 0;">
+          ${filteredChannels.map(([id]) => {
+            const meta = CHANNEL_IDENTITIES[id] || {};
+            const isCur = id === activeChannelId;
+            const isEnrolled = enrolledBatches.includes(meta.batchId);
+            return `
+              <button type="button" class="stream-ch-pill ${isCur ? 'active' : ''} ${isEnrolled ? 'stream-ch-enrolled' : ''}" data-ch-id="${escapeHtml(id)}" style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.76rem; font-weight: 800; padding: 0.28rem 0.65rem; border-radius: 8px; border: 1.5px solid ${isCur ? meta.badgeColor || '#064E3B' : (isEnrolled ? '#6EE7B7' : '#E2E8F0')}; background: ${isCur ? (meta.badgeColor || '#064E3B') : (isEnrolled ? '#ECFDF5' : '#FFFFFF')}; color: ${isCur ? '#FFFFFF' : (isEnrolled ? '#065F46' : '#334155')}; cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: all 0.15s ease; box-shadow: ${isCur ? '0 2px 6px rgba(0,0,0,0.1)' : 'none'};">
+                <span>${meta.icon || '💬'}</span>
+                <span>${escapeHtml(meta.shortName || meta.name || id)}</span>
+                ${isEnrolled ? `<span style="font-size: 0.65rem; background: ${isCur ? 'rgba(255,255,255,0.25)' : '#A7F3D0'}; color: ${isCur ? '#FFF' : '#064E3B'}; padding: 1px 4px; border-radius: 3px; font-weight: 800;">★ My Class</span>` : ''}
+              </button>
+            `;
+          }).join('')}
+        </div>
 
-        <!-- ACTIVE CLASS IDENTITY BANNER (Compact & Sleek) -->
-        <div class="stream-active-banner" style="background: ${activeMeta.bannerBg}; color: #FFFFFF; padding: 0.45rem 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; border-bottom: 1.5px solid rgba(0,0,0,0.1); flex-shrink: 0;">
-          <div style="display: flex; align-items: center; gap: 0.5rem; overflow: hidden;">
-            <div class="stream-banner-icon" style="font-size: 1.25rem; width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.25);">
+        <!-- ACTIVE CHANNEL CONDENSED HERO BANNER -->
+        <div class="stream-active-banner" style="background: ${activeMeta.bannerBg}; color: #FFFFFF; padding: 0.4rem 0.85rem; border-bottom: 1.5px solid ${activeMeta.accentBorder}; display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; flex-shrink: 0;">
+          <div style="display: flex; align-items: center; gap: 0.5rem; min-width: 0;">
+            <div class="stream-banner-icon" style="width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,0.18); display: flex; align-items: center; justify-content: center; font-size: 1.25rem; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.25);">
               ${activeMeta.icon}
             </div>
-            <div style="overflow: hidden;">
-              <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
-                <h3 style="font-size: 0.95rem; font-weight: 800; color: #FFFFFF; margin: 0; letter-spacing: -0.01em;">
+            <div style="min-width: 0;">
+              <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+                <h3 style="margin: 0; font-size: 0.96rem; font-weight: 900; color: #FFFFFF; letter-spacing: -0.01em; line-height: 1.2;">
                   ${escapeHtml(activeMeta.name)}
                 </h3>
-                <span style="background: rgba(255,255,255,0.2); color: #FFFFFF; font-size: 0.65rem; font-weight: 800; padding: 0.05rem 0.4rem; border-radius: 4px; border: 1px solid rgba(255,255,255,0.3);">
+                <span style="font-size: 0.68rem; background: rgba(255,255,255,0.2); padding: 0.12rem 0.4rem; border-radius: 4px; font-weight: 800;">
                   ${escapeHtml(activeMeta.category)}
                 </span>
               </div>
-              <p class="stream-banner-tagline" style="font-size: 0.72rem; color: #E2E8F0; margin: 0.05rem 0 0 0; opacity: 0.9; text-overflow: ellipsis; white-space: nowrap; overflow: hidden;">
-                ${escapeHtml(activeMeta.tagline)} • <strong style="color: #FEF08A;">Mentors: ${escapeHtml(activeMeta.mentors)}</strong>
-              </p>
+              <div class="stream-banner-tagline" style="font-size: 0.73rem; opacity: 0.92; color: #F0FDF4; line-height: 1.2; margin-top: 0.1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                👨‍🏫 Mentors: <strong>${escapeHtml(activeMeta.mentors)}</strong> • ${escapeHtml(activeMeta.tagline)}
+              </div>
             </div>
           </div>
 
-          <div style="display: flex; align-items: center; gap: 0.45rem; flex-shrink: 0;">
+          <div style="display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0;">
             ${isAdmin ? `
-              <button type="button" class="btn-clear-group-chat" data-ch-id="${escapeHtml(activeChannelId)}" data-ch-name="${escapeHtml(activeMeta.name)}" style="background: rgba(220, 38, 38, 0.28); color: #FFFFFF; border: 1px solid rgba(254, 202, 202, 0.45); padding: 0.22rem 0.55rem; border-radius: 6px; font-size: 0.72rem; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem; transition: all 0.2s ease;" title="Clear chat history for this group">
-                <i class="fa-solid fa-trash-can" aria-hidden="true"></i> <span>Clear</span>
+              <button type="button" class="btn-clear-group-chat" data-ch-id="${escapeHtml(activeChannelId)}" data-ch-name="${escapeHtml(activeMeta.name)}" style="background: rgba(220, 38, 38, 0.2); color: #FCA5A5; border: 1px solid rgba(239, 68, 68, 0.4); font-size: 0.72rem; font-weight: 800; padding: 0.22rem 0.55rem; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem;" title="Clear group messages">
+                <i class="fa-solid fa-trash-can" aria-hidden="true"></i> <span>Clear Chat</span>
               </button>
             ` : ''}
-            <div style="text-align: right; display: none;" class="desktop-banner-stats">
+            <div class="desktop-banner-stats" style="display: none; text-align: right;">
               <span style="font-size: 0.68rem; color: #D1FAE5; background: rgba(0,0,0,0.2); padding: 0.18rem 0.45rem; border-radius: 6px; font-weight: 700; display: inline-block;">
                 👥 Enrolled: ${studentCount}
               </span>
@@ -824,29 +864,10 @@
           </div>
         </div>
 
-        <!-- STICKY PINNED MESSAGES BANNER -->
-        ${latestPin ? `
-          <div id="stream-pinned-bar" style="background: #FFFBEB; border-bottom: 1.5px solid #FCD34D; padding: 0.35rem 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-size: 0.76rem; color: #92400E; flex-shrink: 0; box-shadow: 0 1px 4px rgba(0,0,0,0.03);">
-            <div style="display: flex; align-items: center; gap: 0.45rem; overflow: hidden; flex: 1;">
-              <span style="background: #F59E0B; color: #FFF; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.65rem; font-weight: 900; display: inline-flex; align-items: center; gap: 0.25rem; flex-shrink: 0; letter-spacing: 0.3px;">
-                <i class="fa-solid fa-thumbtack" aria-hidden="true"></i> PINNED (${pinnedMessages.length})
-              </span>
-              <span class="pinned-preview-text" style="font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #78350F; font-size: 0.78rem;">
-                ${escapeHtml(latestPin.text || '')}
-              </span>
-            </div>
-            <div style="display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0;">
-              <button type="button" class="btn-jump-pin" data-msg-id="${escapeHtml(latestPin.id)}" style="background: #FEF3C7; color: #B45309; border: 1px solid #FCD34D; font-size: 0.7rem; font-weight: 800; padding: 0.18rem 0.5rem; border-radius: 5px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;" title="Jump to pinned message">
-                <i class="fa-solid fa-arrow-down" aria-hidden="true"></i> Jump
-              </button>
-              ${isAdmin ? `
-                <button type="button" class="btn-unpin-msg" data-unpin-msg="${escapeHtml(latestPin.id)}" style="background: none; border: none; color: #DC2626; font-size: 0.85rem; cursor: pointer; padding: 0.15rem 0.35rem;" title="Unpin this announcement">
-                  <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-                </button>
-              ` : ''}
-            </div>
-          </div>
-        ` : ''}
+        <!-- STICKY PINNED MESSAGES BANNER CONTAINER -->
+        <div id="stream-pinned-bar-wrapper">
+          ${renderPinnedBarHtml(pinnedMessages, isAdmin)}
+        </div>
 
         <!-- MESSAGES FEED CONTAINER -->
         <div id="stream-msg-list" style="flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0.75rem 0.85rem; background: #FAF9F6; display: flex; flex-direction: column;">
@@ -878,7 +899,92 @@
     `;
 
     wireEvents(container);
-    scrollBottom();
+    scrollBottom(container);
+  }
+
+  function setupRealtimeListeners() {
+    if (!client || isListening) return;
+    isListening = true;
+
+    const handleMsgEvent = (eventType, event) => {
+      if (!activeChannel) return;
+      const isMatch = event.channel_id === activeChannel.id || 
+                      event.cid === activeChannel.cid || 
+                      event.channel?.id === activeChannel.id;
+      if (!isMatch) return;
+
+      if (!activeChannel.state) activeChannel.state = { messages: [] };
+      if (!Array.isArray(activeChannel.state.messages)) activeChannel.state.messages = [];
+
+      if (eventType === 'message.new' || eventType === 'notification.message_new') {
+        if (event.message) {
+          const idx = activeChannel.state.messages.findIndex(m => m.id === event.message.id);
+          if (idx >= 0) {
+            activeChannel.state.messages[idx] = { ...activeChannel.state.messages[idx], ...event.message };
+          } else {
+            activeChannel.state.messages.push(event.message);
+          }
+        }
+      } else if (eventType === 'message.updated') {
+        if (event.message) {
+          const idx = activeChannel.state.messages.findIndex(m => m.id === event.message.id);
+          if (idx >= 0) {
+            activeChannel.state.messages[idx] = { ...activeChannel.state.messages[idx], ...event.message };
+          } else {
+            activeChannel.state.messages.push(event.message);
+          }
+        }
+      } else if (eventType === 'message.deleted') {
+        const delId = event.message?.id || event.id;
+        if (delId) {
+          activeChannel.state.messages = activeChannel.state.messages.filter(m => m.id !== delId);
+        }
+      } else if (eventType === 'channel.truncated' || eventType === 'notification.channel_truncate') {
+        activeChannel.state.messages = [];
+      }
+
+      renderPinnedBarAndList();
+    };
+
+    const eventTypes = [
+      'message.new',
+      'message.updated',
+      'message.deleted',
+      'channel.updated',
+      'channel.truncated',
+      'notification.message_new',
+      'notification.channel_truncate'
+    ];
+
+    eventTypes.forEach(evtType => {
+      client.on(evtType, event => {
+        handleMsgEvent(evtType, event);
+      });
+    });
+
+    client.on('user.presence.changed', () => {
+      const pane = getActiveCommunityPane();
+      const cntEl = pane?.querySelector('#stream-online-count');
+      if (cntEl && activeChannel) {
+        cntEl.textContent = `${activeChannel.state?.watcher_count || 1} active`;
+      }
+    });
+
+    client.on('typing.start', e => {
+      if (e.user?.id !== currentUser?.id && activeChannel && (e.channel_id === activeChannel.id || e.cid === activeChannel.cid)) {
+        const pane = getActiveCommunityPane();
+        const box = pane?.querySelector('#stream-typing-box');
+        if (box) box.textContent = `✍️ ${escapeHtml(e.user?.name || 'Someone')} is typing in this group...`;
+      }
+    });
+
+    client.on('typing.stop', e => {
+      if (e.user?.id !== currentUser?.id && activeChannel && (e.channel_id === activeChannel.id || e.cid === activeChannel.cid)) {
+        const pane = getActiveCommunityPane();
+        const box = pane?.querySelector('#stream-typing-box');
+        if (box) box.textContent = '';
+      }
+    });
   }
 
   function wireEvents(container) {
@@ -897,7 +1003,7 @@
         } else {
           document.body.classList.remove('stream-body-fullscreen-lock');
         }
-        scrollBottom();
+        scrollBottom(container);
       });
     }
 
@@ -942,72 +1048,7 @@
       });
     });
 
-    // 3. Helper to refresh message list and pinned bar
-    const refreshMsgList = () => {
-      const list = container.querySelector('#stream-msg-list');
-      if (list && activeChannel) {
-        list.innerHTML = renderMsgList(activeChannel.state?.messages);
-        scrollBottom();
-      }
-    };
-
-    // 4. Attach client-level real-time listener
-    if (client && !isListening) {
-      isListening = true;
-
-      client.on('message.new', event => {
-        if (activeChannel && (event.channel_id === activeChannel.id || event.cid === activeChannel.cid)) {
-          if (event.message && activeChannel.state?.messages) {
-            if (!activeChannel.state.messages.some(m => m.id === event.message.id)) {
-              activeChannel.state.messages.push(event.message);
-            }
-          }
-          refreshMsgList();
-        }
-      });
-
-      client.on('message.updated', event => {
-        if (activeChannel && (event.channel_id === activeChannel.id || event.cid === activeChannel.cid)) {
-          refreshMsgList();
-        }
-      });
-
-      client.on('message.deleted', event => {
-        if (activeChannel && (event.channel_id === activeChannel.id || event.cid === activeChannel.cid)) {
-          refreshMsgList();
-        }
-      });
-
-      client.on('channel.truncated', event => {
-        if (activeChannel && (event.channel_id === activeChannel.id || event.cid === activeChannel.cid)) {
-          if (activeChannel.state) activeChannel.state.messages = [];
-          refreshMsgList();
-        }
-      });
-
-      client.on('user.presence.changed', () => {
-        const cntEl = container.querySelector('#stream-online-count');
-        if (cntEl && activeChannel) {
-          cntEl.textContent = `${activeChannel.state?.watcher_count || 1} active now`;
-        }
-      });
-
-      client.on('typing.start', e => {
-        if (e.user?.id !== currentUser.id && activeChannel && (e.channel_id === activeChannel.id || e.cid === activeChannel.cid)) {
-          const box = container.querySelector('#stream-typing-box');
-          if (box) box.textContent = `✍️ ${escapeHtml(e.user?.name || 'Someone')} is typing in this group...`;
-        }
-      });
-
-      client.on('typing.stop', e => {
-        if (e.user?.id !== currentUser.id && activeChannel && (e.channel_id === activeChannel.id || e.cid === activeChannel.cid)) {
-          const box = container.querySelector('#stream-typing-box');
-          if (box) box.textContent = '';
-        }
-      });
-    }
-
-    // 5. Autocomplete popup controller (@mentions & /slash commands)
+    // 3. Autocomplete popup controller (@mentions & /slash commands)
     const input = container.querySelector('#stream-msg-input');
     const autoBox = container.querySelector('#stream-autocomplete-box');
     const quickHgBtn = container.querySelector('#btn-quick-hg');
@@ -1339,7 +1380,7 @@
         }
       }
 
-      renderUI(container);
+      renderPinnedBarAndList(container);
     }
 
     // 8. Event delegation on container for Pin, Unpin, Delete, Jump
@@ -1425,7 +1466,7 @@
           if (activeChannel?.state?.messages) {
             activeChannel.state.messages = activeChannel.state.messages.filter(m => m.id !== msgId);
           }
-          refreshMsgList();
+          renderPinnedBarAndList(container);
         } catch (err) {
           console.error('[Delete Msg Error]', err);
           alert('Delete failed: ' + err.message);
@@ -1541,6 +1582,7 @@
       }
 
       await setupChannels();
+      setupRealtimeListeners();
       renderUI(containerEl);
     } catch (err) {
       console.error('[StreamChat Error]', err);
