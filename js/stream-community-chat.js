@@ -553,8 +553,11 @@
     const primaryBatch = enrolledBatches[0] || resolveBatchId() || 'BAT-10';
     const batches = (window.PRAGYAN_ACADEMIC && window.PRAGYAN_ACADEMIC.BATCHES) || [];
 
-    // Register all class-specific batch channels for everyone
+    // Register batch channels: Admin gets all batches; Students get ONLY their enrolled class(es)
     for (const b of batches) {
+      if (!isAdmin && enrolledBatches.length > 0 && !enrolledBatches.includes(b.batchId)) {
+        continue;
+      }
       const chId = `batch-${b.batchId}`;
       const meta = CHANNEL_IDENTITIES[chId] || { name: b.name || b.batchId };
       const ch = client.channel(CHANNEL_TYPE, chId, {
@@ -564,12 +567,27 @@
       channelsMap.set(chId, ch);
     }
 
+    // Fallback: If channelsMap is empty for student, ensure their primary batch channel exists
+    if (!isAdmin && channelsMap.size === 0) {
+      const fallbackBatchId = primaryBatch || 'BAT-10';
+      const chId = `batch-${fallbackBatchId}`;
+      const meta = CHANNEL_IDENTITIES[chId] || { name: fallbackBatchId };
+      const ch = client.channel(CHANNEL_TYPE, chId, { name: meta.name });
+      bindChannelRealtime(ch);
+      channelsMap.set(chId, ch);
+    }
+
     // Set default active channel to student's primary enrolled batch
     if (!isAdmin) {
       if (primaryBatch && channelsMap.has(`batch-${primaryBatch}`)) {
         activeChannelId = `batch-${primaryBatch}`;
-      } else if (channelsMap.size > 0) {
-        activeChannelId = Array.from(channelsMap.keys())[0];
+      } else {
+        const firstValid = enrolledBatches.find(b => channelsMap.has(`batch-${b}`));
+        if (firstValid) {
+          activeChannelId = `batch-${firstValid}`;
+        } else if (channelsMap.size > 0) {
+          activeChannelId = Array.from(channelsMap.keys())[0];
+        }
       }
     } else {
       if (!channelsMap.has(activeChannelId)) {
@@ -603,6 +621,13 @@
 
   async function switchChannel(targetChannelId, container) {
     if (!channelsMap.has(targetChannelId)) return;
+    const isAdmin = currentUser.role === 'admin';
+    const enrolledBatches = resolveStudentBatches();
+    const targetMeta = CHANNEL_IDENTITIES[targetChannelId];
+    if (!isAdmin && enrolledBatches.length > 0 && targetMeta?.batchId && !enrolledBatches.includes(targetMeta.batchId)) {
+      console.warn('[StreamChat] Student access restricted to enrolled class chat only:', targetChannelId);
+      return;
+    }
     activeChannelId = targetChannelId;
     activeChannel = channelsMap.get(targetChannelId);
     replyingToMessage = null;
@@ -1474,7 +1499,18 @@
   }
 
   function getCategoriesList() {
-    return ['ALL', 'Senior Secondary', 'Secondary', 'Junior & Middle', 'Special English'];
+    const isAdmin = currentUser?.role === 'admin';
+    const enrolledBatches = resolveStudentBatches();
+    const allCats = ['ALL', 'Senior Secondary', 'Secondary', 'Junior & Middle', 'Special English'];
+    if (isAdmin) return allCats;
+    const catSet = new Set();
+    Object.entries(CHANNEL_IDENTITIES).forEach(([id, meta]) => {
+      if (enrolledBatches.includes(meta.batchId) && meta.category) {
+        catSet.add(meta.category);
+      }
+    });
+    const arr = Array.from(catSet);
+    return arr.length > 1 ? ['ALL', ...arr] : (arr.length === 1 ? arr : allCats);
   }
 
   function showHelpModal() {
@@ -1585,6 +1621,9 @@
 
     const filteredChannels = channelList.filter(([id]) => {
       const meta = CHANNEL_IDENTITIES[id] || {};
+      if (!isAdmin && enrolledBatches.length > 0 && meta.batchId && !enrolledBatches.includes(meta.batchId)) {
+        return false;
+      }
       const matchCat = selectedCategory === 'ALL' || meta.category === selectedCategory;
       const matchSearch = !searchQuery ||
         (meta.name && meta.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -1609,6 +1648,7 @@
     const studentCount = getStudentCountForBatch(activeMeta.batchId);
     const onlineCount = activeChannel?.state?.watcher_count || 1;
     const categories = getCategoriesList();
+    const showCatBar = (isAdmin || categories.length > 1) && filteredChannels.length > 1;
     const messages = (activeChannel?.state?.messages || []).filter(m => !m.deleted_at);
     const pinnedMessages = messages.filter(m => m.pinned || m.is_pinned || Boolean(m.pinned_at));
     const mediaList = getMediaAttachmentsFromMessages(messages);
@@ -1645,6 +1685,7 @@
           </div>
         </div>
 
+        ${showCatBar ? `
         <!-- CATEGORIES FILTER BAR -->
         <div class="stream-cat-bar" style="background: #F8FAFC; padding: 0.35rem 0.75rem; border-bottom: 1px solid #E2E8F0; display: flex; gap: 0.35rem; align-items: center; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex-shrink: 0;">
           ${categories.map(cat => `
@@ -1653,6 +1694,7 @@
             </button>
           `).join('')}
         </div>
+        ` : ''}
 
         <!-- CHANNELS HORIZONTAL SCROLL BAR -->
         <div class="stream-channels-scroll-wrap" style="display: flex; gap: 0.35rem; overflow-x: auto; -webkit-overflow-scrolling: touch; padding: 0.4rem 0.75rem; background: #FFFFFF; border-bottom: 1.5px solid var(--border-sand, #E2E8F0); scrollbar-width: none; flex-shrink: 0;">

@@ -832,10 +832,16 @@ ${batchBlock}
         .pragyan-chat-widget {
           left: 0.5rem;
           bottom: 0.75rem;
+          right: 0.5rem;
+        }
+        .chat-toggle-btn {
+          padding: 0.65rem 1.15rem;
+          font-size: 0.88rem;
+          box-shadow: 0 4px 18px rgba(90, 46, 37, 0.35);
         }
         .chat-window {
           left: 0 !important;
-          right: auto !important;
+          right: 0 !important;
           width: calc(100vw - 1rem) !important;
           max-width: calc(100vw - 1rem) !important;
           bottom: 3.85rem !important;
@@ -844,10 +850,14 @@ ${batchBlock}
              every phone with a retracting address bar the panel was sized against
              the tall viewport and its input row sat below the fold — the send
              button could not be reached at all. */
-          height: auto !important;
+          height: clamp(380px, calc(100dvh - 5.5rem), 560px) !important;
           max-height: calc(100vh - 5.5rem) !important;
           max-height: calc(100dvh - 5.5rem) !important;
           min-height: 320px;
+          border-radius: 1.15rem !important;
+        }
+        .chat-header {
+          padding: 0.75rem 0.95rem;
         }
         /* 44px touch targets. These were ~25px (0.3rem padding on a 0.95rem
            glyph), which is under the 24px AA floor once the icon is inset and
@@ -867,6 +877,35 @@ ${batchBlock}
            off the right edge of the panel. */
         .key-input-row input { font-size: 16px; }
         .key-save-btn { min-height: 44px; }
+        .chat-messages {
+          padding: 0.75rem;
+          gap: 0.65rem;
+        }
+        .chat-msg {
+          max-width: 90%;
+          font-size: 0.85rem;
+        }
+        .chat-suggestions {
+          gap: 0.35rem;
+          margin-top: 0.35rem;
+        }
+        .chip-btn {
+          font-size: 0.75rem;
+          padding: 0.3rem 0.65rem;
+        }
+        .chat-input-area {
+          padding: 0.65rem 0.75rem;
+          padding-bottom: max(0.65rem, env(safe-area-inset-bottom));
+          gap: 0.45rem;
+        }
+        #chatInput {
+          font-size: 16px;
+          padding: 0.55rem 0.85rem;
+        }
+        .chat-send-btn {
+          width: 42px;
+          height: 42px;
+        }
       }
 
       /* The panel fades and slides, the typing dots bounce and the toggle scales

@@ -1152,18 +1152,22 @@
           });
         } else if (operation === 'delete') {
           if (filters.all === true) {
-            // Bulk purge: chunk by primary key so no unfiltered DELETE can ever
-            // reach the wire (the gateway rejects those outright).
-            const idCol = ORDER_COLUMNS[table] || 'id';
-            const allRows = await this._apiDb(table, 'select', {
-              filters: { columns: idCol, limit: 1000 }
-            });
-            const ids = (allRows || []).map(r => r?.[idCol]).filter(Boolean);
-            for (let i = 0; i < ids.length; i += 500) {
-              const chunk = ids.slice(i, i + 500);
-              await this._apiDb(table, 'delete', { filters: { where: { [idCol]: chunk } } });
+            if (table === 'audit_logs') {
+              result = await this._apiDb(table, 'delete', { filters: { all: true } });
+            } else {
+              // Bulk purge: chunk by primary key so no unfiltered DELETE can ever
+              // reach the wire (the gateway rejects those outright).
+              const idCol = ORDER_COLUMNS[table] || 'id';
+              const allRows = await this._apiDb(table, 'select', {
+                filters: { columns: idCol, limit: 1000 }
+              });
+              const ids = (allRows || []).map(r => r?.[idCol]).filter(Boolean);
+              for (let i = 0; i < ids.length; i += 500) {
+                const chunk = ids.slice(i, i + 500);
+                await this._apiDb(table, 'delete', { filters: { where: { [idCol]: chunk } } });
+              }
+              result = ids;
             }
-            result = ids;
           } else {
             if (!filters.where || Object.keys(filters.where).length === 0) {
               return { success: false, error: 'Delete requires a where clause' };

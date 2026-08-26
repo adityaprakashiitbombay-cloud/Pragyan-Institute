@@ -587,12 +587,14 @@ export default async function handler(req, res) {
         if (!isHead) {
           return res.status(403).json({ success: false, error: 'Only the head administrator can purge audit logs' });
         }
+        result = await supabase.from('audit_logs').delete().neq('log_id', '00000000-0000-0000-0000-000000000000').select(readColumns(table));
+      } else {
+        if (!filters.where || Object.keys(filters.where).length === 0) {
+          // An unfiltered delete would empty the table.
+          return res.status(400).json({ success: false, error: 'A delete filter is required' });
+        }
+        result = await addWhere(supabase.from(table).delete(), filters.where).select(readColumns(table));
       }
-      if (!filters.where || Object.keys(filters.where).length === 0) {
-        // An unfiltered delete would empty the table.
-        return res.status(400).json({ success: false, error: 'A delete filter is required' });
-      }
-      result = await addWhere(supabase.from(table).delete(), filters.where).select(readColumns(table));
     }
 
     if (result.error) {

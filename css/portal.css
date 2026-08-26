@@ -10312,6 +10312,24 @@ body.stream-chat-is-fullscreen #stream-community-chat-app {
     padding: 0.28rem 0.55rem !important;
   }
 
+  .stream-msg-quote-header {
+    max-width: 100% !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    font-size: 0.7rem !important;
+    padding: 0.2rem 0.45rem !important;
+  }
+
+  .stream-media-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.5rem !important;
+  }
+
+  .stream-media-card, .stream-pdf-card {
+    max-width: 100% !important;
+  }
+
   .stream-msg-actions {
     opacity: 0.9 !important;
     display: inline-flex !important;

@@ -176,6 +176,24 @@ export function runCommunityChatLayoutTests(assert) {
     'T35.63: api/_lib/auth.js sets SESSION_TTL_SECONDS to 7 days (604,800 seconds) so users stay logged in for at least a week');
   assert(/CHAT_TOKEN_TTL_SECONDS\s*=\s*7\s*\*\s*24\s*\*\s*60\s*\*\s*60/.test(healthJs),
     'T35.64: api/health.js sets CHAT_TOKEN_TTL_SECONDS to 7 days (604,800 seconds) matching the portal session lifetime');
+
+  // --- 17. Student Class Scoping & Master Audit Log Purge Fix Suite ---
+  const dbJs = read('api/db.js');
+  const aiChatJs = read('js/chat.js');
+
+  assert(chatJs.includes('!isAdmin && enrolledBatches.length > 0 && !enrolledBatches.includes(b.batchId)') &&
+         chatJs.includes('!isAdmin && enrolledBatches.length > 0 && meta.batchId && !enrolledBatches.includes(meta.batchId)'),
+    'T35.65: js/stream-community-chat.js strictly scopes channel setup and rendering to student enrolled classes only');
+
+  assert(chatJs.includes('Student access restricted to enrolled class chat only'),
+    'T35.66: js/stream-community-chat.js blocks non-admin students from switching to other class channels');
+
+  assert(dbJs.includes("table === 'audit_logs' && filters.all === true") && dbJs.includes(".neq('log_id'"),
+    'T35.67: api/db.js supports head admin atomic full purge of audit_logs when filters.all is true');
+
+  assert(aiChatJs.includes('height: clamp(380px, calc(100dvh - 5.5rem), 560px) !important') &&
+         portalCss.includes('.stream-msg-quote-header') && portalCss.includes('overflow: hidden !important'),
+    'T35.68: js/chat.js and css/portal.css enforce clean mobile responsive dimensions and overflow protection');
 }
 
 

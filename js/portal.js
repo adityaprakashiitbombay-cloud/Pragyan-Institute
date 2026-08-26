@@ -12809,7 +12809,7 @@ const inputRoll = modalEl.querySelector('#deleteConfirmRollInput')?.value.trim()
                 <div style="font-size: 0.8rem; color: #FEE2E2; margin-top: 0.15rem;">Main Admin Exclusive Action — Chandan Kumar</div>
               </div>
             </div>
-            <button type="button" aria-label="Close audit purge dialog" onclick="document.getElementById('auditPurgeModal').remove()" style="background: none; border: none; color: #fff; font-size: 1.25rem; cursor: pointer;">
+            <button type="button" id="btnCloseAuditPurgeHeader" aria-label="Close audit purge dialog" style="background: none; border: none; color: #fff; font-size: 1.25rem; cursor: pointer; padding: 0.25rem; min-width: 36px; min-height: 36px; display: inline-flex; align-items: center; justify-content: center;">
               <i aria-hidden="true" class="fa-solid fa-xmark"></i>
             </button>
           </div>
@@ -12850,7 +12850,7 @@ const inputRoll = modalEl.querySelector('#deleteConfirmRollInput')?.value.trim()
 
             <!-- Action Buttons -->
             <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 0.35rem;">
-              <button type="button" class="btn" onclick="document.getElementById('auditPurgeModal').remove()" style="background: #E2E8F0; color: #334155; font-weight: 700; padding: 0.6rem 1.15rem; font-size: 0.85rem; border-radius: 6px; cursor: pointer;">
+              <button type="button" id="btnCancelPurgeAuditLogs" class="btn" style="background: #E2E8F0; color: #334155; font-weight: 700; padding: 0.6rem 1.15rem; font-size: 0.85rem; border-radius: 6px; cursor: pointer;">
                 Cancel / Keep Data
               </button>
               <button type="button" id="btnConfirmPurgeAuditLogs" class="btn" disabled style="background: #94A3B8; color: #fff; font-weight: 800; padding: 0.6rem 1.25rem; font-size: 0.85rem; border-radius: 6px; cursor: not-allowed; display: inline-flex; align-items: center; gap: 0.4rem; transition: all 0.2s;">
@@ -12869,6 +12869,9 @@ const inputRoll = modalEl.querySelector('#deleteConfirmRollInput')?.value.trim()
       closeOnBackdrop: false,
       initialFocus: '#confirmAuditPurgeInput'
     });
+
+    document.getElementById('btnCloseAuditPurgeHeader')?.addEventListener('click', () => purgeDialog.close());
+    document.getElementById('btnCancelPurgeAuditLogs')?.addEventListener('click', () => purgeDialog.close());
 
     const input = document.getElementById('confirmAuditPurgeInput');
     const confirmBtn = document.getElementById('btnConfirmPurgeAuditLogs');
