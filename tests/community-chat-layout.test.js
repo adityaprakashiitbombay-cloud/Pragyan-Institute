@@ -221,6 +221,15 @@ export function runCommunityChatLayoutTests(assert) {
   assert(portalJs.includes("portalOverlay.classList.remove('active', 'community-tab-active')") &&
          portalJs.includes("document.querySelector('.portal-modal-card')?.classList.remove('community-tab-active')"),
     'T35.74: js/portal.js cleans up community-tab-active upon closePortal and logout');
+
+  assert(portalCss.includes('min-height: 46px !important') &&
+         portalCss.includes('overflow-x: auto !important') &&
+         portalCss.includes('touch-action: pan-x !important'),
+    'T35.75: css/portal.css defines persistent, non-collapsing mobile horizontal navigation tabs');
+
+  assert(portalCss.includes('grid-template-columns: repeat(2, 1fr) !important') &&
+         portalCss.includes('overscroll-behavior: contain !important'),
+    'T35.76: css/portal.css optimizes mobile admin overview stats grid and scroll containment');
 }
 
 
