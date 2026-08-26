@@ -3529,10 +3529,14 @@ function renderStudentDashboard() {
       studentWrapper?.classList.add('community-tab-active');
       portalOverlayEl?.classList.add('community-tab-active');
       portalModalCardEl?.classList.add('community-tab-active');
+      if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+        document.body.classList.add('stream-body-fullscreen-lock');
+      }
     } else {
       studentWrapper?.classList.remove('community-tab-active');
       portalOverlayEl?.classList.remove('community-tab-active');
       portalModalCardEl?.classList.remove('community-tab-active');
+      document.body.classList.remove('stream-body-fullscreen-lock');
     }
 
     // Reset content scroll so switching tabs resets to top
@@ -6393,10 +6397,14 @@ function renderStudentDashboard() {
       adminWrapper?.classList.add('community-tab-active');
       portalOverlayEl?.classList.add('community-tab-active');
       portalModalCardEl?.classList.add('community-tab-active');
+      if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+        document.body.classList.add('stream-body-fullscreen-lock');
+      }
     } else {
       adminWrapper?.classList.remove('community-tab-active');
       portalOverlayEl?.classList.remove('community-tab-active');
       portalModalCardEl?.classList.remove('community-tab-active');
+      document.body.classList.remove('stream-body-fullscreen-lock');
     }
 
     // Toggle Overview KPI cards: show strictly on Students tab

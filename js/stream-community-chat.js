@@ -1699,8 +1699,8 @@
               <span id="stream-online-count" style="font-weight: 700;">${onlineCount} active</span>
             </div>
 
-            <!-- Fullscreen Toggle Button -->
-            <button type="button" id="btn-stream-fullscreen" class="btn-stream-fullscreen" title="Toggle Fullscreen View" aria-label="Toggle Fullscreen View" style="background: rgba(255,255,255,0.12); color: #FFFFFF; border: 1px solid rgba(255,255,255,0.22); border-radius: 6px; padding: 0.22rem 0.6rem; font-size: 0.74rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem; transition: all 0.15s ease;">
+            <!-- Fullscreen / Mobile Exit Button -->
+            <button type="button" id="btn-stream-fullscreen" class="btn-stream-fullscreen" title="Toggle Fullscreen View" aria-label="Toggle Fullscreen View" style="background: rgba(255,255,255,0.18); color: #FFFFFF; border: 1px solid rgba(255,255,255,0.28); border-radius: 6px; padding: 0.22rem 0.6rem; font-size: 0.74rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem; transition: all 0.15s ease;">
               <i class="fa-solid fa-expand" aria-hidden="true"></i> <span>Fullscreen</span>
             </button>
           </div>
@@ -2312,10 +2312,31 @@
 
     // --- DELEGATED CONTAINER CLICK LISTENER ---
     container.addEventListener('click', async e => {
-      // 1. Fullscreen Toggle
+      // 1. Fullscreen Toggle / Mobile Chat Exit
       const fullscreenBtn = e.target.closest('#btn-stream-fullscreen');
       if (fullscreenBtn) {
         e.preventDefault();
+        const isMobileScreen = (typeof window !== 'undefined' && window.innerWidth <= 768);
+        if (isMobileScreen) {
+          document.body.classList.remove('stream-body-fullscreen-lock');
+          const chatWrapper = container.querySelector('.stream-chat-wrapper');
+          chatWrapper?.classList.remove('stream-fullscreen');
+          if (isAdmin) {
+            if (typeof window.switchAdminTab === 'function') {
+              window.switchAdminTab('students');
+            } else {
+              document.querySelector('.admin-tab-btn[data-tab="students"]')?.click();
+            }
+          } else {
+            if (typeof window.switchStudentTab === 'function') {
+              window.switchStudentTab('details');
+            } else {
+              document.querySelector('.student-tab-btn[data-tab="details"]')?.click();
+            }
+          }
+          return;
+        }
+
         const chatWrapper = container.querySelector('.stream-chat-wrapper');
         if (chatWrapper) {
           const isFull = chatWrapper.classList.toggle('stream-fullscreen');

@@ -239,6 +239,18 @@ export function runCommunityChatLayoutTests(assert) {
   assert(portalJs.includes('contentBody.scrollTop = 0') &&
          portalJs.includes("btn.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' })"),
     'T35.78: js/portal.js resets dashboard content scroll on mobile tab switch and scrolls active tab button into view');
+
+  assert(portalCss.includes('/* Community Chat: Mobile Fullscreen-Only Layout */') &&
+         portalCss.includes('.stream-chat-wrapper,') &&
+         portalCss.includes('.stream-chat-wrapper.stream-fullscreen') &&
+         portalCss.includes('z-index: 2147483647 !important'),
+    'T35.79: css/portal.css defines mobile fullscreen-only layout for .stream-chat-wrapper and .stream-loading-card');
+
+  assert(portalJs.includes("document.body.classList.add('stream-body-fullscreen-lock')") &&
+         portalJs.includes("document.body.classList.remove('stream-body-fullscreen-lock')") &&
+         chatJs.includes('isMobileScreen') &&
+         chatJs.includes("switchAdminTab('students')"),
+    'T35.80: js/portal.js and stream-community-chat.js manage body fullscreen lock and mobile exit transition to default tabs');
 }
 
 
