@@ -2935,11 +2935,13 @@ const supaPayload = pushableReqs.map(r => ({
 
     // Pointer drag detection for horizontal scrollable tab bars (prevents touch scrolling from triggering accidental tab switch clicks)
     let isNavTabsDragging = false;
+    let isNavTabsPointerDown = false;
     let navTabsStartX = 0;
     let navTabsStartY = 0;
 
     document.addEventListener('pointerdown', (e) => {
       if (e.target.closest('.dashboard-nav-tabs, .portal-nav-bar')) {
+        isNavTabsPointerDown = true;
         isNavTabsDragging = false;
         navTabsStartX = e.clientX;
         navTabsStartY = e.clientY;
@@ -2947,9 +2949,24 @@ const supaPayload = pushableReqs.map(r => ({
     }, { passive: true });
 
     document.addEventListener('pointermove', (e) => {
-      if (!isNavTabsDragging && (Math.abs(e.clientX - navTabsStartX) > 8 || Math.abs(e.clientY - navTabsStartY) > 8)) {
-        isNavTabsDragging = true;
+      if (isNavTabsPointerDown && !isNavTabsDragging && (Math.abs(e.clientX - navTabsStartX) > 8 || Math.abs(e.clientY - navTabsStartY) > 8)) {
+        const dx = Math.abs(e.clientX - navTabsStartX);
+        const dy = Math.abs(e.clientY - navTabsStartY);
+        if (dx > dy) {
+          isNavTabsDragging = true;
+        }
       }
+    }, { passive: true });
+
+    document.addEventListener('pointerup', () => {
+      isNavTabsPointerDown = false;
+      // Clear drag state on next microtask so pending clicks resolve cleanly
+      setTimeout(() => { isNavTabsDragging = false; }, 30);
+    }, { passive: true });
+
+    document.addEventListener('pointercancel', () => {
+      isNavTabsPointerDown = false;
+      isNavTabsDragging = false;
     }, { passive: true });
 
     // Student Dashboard Tab Buttons
@@ -7375,41 +7392,47 @@ function renderStudentDashboard() {
   }
 
   function bindStudentTableActions(container) {
-    // Open Make Changes Control Modal
-    container.querySelectorAll('.btn-make-changes').forEach(btn => {
-      btn.onclick = () => {
-        openStudentManagementModal(btn.dataset.id, 'pay');
-      };
-    });
+    if (!container) return;
+    if (container._hasBoundStudentActions) return;
+    container._hasBoundStudentActions = true;
 
-    // Reset student password to DOB
-    container.querySelectorAll('.btn-reset-pw-dob').forEach(btn => {
-      btn.onclick = async () => {
-        const id = btn.dataset.id;
-        const name = btn.dataset.name || 'Student';
-        const dob = btn.dataset.dob || 'DOB';
+    container.addEventListener('click', async (e) => {
+      // Open Make Changes Control Modal
+      const makeChangesBtn = e.target.closest('.btn-make-changes');
+      if (makeChangesBtn) {
+        openStudentManagementModal(makeChangesBtn.dataset.id, 'pay');
+        return;
+      }
+
+      // Reset student password to DOB
+      const resetBtn = e.target.closest('.btn-reset-pw-dob');
+      if (resetBtn) {
+        const id = resetBtn.dataset.id;
+        const name = resetBtn.dataset.name || 'Student';
+        const dob = resetBtn.dataset.dob || 'DOB';
         if (confirm(`Reset login password for ${name} to their official Date of Birth (${dob})?`)) {
-          const origHtml = btn.innerHTML;
+          const origHtml = resetBtn.innerHTML;
           try {
-            btn.disabled = true;
-            btn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-spinner fa-spin"></i> Resetting...';
+            resetBtn.disabled = true;
+            resetBtn.innerHTML = '<i aria-hidden="true" class="fa-solid fa-spinner fa-spin"></i> Resetting...';
             await AppState.resetStudentPasswordToDob(id);
             alert(`✅ Password for ${name} has been reset to Date of Birth (${dob}). The student can now log in using their DOB.`);
           } catch (err) {
             alert('Failed to reset password: ' + err.message);
           } finally {
-            btn.disabled = false;
-            btn.innerHTML = origHtml;
+            resetBtn.disabled = false;
+            resetBtn.innerHTML = origHtml;
           }
         }
-      };
-    });
+        return;
+      }
 
-    // Delete student with comprehensive warning & cascade purge
-    container.querySelectorAll('.btn-delete-student').forEach(btn => {
-      btn.onclick = () => {
-        openDeleteStudentModal(btn.dataset.id);
-      };
+      // Delete student with comprehensive warning & cascade purge
+      const deleteBtn = e.target.closest('.btn-delete-student');
+      if (deleteBtn) {
+        openDeleteStudentModal(deleteBtn.dataset.id);
+        return;
+      }
     });
   }
 
@@ -8600,10 +8623,19 @@ const inputRoll = modalEl.querySelector('#deleteConfirmRollInput')?.value.trim()
       const allTransactions = [];
       const processedReceiptNos = new Set();
 
+      // Pre-index master receipts by student_id/rollNo/UUID in a single O(M) pass
+      const masterReceiptsByStudent = new Map();
+      masterReceipts.forEach(r => {
+        if (!isRealCollectedPayment(r)) return;
+        const rStuId = (r.student_id || r.studentId || '').toString().toLowerCase();
+        if (rStuId) {
+          if (!masterReceiptsByStudent.has(rStuId)) masterReceiptsByStudent.set(rStuId, []);
+          masterReceiptsByStudent.get(rStuId).push(r);
+        }
+      });
+
       // Per-collector tallies, one bucket per roster member plus one for
-      // receipts that never recorded who took the money. This replaces six
-      // standalone counters that could only ever split the books two ways, so
-      // every rupee Aditi Singh collected was reported as Prof. Ravi Ranjan's.
+      // receipts that never recorded who took the money.
       const facultyRoster = (ACADEMIC && ACADEMIC.FACULTY) || [];
       const UNATTRIBUTED = '__unattributed__';
       const collectorTally = new Map();
@@ -8648,28 +8680,29 @@ const inputRoll = modalEl.querySelector('#deleteConfirmRollInput')?.value.trim()
           }
         });
 
-        // 1.2 Process matched entries from masterReceipts (ONLY Genuine Monetary Payments)
-        masterReceipts.forEach(r => {
-          if (isRealCollectedPayment(r)) {
-            const rStuId = (r.student_id || r.studentId || '').toString().toLowerCase();
-            const rNo = (r.receipt_no || r.receiptNo || '').toString();
-            const isMatch = (sUuid && rStuId === sUuid) || (sId && rStuId === sId) || (sRoll && rStuId === sRoll) || (sRoll && rNo.includes(sRoll));
-            if (isMatch && rNo && !processedReceiptNos.has(rNo)) {
-              processedReceiptNos.add(rNo);
-              const amt = Number(r.amount) || 0;
-              studentCollectedSum += amt;
-              studentTxList.push({
-                receiptNo: rNo,
-                date: r.payment_date || r.date || 'N/A',
-                studentName: s.name,
-                rollNo: s.rollNo || s.roll_no || s.student_id,
-                className: s.className || s.class_name,
-                amount: amt,
-                mode: r.payment_mode || r.mode || 'Cash at Counter',
-                collector: r.collected_by || r.by || '',
-                note: r.note || 'Tuition Fee Payment'
-              });
-            }
+        // 1.2 Process matched entries from pre-indexed masterReceipts (O(1) Map lookup)
+        const candidateReceipts = [
+          ...(sUuid ? (masterReceiptsByStudent.get(sUuid) || []) : []),
+          ...(sId && sId !== sUuid ? (masterReceiptsByStudent.get(sId) || []) : []),
+          ...(sRoll && sRoll !== sId && sRoll !== sUuid ? (masterReceiptsByStudent.get(sRoll) || []) : [])
+        ];
+        candidateReceipts.forEach(r => {
+          const rNo = (r.receipt_no || r.receiptNo || '').toString();
+          if (rNo && !processedReceiptNos.has(rNo)) {
+            processedReceiptNos.add(rNo);
+            const amt = Number(r.amount) || 0;
+            studentCollectedSum += amt;
+            studentTxList.push({
+              receiptNo: rNo,
+              date: r.payment_date || r.date || 'N/A',
+              studentName: s.name,
+              rollNo: s.rollNo || s.roll_no || s.student_id,
+              className: s.className || s.class_name,
+              amount: amt,
+              mode: r.payment_mode || r.mode || 'Cash at Counter',
+              collector: r.collected_by || r.by || '',
+              note: r.note || 'Tuition Fee Payment'
+            });
           }
         });
 
