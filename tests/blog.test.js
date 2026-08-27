@@ -164,5 +164,13 @@ export function runBlogTests(assert) {
     'T25.58: increment_blog_views supports case-insensitive and trimmed slug matching');
   assert(appSrc.includes("increment_blog_views") && appSrc.includes("saveBlogViewsMap"),
     'T25.59: app.js invokes atomic RPC and updates local storage view map');
+
+  // --- 14. Blog Markdown Studio Toolbar, Guide & Metrics -----------------------
+  assert(portalSrc.includes('class="blog-md-studio"') && portalSrc.includes('class="blog-md-toolbar"'),
+    'T25.60: portal.js embeds rich .blog-md-studio container and .blog-md-toolbar for instant one-click markdown formatting');
+  assert(portalSrc.includes('id="btnBlogToggleGuide"') && portalSrc.includes('id="blogMdGuidePanel"'),
+    'T25.61: portal.js includes interactive collapsible markdown cheatsheet and syntax badges');
+  assert(portalSrc.includes('id="btnBlogLoadTemplate"') && portalSrc.includes('id="blogMdStats"'),
+    'T25.62: portal.js provides structured article template loader and live word/character/reading-time metrics');
 }
 

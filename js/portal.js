@@ -13599,10 +13599,96 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
               <img id="blogCoverPreview" src="${escapeHtml(values.cover_image_url)}" alt="" style="${values.cover_image_url ? 'display:block' : 'display:none'}; margin-top:0.7rem; width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:var(--radius-md); border:1px solid var(--border-sand);">
             </div>
             <div class="form-group">
-              <label class="form-label" for="blogEdBody">Article body (Markdown) *</label>
-              <textarea class="form-input" id="blogEdBody" rows="12" style="font-family:ui-monospace,Consolas,monospace; font-size:0.88rem;" placeholder="# Heading&#10;&#10;Paragraph with **bold**, *italics*, - bullets, > quotes.&#10;:::tip&#10;Callout boxes like this one.&#10;:::">${escapeHtml(values.content_markdown)}</textarea>
+              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.45rem;">
+                <label class="form-label" for="blogEdBody" style="margin-bottom:0; font-weight:800; color:var(--text-mahogany);">
+                  <i aria-hidden="true" class="fa-solid fa-feather-pointed" style="color:var(--primary-emerald);"></i> Article Body (Markdown) *
+                </label>
+                <div style="display:flex; align-items:center; gap:0.4rem;">
+                  <button type="button" class="btn btn-sm btn-outline-sage" id="btnBlogToggleGuide" style="padding:0.25rem 0.65rem; font-size:0.78rem; font-weight:700; border-radius:6px;" title="View Markdown syntax cheat sheet">
+                    <i aria-hidden="true" class="fa-solid fa-lightbulb" style="color:#D97706;"></i> Markdown Guide
+                  </button>
+                  <button type="button" class="btn btn-sm blog-md-btn-template" id="btnBlogLoadTemplate" style="padding:0.25rem 0.65rem; font-size:0.78rem; border-radius:6px;" title="Insert a pre-formatted article outline">
+                    <i aria-hidden="true" class="fa-solid fa-file-lines"></i> Load Template
+                  </button>
+                </div>
+              </div>
+
+              <!-- Markdown Writing Studio Container -->
+              <div class="blog-md-studio">
+                <!-- Interactive Quick Formatting Toolbar -->
+                <div class="blog-md-toolbar">
+                  <div class="blog-md-toolbar-group">
+                    <button type="button" class="blog-md-btn" data-md-action="h1" title="Main Heading (# Title)"><i aria-hidden="true" class="fa-solid fa-heading"></i> 1</button>
+                    <button type="button" class="blog-md-btn" data-md-action="h2" title="Section Heading (## Section)"><i aria-hidden="true" class="fa-solid fa-heading"></i> 2</button>
+                    <button type="button" class="blog-md-btn" data-md-action="h3" title="Sub-section (### Sub-section)"><i aria-hidden="true" class="fa-solid fa-heading"></i> 3</button>
+                  </div>
+                  <div class="blog-md-toolbar-group">
+                    <button type="button" class="blog-md-btn" data-md-action="bold" title="Bold (**bold text**)"><i aria-hidden="true" class="fa-solid fa-bold"></i></button>
+                    <button type="button" class="blog-md-btn" data-md-action="italic" title="Italic (*italic text*)"><i aria-hidden="true" class="fa-solid fa-italic"></i></button>
+                    <button type="button" class="blog-md-btn" data-md-action="code" title="Inline Code (&grave;code&grave;)"><i aria-hidden="true" class="fa-solid fa-code"></i></button>
+                  </div>
+                  <div class="blog-md-toolbar-group">
+                    <button type="button" class="blog-md-btn" data-md-action="bullet" title="Bullet List (- item)"><i aria-hidden="true" class="fa-solid fa-list-ul"></i></button>
+                    <button type="button" class="blog-md-btn" data-md-action="numbered" title="Numbered List (1. item)"><i aria-hidden="true" class="fa-solid fa-list-ol"></i></button>
+                    <button type="button" class="blog-md-btn" data-md-action="quote" title="Quote (> inspiring quote)"><i aria-hidden="true" class="fa-solid fa-quote-left"></i></button>
+                  </div>
+                  <div class="blog-md-toolbar-group">
+                    <button type="button" class="blog-md-btn blog-md-btn-callout-tip" data-md-action="tip" title="Insert Tip Callout Box (:::tip ... :::)"><i aria-hidden="true" class="fa-solid fa-lightbulb"></i> Tip Box</button>
+                    <button type="button" class="blog-md-btn blog-md-btn-callout-info" data-md-action="info" title="Insert Info Callout Box (:::info ... :::)"><i aria-hidden="true" class="fa-solid fa-circle-info"></i> Info Box</button>
+                    <button type="button" class="blog-md-btn blog-md-btn-callout-warn" data-md-action="warn" title="Insert Warning Box (:::warn ... :::)"><i aria-hidden="true" class="fa-solid fa-triangle-exclamation"></i> Warning</button>
+                  </div>
+                  <div class="blog-md-toolbar-group">
+                    <button type="button" class="blog-md-btn" data-md-action="link" title="Insert Hyperlink [Text](URL)"><i aria-hidden="true" class="fa-solid fa-link"></i> Link</button>
+                    <button type="button" class="blog-md-btn" data-md-action="codeblock" title="Insert Multi-line Code Block"><i aria-hidden="true" class="fa-solid fa-terminal"></i> Code Block</button>
+                  </div>
+                </div>
+
+                <!-- Collapsible Visual Cheatsheet & Guide -->
+                <div id="blogMdGuidePanel" class="blog-md-guide-panel" style="display:none;">
+                  <div style="font-weight:800; color:#0F172A; display:flex; align-items:center; justify-content:space-between;">
+                    <span><i aria-hidden="true" class="fa-solid fa-book-open" style="color:var(--primary-emerald);"></i> Markdown Formatting Cheatsheet <span style="font-weight:400; font-size:0.75rem; color:#64748B;">(Click any syntax badge below to insert)</span></span>
+                    <button type="button" id="btnCloseBlogGuide" style="background:none; border:none; color:#64748B; cursor:pointer; font-size:0.9rem;" title="Close guide"><i aria-hidden="true" class="fa-solid fa-xmark"></i></button>
+                  </div>
+                  <div class="blog-md-guide-grid">
+                    <div class="blog-md-guide-card">
+                      <h5><i aria-hidden="true" class="fa-solid fa-heading" style="color:#0284C7;"></i> Headings</h5>
+                      <span class="blog-md-syntax-badge" data-syntax="# Main Title"># Main Title</span><br>
+                      <span class="blog-md-syntax-badge" data-syntax="## Section Heading">## Section Heading</span><br>
+                      <span class="blog-md-syntax-badge" data-syntax="### Sub-Topic">### Sub-Topic</span>
+                    </div>
+                    <div class="blog-md-guide-card">
+                      <h5><i aria-hidden="true" class="fa-solid fa-font" style="color:#16A34A;"></i> Text Styling</h5>
+                      <span class="blog-md-syntax-badge" data-syntax="**Bold Text**">**Bold Text**</span><br>
+                      <span class="blog-md-syntax-badge" data-syntax="*Italic Text*">*Italic Text*</span><br>
+                      <span class="blog-md-syntax-badge" data-syntax="&#96;Inline Code&#96;">&#96;Inline Code&#96;</span>
+                    </div>
+                    <div class="blog-md-guide-card">
+                      <h5><i aria-hidden="true" class="fa-solid fa-list-check" style="color:#8B5CF6;"></i> Lists &amp; Quotes</h5>
+                      <span class="blog-md-syntax-badge" data-syntax="- Bullet point item">- Bullet point</span><br>
+                      <span class="blog-md-syntax-badge" data-syntax="1. Numbered step item">1. Numbered step</span><br>
+                      <span class="blog-md-syntax-badge" data-syntax="> Inspiring quote or formula">> Quote / Formula</span>
+                    </div>
+                    <div class="blog-md-guide-card">
+                      <h5><i aria-hidden="true" class="fa-solid fa-cube" style="color:#EA580C;"></i> Visual Callout Boxes</h5>
+                      <span class="blog-md-syntax-badge" data-syntax=":::tip&#10;💡 Pro Tip: Practice previous year questions daily.&#10;:::">:::tip (Green Pro-Tip Box)</span><br>
+                      <span class="blog-md-syntax-badge" data-syntax=":::info&#10;ℹ️ Important Notice: Class mock test is on Sunday.&#10;:::">:::info (Blue Info Box)</span><br>
+                      <span class="blog-md-syntax-badge" data-syntax=":::warn&#10;⚠️ Caution: Remember to write SI units in calculations.&#10;:::">:::warn (Amber Warning Box)</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Textarea Editor with rich educational placeholder -->
+                <textarea class="form-input" id="blogEdBody" rows="14" style="font-family:ui-monospace,Consolas,monospace; font-size:0.88rem; border:none; border-radius:0; padding:0.85rem; width:100%; box-sizing:border-box; outline:none; resize:vertical; min-height:220px;" placeholder="# 📚 Article / Chapter Title&#10;&#10;Write your introductory overview here. Highlight **core concepts**, emphasize *key terms*, and provide practical student guidance.&#10;&#10;## 🎯 Key Points to Remember&#10;- Point 1: Essential exam concept&#10;- Point 2: Standard formula or definition&#10;- Point 3: Best practice for solving problems&#10;&#10;:::tip&#10;💡 Exam Tip: Revise high-weightage chapters first for maximum score.&#10;:::&#10;&#10;## 📝 Step-by-Step Problem Solving&#10;1. Write down given variables and units.&#10;2. Apply the relevant standard formula.&#10;3. Double-check your final calculation and unit.&#10;&#10;:::warn&#10;⚠️ Common Mistake: Always convert values to standard SI units before calculating!&#10;:::&#10;&#10;> &quot;Consistent daily revision is the single biggest key to scoring 95%+ in board examinations.&quot;">${escapeHtml(values.content_markdown)}</textarea>
+
+                <!-- Live Metrics Footer -->
+                <div class="blog-md-footer-stats" id="blogMdStats">
+                  <span id="blogWordCount"><i aria-hidden="true" class="fa-solid fa-align-left"></i> 0 words</span>
+                  <span id="blogCharCount">0 characters</span>
+                  <span id="blogReadingTime"><i aria-hidden="true" class="fa-solid fa-clock"></i> ~1 min read</span>
+                </div>
+              </div>
             </div>
-            <div class="form-group">
+            <div class="form-group" style="margin-top:0.9rem;">
               <button type="button" class="btn btn-outline-sage" id="blogPreviewToggle" aria-expanded="false" style="padding:0.45rem 1rem; font-size:0.85rem;">
                 <i aria-hidden="true" class="fa-solid fa-eye"></i> Live Preview
               </button>
@@ -13659,6 +13745,105 @@ Draw rough sketches for Area Under Curves problems — it prevents coordinate si
         icon.className = 'fa-solid fa-cloud-arrow-up';
       }
     }
+
+    // --- Blog Markdown Toolbar, Guide & Metrics Wiring ---
+    const bodyTextarea = modalEl.querySelector('#blogEdBody');
+    const guidePanel = modalEl.querySelector('#blogMdGuidePanel');
+    const toggleGuideBtn = modalEl.querySelector('#btnBlogToggleGuide');
+    const closeGuideBtn = modalEl.querySelector('#btnCloseBlogGuide');
+    const loadTemplateBtn = modalEl.querySelector('#btnBlogLoadTemplate');
+
+    if (toggleGuideBtn && guidePanel) {
+      toggleGuideBtn.addEventListener('click', () => {
+        const isHidden = guidePanel.style.display === 'none';
+        guidePanel.style.display = isHidden ? 'block' : 'none';
+      });
+    }
+    if (closeGuideBtn && guidePanel) {
+      closeGuideBtn.addEventListener('click', () => {
+        guidePanel.style.display = 'none';
+      });
+    }
+
+    function insertAtCursor(prefix, suffix = '', defaultText = '') {
+      if (!bodyTextarea) return;
+      bodyTextarea.focus();
+      const start = bodyTextarea.selectionStart;
+      const end = bodyTextarea.selectionEnd;
+      const selected = bodyTextarea.value.substring(start, end);
+      const textToInsert = selected || defaultText;
+      const replacement = `${prefix}${textToInsert}${suffix}`;
+      
+      bodyTextarea.setRangeText(replacement, start, end, 'select');
+      updateBlogStats();
+    }
+
+    modalEl.querySelectorAll('.blog-md-btn[data-md-action]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const action = btn.dataset.mdAction;
+        switch (action) {
+          case 'h1': insertAtCursor('# ', '', 'Main Heading'); break;
+          case 'h2': insertAtCursor('## ', '', 'Section Title'); break;
+          case 'h3': insertAtCursor('### ', '', 'Sub-section Title'); break;
+          case 'bold': insertAtCursor('**', '**', 'bold text'); break;
+          case 'italic': insertAtCursor('*', '*', 'italic text'); break;
+          case 'code': insertAtCursor('`', '`', 'code snippet'); break;
+          case 'bullet': insertAtCursor('- ', '', 'Bullet item'); break;
+          case 'numbered': insertAtCursor('1. ', '', 'Numbered step'); break;
+          case 'quote': insertAtCursor('> ', '', 'Inspiring quote or faculty note'); break;
+          case 'tip': insertAtCursor(':::tip\n💡 Pro Tip: ', '\n:::\n', 'Write student exam tip here'); break;
+          case 'info': insertAtCursor(':::info\nℹ️ Important Notice: ', '\n:::\n', 'Write important syllabus or test details here'); break;
+          case 'warn': insertAtCursor(':::warn\n⚠️ Caution: ', '\n:::\n', 'Write common mistakes to avoid here'); break;
+          case 'link': insertAtCursor('[', '](https://example.com)', 'Link Title'); break;
+          case 'codeblock': insertAtCursor('```\n', '\n```\n', '// Write code or mathematical proof here'); break;
+        }
+      });
+    });
+
+    modalEl.querySelectorAll('.blog-md-syntax-badge[data-syntax]').forEach(badge => {
+      badge.addEventListener('click', () => {
+        const syntax = badge.dataset.syntax || badge.textContent;
+        insertAtCursor(syntax + '\n');
+      });
+    });
+
+    if (loadTemplateBtn) {
+      loadTemplateBtn.addEventListener('click', () => {
+        if (bodyTextarea.value.trim().length > 0) {
+          if (!confirm('This will append a structured article outline to your editor. Continue?')) {
+            return;
+          }
+        }
+        const template = `# 📚 [Chapter / Strategy Title]\n\nWrite your introductory summary here. You can explain **key concepts**, emphasize *important rules*, and provide practical guidance for students.\n\n## 🎯 Key Points to Master\n- Point 1: Fundamental concept or formula\n- Point 2: High-scoring board exam pattern\n- Point 3: Shortcut or mnemonics to remember\n\n:::tip\n💡 Pro Tip: Solve at least 5 previous year numericals from this section daily.\n:::\n\n## 📝 Step-by-Step Problem Solving\n1. Identify and list all given variables with correct units.\n2. State the applicable theorem or formula clearly.\n3. Execute arithmetic step-by-step and underline your final answer.\n\n:::warn\n⚠️ Common Mistake: Always convert units to standard SI units before solving!\n:::\n\n> "Consistency and disciplined daily practice is the true formula for 95%+ in board examinations."\n`;
+        if (bodyTextarea.value.trim().length === 0) {
+          bodyTextarea.value = template;
+        } else {
+          bodyTextarea.value += '\n\n' + template;
+        }
+        updateBlogStats();
+        bodyTextarea.focus();
+      });
+    }
+
+    function updateBlogStats() {
+      if (!bodyTextarea) return;
+      const text = bodyTextarea.value || '';
+      const words = text.trim().split(/\s+/).filter(Boolean).length;
+      const chars = text.length;
+      const readMin = md.estimateReadingMinutes(text);
+
+      const wordEl = modalEl.querySelector('#blogWordCount');
+      const charEl = modalEl.querySelector('#blogCharCount');
+      const readEl = modalEl.querySelector('#blogReadingTime');
+
+      if (wordEl) wordEl.innerHTML = `<i aria-hidden="true" class="fa-solid fa-align-left"></i> ${words} word${words === 1 ? '' : 's'}`;
+      if (charEl) charEl.textContent = `${chars} character${chars === 1 ? '' : 's'}`;
+      if (readEl) readEl.innerHTML = `<i aria-hidden="true" class="fa-solid fa-clock"></i> ~${readMin} min read`;
+    }
+
+    bodyTextarea?.addEventListener('input', updateBlogStats);
+    updateBlogStats();
 
     const previewToggle = modalEl.querySelector('#blogPreviewToggle');
     const previewPane = modalEl.querySelector('#blogPreviewPane');
