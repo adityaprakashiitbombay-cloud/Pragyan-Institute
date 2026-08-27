@@ -691,6 +691,7 @@
   border-bottom: 1px solid var(--border-sand);
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
   flex-shrink: 0;
   min-height: 52px;
   position: relative;
@@ -708,22 +709,33 @@
   align-items: center;
   gap: 0.6rem;
   white-space: nowrap;
-  transition: all var(--transition-fast);
+  transition: color 0.2s cubic-bezier(0.16, 1, 0.3, 1), 
+              background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), 
+              border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), 
+              transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.2s ease;
   flex-shrink: 0;
   cursor: pointer;
   background: transparent;
   border-top: none;
   border-left: none;
   border-right: none;
+  will-change: transform;
 }
 
 .dash-tab-btn i {
   font-size: 1.05rem;
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.2s ease;
 }
 
 .dash-tab-btn:hover {
   color: var(--primary-emerald);
-  background-color: rgba(6, 78, 59, 0.04);
+  background-color: rgba(6, 78, 59, 0.05);
+  transform: translateY(-1px);
+}
+
+.dash-tab-btn:active {
+  transform: scale(0.97);
 }
 
 .dash-tab-btn.active {
@@ -731,6 +743,11 @@
   border-bottom-color: var(--primary-emerald);
   background-color: var(--primary-emerald-lighter);
   font-weight: 700;
+  transform: translateY(-1px);
+}
+
+.dash-tab-btn.active i {
+  transform: scale(1.1);
 }
 
 .tab-badge {
@@ -740,6 +757,7 @@
   font-weight: 700;
   padding: 0.15rem 0.5rem;
   border-radius: var(--radius-full);
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* Tab Content Areas */
@@ -749,13 +767,18 @@
   min-height: 0;
 }
 
-.tab-pane {
+.tab-pane,
+.admin-tab-pane,
+.student-tab-pane {
   display: none;
-  animation: fadeIn 0.3s ease;
 }
 
-.tab-pane.active {
-  display: block;
+.tab-pane.active,
+.admin-tab-pane.active,
+.student-tab-pane.active {
+  display: block !important;
+  animation: tabPaneSmoothFadeSlide 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: opacity, transform;
 }
 
 .tab-pane:not(.active),
@@ -765,6 +788,17 @@
 .student-tab-pane:not(.active),
 .student-tab-pane[hidden] {
   display: none !important;
+}
+
+@keyframes tabPaneSmoothFadeSlide {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes fadeIn {
@@ -4122,12 +4156,21 @@
     cursor: pointer !important;
     touch-action: manipulation !important;
     box-sizing: border-box !important;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+    will-change: transform;
+  }
+
+  .dash-tab-btn:active,
+  .admin-tab-btn:active,
+  .student-tab-btn:active {
+    transform: scale(0.96) !important;
   }
 
   .dash-tab-btn i,
   .admin-tab-btn i,
   .student-tab-btn i {
     font-size: 0.9rem !important;
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
   }
 
   .dash-tab-btn:hover,
@@ -4146,6 +4189,13 @@
     border-bottom: 2px solid var(--primary-emerald, #064E3B) !important;
     font-weight: 800 !important;
     box-shadow: 0 1px 3px rgba(6, 78, 59, 0.12) !important;
+    transform: translateY(-1px) !important;
+  }
+
+  .dash-tab-btn.active i,
+  .admin-tab-btn.active i,
+  .student-tab-btn.active i {
+    transform: scale(1.1) !important;
   }
 
   .badge-count,
