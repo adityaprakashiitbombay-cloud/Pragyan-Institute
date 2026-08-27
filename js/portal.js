@@ -2933,12 +2933,35 @@ const supaPayload = pushableReqs.map(r => ({
       }
     });
 
+    // Pointer drag detection for horizontal scrollable tab bars (prevents touch scrolling from triggering accidental tab switch clicks)
+    let isNavTabsDragging = false;
+    let navTabsStartX = 0;
+    let navTabsStartY = 0;
+
+    document.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('.dashboard-nav-tabs, .portal-nav-bar')) {
+        isNavTabsDragging = false;
+        navTabsStartX = e.clientX;
+        navTabsStartY = e.clientY;
+      }
+    }, { passive: true });
+
+    document.addEventListener('pointermove', (e) => {
+      if (!isNavTabsDragging && (Math.abs(e.clientX - navTabsStartX) > 8 || Math.abs(e.clientY - navTabsStartY) > 8)) {
+        isNavTabsDragging = true;
+      }
+    }, { passive: true });
+
     // Student Dashboard Tab Buttons
     document.addEventListener('click', (e) => {
       const tabBtn = e.target.closest('.student-tab-btn');
       if (tabBtn) {
+        if (isNavTabsDragging) {
+          isNavTabsDragging = false;
+          return;
+        }
         const targetTab = tabBtn.dataset.tab;
-        switchStudentTab(targetTab);
+        switchStudentTab(targetTab, { isUserClick: true });
       }
     });
 
@@ -2946,8 +2969,12 @@ const supaPayload = pushableReqs.map(r => ({
     document.addEventListener('click', (e) => {
       const tabBtn = e.target.closest('.admin-tab-btn');
       if (tabBtn) {
+        if (isNavTabsDragging) {
+          isNavTabsDragging = false;
+          return;
+        }
         const targetTab = tabBtn.dataset.tab;
-        switchAdminTab(targetTab);
+        switchAdminTab(targetTab, { isUserClick: true });
       }
     });
 
@@ -3509,7 +3536,7 @@ function renderStudentDashboard() {
 
     // Preserve and render ONLY the active student tab
     const targetTab = AppState.activeStudentTab || 'details';
-    switchStudentTab(targetTab);
+    switchStudentTab(targetTab, { isBackgroundSync: true });
 
     // Prompt student for mobile/browser push alerts (student-only login policy)
     if (window.PushClient && typeof window.PushClient.renderStudentPrompt === 'function') {
@@ -3518,7 +3545,11 @@ function renderStudentDashboard() {
     }
   }
 
-  function switchStudentTab(tabName) {
+  function switchStudentTab(tabName, options = {}) {
+    const isBackground = Boolean(options.isBackgroundSync);
+    const isUserClick = Boolean(options.isUserClick);
+    const previousTab = AppState.activeStudentTab;
+
     AppState.activeStudentTab = tabName;
     AppState.activeTab = tabName;
 
@@ -3542,9 +3573,9 @@ function renderStudentDashboard() {
       } catch (_) {}
     }
 
-    // Reset content scroll so switching tabs resets to top
+    // Reset content scroll ONLY when user explicitly clicks a DIFFERENT tab
     const contentBody = studentWrapper?.querySelector('.dashboard-content-body');
-    if (contentBody) {
+    if (!isBackground && isUserClick && previousTab && previousTab !== tabName && contentBody) {
       contentBody.scrollTop = 0;
     }
 
@@ -3552,7 +3583,8 @@ function renderStudentDashboard() {
     document.querySelectorAll('.student-tab-btn').forEach(btn => {
       if (btn.dataset.tab === tabName) {
         btn.classList.add('active');
-        if (typeof btn.scrollIntoView === 'function') {
+        // ONLY scrollIntoView when user explicitly clicked a DIFFERENT tab
+        if (!isBackground && isUserClick && previousTab && previousTab !== tabName && typeof btn.scrollIntoView === 'function') {
           btn.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
         }
       } else {
@@ -3575,15 +3607,15 @@ function renderStudentDashboard() {
 
     // Dynamically re-render active student tab
     if (tabName === 'details') {
-      renderStudentDetailsTab();
+      renderStudentDetailsTab(options);
     } else if (tabName === 'batch') {
-      renderStudentBatchTab();
+      renderStudentBatchTab(options);
     } else if (tabName === 'notifications') {
-      renderStudentNotifications();
+      renderStudentNotifications(undefined, options);
     } else if (tabName === 'fees') {
-      renderStudentFeeTab();
+      renderStudentFeeTab(options);
     } else if (tabName === 'community') {
-      renderCommunityChatTab();
+      renderCommunityChatTab(options);
     }
   }
 
@@ -5555,7 +5587,7 @@ function renderStudentDashboard() {
     if (targetTab === 'email' && !isMainAdmin()) {
       targetTab = 'students';
     }
-    switchAdminTab(targetTab);
+    switchAdminTab(targetTab, { isBackgroundSync: true });
   }
 
   /* ==========================================================================
@@ -6384,10 +6416,16 @@ function renderStudentDashboard() {
     updatePendingModalContent();
   }
 
-  function switchAdminTab(tabName) {
+  function switchAdminTab(tabName, options = {}) {
+    const isBackground = Boolean(options.isBackgroundSync);
+    const isUserClick = Boolean(options.isUserClick);
+    const previousTab = AppState.activeAdminTab;
+
     // Access control: Only main admin (Chandan Kumar) can switch to email tab
     if (tabName === 'email' && !isMainAdmin()) {
-      alert('🔒 Access Restricted: Mass Email Dispatch & Invoicing campaigns can only be authorized and dispatched by Main Institute Admin (Chandan Kumar).');
+      if (!isBackground) {
+        alert('🔒 Access Restricted: Mass Email Dispatch & Invoicing campaigns can only be authorized and dispatched by Main Institute Admin (Chandan Kumar).');
+      }
       tabName = 'students';
     }
 
@@ -6427,16 +6465,17 @@ function renderStudentDashboard() {
       }
     }
 
-    // Reset content scroll so switching tabs resets to top
+    // Reset content scroll ONLY when user explicitly clicked a DIFFERENT tab
     const contentBody = adminWrapper?.querySelector('.dashboard-content-body');
-    if (contentBody) {
+    if (!isBackground && isUserClick && previousTab && previousTab !== tabName && contentBody) {
       contentBody.scrollTop = 0;
     }
 
     document.querySelectorAll('.admin-tab-btn').forEach(btn => {
       if (btn.dataset.tab === tabName) {
         btn.classList.add('active');
-        if (typeof btn.scrollIntoView === 'function') {
+        // ONLY scrollIntoView when user explicitly clicked a DIFFERENT tab
+        if (!isBackground && isUserClick && previousTab && previousTab !== tabName && typeof btn.scrollIntoView === 'function') {
           btn.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
         }
       } else {
@@ -6458,29 +6497,29 @@ function renderStudentDashboard() {
 
     // Dynamically re-render active admin tab
     if (tabName === 'students') {
-      renderAdminStudentList();
+      renderAdminStudentList(options);
     } else if (tabName === 'analytics') {
-      renderAdminAnalyticsTab();
+      renderAdminAnalyticsTab(options);
     } else if (tabName === 'email') {
-      renderAdminEmailTab();
+      renderAdminEmailTab(options);
     } else if (tabName === 'requests') {
-      renderAdminRequestsManager();
+      renderAdminRequestsManager(options);
     } else if (tabName === 'post-notice') {
-      renderAdminNoticesManager();
+      renderAdminNoticesManager(options);
     } else if (tabName === 'history') {
-      renderAdminAuditHistoryTab();
+      renderAdminAuditHistoryTab(options);
     } else if (tabName === 'settings') {
-      renderAdminSettingsTab();
+      renderAdminSettingsTab(options);
     } else if (tabName === 'blog') {
-      renderAdminBlogTab();
+      renderAdminBlogTab(options);
     } else if (tabName === 'schedule') {
-      renderAdminScheduleTab();
+      renderAdminScheduleTab(options);
     } else if (tabName === 'batches') {
-      renderAdminBatchesTab();
+      renderAdminBatchesTab(options);
     } else if (tabName === 'push') {
-      renderAdminPushTab();
+      renderAdminPushTab(options);
     } else if (tabName === 'community') {
-      renderCommunityChatTab();
+      renderCommunityChatTab(options);
     }
   }
 
@@ -7110,12 +7149,24 @@ function renderStudentDashboard() {
     return result;
   }
 
-  function renderAdminStudentList() {
+  function renderAdminStudentList(options = {}) {
     const pane = document.getElementById('adminTabPane-students');
     if (!pane) return;
 
     const students = AppState.getStudents();
     const activeFilteredStudents = applyStudentDirectoryFilters(students);
+
+    // Capture previous table and content scroll positions before re-rendering
+    const prevTableResponsive = pane.querySelector('.table-responsive');
+    const savedTableScrollLeft = prevTableResponsive ? prevTableResponsive.scrollLeft : 0;
+    const contentBody = document.querySelector('#adminDashboardContainer .dashboard-content-body');
+    const savedContentScrollTop = contentBody ? contentBody.scrollTop : 0;
+
+    // Check if search input is focused
+    const searchInput = pane.querySelector('#adminSearchStudent');
+    const wasSearchFocused = searchInput && document.activeElement === searchInput;
+    const searchSelectionStart = searchInput?.selectionStart;
+    const searchSelectionEnd = searchInput?.selectionEnd;
 
     pane.innerHTML = `
       <div class="dash-card">
@@ -7168,7 +7219,7 @@ function renderStudentDashboard() {
           </div>
         </div>
 
-        <div class="table-responsive">
+        <div class="table-responsive" id="adminStudentTableResponsive">
           <table class="portal-table">
             <thead>
               <tr>
@@ -7189,10 +7240,35 @@ function renderStudentDashboard() {
       </div>
     `;
 
+    // Restore table horizontal scroll position (so columns don't jump back to "Student ID"!)
+    const newTableResponsive = pane.querySelector('.table-responsive');
+    if (newTableResponsive && savedTableScrollLeft > 0) {
+      newTableResponsive.scrollLeft = savedTableScrollLeft;
+    }
+
+    // Restore vertical content scroll position on background sync
+    if (contentBody && savedContentScrollTop > 0 && options.isBackgroundSync) {
+      contentBody.scrollTop = savedContentScrollTop;
+    }
+
+    // Restore search focus if user was typing
+    if (wasSearchFocused) {
+      const newSearchInput = pane.querySelector('#adminSearchStudent');
+      if (newSearchInput) {
+        newSearchInput.focus();
+        if (searchSelectionStart !== undefined) {
+          newSearchInput.setSelectionRange(searchSelectionStart, searchSelectionEnd);
+        }
+      }
+    }
+
     const updateTable = () => {
       const filtered = applyStudentDirectoryFilters(students);
+      const tableWrap = pane.querySelector('.table-responsive');
+      const savedScroll = tableWrap ? tableWrap.scrollLeft : 0;
       const tbody = pane.querySelector('#adminStudentTableBody');
       if (tbody) tbody.innerHTML = renderStudentTableRows(filtered);
+      if (tableWrap && savedScroll > 0) tableWrap.scrollLeft = savedScroll;
       bindStudentTableActions(pane);
     };
 

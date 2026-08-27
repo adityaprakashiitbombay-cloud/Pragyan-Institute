@@ -162,4 +162,14 @@ export function runClientMoneyAndTouchTests(assert) {
     .map(([id, n]) => `${id}×${n}`);
   assert(dupes.length === 0,
     `T24.22: js/portal.js emits no duplicate element id outside a ternary — getElementById returns the first match, so a handler binds to the wrong pane (found: ${dupes.join(', ') || 'none'})`);
+
+  // ── E. Tab Navigation Drag Protection & Scroll Retention ─────────────────
+  assert(portal.includes('isNavTabsDragging') &&
+         portal.includes('Math.abs(e.clientX - navTabsStartX) > 8'),
+    'T24.23: js/portal.js implements pointer drag distance tracking on nav tabs preventing horizontal swipe/scroll from triggering accidental tab clicks');
+
+  assert(portal.includes('savedTableScrollLeft') &&
+         portal.includes('isBackgroundSync') &&
+         portal.includes('isUserClick'),
+    'T24.24: js/portal.js guards tab switching and table rendering to preserve table horizontal scroll position and prevent unwanted scroll jumps on background sync');
 }
